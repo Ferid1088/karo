@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Protokoll – Karo{% endblock %}
+{% block content %}
+<h1>Protokoll</h1>
+<p class="sub">Jeder Modellaufruf mit Prompt, Antwort, Modell und — beim
+API-Weg — geschätzten Kosten. Zugangsdaten werden vor dem Schreiben
+geschwärzt, und Karo prüft diese Schwärzung beim Start selbst.</p>
+
+<div class="grid2" style="margin-bottom:1.4rem">
+  <dl class="kpi">
+    <dt>Aufrufe diesen Monat</dt>
+    <dd>{{ monat.n }}{% if backend == 'api' %}<span class="note"> ·
+      {{ '%.2f' % (monat.c or 0) }} $</span>{% endif %}</dd>
+  </dl>
+  <dl class="kpi">
+    <dt>Aufrufe gesamt</dt>
+    <dd>{{ gesamt.n }}{% if backend == 'api' %}<span class="note"> ·
+      {{ '%.2f' % (gesamt.c or 0) }} $</span>{% endif %}</dd>
+  </dl>
+</div>
+
+{% if backend == 'abo' %}
+<p class="hint" style="margin-bottom:1.2rem">Zugang über das Claude-Abo — die
+Aufrufe sind im Monatsbeitrag enthalten, deshalb steht hier keine
+Einzelabrechnung.</p>
+{% endif %}
+
+<div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>Zeit</th><th>Zweck</th><th>Weg</th><th>Modell</th><th>Schema</th>
+        <th class="num">ein</th><th class="num">aus</th>
+        {% if backend == 'api' %}<th class="num">Kosten</th>{% endif %}
+        <th class="num">ms</th></tr>
+    </thead>
+    <tbody>
+      {% for r in zeilen %}
+      <tr>
+        <td><a href="/protokoll/{{ r.id }}">{{ r.created_at[5:16] | replace('T', ' ') }}</a></td>
+        <td><code>{{ r.purpose }}</code>{% if r.had_image %} 🖼{% endif %}</td>
+        <td class="klein">{{ r.backend or '–' }}</td>
+        <td class="klein">{{ r.model }}</td>
+        <td>{% if r.schema_ok %}<span class="pill gruen">ok</span>
+            {% else %}<span class="pill rot" title="{{ r.error }}">Fehler</span>{% endif %}</td>
+        <td class="num">{{ r.tokens_in or '–' }}</td>
+        <td class="num">{{ r.tokens_out or '–' }}</td>
+        {% if backend == 'api' %}
+        <td class="num">{{ ('%.4f' % r.cost_usd) if r.cost_usd else '–' }}</td>
+        {% endif %}
+        <td class="num">{{ r.duration_ms or '–' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if not zeilen %}<div class="empty">Noch keine Modellaufrufe.</div>{% endif %}
+{% endblock %}

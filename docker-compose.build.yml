@@ -1,0 +1,23 @@
+# Overlay für einen lokalen Build statt des fertigen Docker-Hub-Images —
+# für die Entwicklung oder um MIT_MP4/MIT_NOTEBOOKLM abzuschalten, ohne auf
+# das nächste veröffentlichte Image zu warten.
+#
+# Nicht direkt aufrufen, sondern über `make up` / `make up-klein`:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml \
+#       up -d --build
+
+services:
+  karo:
+    build:
+      context: .
+      args:
+        # 1 = MP4-Ausgabe mit dabei, 0 = nur Folien mit Stimme (~320 MB).
+        # Der große Sprung auf ~3,9 GB kommt von MIT_NOTEBOOKLM unten, nicht
+        # von diesem Schalter.
+        MIT_MP4: ${KARO_MIT_MP4:-1}
+        # 1 = NotebookLM-Kommandozeile samt Chromium fuer die Anmeldung IM
+        # Browser (Standard: an). 0 = ohne — siehe README, Abschnitt
+        # „NotebookLM“.
+        MIT_NOTEBOOKLM: ${KARO_MIT_NOTEBOOKLM:-1}
+    image: karo:local

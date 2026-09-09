@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+{% set show_nav = cfg.setup_complete %}
+{% block title %}Einrichtung – Karo{% endblock %}
+{% block mainclass %}narrow{% endblock %}
+
+{% block content %}
+<h1>{{ 'Einstellungen' if cfg.setup_complete else 'Karo einrichten' }}</h1>
+<p class="sub">Ihre Zugangsdaten bleiben auf diesem Rechner. Sie werden nicht an
+den Hersteller übertragen und stehen weder im Programm noch in den Protokollen.</p>
+
+{% if not cfg.setup_complete %}
+<div class="steps">
+  <span class="{{ 'on' if schritt == 'start' }}">1 · Zugang</span>
+  <span class="{{ 'on' if schritt == 'modell' }}">2 · Modell, Ausgabe, Passwort</span>
+</div>
+{% endif %}
+
+{% if schritt == 'start' %}
+<form method="post" action="/setup/credentials">
+  {{ csrf_input() }}
+
+  <div class="card">
+    <h3>Wie soll Karo Claude erreichen?</h3>
+
+    <label class="wahl">
+      <input type="radio" name="backend" value="abo" id="w-abo"
+             {{ 'checked' if cfg.llm_backend != 'api' }}>
+      <span>
+        <b>Mit Ihrem Claude-Abo</b> — 20 €/Monat, kein API-Guthaben nötig
+        <em>Karo ruft die Claude-Code-CLI mit einem Token auf, den Sie einmal
+        selbst erzeugen. Für die eigene Familie der einfachste Weg.</em>
+      </span>
+    </label>
+
+    <label class="wahl">
+      <input type="radio" name="backend" value="api" id="w-api"
+             {{ 'checked' if cfg.llm_backend == 'api' }}>
+      <span>
+        <b>Mit einem Anthropic-API-Schlüssel</b> — Abrechnung pro Aufruf
+        <em>Bei einem Kind rund ein Euro im Monat. Der Weg, der auch dann
+        gilt, wenn Karo an andere Haushalte weitergegeben wird.</em>
+      </span>
+    </label>
+
+    <div class="msg warn" style="margin-top:1rem">
+      <b>Zum Weitergeben:</b> Anthropic erlaubt Entwicklern nicht, das eigene
+      claude.ai-Konto für ein Produkt anzubieten. Wenn Ihr Freund Karo mit
+      <em>seinem eigenen</em> Abo und <em>seinem eigenen</em> Token benutzt,
+      ist das etwas anderes — er verbraucht sein Kontingent, nicht Ihres. Für
+      ein verkauftes Produkt bleibt der API-Schlüssel der vorgesehene Weg.
+    </div>
+  </div>
+
+  <div class="card" id="feld-abo">
+    <h3>Token aus dem Abo</h3>
+    <p class="hint">So kommen Sie an den Token — einmal am Rechner, im Terminal:</p>
+    <pre>npm install -g @anthropic-ai/claude-code   <span class="c-com"># falls noch nicht da</span>
+claude auth login                          <span class="c-com"># mit Ihrem Abo anmelden</span>
+claude setup-token                         <span class="c-com"># Token wird angezeigt</span></pre>
+    <div class="field" style="margin-top:.8rem">
+      <label for="token">Abo-Token</label>
+      <input type="password" id="token" name="token" autocomplete="off"
+             placeholder="sk-ant-oat...">
+      <p class="hint">Der Token wird sofort mit einem echten Aufruf geprüft und
+      nur bei Erfolg gespeichert.</p>
+    </div>
+    {% if cli_vorhanden %}
+      <div class="msg ok">Die Claude-Code-CLI ist im Container vorhanden
+      (<code>{{ cli_pfad }}</code>).</div>
+    {% else %}
+      <div class="msg err">Die Claude-Code-CLI fehlt im Container. Bitte das
+      Image neu bauen (<code>make up</code>) — dabei wird sie mitinstalliert.
+      Ohne sie funktioniert nur der API-Weg.</div>
+    {% endif %}
+  </div>
+
+  <div class="card" id="feld-api">
+    <h3>API-Schlüssel</h3>
+    <div class="field">
+      <label for="api_key">Anthropic-API-Schlüssel</label>
+      <input type="password" id="api_key" name="api_key" autocomplete="off"
+             placeholder="sk-ant-api03-...">
+      <p class="hint">Zu holen unter <code>console.anthropic.com</code> →
+      API Keys.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Wer lernt hier?</h3>
+    <div class="row">
+      <div class="field">
+        <label for="learner_name">Vorname</label>
+        <input type="text" id="learner_name" name="learner_name" maxlength="60"
+               value="{{ cfg.learner_name }}">
+        <p class="hint">Bleibt lokal. Karo benutzt ihn, um genau diesen Namen
+        aus allem zu entfernen, was an das Modell geht.</p>
+      </div>
+      <div class="field" style="flex:0 0 130px">
+        <label for="grade">Klassenstufe</label>
+        <input type="number" id="grade" name="grade" min="1" max="13"
+               value="{{ cfg.learner_grade }}">
+      </div>
+      <div class="field">
+        <label for="subject">Fach</label>
+        <input type="text" id="subject" name="subject" maxlength="60"
+               value="{{ cfg.subject }}">
+      </div>
+    </div>
+  </div>
+
+  <button type="submit">Verbindung prüfen</button>
+</form>
+
+<script>
+  // Nur das Feld zeigen, das zum gewählten Weg gehört.
+  function umschalten() {
+    const abo = document.getElementById("w-abo").checked;
+    document.getElementById("feld-abo").hidden = !abo;
+    document.getElementById("feld-api").hidden = abo;
+  }
+  document.getElementById("w-abo").addEventListener("change", umschalten);
+  document.getElementById("w-api").addEventListener("change", umschalten);
+  umschalten();
+</script>
+
+{% else %}
+<div class="card" id="claude-verbindung">
+  <h3>Claude-Verbindung
+    <span class="pill {{ 'gruen' if claude_ok else 'rot' }}">{{ 'verbunden' if claude_ok else 'getrennt' }}</span>
+  </h3>
+  <p class="hint">{{ claude_note }}</p>
+  <form method="post" action="/setup/claude/verbinden">
+    {{ csrf_input() }}
+    <label class="wahl">
+      <input type="radio" name="backend" value="abo" id="v-abo"
+             {{ 'checked' if cfg.llm_backend != 'api' }}>
+      <span><b>Claude-Abo</b> — Token aus <code>claude setup-token</code></span>
+    </label>
+    <label class="wahl">
+      <input type="radio" name="backend" value="api" id="v-api"
+             {{ 'checked' if cfg.llm_backend == 'api' }}>
+      <span><b>Anthropic-API-Schlüssel</b></span>
+    </label>
+
+    <div class="field" id="vfeld-abo" style="margin-top:.8rem">
+      <label for="v-token">Abo-Token
+        <span class="hilfe" tabindex="0"
+              title="Einmal am Rechner im Terminal: „claude setup-token“ ausführen (nach „claude auth login“, falls noch nicht angemeldet). Den kompletten, langlebigen OAuth-Token hier einfügen — er beginnt meist mit „sk-ant-oat...“. Wird sofort mit einem echten Aufruf geprüft und nur bei Erfolg gespeichert.">?</span>
+      </label>
+      <input type="password" id="v-token" name="token" autocomplete="off"
+             placeholder="sk-ant-oat...">
+    </div>
+    <div class="field" id="vfeld-api" style="margin-top:.8rem">
+      <label for="v-api-key">Anthropic-API-Schlüssel
+        <span class="hilfe" tabindex="0"
+              title="Zu holen unter console.anthropic.com → API Keys. Wird sofort mit einem echten Aufruf geprüft und nur bei Erfolg gespeichert.">?</span>
+      </label>
+      <input type="password" id="v-api-key" name="api_key" autocomplete="off"
+             placeholder="sk-ant-api03-...">
+    </div>
+    <button type="submit" style="margin-top:.6rem">Verbinden</button>
+  </form>
+</div>
+<script>
+  (function () {
+    function umschalten() {
+      const abo = document.getElementById("v-abo").checked;
+      document.getElementById("vfeld-abo").hidden = !abo;
+      document.getElementById("vfeld-api").hidden = abo;
+    }
+    document.getElementById("v-abo").addEventListener("change", umschalten);
+    document.getElementById("v-api").addEventListener("change", umschalten);
+    umschalten();
+  })();
+</script>
+
+<div class="card" id="notebooklm-verbindung">
+  <h3>NotebookLM-Verbindung
+    <span class="pill {{ 'gruen' if nlm_ok else 'rot' }}">{{ 'verbunden' if nlm_ok else 'getrennt' }}</span>
+  </h3>
+  <p class="hint">{{ nlm_warnung }}</p>
+  <p class="{{ 'text-gut' if nlm_ok else 'text-warn' }}">{{ nlm_grund }}</p>
+  {% if not nlm_ok %}
+    {% if nlm_login.laeuft %}
+      {% if nlm_login.vnc_bereit %}
+      <em class="warn">Bitte hier im Fenster bei Google anmelden.</em>
+      <iframe src="http://127.0.0.1:{{ nlm_login.novnc_port }}/vnc.html?autoconnect=true&resize=scale&reconnect=true"
+              title="NotebookLM-Anmeldung" style="width:100%;height:520px;
+              margin-top:.5rem;border:1px solid var(--border);
+              border-radius:6px;background:#000"></iframe>
+      <p class="hint" style="margin-top:.4rem">Läuft direkt in Karo — kein
+      separates Fenster nötig. Nach der Anmeldung schließt sich das Fenster
+      hier von selbst.</p>
+      {% else %}
+      <em class="warn">Anmeldung wird vorbereitet — diese Seite in ein paar
+      Sekunden neu laden.</em>
+      {% endif %}
+    {% else %}
+    <form method="post" action="/setup/notebooklm/anmelden">
+      {{ csrf_input() }}
+      <button type="submit" class="quiet">Jetzt anmelden</button>
+    </form>
+    {% if nlm_login.meldung %}
+    <em class="{{ 'text-gut' if nlm_login.ok else 'warn' }}">{{ nlm_login.meldung }}</em>
+    {% endif %}
+    {% endif %}
+  {% endif %}
+</div>
+
+<form method="post" action="/setup/finish">
+  {{ csrf_input() }}
+
+  <div class="card">
+    <h3>Modelle</h3>
+    <p class="hint" style="margin-bottom:.8rem">
+      Zugang über <b>{{ backends.get(cfg.llm_backend, cfg.llm_backend) }}</b>.
+      Für das Lesen der Handschrift lohnt sich das stärkere Modell, für Texte
+      reicht das günstige.
+    </p>
+    {% if modelle %}
+    <div class="row">
+      <div class="field">
+        <label for="model_vision">Handschrift lesen</label>
+        <select id="model_vision" name="model_vision">
+          {% for m in modelle %}
+          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_vision }}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="model_text">Texte erzeugen</label>
+        <select id="model_text" name="model_text">
+          {% for m in modelle %}
+          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_text }}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% else %}
+    <div class="msg warn">Die Modelliste konnte nicht abgerufen werden. Die
+    bisherige Auswahl bleibt: <code>{{ cfg.model_vision or '–' }}</code> /
+    <code>{{ cfg.model_text or '–' }}</code>.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>Wie soll Lernmaterial ausgegeben werden?</h3>
+    <p class="hint" style="margin-bottom:.8rem">Das ist nur die Voreinstellung —
+    bei jeder Lerneinheit können Sie neu wählen.</p>
+    {% for wert, label in ausgabe_labels.items() %}
+    <label class="wahl">
+      <input type="radio" name="default_ausgabe" value="{{ wert }}"
+             {{ 'checked' if cfg.default_ausgabe == wert }}>
+      <span>
+        <b>{{ label }}</b>
+        <em>{{ ausgabe_hints[wert] }}</em>
+        {% if wert == 'mp4' %}
+          <em class="{{ 'gut' if mp4_ok else 'warn' }}">{{ mp4_grund }}</em>
+        {% elif wert == 'notebooklm' %}
+          <em class="{{ 'gut' if nlm_ok else 'warn' }}">{{ nlm_grund }}</em>
+          {% if not nlm_ok %}
+          <em class="warn">Verbindung herstellen: <a href="#notebooklm-verbindung">weiter oben auf dieser Seite</a>.</em>
+          {% endif %}
+        {% endif %}
+      </span>
+    </label>
+    {% endfor %}
+
+    <div class="field" style="margin-top:1rem">
+      <label for="tts_stimme">Stimme für die MP4-Ausgabe</label>
+      <select id="tts_stimme" name="tts_stimme">
+        {% for wert, label in stimmen.items() %}
+        <option value="{{ wert }}" {{ 'selected' if cfg.tts_stimme == wert }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="hint">Der HTML-Modus benutzt die Stimme Ihres Betriebssystems
+      und braucht das hier nicht.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Lernzyklus und Recherche</h3>
+    <div class="row">
+      <div class="field" style="flex:0 0 190px">
+        <label for="max_lernrunden">Runden je Thema, höchstens</label>
+        <input type="number" id="max_lernrunden" name="max_lernrunden"
+               min="1" max="8" value="{{ cfg.max_lernrunden }}">
+        <p class="hint">Danach hört Karo auf — an dieser Stelle hilft ein
+        Mensch mehr als eine vierte Erklärung.</p>
+      </div>
+      <div class="field">
+        <label for="recherche">Im Netz nach Lernmaterial suchen</label>
+        <select id="recherche" name="recherche">
+          <option value="ja" {{ 'selected' if cfg.recherche_erlaubt }}>ja, auf geprüften Schulseiten</option>
+          <option value="nein" {{ 'selected' if not cfg.recherche_erlaubt }}>nein, nur eigenes Material</option>
+        </select>
+        <p class="hint">Funde erscheinen als Vorschlag und müssen freigegeben
+        werden. Die Fakten kommen immer aus Ihrem Schulmaterial.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Blätter und Ablage</h3>
+    {% if drive_ok and drive_writable %}
+      <div class="msg ok">Drive-Ordner gefunden: <code>{{ drive_path }}</code></div>
+    {% elif drive_ok %}
+      <div class="msg warn">Ordner gefunden, aber nicht beschreibbar:
+      <code>{{ drive_path }}</code>.</div>
+    {% else %}
+      <div class="msg warn">Unter <code>{{ drive_path }}</code> ist kein
+      nutzbarer Ordner eingehängt. Karo funktioniert trotzdem — Blätter laden
+      Sie dann direkt hoch. Zum Nachrüsten <code>KARO_DRIVE_PATH</code> in der
+      <code>.env</code> setzen und neu starten.</div>
+    {% endif %}
+    {% if not heif_ok %}
+      <div class="msg warn">HEIC-Dateien können nicht gelesen werden. Am iPhone
+      unter Einstellungen › Kamera › Formate auf „Maximale Kompatibilität“
+      stellen.</div>
+    {% endif %}
+    {% if not xlsx_ok %}
+      <div class="msg warn">Der Tabellenexport (Lernstand.xlsx) ist nicht
+      verfügbar — <code>openpyxl</code> fehlt im Image.</div>
+    {% endif %}
+
+    <div class="field" style="margin-top:1rem">
+      <label for="header_crop">Oberen Blattrand abschneiden</label>
+      <select id="header_crop" name="header_crop">
+        {% for wert, label in [(0, 'nicht abschneiden'),
+                               (8, '8 % – üblicher Namensbereich'),
+                               (12, '12 % – breiter Kopf'),
+                               (18, '18 % – sehr breiter Kopf')] %}
+        <option value="{{ wert }}" {{ 'selected' if cfg.header_crop_percent == wert }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="hint">Auf deutschen Arbeitsblättern steht oben der Name. Was
+      hier abgeschnitten wird, verlässt den Rechner nicht. Antwortblätter
+      werden nie beschnitten.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Passwort für diese Instanz</h3>
+    <div class="row">
+      <div class="field">
+        <label for="password">{{ 'Neues Passwort' if cfg.has_password else 'Passwort' }}</label>
+        <input type="password" id="password" name="password"
+               autocomplete="new-password" {{ '' if cfg.has_password else 'required' }}>
+      </div>
+      <div class="field">
+        <label for="password2">Wiederholen</label>
+        <input type="password" id="password2" name="password2"
+               autocomplete="new-password">
+      </div>
+    </div>
+    <p class="hint">
+      {% if cfg.has_password %}Leer lassen, um das bestehende Passwort zu behalten.
+      {% else %}Pflichtfeld, mindestens {{ min_password }} Zeichen.{% endif %}
+      Karo ist nur von diesem Rechner aus erreichbar — das Passwort schützt vor
+      anderen Personen, die an demselben Rechner sitzen.
+    </p>
+  </div>
+
+  <div class="actions">
+    <button type="submit">{{ 'Speichern' if cfg.setup_complete else 'Einrichtung abschließen' }}</button>
+  </div>
+</form>
+
+<form method="post" action="/setup/reset" style="margin-top:1rem"
+      onsubmit="return confirm('Zugangsdaten wirklich löschen? Die Lerndaten bleiben erhalten.')">
+  {{ csrf_input() }}
+  <button type="submit" class="quiet">Zugangsdaten löschen und neu eingeben</button>
+</form>
+{% endif %}
+{% endblock %}

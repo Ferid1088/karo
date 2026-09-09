@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Themen – Karo{% endblock %}
+{% block content %}
+<h1>Themen</h1>
+<p class="sub">Die Einheit, in der Karo bewertet und lehrt. Themen kommen aus
+Ihrem Schulmaterial — freigegeben werden sie von Ihnen.</p>
+
+{% if vorschlaege %}
+<h2>Vorschläge <span class="badge">{{ vorschlaege | length }}</span></h2>
+<p class="hint">Karo hat diese Themen im eingelesenen Material gefunden. Namen
+lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
+<form method="post" action="/themen/entscheiden">
+  {{ csrf_input() }}
+  {% for t in vorschlaege %}
+  <div class="item">
+    <div class="pos">{{ t.code }}</div>
+    <div class="field" style="margin-bottom:.5rem">
+      <input type="text" name="label_{{ t.id }}" value="{{ t.label }}"
+             maxlength="200">
+    </div>
+    {% if t.beschreibung %}<p class="grund">{{ t.beschreibung }}</p>{% endif %}
+    <div class="seg">
+      <label><input type="radio" name="aktion_{{ t.id }}" value="aktiv" checked>
+        <span>übernehmen</span></label>
+      <label><input type="radio" name="aktion_{{ t.id }}" value="abgelehnt">
+        <span>verwerfen</span></label>
+    </div>
+  </div>
+  {% endfor %}
+  <div class="actions" style="margin-top:1rem">
+    <button type="submit">Entscheidungen speichern</button>
+  </div>
+</form>
+{% endif %}
+
+<h2>Freigegebene Themen</h2>
+{% if aktive %}
+<div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>Thema</th><th>Flagge</th><th>Verlauf</th><th class="num">richtig</th>
+        <th>häufigster Fehler</th><th>nächster Schritt</th></tr>
+    </thead>
+    <tbody>
+      {% for t in aktive %}
+      <tr>
+        <td>
+          <strong>{{ t.label }}</strong><br>
+          <span class="klein">{{ t.code }}
+            {% if t.lehr_quellen %}· {{ t.lehr_quellen }} Quellen{% elif t.quellen %}
+            · <span style="color:var(--warn)">nur Aufgaben, keine Erklärung</span>{% else %}
+            · <span style="color:var(--warn)">kein eigenes Material</span>{% endif %}</span>
+        </td>
+        <td>{{ flagge(t.flag) }}<br>
+          <span class="klein">{{ t.begruendung or '' }}</span></td>
+        <td>
+          <div class="verlauf">
+            {% for o in t.verlauf %}
+              <span class="dot {{ 'r' if o.richtig else ('k' if o.fehlertyp in ('konzeptfehler','regel_vergessen') else 'f') }}"
+                    title="{{ o.beantwortet_am }} – {{ 'richtig' if o.richtig else error_labels.get(o.fehlertyp, 'falsch') }}"></span>
+            {% else %}<span class="klein">noch nichts</span>{% endfor %}
+          </div>
+        </td>
+        <td class="num">{{ t.richtig }}/{{ t.antworten }}</td>
+        <td class="klein">{{ error_labels.get(t.haupt_fehler, '–') }}</td>
+        <td>
+          {% if t.offene_lesson %}
+            <a class="btn" href="/lernen/{{ t.offene_lesson }}">Lerneinheit öffnen</a>
+          {% else %}
+          <div class="actions" style="gap:.4rem">
+            <form method="post" action="/themen/{{ t.id }}/pruefen" class="actions"
+                  style="gap:.3rem">
+              {{ csrf_input() }}
+              <select name="modus" class="mini">
+                <option value="bildschirm">am Bildschirm</option>
+                <option value="papier">auf Papier</option>
+              </select>
+              <button type="submit" class="quiet">prüfen</button>
+            </form>
+            {% if t.flag in ('rot', 'gelb') %}
+              <form method="post" action="/themen/{{ t.id }}/lernen" class="actions"
+                    style="gap:.3rem">
+                {{ csrf_input() }}
+                <select name="ausgabe" class="mini">
+                  {% for wert, label in ausgabe_labels.items() %}
+                  <option value="{{ wert }}" {{ 'selected' if cfg.default_ausgabe == wert }}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit">erklären</button>
+              </form>
+              {% if not t.lehr_quellen %}
+              <span class="klein" style="color:var(--warn)">Kein eigenes Material — auf der nächsten Seite im Netz suchen oder erst ein Erklärblatt einlesen.</span>
+              {% endif %}
+            {% endif %}
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="hint" style="margin-top:1rem">
+  Grün = richtig · Orange = Verständnisfehler · Rot = anderer Fehler.
+  Ältestes links. Eine einzelne falsche Antwort ändert die Flagge nie.
+</p>
+{% else %}
+<div class="empty">Noch keine freigegebenen Themen.
+  {% if not vorschlaege %}
+  <p class="klein">Legen Sie zuerst ein Blatt in die
+  <a href="/wissen">Wissensbasis</a> — daraus schlägt Karo Themen vor.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:2rem">
+  <h3>Thema selbst anlegen</h3>
+  <form method="post" action="/themen/neu" class="row">
+    {{ csrf_input() }}
+    <div class="field" style="flex:2 1 280px">
+      <label for="label">Name</label>
+      <input type="text" id="label" name="label" maxlength="200"
+             placeholder="Brüche mit verschiedenen Nennern addieren" required>
+    </div>
+    <div class="field" style="flex:2 1 280px">
+      <label for="beschreibung">Was das Kind können muss</label>
+      <input type="text" id="beschreibung" name="beschreibung" maxlength="500">
+    </div>
+    <div class="field" style="flex:0 0 auto">
+      <button type="submit" class="ghost">Anlegen</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

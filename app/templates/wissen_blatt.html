@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.source_name }} – Karo{% endblock %}
+{% block content %}
+<h1>{{ doc.source_name }}</h1>
+<p class="sub">{{ doc.captured_on or '' }} · {{ doc.doc_type or 'Typ unbekannt' }}
+{% if doc.note %} · {{ doc.note }}{% endif %}
+{% if doc.themenname %} · Themenname beim Hochladen: „{{ doc.themenname }}“{% endif %}</p>
+
+<div class="review">
+  <div class="scanbox">
+    <img src="/scan/{{ doc.id }}.jpg" alt="Gescanntes Blatt">
+    <p class="hint">Genau dieses Bild wurde an das Modell gesendet — bereits
+    zugeschnitten und verkleinert.</p>
+  </div>
+  <div>
+    {% for a in abschnitte %}
+    <div class="item">
+      <div class="pos">{{ a.art }}{% if a.thema_label %} · {{ a.thema_label }}
+        {% elif a.thema_hinweis %} · {{ a.thema_hinweis }}{% endif %}</div>
+      {% if a.titel %}<p class="aufgabe">{{ a.titel }}</p>{% endif %}
+      <div class="antwort">{{ a.text }}</div>
+    </div>
+    {% else %}
+    <div class="empty">Auf diesem Blatt wurde kein Abschnitt erkannt.
+      <p class="klein">Meist liegt es an der Bildqualität: Blatt flach
+      hinlegen, von oben fotografieren, keine Schatten.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+<p style="margin-top:1.4rem"><a href="/wissen">← zurück zur Wissensbasis</a></p>
+{% endblock %}

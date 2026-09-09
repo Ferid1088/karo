@@ -1,0 +1,51 @@
+# Karo — läuft ausschließlich auf dem Rechner der Familie.
+#
+# Diese Datei lädt das fertige Image von Docker Hub (farid1088/karo) — kein
+# Quellcode und kein lokaler Build nötig, funktioniert genauso auf Intel/AMD
+# (Windows, die meisten Macs) wie auf Apple Silicon: das Image wird für beide
+# Architekturen veröffentlicht, Docker wählt beim Pull automatisch die
+# passende. Wer lieber selbst baut (z. B. um MIT_MP4/MIT_NOTEBOOKLM
+# abzuschalten), nimmt stattdessen docker-compose.build.yml — siehe
+# `make up` / `make up-klein` im Makefile.
+#
+# Vor dem ersten Start eine Datei `.env` neben dieser hier anlegen und darin
+# den Pfad zum Google-Drive-Ordner setzen:
+#
+#   KARO_DRIVE_PATH=/Users/name/Library/CloudStorage/GoogleDrive-.../Meine Ablage/Karo
+#
+# Dann:  docker compose up -d   und  http://127.0.0.1:8080  im Browser öffnen.
+
+services:
+  karo:
+    image: farid1088/karo:latest
+    container_name: karo
+
+    ports:
+      # An 127.0.0.1 gebunden: die App ist aus dem Netzwerk nicht erreichbar.
+      - "127.0.0.1:8080:8080"
+      # noVNC-Brücke für die NotebookLM-Anmeldung im Browser — auch nur auf
+      # 127.0.0.1, und der Container hört dort ohnehin nur, während gerade
+      # eine Anmeldung läuft (siehe app/media/notebooklm.py).
+      - "127.0.0.1:6080:6080"
+
+    volumes:
+      # Datenbank, Blätter, Zugangsdaten. Bleibt auf diesem Rechner.
+      - karo-data:/data
+      # Der Google-Drive-Ordner, den der Drive-Desktop-Client synchronisiert.
+      - ${KARO_DRIVE_PATH:-./drive-lokal}:/drive
+      # NotebookLM-Sitzung (optional): einmalig auf diesem Rechner mit
+      # `notebooklm login` erzeugt — siehe README, Abschnitt „NotebookLM“.
+      # Als Ordner gemountet, nicht ins karo-data-Volume gelegt, damit sie
+      # sich ohne Container-Zugriff erneuern lässt.
+      - ${KARO_NOTEBOOKLM_HOME:-./notebooklm-lokal}:/data/notebooklm
+
+    environment:
+      - KARO_LOG_LEVEL=INFO
+      - KARO_DRIVE_PATH=${KARO_DRIVE_PATH:-}
+      - TZ=Europe/Berlin
+      - CLAUDE_CODE_MAX_OUTPUT_TOKENS=4096
+
+    restart: unless-stopped
+
+volumes:
+  karo-data:

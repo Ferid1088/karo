@@ -1,0 +1,28 @@
+# Zugangsdaten und Nutzerdaten gehören niemals in das Repository.
+.env
+.env.*
+!.env.example
+config.json
+*.key
+session.key
+data/
+drive-lokal/
+# NotebookLM-Sitzung (Cookies eines echten Google-Logins) — niemals ins Repo.
+notebooklm-lokal/
+*.db
+*.db-wal
+*.db-shm
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+karo-py310/
+karo/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+
+# Sicherungen enthalten config.json und session.key
+sicherung/
+*.tar.gz

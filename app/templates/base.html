@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="same-origin">
+  <title>{% block title %}Karo{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Comic+Neue:wght@400;700&display=swap">
+  <link rel="stylesheet" href="/static/karo.css?v={{ asset_version|default('0') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📐</text></svg>">
+</head>
+<body>
+{% macro csrf_input() -%}
+<input type="hidden" name="{{ csrf_field }}" value="{{ csrf }}">
+{%- endmacro %}
+
+{% macro flagge(wert) -%}
+<span class="pill {{ wert }}">{{ flag_labels.get(wert, wert) }}</span>
+{%- endmacro %}
+
+{% if show_nav|default(true) %}
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="/">Ka<span>ro</span></a>
+    <nav class="main">
+      <a href="/" class="{{ 'on' if path == '/' }}">Übersicht</a>
+      <a href="/themen" class="{{ 'on' if path.startswith('/themen') }}">Themen
+        {% if offene_vorschlaege %}<b class="badge">{{ offene_vorschlaege }}</b>{% endif %}
+      </a>
+      <a href="/wissen" class="{{ 'on' if path.startswith('/wissen') }}">Wissensbasis</a>
+      <a href="/recherche" class="{{ 'on' if path.startswith('/recherche') }}">Recherche
+        {% if offene_funde %}<b class="badge">{{ offene_funde }}</b>{% endif %}
+      </a>
+      <a href="/klassenarbeit" class="{{ 'on' if path.startswith('/klassenarbeit') }}">Klassenarbeit</a>
+      <a href="/protokoll" class="{{ 'on' if path.startswith('/protokoll') }}">Protokoll</a>
+    </nav>
+    <div class="spacer"></div>
+    <a href="/setup" class="leise">Einstellungen</a>
+    <form method="post" action="/logout" style="display:inline">
+      {{ csrf_input() }}
+      <button type="submit" class="linklike">Abmelden</button>
+    </form>
+  </div>
+</header>
+{% endif %}
+
+<main class="{% block mainclass %}{% endblock %}">
+  {% set flash_msg = request.session.pop('flash', None) %}
+  {% set flash_kind = request.session.pop('flash_kind', 'ok') %}
+  {% if flash_msg %}<div class="msg {{ flash_kind }}">{{ flash_msg }}</div>{% endif %}
+  {% if error %}<div class="msg err">{{ error }}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+{% if show_nav|default(true) %}
+<div class="farbwelten" id="farbwelten" role="group" aria-label="Farbwelt aussuchen">
+  <button type="button" data-farbe="lila" style="background:#4f46e5" title="Zauberlila" aria-label="Zauberlila"></button>
+  <button type="button" data-farbe="ozean" style="background:#0284c7" title="Meeresblau" aria-label="Meeresblau"></button>
+  <button type="button" data-farbe="wiese" style="background:#16a34a" title="Wiesengrün" aria-label="Wiesengrün"></button>
+  <button type="button" data-farbe="sonne" style="background:#ea580c" title="Sonnenschein" aria-label="Sonnenschein"></button>
+  <button type="button" data-farbe="zuckerwatte" style="background:#db2777" title="Zuckerwatte" aria-label="Zuckerwatte"></button>
+  <button type="button" data-farbe="lava" style="background:#dc2626" title="Feuerrot" aria-label="Feuerrot"></button>
+  <button type="button" data-farbe="dunkel" style="background:radial-gradient(circle at 35% 30%, #4c458f 0%, #262353 55%, #1c1a3a 100%)" title="Nachtmodus" aria-label="Nachtmodus"></button>
+</div>
+<script>
+(function () {
+  var SCHLUESSEL = "karo-farbwelt";
+  var knoepfe = document.querySelectorAll("#farbwelten button");
+
+  function anwenden(farbe, animieren) {
+    document.documentElement.setAttribute("data-theme-color", farbe);
+    knoepfe.forEach(function (b) {
+      b.classList.toggle("aktiv", b.dataset.farbe === farbe);
+    });
+    if (animieren) {
+      var aktiv = document.querySelector("#farbwelten button.aktiv");
+      if (aktiv) {
+        aktiv.classList.remove("aktiv");
+        void aktiv.offsetWidth;   // Animation neu anstossen
+        aktiv.classList.add("aktiv");
+      }
+    }
+  }
+
+  var gespeichert = null;
+  try { gespeichert = localStorage.getItem(SCHLUESSEL); } catch (e) {}
+  anwenden(gespeichert || "lila", false);
+
+  knoepfe.forEach(function (b) {
+    b.addEventListener("click", function () {
+      var farbe = b.dataset.farbe;
+      anwenden(farbe, true);
+      try { localStorage.setItem(SCHLUESSEL, farbe); } catch (e) {}
+    });
+  });
+})();
+</script>
+<div class="verbindungen-widget" id="verbindungen-widget">
+  <a class="status" id="status-claude" href="/setup#claude-verbindung">Claude</a>
+  <a class="status" id="status-notebooklm" href="/setup#notebooklm-verbindung">NotebookLM</a>
+</div>
+<div id="verbindung-popup-slot"></div>
+<script>
+(function () {
+  var LABELS = {claude: "Claude", notebooklm: "NotebookLM"};
+  var LINKS = {claude: "/setup#claude-verbindung", notebooklm: "/setup#notebooklm-verbindung"};
+
+  function pillEl(name) { return document.getElementById("status-" + name); }
+
+  function anwenden(name, ok) {
+    var el = pillEl(name);
+    if (!el) return;
+    el.classList.toggle("ok", ok);
+    el.classList.toggle("err", !ok);
+    el.innerHTML = '<span class="punkt"></span>' + LABELS[name];
+  }
+
+  function gelesen(schluessel) {
+    try { return sessionStorage.getItem(schluessel); } catch (e) { return null; }
+  }
+  function geschrieben(schluessel, wert) {
+    try { sessionStorage.setItem(schluessel, wert); } catch (e) {}
+  }
+
+  function zeigePopup(name, note) {
+    var slot = document.getElementById("verbindung-popup-slot");
+    if (!slot || slot.querySelector(".verbindung-popup[data-name='" + name + "']")) return;
+    var div = document.createElement("div");
+    div.className = "verbindung-popup";
+    div.setAttribute("data-name", name);
+    div.innerHTML =
+      "<b>" + LABELS[name] + "-Verbindung getrennt</b>" +
+      "<p>" + (note || "") + " Bitte auf der Seite „Einstellungen“ neu " +
+      "verbinden — die passende Karte steht dort oben.</p>" +
+      "<div class=\"zeilen\">" +
+        "<button type=\"button\">Später</button>" +
+        "<a href=\"" + LINKS[name] + "\">Jetzt öffnen</a>" +
+      "</div>";
+    div.querySelector("button").addEventListener("click", function () { div.remove(); });
+    slot.appendChild(div);
+  }
+
+  function pruefen() {
+    fetch("/verbindungen/status", {headers: {"Accept": "application/json"}})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (daten) {
+        if (!daten) return;
+        ["claude", "notebooklm"].forEach(function (name) {
+          var eintrag = daten[name] || {};
+          var ok = !!eintrag.ok;
+          anwenden(name, ok);
+
+          var warVerbunden = gelesen("verbindung-" + name) === "ok";
+          if (!ok && warVerbunden && gelesen("verbindung-popup-" + name) !== "1") {
+            zeigePopup(name, eintrag.note);
+            geschrieben("verbindung-popup-" + name, "1");
+          }
+          if (ok) {
+            geschrieben("verbindung-popup-" + name, "0");
+          }
+          geschrieben("verbindung-" + name, ok ? "ok" : "err");
+        });
+      })
+      .catch(function () {});
+  }
+
+  pruefen();
+  setInterval(pruefen, 120000);
+})();
+</script>
+{% endif %}
+</body>
+</html>

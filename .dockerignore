@@ -1,0 +1,25 @@
+# Nichts Geheimes und nichts Grosses in den Build-Kontext.
+.env
+.env.*
+config.json
+*.key
+session.key
+data/
+drive-lokal/
+*.db
+*.db-wal
+*.db-shm
+
+.git/
+.gitignore
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+tests/
+README.md
+Makefile
+sicherung/
+*.tar.gz

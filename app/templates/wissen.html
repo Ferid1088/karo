@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Wissensbasis – Karo{% endblock %}
+{% block content %}
+<h1>Wissensbasis</h1>
+<p class="sub">Die Blätter aus dem Unterricht. Sie sind die Faktengrundlage:
+jede Erklärung, die Karo erzeugt, wird gegen genau dieses Material geprüft.</p>
+
+<div class="grid2">
+  <dl class="kpi"><dt>Blätter</dt><dd>{{ kb_stat.blaetter or 0 }}</dd></dl>
+  <dl class="kpi"><dt>Erklärungen &amp; Regeln</dt><dd>{{ kb_stat.lehr or 0 }}</dd></dl>
+  <dl class="kpi"><dt>Aufgaben</dt><dd>{{ kb_stat.aufgaben or 0 }}</dd></dl>
+</div>
+
+<div class="card">
+  <div class="actions">
+    <form method="post" action="/wissen/einlesen">{{ csrf_input() }}
+      <button type="submit">Neue Blätter einlesen</button></form>
+    <form method="post" action="/wissen/upload" enctype="multipart/form-data"
+          class="actions">
+      {{ csrf_input() }}
+      <input type="text" name="themenname" required maxlength="200"
+             placeholder="Themenname, z. B. Bruchrechnung" style="max-width:220px">
+      <input type="file" name="datei" accept="image/*,application/pdf" required
+             style="max-width:220px">
+      <button type="submit" class="ghost">Hochladen</button>
+    </form>
+    {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
+    {% if offen %}<span class="pill neu">{{ offen }} in Arbeit</span>{% endif %}
+  </div>
+  <p class="hint" style="margin-top:.7rem">
+    {% if drive_ok %}Ablegen in <code>{{ inbox_path }}</code>, dann einlesen.
+    {% else %}{{ inbox_path }}.{% endif %}
+    Am besten sind Erklärseiten und Merkblätter — aus ihnen lernt Karo den
+    Rechenweg, den Ihre Lehrkraft verlangt.
+  </p>
+  <p class="hint">Beim direkten Hochladen geben Sie einen Themennamen vor
+  (z. B. „Bruchrechnung“) — Karo zerlegt das Blatt dann in die konkreten
+  Unterthemen darunter, statt frei zu raten. Der Ordnerweg oben liest mehrere
+  Blätter auf einmal ein und kennt daher keinen Themennamen je Blatt.</p>
+</div>
+
+{% if blaetter %}
+<div class="tablewrap">
+  <table>
+    <thead><tr><th>Datum</th><th>Datei</th><th>Typ</th>
+      <th class="num">Abschnitte</th><th>Stand</th><th></th></tr></thead>
+    <tbody>
+      {% for d in blaetter %}
+      <tr>
+        <td>{{ d.captured_on or '–' }}</td>
+        <td class="klein">{{ d.source_name }}</td>
+        <td>{{ d.doc_type or '–' }}</td>
+        <td class="num">{{ d.abschnitte or 0 }}</td>
+        <td>
+          <span class="pill {{ d.state }}">{{ doc_labels.get(d.state, d.state) }}</span>
+          {% if doc_hints.get(d.state) %}
+          <div class="klein" style="margin-top:.25rem;max-width:24ch">
+            {{ doc_hints[d.state] }}</div>
+          {% endif %}
+        </td>
+        <td><a href="/wissen/{{ d.id }}" class="klein">ansehen</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <p>Noch kein Blatt in der Wissensbasis.</p>
+  <p class="klein">Ein Erklärblatt oder eine Buchseite fotografieren, hochladen —
+  Karo liest sie und schlägt daraus die Themen vor.</p>
+</div>
+{% endif %}
+{% endblock %}

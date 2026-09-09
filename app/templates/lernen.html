@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% block title %}Lerneinheit – Karo{% endblock %}
+{% block content %}
+{% set thema = lesson.thema or {} %}
+{% set r = lesson.aktuelle %}
+<h1>{{ thema.label or 'Lerneinheit' }}</h1>
+<p class="sub">
+  Runde {{ lesson.runden }} von höchstens {{ lesson.max_runden }} ·
+  Ausgabe: {{ ausgabe_labels.get(lesson.ausgabe, lesson.ausgabe) }} ·
+  Flagge: {{ flag_labels.get(thema.flag, '–') }}
+</p>
+
+{% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
+
+{% if lesson.state == 'abgebrochen' %}
+<div class="msg warn">{{ lesson.abbruch_grund or
+  'Diese Lerneinheit ist beendet.' }}</div>
+{% elif lesson.state == 'gelernt' %}
+<div class="msg ok">Das Thema sitzt. Die Lerneinheit ist abgeschlossen.</div>
+{% elif lesson.state == 'wartet' %}
+<div class="card">
+  {% if lesson.runden == 0 %}
+  <h3>Bevor Karo eine Erklärung schreibt</h3>
+  {% else %}
+  <h3>Bereit für die nächste Runde?</h3>
+  <p>Noch nicht sicher genug — Karo erklärt es jetzt eine Stufe einfacher
+  und dabei ausführlicher als beim letzten Mal.</p>
+  {% endif %}
+
+  {% if not hat_material %}
+  <div class="msg warn">Für dieses Thema gibt es noch kein eigenes
+  Schulmaterial. Bitte entweder ein Erklärblatt einlesen (Wissensbasis), oder
+  unten im Netz suchen und eine Quelle freigeben — dann wird die freigegebene
+  Quelle selbst zur Faktengrundlage, und Karo prüft die Erklärung dagegen.</div>
+  {% endif %}
+
+  {% if vorschlaege %}
+  <p>Karo hat diese Quellen gefunden.
+  {% if hat_material %}Nur der Titel zählt als Hinweis — die Fakten kommen
+  weiterhin aus Ihrem Schulmaterial.{% else %}Eine freigegebene Quelle wird
+  hier zur Faktengrundlage, da kein eigenes Material vorliegt.{% endif %}
+  Bitte einen Fund öffnen, bevor Sie ihn freigeben.</p>
+  <form method="post" action="/recherche/entscheiden">
+    {{ csrf_input() }}
+    <input type="hidden" name="zurueck" value="/lernen/{{ lesson.id }}">
+    {% for h in vorschlaege %}
+    <div class="item">
+      <p class="aufgabe">
+        <a href="{{ h.url }}" target="_blank" rel="noopener noreferrer">{{ h.titel }}</a
+        >{% if h.kanal %}<span class="klein">· {{ h.kanal }}</span>{% endif %}
+      </p>
+      {% if h.warum %}<p class="grund klein">{{ h.warum }}</p>{% endif %}
+      <div class="seg">
+        <label><input type="radio" name="hit_{{ h.id }}" value="freigegeben">
+          <span>freigeben</span></label>
+        <label><input type="radio" name="hit_{{ h.id }}" value="abgelehnt" checked>
+          <span>ablehnen</span></label>
+      </div>
+    </div>
+    {% endfor %}
+    <button type="submit" class="ghost" style="margin-top:.6rem">Entscheidungen speichern</button>
+  </form>
+  {% elif recherche_erlaubt %}
+  <p>Soll Karo im Netz nach bekannten Lernquellen suchen (z. B. Lehrerschmidt,
+  simpleclub)? Sie sehen danach nur Titel und Quelle und entscheiden je Fund
+  einzeln.{% if not hat_material %} Da hier kein eigenes Material vorliegt,
+  würde eine freigegebene Quelle diesmal selbst als Faktengrundlage
+  dienen.{% endif %}</p>
+  <form method="post" action="/lernen/{{ lesson.id }}/forschen">
+    {{ csrf_input() }}
+    <button type="submit" class="ghost">Im Netz nach Quellen suchen</button>
+  </form>
+  {% if offen %}<p class="hint">({{ offen }} Vorgang läuft — nach der Suche
+  erscheinen mögliche Funde hier zur Freigabe.)</p>{% endif %}
+  {% endif %}
+
+  <form method="post" action="/lernen/{{ lesson.id }}/runde/weiter" style="margin-top:1rem">
+    {{ csrf_input() }}
+    <button type="submit" class="btn gross" {{ 'disabled' if not hat_material }}>{{
+      'Ohne weitere Quellen loslegen' if vorschlaege else
+      ('Jetzt loslegen' if lesson.runden == 0 else 'Nächste Runde starten') }}</button>
+  </form>
+</div>
+{% endif %}
+
+{% if r and r.state in ('offen', 'geprueft') %}
+<div class="card">
+  {% if r.job_fehler %}
+  <h3>Das hat nicht geklappt</h3>
+  <div class="msg warn">{{ r.job_fehler }}</div>
+  <p class="hint">Diese Runde ist stehen geblieben. Bitte die Lerneinheit
+  beenden und erneut starten — meist behebt sich der Grund von selbst (z. B.
+  fehlendes Material einlesen).</p>
+  {% else %}
+  <h3>Karo arbeitet</h3>
+  <ol class="schritte">
+    <li class="fertig">Material aus Ihrer Wissensbasis gesammelt</li>
+    <li class="{{ 'fertig' if r.erklaerung else 'laeuft' }}">Erklärung schreiben</li>
+    <li class="{{ 'fertig' if r.pruefung else ('laeuft' if r.erklaerung else '') }}">
+      Gegenprüfung gegen das Schulmaterial</li>
+    <li class="{{ 'laeuft' if r.state == 'geprueft' }}">
+      {{ ausgabe_labels.get(lesson.ausgabe, 'Material') }} erzeugen</li>
+  </ol>
+  {% if r.notebooklm_quelle_pfad %}
+  <p class="actions">
+    <a class="btn quiet" href="/material/{{ r.id }}/notebooklm-quelle" target="_blank"
+       rel="noopener">An NotebookLM gesendeter Text (vor dem Versand einsehbar)</a>
+  </p>
+  {% endif %}
+  <p class="hint">Diese Seite in einem Moment neu laden.
+  {% if offen %}({{ offen }} Vorgang läuft){% endif %}</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if r and r.material_pfad %}
+<div class="card">
+  <h3>{{ r.erklaerung.get('titel') or thema.label }}</h3>
+  {% if r.erklaerung.get('kernidee') %}
+  <p>{{ r.erklaerung.kernidee }}</p>
+  {% endif %}
+  {% if r.stufe != 'normal' %}
+  <p class="hint">{{ stufe_labels.get(r.stufe, r.stufe) }}</p>
+  {% endif %}
+  <div class="actions" style="margin-top:.9rem">
+    <a class="btn gross" href="/material/{{ r.id }}" target="_blank"
+       rel="noopener">▶ Lernmaterial öffnen</a>
+    {% if r.notebooklm_quelle_pfad %}
+    <a class="btn quiet" href="/material/{{ r.id }}/notebooklm-quelle" target="_blank"
+       rel="noopener">An NotebookLM gesendeter Text</a>
+    {% endif %}
+    <form method="post" action="/lernen/{{ lesson.id }}/fragen" class="actions"
+          style="gap:.4rem">
+      {{ csrf_input() }}
+      <select name="modus" class="mini">
+        <option value="bildschirm">Fragen am Bildschirm</option>
+        <option value="papier">Fragen auf Papier</option>
+      </select>
+      <button type="submit" class="ghost">Habe gelernt — Fragen stellen</button>
+    </form>
+  </div>
+  {% if r.pruefung.get('ausgabe_hinweis') %}
+  <div class="msg warn" style="margin-top:.9rem">{{ r.pruefung.ausgabe_hinweis }}</div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if funde %}
+<div class="card">
+  <h3>Freigegebene Fundstellen</h3>
+  <p class="hint">Nur als Anregung genutzt — die Fakten kommen aus Ihrem
+  Schulmaterial.</p>
+  <ul>
+    {% for f in funde %}
+    <li><a href="{{ f.url }}" target="_blank" rel="noopener noreferrer">{{ f.titel }}</a>
+      {% if f.kanal %}<span class="klein">· {{ f.kanal }}</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<h2>Runden</h2>
+{% for runde in lesson.runden_liste %}
+<div class="card">
+  <div class="actions" style="justify-content:space-between">
+    <div>
+      <h3 style="margin:0">Runde {{ runde.nr }}
+        <span class="pill {{ runde.state }}">{{ runde.state }}</span></h3>
+      <span class="klein">{{ stufe_labels.get(runde.stufe, runde.stufe) }}</span>
+    </div>
+    <div class="actions" style="gap:.3rem">
+      {% if runde.material_pfad %}
+      <a class="btn quiet" href="/material/{{ runde.id }}" target="_blank"
+         rel="noopener">öffnen</a>
+      {% endif %}
+      {% if runde.notebooklm_quelle_pfad %}
+      <a class="btn quiet" href="/material/{{ runde.id }}/notebooklm-quelle"
+         target="_blank" rel="noopener">gesendeter Text</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if runde.pruefung.get('urteil') %}
+  <div class="pruefung {{ runde.pruefung.urteil }}">
+    <b>Gegenprüfung: {{
+      {'passt': 'passt zum Schulmaterial',
+       'kleine_abweichung': 'kleine Abweichungen',
+       'widerspruch': 'Widerspruch — verworfen'}.get(runde.pruefung.urteil,
+       runde.pruefung.urteil) }}</b>
+    <p>{{ runde.pruefung.get('zusammenfassung') or '' }}</p>
+    {% if runde.pruefung.get('befunde') %}
+    <ul>
+      {% for b in runde.pruefung.befunde %}
+      <li><span class="klein">Folie {{ b.folie }} · {{ b.art }}
+        {% if b.schwere == 'blockierend' %}<b style="color:var(--bad)">blockierend</b>{% endif %}</span><br>
+        {{ b.was }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if runde.quiz %}
+  <p style="margin-top:.7rem">
+    Verständnisfragen: <span class="pill {{ runde.quiz.state }}">{{ runde.quiz.state }}</span>
+    <a href="/quiz/{{ runde.quiz.id }}" class="klein">öffnen</a>
+  </p>
+  {% endif %}
+
+  {% if runde.erklaerung.get('folien') %}
+  <details style="margin-top:.7rem">
+    <summary class="klein" style="cursor:pointer">Sprechtext nachlesen
+      ({{ runde.erklaerung.folien | length }} Folien)</summary>
+    <ol class="klein" style="margin-top:.5rem">
+      {% for f in runde.erklaerung.folien %}
+      <li><strong>{{ f.titel }}</strong><br>{{ f.sprechtext }}</li>
+      {% endfor %}
+    </ol>
+  </details>
+  {% endif %}
+
+  {% if runde.material_pfad %}
+  <details style="margin-top:.7rem">
+    <summary class="klein" style="cursor:pointer">Neu erzeugen — auch mit anderer Ausgabeart</summary>
+    <form method="post" action="/lernen/{{ lesson.id }}/runde/{{ runde.id }}/variante"
+          class="actions" style="gap:.4rem; margin-top:.5rem; flex-wrap:wrap">
+      {{ csrf_input() }}
+      <input type="text" name="wunsch" maxlength="500" style="flex:1; min-width:12rem"
+             placeholder="z. B. länger, mit mehr Beispielen, langsamer gesprochen">
+      <select name="ausgabe" class="mini">
+        <option value="">wie diese Runde ({{ ausgabe_labels.get(lesson.ausgabe, lesson.ausgabe) }})</option>
+        {% for wert, bezeichnung in ausgabe_labels.items() %}
+        <option value="{{ wert }}">{{ bezeichnung }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="ghost">Anfordern</button>
+    </form>
+    {% if runde.varianten %}
+    <ul class="klein" style="margin-top:.5rem">
+      {% for v in runde.varianten %}
+      <li>„{{ v.wunsch }}“
+        {% if v.ausgabe %}<span class="klein">({{ ausgabe_labels.get(v.ausgabe, v.ausgabe) }})</span>{% endif %}
+        —
+        {% if v.state == 'bereit' %}
+        <a href="/material/variante/{{ v.id }}" target="_blank" rel="noopener">öffnen</a>
+        {% if v.notebooklm_quelle_pfad %}
+        · <a href="/material/variante/{{ v.id }}/notebooklm-quelle" target="_blank"
+             rel="noopener">gesendeter Text</a>
+        {% endif %}
+        {% elif v.state == 'fehler' %}
+        <span style="color:var(--bad)">{{ v.fehler }}</span>
+        {% else %}
+        wird erzeugt …
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </details>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% if lesson.state not in ('gelernt', 'abgebrochen') %}
+<form method="post" action="/lernen/{{ lesson.id }}/abbrechen"
+      style="margin-top:1rem"
+      onsubmit="return confirm('Lerneinheit beenden?')">
+  {{ csrf_input() }}
+  <button type="submit" class="quiet">Lerneinheit beenden</button>
+</form>
+{% endif %}
+{% endblock %}

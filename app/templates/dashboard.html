@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Übersicht – Karo{% endblock %}
+{% block content %}
+<h1>Übersicht</h1>
+<p class="sub">Was gerade Aufmerksamkeit braucht.</p>
+
+{% if kb_stat.n == 0 %}
+<div class="card leer-start">
+  <h3>Karo braucht zuerst Ihr Schulmaterial</h3>
+  <p>Legen Sie ein Erklärblatt, eine Buchseite oder ein Arbeitsblatt in die
+  Wissensbasis. Daraus schlägt Karo die Themen vor und erklärt später ausschließlich
+  auf dieser Grundlage — nicht mit einem beliebigen Rechenweg aus dem Netz.</p>
+  <a class="btn" href="/wissen">Erstes Blatt einlesen</a>
+</div>
+{% endif %}
+
+<div class="grid2">
+  {% for f in flag_order %}
+  <dl class="kpi {{ f }}">
+    <dt>{{ flag_labels[f] }}</dt>
+    <dd>{{ zaehler.get(f, 0) }}<span class="note"> Themen</span></dd>
+  </dl>
+  {% endfor %}
+</div>
+
+{% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
+{% if offen %}
+<div class="msg">{{ offen }} Vorgang/Vorgänge laufen gerade. Diese Seite in ein
+paar Sekunden neu laden.</div>
+{% endif %}
+
+{% if fehler %}
+<div class="card">
+  <h3 style="color:var(--bad)">Fehlgeschlagene Vorgänge</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Art</th><th>Meldung</th><th></th></tr></thead>
+      <tbody>
+        {% for j in fehler %}
+        <tr>
+          <td><code>{{ j.type }}</code></td>
+          <td style="color:var(--muted)">{{ j.last_error }}</td>
+          <td><form method="post" action="/vorgang/{{ j.id }}/erneut">
+            {{ csrf_input() }}
+            <button class="quiet" type="submit">Erneut</button></form></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if offene_quizze %}
+<h2>Offene Fragerunden</h2>
+<div class="tablewrap">
+  <table>
+    <thead><tr><th>Thema</th><th>Anlass</th><th>Weg</th><th>Stand</th>
+      <th class="num">Fragen</th><th></th></tr></thead>
+    <tbody>
+      {% for q in offene_quizze %}
+      <tr>
+        <td>{{ q.thema_label }}</td>
+        <td>{{ 'Lernrunde' if q.anlass == 'lernrunde' else 'Prüfung' }}</td>
+        <td>{{ 'am Bildschirm' if q.modus == 'bildschirm' else 'auf Papier' }}</td>
+        <td><span class="pill {{ q.state }}">{{ q.state }}</span></td>
+        <td class="num">{{ q.n }}</td>
+        <td><a class="btn" href="/quiz/{{ q.id }}">öffnen</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if offene_lessons %}
+<h2>Laufende Lerneinheiten</h2>
+<div class="tablewrap">
+  <table>
+    <thead><tr><th>Thema</th><th>Flagge</th><th class="num">Runde</th>
+      <th>Ausgabe</th><th>Stand</th><th></th></tr></thead>
+    <tbody>
+      {% for l in offene_lessons %}
+      <tr>
+        <td>{{ l.thema_label }}</td>
+        <td>{{ flagge(l.flag) }}</td>
+        <td class="num">{{ l.runden }}/{{ l.max_runden }}</td>
+        <td style="font-size:.85rem">{{ ausgabe_labels.get(l.ausgabe, l.ausgabe) }}</td>
+        <td><span class="pill {{ l.state }}">{{ l.state }}</span></td>
+        <td><a class="btn" href="/lernen/{{ l.id }}">öffnen</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<h2>Themen</h2>
+{% if themen %}
+<div class="tablewrap">
+  <table>
+    <thead><tr><th>Thema</th><th>Flagge</th><th class="num">richtig</th>
+      <th>häufigster Fehler</th><th></th></tr></thead>
+    <tbody>
+      {% for t in themen[:12] %}
+      <tr>
+        <td><strong>{{ t.label }}</strong><br>
+          <span class="klein">{{ t.begruendung or '' }}</span></td>
+        <td>{{ flagge(t.flag) }}</td>
+        <td class="num">{{ t.richtig }}/{{ t.antworten }}</td>
+        <td class="klein">{{ error_labels.get(t.haupt_fehler, '–') }}</td>
+        <td><a href="/themen" class="klein">im Themenblatt</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if themen | length > 12 %}
+<p class="hint">{{ themen | length - 12 }} weitere unter „Themen“.</p>
+{% endif %}
+{% else %}
+<div class="empty">Noch keine freigegebenen Themen.
+{% if offene_vorschlaege %}
+  <p><a class="btn" href="/themen">{{ offene_vorschlaege }} Vorschläge ansehen</a></p>
+{% endif %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:2rem">
+  <div class="actions" style="justify-content:space-between">
+    <div>
+      <h3 style="margin:0">Lernstand als Tabelle</h3>
+      <span class="klein">Schreibt <code>Lernstand.xlsx</code> in den
+      Drive-Ordner — dort mit einem Klick als Google Sheet öffenbar.</span>
+    </div>
+    <form method="post" action="/export">{{ csrf_input() }}
+      <button class="ghost" type="submit">Jetzt schreiben</button></form>
+  </div>
+</div>
+
+{% if einig.gesamt %}
+<p class="hint" style="margin-top:1.4rem">
+  Übereinstimmung Modell / Lernbegleitung:
+  <strong>{{ (einig.quote * 100) | round | int }} %</strong>
+  bei den letzten {{ einig.gesamt }} Antworten. Je niedriger dieser Wert, desto
+  vorsichtiger sind die Flaggen zu lesen.
+</p>
+{% endif %}
+{% endblock %}

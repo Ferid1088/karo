@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Fragen – Karo{% endblock %}
+{% block content %}
+{% set thema = quiz.thema or {} %}
+<h1>{{ thema.label or 'Fragen' }}</h1>
+<p class="sub">
+  {{ 'Verständnisfragen nach der Erklärung' if quiz.anlass == 'lernrunde' else 'Prüfung' }}
+  · {{ 'am Bildschirm' if quiz.modus == 'bildschirm' else 'auf Papier' }}
+  {% if quiz.round_nr %} · Runde {{ quiz.round_nr }}{% endif %}
+</p>
+
+{% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
+
+{% if quiz.state == 'offen' %}
+  <div class="card">
+    <h3>Die Fragen werden erstellt</h3>
+    <p>Karo schreibt gerade {{ 4 if quiz.anlass == 'lernrunde' else 5 }} Fragen
+    aus Ihrem Schulmaterial. Das dauert etwa eine halbe Minute.</p>
+    <p class="hint">Diese Seite in einem Moment neu laden.
+    {% if offen %}({{ offen }} Vorgang läuft){% endif %}</p>
+  </div>
+
+{% elif quiz.state == 'bereit' and quiz.modus == 'papier' %}
+  <div class="card">
+    <h3>Blatt ausdrucken</h3>
+    <div class="actions">
+      <a class="btn" href="/quiz/{{ quiz.id }}/drucken" target="_blank"
+         rel="noopener">Fragebogen öffnen</a>
+      <a class="btn quiet" href="/quiz/{{ quiz.id }}/drucken?loesungen=ja"
+         target="_blank" rel="noopener">Lösungsblatt (nur für Sie)</a>
+    </div>
+    <p class="hint" style="margin-top:.7rem">Im Fenster Strg+P (Mac: Cmd+P).
+    Das Lösungsblatt ist für Sie zum Nachsehen — nicht für das Kind.</p>
+  </div>
+  <div class="card">
+    <h3>Bearbeitetes Blatt fotografieren</h3>
+    <form method="post" action="/quiz/{{ quiz.id }}/blatt"
+          enctype="multipart/form-data" class="actions">
+      {{ csrf_input() }}
+      <input type="file" name="datei" accept="image/*,application/pdf" required
+             style="max-width:260px">
+      <button type="submit">Hochladen und ablesen</button>
+    </form>
+    <p class="hint" style="margin-top:.7rem">Blatt flach hinlegen, von oben
+    fotografieren, keine Schatten. Karo liest nur die Antworten ab und rechnet
+    nichts nach — bewertet wird erst danach.</p>
+  </div>
+
+{% elif quiz.state == 'bereit' %}
+  <div class="card">
+    <p class="hint">Das Kind beantwortet die Fragen hier. Kurze Antworten
+    genügen — eine Zahl, ein Bruch, ein Satz.</p>
+  </div>
+  <form method="post" action="/quiz/{{ quiz.id }}/antworten">
+    {{ csrf_input() }}
+    {% for f in quiz.fragen %}
+    <div class="item">
+      <div class="pos">Frage {{ f.position }}{% if f.stufe %} · {{ f.stufe }}{% endif %}</div>
+      <p class="aufgabe">{{ f.frage }}</p>
+      <div class="field" style="margin:0">
+        <label for="a{{ f.id }}" class="sr">Antwort</label>
+        <input type="text" id="a{{ f.id }}" name="antwort_{{ f.id }}"
+               value="{{ f.schueler_antwort or '' }}" autocomplete="off"
+               placeholder="Antwort">
+      </div>
+    </div>
+    {% endfor %}
+    <div class="actions" style="margin-top:1rem">
+      <button type="submit">Fertig — auswerten</button>
+      <a class="btn quiet" href="/">später</a>
+    </div>
+  </form>
+
+{% elif quiz.state == 'beantwortet' %}
+  <div class="card">
+    <h3>Die Antworten werden ausgewertet</h3>
+    <p>Karo beurteilt jede Antwort und schlägt einen Fehlertyp vor. Danach
+    geben Sie frei.</p>
+    <p class="hint">Diese Seite in einem Moment neu laden.
+    {% if offen %}({{ offen }} Vorgang läuft){% endif %}</p>
+  </div>
+
+{% else %}
+  {% if quiz.finished_at %}
+  <div class="msg ok">Diese Fragerunde ist freigegeben. Bewertungen sind
+  unveränderlich — das ist Absicht: der Lernstand soll nicht rückwirkend
+  umgeschrieben werden können.</div>
+  {% else %}
+  <div class="card">
+    <p class="hint">Vorschlag von Karo. Sie entscheiden — Ihre Korrekturen
+    werden gezählt und zeigen mit der Zeit, wie verlässlich die Vorschläge
+    sind.</p>
+  </div>
+  {% endif %}
+
+  <form method="post" action="/quiz/{{ quiz.id }}/freigabe">
+    {{ csrf_input() }}
+    {% for f in quiz.fragen %}
+    <div class="item {{ 'low' if f.vorschlag_konf is not none and f.vorschlag_konf < 0.6 }}">
+      <div class="pos">Frage {{ f.position }}
+        {% if f.vorschlag_konf is not none and f.vorschlag_konf < 0.6 %}
+          · unsicher beurteilt{% endif %}</div>
+      <p class="aufgabe">{{ f.frage }}</p>
+      <div class="antwort">{{ f.schueler_antwort or '(leer gelassen)' }}</div>
+      {% if f.erwartet %}
+      <p class="grund">Erwartet war: <strong>{{ f.erwartet }}</strong></p>
+      {% endif %}
+      {% if f.grund.fuer_begleitung %}
+      <p class="grund">{{ f.grund.fuer_begleitung }}</p>
+      {% endif %}
+      {% if f.vorschlag_richtig is none and not f.antwort_id %}
+      <p class="grund" style="color:var(--warn)">Karo hat zu dieser Frage keine
+      Beurteilung geliefert. Bitte selbst entscheiden.</p>
+      {% endif %}
+
+      <input type="hidden" name="frage_id" value="{{ f.id }}">
+      <input type="hidden" name="v_urteil_{{ f.id }}"
+             value="{% if f.vorschlag_richtig == 1 %}ja{% elif f.vorschlag_richtig == 0 %}nein{% endif %}">
+      <input type="hidden" name="v_fehler_{{ f.id }}" value="{{ f.vorschlag_fehler or '' }}">
+      <input type="hidden" name="call_{{ f.id }}" value="{{ f.auswert_call_id or '' }}">
+      <input type="hidden" name="grund_{{ f.id }}" value="{{ f.grund.fuer_begleitung }}">
+
+      <div class="row">
+        <div style="flex:0 0 auto">
+          <label>Bewertung</label>
+          <div class="seg">
+            <label><input type="radio" name="urteil_{{ f.id }}" value="ja"
+              {{ 'checked' if f.vorschlag_richtig == 1 }}
+              {{ 'disabled' if f.antwort_id }}><span>richtig</span></label>
+            <label><input type="radio" name="urteil_{{ f.id }}" value="nein"
+              {{ 'checked' if f.vorschlag_richtig == 0 }}
+              {{ 'disabled' if f.antwort_id }}><span>falsch</span></label>
+            <label><input type="radio" name="urteil_{{ f.id }}" value="skip"
+              {{ 'disabled' if f.antwort_id }}><span>überspringen</span></label>
+          </div>
+        </div>
+        <div>
+          <label for="fe{{ f.id }}">Fehlertyp</label>
+          <select name="fehler_{{ f.id }}" id="fe{{ f.id }}"
+                  {{ 'disabled' if f.antwort_id }}>
+            <option value="">–</option>
+            {% for key, label in error_labels.items() %}
+            <option value="{{ key }}" {{ 'selected' if f.vorschlag_fehler == key }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      {% if f.antwort_id %}<p class="hint">bereits bewertet</p>{% endif %}
+    </div>
+    {% else %}
+    <div class="empty">Diese Fragerunde hat keine Fragen.</div>
+    {% endfor %}
+
+    {% if quiz.fragen and not quiz.finished_at %}
+    <div class="actions" style="margin-top:1rem">
+      <button type="submit">Freigeben und Flagge setzen</button>
+      <a class="btn quiet" href="/">Zurück</a>
+    </div>
+    <p class="hint" style="margin-top:.6rem">Jede Frage braucht eine
+    Entscheidung. „Überspringen“ ist eine gültige Entscheidung — die Frage
+    fließt dann nicht in die Flagge ein.</p>
+    {% endif %}
+  </form>
+{% endif %}
+{% endblock %}

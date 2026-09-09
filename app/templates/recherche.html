@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Recherche – Karo{% endblock %}
+{% block content %}
+<h1>Recherche</h1>
+<p class="sub">Zusätzliches Lernmaterial aus dem Netz — nur von geprüften
+Schulseiten, und nur nach Ihrer Freigabe.</p>
+
+{% if not aktiv %}
+<div class="msg warn">Die Recherche ist in den Einstellungen ausgeschaltet.
+Karo arbeitet dann ausschließlich mit Ihrem eigenen Material — das funktioniert
+vollständig.</div>
+{% endif %}
+
+{% if vorschlaege %}
+<form method="post" action="/recherche/entscheiden">
+  {{ csrf_input() }}
+  {% for h in vorschlaege %}
+  <div class="item">
+    <div class="pos">{{ h.thema_label }}{% if h.kanal %} · {{ h.kanal }}{% endif %}</div>
+    <p class="aufgabe">
+      <a href="{{ h.url }}" target="_blank" rel="noopener noreferrer">{{ h.titel }}</a>
+    </p>
+    <p class="grund">{{ h.warum or '' }}</p>
+    <p class="klein" style="word-break:break-all">{{ h.url }}</p>
+    <div class="seg">
+      <label><input type="radio" name="hit_{{ h.id }}" value="freigegeben">
+        <span>freigeben</span></label>
+      <label><input type="radio" name="hit_{{ h.id }}" value="abgelehnt" checked>
+        <span>ablehnen</span></label>
+    </div>
+  </div>
+  {% endfor %}
+  <div class="actions" style="margin-top:1rem">
+    <button type="submit">Entscheidungen speichern</button>
+  </div>
+  <p class="hint" style="margin-top:.6rem">Bitte öffnen Sie einen Fund, bevor
+  Sie ihn freigeben. Karo hat den Titel bewertet, nicht das Video angesehen.</p>
+</form>
+{% else %}
+<div class="empty">Keine offenen Vorschläge.
+  <p class="klein">Karo sucht erst, wenn Sie das auf der Seite einer
+  Lerneinheit anstoßen — vor Runde 1 oder vor jeder weiteren Runde.</p>
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:2rem">
+  <h3>Wo Karo überhaupt suchen darf</h3>
+  <p class="hint">Eine Erlaubnisliste, keine Sperrliste: was hier nicht steht,
+  kommt nicht vor. Erweitern ist eine Codeänderung — das ist Absicht, weil am
+  Ende der Kette ein Kind sitzt.</p>
+  <ul class="klein">
+    {% for q in erlaubte %}<li>{{ q }}</li>{% endfor %}
+  </ul>
+  <p class="klein" style="margin-top:.7rem"><strong>YouTube nur diese
+  Kanäle:</strong> {{ kanaele | join(', ') }}</p>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Aufruf {{ zeile.id }} – Karo{% endblock %}
+{% block content %}
+<h1>Aufruf {{ zeile.id }}</h1>
+<p class="sub"><code>{{ zeile.purpose }}</code> · {{ zeile.backend or '–' }} ·
+{{ zeile.model }} · {{ zeile.created_at }}</p>
+
+{% if zeile.error %}<div class="msg err">{{ zeile.error }}</div>{% endif %}
+
+<div class="card">
+  <h3>Gesendeter Prompt</h3>
+  <p class="hint">{% if zeile.had_image %}Zusätzlich wurde ein Bild
+  mitgesendet — es steht auf der Seite des Blattes.{% endif %}
+  Kein Name, keine Schule, kein Geburtsdatum, soweit Karo sie erkennt.</p>
+  <pre>{{ zeile.prompt }}</pre>
+</div>
+
+<div class="card">
+  <h3>Antwort</h3>
+  <pre>{{ zeile.response_raw or '(keine)' }}</pre>
+</div>
+
+<a href="/protokoll">← zurück</a>
+{% endblock %}

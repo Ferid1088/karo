@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% set show_nav = false %}
+{% block title %}Anmelden – Karo{% endblock %}
+{% block mainclass %}narrow{% endblock %}
+{% block content %}
+<h1>Karo</h1>
+<p class="sub">Bitte Passwort eingeben.</p>
+<form method="post" action="/login" class="card">
+  {{ csrf_input() }}
+  <div class="field">
+    <label for="password">Passwort</label>
+    <input type="password" id="password" name="password" autofocus
+           autocomplete="current-password" required>
+  </div>
+  <button type="submit">Anmelden</button>
+</form>
+{% endblock %}

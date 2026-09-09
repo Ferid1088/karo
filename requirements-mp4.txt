@@ -1,0 +1,3 @@
+# Nur fuer die MP4-Ausgabe. Zusammen rund 250 MB — deshalb getrennt, damit
+# eine schlanke Installation (nur Folien mit Stimme) sie nicht braucht.
+piper-tts==1.2.0

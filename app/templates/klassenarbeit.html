@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Klassenarbeit – Karo{% endblock %}
+{% block content %}
+<h1>Klassenarbeit</h1>
+<p class="sub">Beim Anlegen werden die aktuellen Flaggen eingefroren. Nach der
+Arbeit tragen Sie ein, was tatsächlich saß. Daraus entsteht die einzige echte
+Messung, ob dieses System funktioniert.</p>
+
+<form method="post" action="/klassenarbeit" class="card">
+  {{ csrf_input() }}
+  <div class="row">
+    <div class="field">
+      <label for="exam_date">Termin</label>
+      <input type="date" id="exam_date" name="exam_date" required min="{{ today }}">
+    </div>
+    <div class="field" style="flex:2 1 300px">
+      <label for="themen">Angekündigte Themen</label>
+      <input type="text" id="themen" name="themen"
+             placeholder="Brüche addieren, Brüche kürzen, Textaufgaben">
+      <p class="hint">Mit Komma trennen. Keine Namen von Lehrkräften eintragen —
+      Karo filtert sie heraus, aber sie gehören gar nicht erst hierher.</p>
+    </div>
+  </div>
+  <button type="submit">Anlegen und Prognose einfrieren</button>
+</form>
+
+{% for e in zeilen %}
+<div class="card">
+  <h3>{{ e.exam_date }}
+    {% if e.kalibrierung.quote is not none %}
+      <span class="pill {{ 'gruen' if e.kalibrierung.quote >= 0.7 else 'gelb' }}">
+        Treffer {{ (e.kalibrierung.quote * 100) | round | int }} %
+        ({{ e.kalibrierung.treffer }}/{{ e.kalibrierung.bewertet }})</span>
+    {% endif %}
+  </h3>
+  <p class="klein">{{ e.themen_liste | join(', ') or 'keine Themen angegeben' }}</p>
+
+  {% if e.kalibrierung.zeilen %}
+  <form method="post" action="/klassenarbeit/{{ e.id }}/ergebnis">
+    {{ csrf_input() }}
+    <div class="tablewrap" style="margin:.7rem 0">
+      <table>
+        <thead><tr><th>Thema</th><th>Prognose</th><th>Tatsächlich</th></tr></thead>
+        <tbody>
+          {% for p in e.kalibrierung.zeilen %}
+          <tr>
+            <td>{{ p.label }}</td>
+            <td>{{ flagge(p.prognose) }}</td>
+            <td>
+              <select name="ist_{{ p.topic_id }}" style="max-width:170px">
+                <option value="">noch nicht bewertet</option>
+                {% for f in flag_order %}
+                  {% if f != 'weiss' %}
+                  <option value="{{ f }}" {{ 'selected' if p.tatsaechlich == f }}>{{ flag_labels[f] }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button type="submit" class="ghost">Ergebnisse speichern</button>
+  </form>
+  {% else %}
+  <p class="hint">Zum Zeitpunkt des Anlegens gab es keine bewerteten Themen —
+  es gibt also nichts zu vergleichen.</p>
+  {% endif %}
+</div>
+{% else %}
+<div class="empty">Noch keine Klassenarbeit angelegt.</div>
+{% endfor %}
+{% endblock %}

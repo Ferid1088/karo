@@ -1,0 +1,7 @@
+# Fuer den optionalen NotebookLM-Ausgabemodus, inklusive der [browser]-Extra:
+# die Anmeldung laeuft jetzt IM Container, sichtbar auf der Einstellungsseite
+# ueber Xvfb + x11vnc + noVNC (siehe app/media/notebooklm.py und die
+# xvfb/x11vnc/novnc/websockify-Systempakete im Dockerfile). Das Chromium
+# selbst wird separat per `playwright install --with-deps chromium` geholt,
+# nicht ueber diese Datei.
+notebooklm-py[browser]==0.8.2
