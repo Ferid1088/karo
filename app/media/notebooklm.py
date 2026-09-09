@@ -335,6 +335,22 @@ def verfuegbar() -> tuple[bool, str]:
     return True, hinweis
 
 
+def trennen() -> None:
+    """Meldet die gespeicherte NotebookLM-Sitzung ab.
+
+    Nutzt den eigenen `auth logout`-Befehl der CLI, statt selbst in
+    `storage_state.json` herumzuloeschen — die CLI kennt ihre eigenen
+    Sperr- und Zusatzdateien besser als Karo.
+
+    Wirft `NotebookLmUnavailable`, wenn die CLI fehlt oder der Befehl
+    scheitert. Kein Fehler, wenn ohnehin keine Sitzung vorlag.
+    """
+    if _cli_available() is None:
+        raise NotebookLmUnavailable(
+            "Die NotebookLM-Kommandozeile ist nicht installiert.")
+    _run("auth", "logout", timeout=SHORT_TIMEOUT)
+
+
 # --------------------------------------------------------------------------
 # Anmeldung aus der Einstellungsseite anstoßen
 # --------------------------------------------------------------------------

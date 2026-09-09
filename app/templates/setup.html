@@ -158,8 +158,17 @@ claude setup-token                         <span class="c-com"># Token wird ange
       <input type="password" id="v-api-key" name="api_key" autocomplete="off"
              placeholder="sk-ant-api03-...">
     </div>
-    <button type="submit" style="margin-top:.6rem">Verbinden</button>
+    <div class="actions" style="margin-top:.6rem">
+      <button type="submit">Verbinden</button>
+    </div>
   </form>
+  {% if claude_ok %}
+  <form method="post" action="/setup/claude/trennen" style="margin-top:.5rem"
+        onsubmit="return confirm('Claude-Verbindung wirklich trennen? Der gespeicherte Token/Schlüssel wird gelöscht — danach neu verbinden nötig.')">
+    {{ csrf_input() }}
+    <button type="submit" class="quiet">Trennen</button>
+  </form>
+  {% endif %}
 </div>
 <script>
   (function () {
@@ -174,37 +183,130 @@ claude setup-token                         <span class="c-com"># Token wird ange
   })();
 </script>
 
+{% macro nlm_anmelde_knopf(taste_text) %}
+{#- Bewusst KEIN <form>: dieser Knopf steht auch innerhalb der grossen
+   /setup/finish-Form (bei der Ausgabe-Auswahl), und ein <form> im <form>
+   ist ungueltiges HTML mit unvorhersehbarem Absende-Verhalten. Der Klick
+   wird stattdessen per fetch() geschickt (siehe Skript unten). -#}
+<div data-nlm-block>
+  <div class="actions">
+    <button type="button" class="quiet"
+            data-nlm-login-btn data-csrf="{{ csrf }}" data-csrf-field="{{ csrf_field }}">
+      {{ taste_text }}</button>
+    {% if nlm_ok %}
+    <button type="button" class="quiet"
+            data-nlm-trennen-btn data-csrf="{{ csrf }}" data-csrf-field="{{ csrf_field }}">
+      Trennen</button>
+    {% endif %}
+  </div>
+  <p class="hint" data-nlm-login-hinweis style="margin-top:.4rem">Öffnet ein
+  eigenes Browserfenster für die Google-Anmeldung.</p>
+  {% if nlm_login.meldung %}
+  <em class="{{ 'text-gut' if nlm_login.ok else 'warn' }}">{{ nlm_login.meldung }}</em>
+  {% endif %}
+</div>
+{% endmacro %}
+
+<script>
+  // DOMContentLoaded, nicht sofort: dieses Skript steht vor dem eigentlichen
+  // Knopf im HTML (der Knopf kommt erst weiter unten, aus dem Makro-Aufruf
+  // bei der Ausgabe-Auswahl) — ohne das Warten faende querySelectorAll hier
+  // noch nichts.
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-nlm-trennen-btn]").forEach(function (btn) {
+      var hinweis = btn.closest("[data-nlm-block]").querySelector("[data-nlm-login-hinweis]");
+
+      btn.addEventListener("click", function () {
+        if (!confirm("NotebookLM-Verbindung wirklich trennen? Danach neu "
+                     + "anmelden nötig.")) {
+          return;
+        }
+        btn.disabled = true;
+        var formular = new FormData();
+        formular.set(btn.dataset.csrfField, btn.dataset.csrf);
+        fetch("/setup/notebooklm/trennen", {method: "POST", body: formular})
+          .then(function () { location.reload(); })
+          .catch(function () {
+            btn.disabled = false;
+            hinweis.textContent = "Trennen fehlgeschlagen — bitte die "
+              + "Internetverbindung prüfen und erneut versuchen.";
+            hinweis.className = "hint warn";
+          });
+      });
+    });
+
+    document.querySelectorAll("[data-nlm-login-btn]").forEach(function (btn) {
+      var hinweis = btn.closest("[data-nlm-block]").querySelector("[data-nlm-login-hinweis]");
+
+      btn.addEventListener("click", function () {
+        // Sofort oeffnen, noch im selben Klick — sonst blockt der Browser
+        // das Popup, weil es dann nicht mehr direkt aus einer
+        // Nutzeraktion kommt.
+        var popup = window.open("about:blank", "karo-notebooklm-login",
+                                "width=980,height=680");
+        if (!popup) {
+          hinweis.textContent = "Das Popup-Fenster wurde vom Browser "
+            + "blockiert. Bitte Popups für diese Seite erlauben und "
+            + "erneut versuchen.";
+          hinweis.className = "hint warn";
+          return;
+        }
+        popup.document.write(
+          "<!doctype html><title>NotebookLM-Anmeldung</title>"
+          + "<body style='font:15px sans-serif;padding:2rem;color:#444'>"
+          + "Anmeldung wird vorbereitet …</body>");
+
+        btn.disabled = true;
+        hinweis.textContent = "Anmeldung wird vorbereitet — das Fenster "
+          + "füllt sich gleich.";
+
+        var formular = new FormData();
+        formular.set(btn.dataset.csrfField, btn.dataset.csrf);
+        fetch("/setup/notebooklm/anmelden", {method: "POST", body: formular})
+          .catch(function () {});
+
+        var versucht = 0;
+        var timer = setInterval(function () {
+          versucht += 1;
+          if (popup.closed) { clearInterval(timer); btn.disabled = false; return; }
+          fetch("/setup/notebooklm/status")
+            .then(function (r) { return r.json(); })
+            .then(function (stand) {
+              if (stand.vnc_bereit) {
+                clearInterval(timer);
+                popup.location = "http://127.0.0.1:" + stand.novnc_port
+                  + "/vnc.html?autoconnect=true&resize=scale&reconnect=true";
+                hinweis.textContent = "Bitte im geöffneten Fenster bei "
+                  + "Google anmelden. Diese Seite hier lädt sich nach "
+                  + "Abschluss von selbst neu.";
+              } else if (!stand.laeuft) {
+                clearInterval(timer);
+                btn.disabled = false;
+                if (stand.meldung) {
+                  hinweis.textContent = stand.meldung;
+                  hinweis.className = stand.ok ? "hint text-gut" : "hint warn";
+                }
+                if (stand.ok) { location.reload(); }
+              } else if (versucht > 150) {   // ~5 Minuten
+                clearInterval(timer);
+                btn.disabled = false;
+              }
+            })
+            .catch(function () {});
+        }, 2000);
+      });
+    });
+  });
+</script>
+
 <div class="card" id="notebooklm-verbindung">
   <h3>NotebookLM-Verbindung
     <span class="pill {{ 'gruen' if nlm_ok else 'rot' }}">{{ 'verbunden' if nlm_ok else 'getrennt' }}</span>
   </h3>
   <p class="hint">{{ nlm_warnung }}</p>
   <p class="{{ 'text-gut' if nlm_ok else 'text-warn' }}">{{ nlm_grund }}</p>
-  {% if not nlm_ok %}
-    {% if nlm_login.laeuft %}
-      {% if nlm_login.vnc_bereit %}
-      <em class="warn">Bitte hier im Fenster bei Google anmelden.</em>
-      <iframe src="http://127.0.0.1:{{ nlm_login.novnc_port }}/vnc.html?autoconnect=true&resize=scale&reconnect=true"
-              title="NotebookLM-Anmeldung" style="width:100%;height:520px;
-              margin-top:.5rem;border:1px solid var(--border);
-              border-radius:6px;background:#000"></iframe>
-      <p class="hint" style="margin-top:.4rem">Läuft direkt in Karo — kein
-      separates Fenster nötig. Nach der Anmeldung schließt sich das Fenster
-      hier von selbst.</p>
-      {% else %}
-      <em class="warn">Anmeldung wird vorbereitet — diese Seite in ein paar
-      Sekunden neu laden.</em>
-      {% endif %}
-    {% else %}
-    <form method="post" action="/setup/notebooklm/anmelden">
-      {{ csrf_input() }}
-      <button type="submit" class="quiet">Jetzt anmelden</button>
-    </form>
-    {% if nlm_login.meldung %}
-    <em class="{{ 'text-gut' if nlm_login.ok else 'warn' }}">{{ nlm_login.meldung }}</em>
-    {% endif %}
-    {% endif %}
-  {% endif %}
+  <em class="klein">An- oder erneut anmelden: Knopf weiter unten bei
+  „NotebookLM-Video“.</em>
 </div>
 
 <form method="post" action="/setup/finish">
@@ -258,9 +360,9 @@ claude setup-token                         <span class="c-com"># Token wird ange
           <em class="{{ 'gut' if mp4_ok else 'warn' }}">{{ mp4_grund }}</em>
         {% elif wert == 'notebooklm' %}
           <em class="{{ 'gut' if nlm_ok else 'warn' }}">{{ nlm_grund }}</em>
-          {% if not nlm_ok %}
-          <em class="warn">Verbindung herstellen: <a href="#notebooklm-verbindung">weiter oben auf dieser Seite</a>.</em>
-          {% endif %}
+          <div style="margin-top:.5rem">
+            {{ nlm_anmelde_knopf('Jetzt anmelden' if not nlm_ok else 'Anmeldedaten erneut holen') }}
+          </div>
         {% endif %}
       </span>
     </label>

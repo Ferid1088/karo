@@ -36,6 +36,28 @@ SCHRIFT = {
 
 DATEINAME = "Lernstand.xlsx"
 
+#: Anzeige auf der Lernstand-Seite in Karo — eigene, ausfuehrlichere Worte
+#: fuer dieselben vier Flaggen. Die Flaggen selbst (Werte, Regel, Reihenfolge)
+#: bleiben ueberall sonst in der App unveraendert; das hier ist nur Text.
+STATUS_EMOJI = {
+    Flag.GRUEN.value: "🟢",
+    Flag.GELB.value: "🟡",
+    Flag.ROT.value: "🔴",
+    Flag.WEISS.value: "⚪",
+}
+STATUS_LABEL = {
+    Flag.GRUEN.value: "sicher (mehrfach unabhängig richtig gemacht)",
+    Flag.GELB.value: "relativ sicher",
+    Flag.ROT.value: "unsicher",
+    Flag.WEISS.value: "noch nicht genug Beweise",
+}
+NAECHSTER_SCHRITT = {
+    Flag.GRUEN.value: "kurz wiederholen",
+    Flag.GELB.value: "weiter üben",
+    Flag.ROT.value: "erklären lassen",
+    Flag.WEISS.value: "prüfen",
+}
+
 
 def _bedeutung(flag: str) -> str:
     """Was die Flagge fuer die Lernbegleitung heisst — in einem Satz."""
@@ -55,8 +77,55 @@ def verfuegbar() -> bool:
     return True
 
 
+def lernstand_zeilen() -> list[dict]:
+    """Der Lernstand als Zeilen — Grundlage sowohl fuer die Ansicht in Karo
+    selbst als auch fuer den Tabellenexport, damit beide nie auseinanderlaufen.
+    """
+    zeilen = [t for t in topics.liste(topics.AKTIV)]
+    zeilen.sort(key=lambda t: (FLAG_ORDER.index(t["flag"])
+                               if t["flag"] in FLAG_ORDER else 9, t["sort"]))
+
+    geuebt = {r["topic_id"]: r["summe"] for r in db.q(
+        "SELECT topic_id, SUM(runden) AS summe FROM lesson GROUP BY topic_id")}
+
+    for t in zeilen:
+        t["flag_label"] = FLAG_LABELS.get(t["flag"], t["flag"])
+        t["bedeutung"] = _bedeutung(t["flag"])
+        t["haupt_fehler_label"] = ERROR_LABELS.get(t.get("haupt_fehler") or "", "")
+        t["geuebte_runden"] = geuebt.get(t["id"]) or 0
+        t["status_emoji"] = STATUS_EMOJI.get(t["flag"], "")
+        t["status_label"] = STATUS_LABEL.get(t["flag"], t["flag"])
+        t["naechster_schritt"] = NAECHSTER_SCHRITT.get(t["flag"], "")
+        # Dieselben Farben wie auf der Themenseite: gruen = richtig,
+        # orange = Verstaendnisfehler, rot = anderer Fehler.
+        t["verlauf"] = quizzes.verlauf(t["id"])
+    return zeilen
+
+
+def verlauf_zeilen(limit: int = 200) -> list[dict]:
+    """Die juengsten Eintraege im Antwortverlauf, fuers Verlaufs-Blatt und
+    die Ansicht in Karo."""
+    zeilen = []
+    for r in db.q(
+        """SELECT a.beantwortet_am, t.label, a.richtig, a.fehlertyp, a.quelle
+             FROM answer_log a JOIN topic t ON t.id = a.topic_id
+            ORDER BY a.id DESC LIMIT ?""", limit):
+        zeilen.append({
+            "datum": r["beantwortet_am"],
+            "label": r["label"],
+            "richtig": bool(r["richtig"]),
+            "fehlertyp_label": ERROR_LABELS.get(r["fehlertyp"] or "", ""),
+            "quelle": "Mensch" if r["quelle"] == "lernbegleitung" else "Modell",
+        })
+    return zeilen
+
+
 def schreiben() -> str | None:
-    """Schreibt die Tabelle. None, wenn openpyxl fehlt oder Drive nicht da ist."""
+    """Schreibt die Tabelle als .xlsx in den Drive-Ordner — der optionale
+    Weg zum Google Sheet. None, wenn openpyxl fehlt oder Drive nicht da ist.
+    Die Werte selbst leben unabhaengig davon in Karos Datenbank (siehe
+    `lernstand_zeilen()`) und lassen sich dort jederzeit ansehen.
+    """
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Alignment, Font, PatternFill
@@ -66,9 +135,7 @@ def schreiben() -> str | None:
         return None
 
     cfg = config.load_safe()
-    zeilen = [t for t in topics.liste(topics.AKTIV)]
-    zeilen.sort(key=lambda t: (FLAG_ORDER.index(t["flag"])
-                               if t["flag"] in FLAG_ORDER else 9, t["sort"]))
+    zeilen = lernstand_zeilen()
 
     wb = Workbook()
 
@@ -113,14 +180,9 @@ def schreiben() -> str | None:
     for zelle in vs[1]:
         zelle.font = Font(bold=True, size=10)
         zelle.fill = PatternFill("solid", fgColor="E8EBF2")
-    for r in db.q(
-        """SELECT a.beantwortet_am, t.label, a.richtig, a.fehlertyp, a.quelle
-             FROM answer_log a JOIN topic t ON t.id = a.topic_id
-            ORDER BY a.id DESC LIMIT 2000"""):
-        vs.append([r["beantwortet_am"], r["label"],
-                   "ja" if r["richtig"] else "nein",
-                   ERROR_LABELS.get(r["fehlertyp"] or "", ""),
-                   "Mensch" if r["quelle"] == "lernbegleitung" else "Modell"])
+    for r in verlauf_zeilen(limit=2000):
+        vs.append([r["datum"], r["label"], "ja" if r["richtig"] else "nein",
+                   r["fehlertyp_label"], r["quelle"]])
     for i, breite in enumerate([12, 44, 9, 24, 14], start=1):
         vs.column_dimensions[get_column_letter(i)].width = breite
     vs.freeze_panes = "A2"

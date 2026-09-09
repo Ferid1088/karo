@@ -582,6 +582,17 @@ def setup_claude_verbinden(request: Request, backend: str = Form("abo"),
     return _zurueck("/setup")
 
 
+@app.post("/setup/claude/trennen")
+def setup_claude_trennen(request: Request):
+    """Nur die Zugangsdaten loeschen — anders als /setup/reset bleiben
+    Modellwahl, Lernername usw. unangetastet, damit ein neuer Token sie
+    nicht erneut abfragt."""
+    config.update(claude_oauth_token="", anthropic_api_key="")
+    connections.status(config.load(), force=True)
+    flash(request, "Claude-Verbindung getrennt.")
+    return _zurueck("/setup")
+
+
 @app.post("/setup/notebooklm/anmelden")
 def setup_notebooklm_login(request: Request):
     from .media import notebooklm
@@ -594,6 +605,28 @@ def setup_notebooklm_login(request: Request):
         flash(request, "Die Anmeldung läuft schon, oder die "
                        "NotebookLM-Kommandozeile ist nicht installiert "
                        "(siehe README, Abschnitt „NotebookLM“).", "warn")
+    return _zurueck("/setup")
+
+
+@app.get("/setup/notebooklm/status")
+def setup_notebooklm_status() -> JSONResponse:
+    """Fuer das Anmelde-Popup: Stand der Anmeldung zum Abfragen per JS, ohne
+    die ganze Seite neu zu laden."""
+    from .media import notebooklm
+
+    return JSONResponse(notebooklm.login_status())
+
+
+@app.post("/setup/notebooklm/trennen")
+def setup_notebooklm_trennen(request: Request):
+    from .media import notebooklm
+
+    try:
+        notebooklm.trennen()
+        flash(request, "NotebookLM-Verbindung getrennt.")
+    except notebooklm.NotebookLmUnavailable as exc:
+        flash(request, str(exc), "warn")
+    connections.status(force=True)
     return _zurueck("/setup")
 
 
@@ -1287,6 +1320,23 @@ def vorgang_erneut(request: Request, job_id: int):
     return _zurueck("/")
 
 
+@app.get("/lernstand", response_class=HTMLResponse)
+def lernstand(request: Request):
+    """Der Lernstand als Tabelle — direkt aus der Datenbank, ohne Umweg
+    ueber Drive oder ein Google Sheet. Der Export dorthin bleibt optional
+    (Knopf auf dieser Seite, siehe `/export`)."""
+    cfg = config.load_safe()
+    return render(request, "lernstand.html",
+                  zeilen=export.lernstand_zeilen(),
+                  verlauf=export.verlauf_zeilen(limit=200),
+                  xlsx_ok=export.verfuegbar(),
+                  drive_ok=ingest.drive_available(),
+                  drive_writable=ingest.drive_writable(),
+                  rule_gruen_tage=cfg.rule_gruen_tage,
+                  rule_rot_konzeptfehler=cfg.rule_rot_konzeptfehler,
+                  rule_min_evidenz=cfg.rule_min_evidenz)
+
+
 @app.post("/export")
 async def export_jetzt(request: Request):
     pfad = await run_in_threadpool(export.nach_freigabe)
@@ -1296,4 +1346,4 @@ async def export_jetzt(request: Request):
     else:
         flash(request, "Der Tabellenexport ist nicht verfügbar "
                        "(openpyxl fehlt oder kein Drive-Ordner).", "warn")
-    return _zurueck("/")
+    return _zurueck("/lernstand")

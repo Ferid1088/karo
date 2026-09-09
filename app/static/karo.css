@@ -168,6 +168,12 @@ th, td { text-align: left; padding: 0.65rem 0.9rem;
 thead th { background: var(--surface-2); font-size: 0.72rem; text-transform: uppercase;
   letter-spacing: 0.07em; color: var(--muted); white-space: nowrap; font-weight: 700; }
 tbody tr:last-child td { border-bottom: none; }
+
+/* --- Lernstand: Zeilenfarbe nach Flagge, wie im Tabellenexport --- */
+tr.zeile-gruen td { background: var(--ok-bg); }
+tr.zeile-gelb td { background: var(--warn-bg); }
+tr.zeile-rot td { background: var(--bad-bg); }
+tr.zeile-weiss td { background: var(--surface-2); }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* --- Formulare --- */

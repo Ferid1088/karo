@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Lernstand – Karo{% endblock %}
+{% block content %}
+<h1>Lernstand als Tabelle</h1>
+<p class="sub">Lebt in Karos eigener Datenbank auf diesem Rechner — diese
+Seite liest sie direkt, kein Export nötig. Ein Google Sheet ist ein
+zusätzlicher, freiwilliger Weg (siehe unten).</p>
+
+{% if zeilen %}
+<div class="row" style="align-items:flex-start;flex-wrap:wrap">
+  <div class="tablewrap" style="flex:3 1 680px">
+    <table>
+      <thead>
+        <tr>
+          <th>Thema</th><th>Kompetenz</th><th>Status</th><th>Zuletzt geprüft</th>
+          <th>Beobachtungen</th><th>Typischer Fehler</th><th>Ursache</th>
+          <th>Nächster Schritt</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in zeilen %}
+        <tr class="zeile-{{ t.flag }}">
+          <td><strong>{{ t.label }}</strong>
+            <br><span class="klein">{{ t.code }}</span></td>
+          <td>{{ t.label }}</td>
+          <td>{{ t.status_emoji }} {{ t.status_label }}</td>
+          <td>{{ t.letzte_uebung or '–' }}</td>
+          <td>
+            <div class="verlauf">
+              {% for o in t.verlauf %}
+                <span class="dot {{ 'r' if o.richtig else ('k' if o.fehlertyp in ('konzeptfehler','regel_vergessen') else 'f') }}"
+                      title="{{ o.beantwortet_am }} – {{ 'richtig' if o.richtig else error_labels.get(o.fehlertyp, 'falsch') }}"></span>
+              {% else %}<span class="klein">noch nichts</span>{% endfor %}
+            </div>
+          </td>
+          <td>{{ t.haupt_fehler_label or '–' }}</td>
+          <td class="klein">{{ t.begruendung or '' }}</td>
+          <td>{{ t.naechster_schritt }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card klein" style="flex:1 1 200px;margin:0">
+    <b style="display:block;margin-bottom:.4rem;color:var(--text)">Status-Farben</b>
+    <div style="margin-bottom:.35rem">🟢 sicher — mehrfach unabhängig
+      richtig gemacht (die letzten {{ rule_gruen_tage }} Übungstage
+      fehlerfrei)</div>
+    <div style="margin-bottom:.35rem">🟡 relativ sicher — der
+      Normalzustand beim Lernen</div>
+    <div style="margin-bottom:.35rem">🔴 unsicher — {{ rule_rot_konzeptfehler }}×
+      derselbe Verständnisfehler zuletzt</div>
+    <div style="margin-bottom:.35rem">⚪ noch nicht genug Beweise —
+      weniger als {{ rule_min_evidenz }} verwertbare Antworten</div>
+
+    <b style="display:block;margin:.9rem 0 .4rem;color:var(--text)">Farben in den Beobachtungen</b>
+    <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+      <span class="dot r" style="position:static"></span> richtig
+    </div>
+    <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+      <span class="dot k" style="position:static"></span> Verständnisfehler
+    </div>
+    <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+      <span class="dot f" style="position:static"></span> anderer Fehler
+    </div>
+    <p class="hint" style="margin:.5rem 0 0">Ältestes links. Eine einzelne
+    falsche Antwort ändert den Status nie.</p>
+  </div>
+</div>
+{% else %}
+<div class="empty">Noch keine freigegebenen Themen — hier erscheint
+etwas, sobald welche freigegeben sind.</div>
+{% endif %}
+
+<div class="card" style="margin-top:1.4rem">
+  <div class="actions" style="justify-content:space-between">
+    <div>
+      <h3 style="margin:0">Als Google Sheet exportieren</h3>
+      {% if drive_ok and drive_writable %}
+      <span class="klein">Schreibt <code>Lernstand.xlsx</code> in den
+      Drive-Ordner — dort mit einem Klick als Google Sheet öffenbar.</span>
+      {% elif not xlsx_ok %}
+      <span class="klein" style="color:var(--warn)">Nicht verfügbar —
+      <code>openpyxl</code> fehlt im Image.</span>
+      {% else %}
+      <span class="klein" style="color:var(--warn)">Nicht verfügbar — kein
+      beschreibbarer Drive-Ordner eingerichtet (siehe Einstellungen).</span>
+      {% endif %}
+    </div>
+    <form method="post" action="/export">{{ csrf_input() }}
+      <button class="ghost" type="submit"
+              {{ 'disabled' if not (xlsx_ok and drive_ok and drive_writable) }}>
+        Jetzt exportieren</button></form>
+  </div>
+</div>
+
+{% if verlauf %}
+<h2 style="margin-top:2rem">Verlauf</h2>
+<div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>Datum</th><th>Thema</th><th>richtig</th><th>Fehlertyp</th>
+        <th>bewertet von</th></tr>
+    </thead>
+    <tbody>
+      {% for v in verlauf %}
+      <tr>
+        <td class="klein">{{ v.datum }}</td>
+        <td>{{ v.label }}</td>
+        <td>{{ 'ja' if v.richtig else 'nein' }}</td>
+        <td>{{ v.fehlertyp_label }}</td>
+        <td>{{ v.quelle }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

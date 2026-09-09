@@ -130,11 +130,10 @@ paar Sekunden neu laden.</div>
   <div class="actions" style="justify-content:space-between">
     <div>
       <h3 style="margin:0">Lernstand als Tabelle</h3>
-      <span class="klein">Schreibt <code>Lernstand.xlsx</code> in den
-      Drive-Ordner — dort mit einem Klick als Google Sheet öffenbar.</span>
+      <span class="klein">In Karo ansehen — der Export als Google Sheet ist
+      dort ein zusätzlicher, freiwilliger Knopf.</span>
     </div>
-    <form method="post" action="/export">{{ csrf_input() }}
-      <button class="ghost" type="submit">Jetzt schreiben</button></form>
+    <a class="ghost btn" href="/lernstand">Ansehen</a>
   </div>
 </div>
 
