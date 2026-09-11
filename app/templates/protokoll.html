@@ -25,8 +25,16 @@ Aufrufe sind im Monatsbeitrag enthalten, deshalb steht hier keine
 Einzelabrechnung.</p>
 {% endif %}
 
+{% if zeilen %}
+<div class="verlauf-filter protokoll-filter" role="group" aria-label="Protokoll gruppieren">
+  <span class="filter-label">Gruppieren nach</span>
+  <button type="button" class="filter-btn active" data-protokoll-level="year">Jahr</button>
+  <button type="button" class="filter-btn" data-protokoll-level="month">Monat</button>
+  <button type="button" class="filter-btn" data-protokoll-level="week">Woche</button>
+  <button type="button" class="filter-btn" data-protokoll-level="day">Tag</button>
+</div>
 <div class="tablewrap">
-  <table>
+  <table id="protokoll-tabelle">
     <thead>
       <tr><th>Zeit</th><th>Zweck</th><th>Weg</th><th>Modell</th><th>Schema</th>
         <th class="num">ein</th><th class="num">aus</th>
@@ -35,7 +43,7 @@ Einzelabrechnung.</p>
     </thead>
     <tbody>
       {% for r in zeilen %}
-      <tr>
+      <tr class="protokoll-eintrag" data-protokoll-datum="{{ r.created_at }}">
         <td><a href="/protokoll/{{ r.id }}">{{ r.created_at[5:16] | replace('T', ' ') }}</a></td>
         <td><code>{{ r.purpose }}</code>{% if r.had_image %} 🖼{% endif %}</td>
         <td class="klein">{{ r.backend or '–' }}</td>
@@ -53,5 +61,66 @@ Einzelabrechnung.</p>
     </tbody>
   </table>
 </div>
+<script>
+(function () {
+  var buttons = document.querySelectorAll("[data-protokoll-level]");
+  var tbody = document.querySelector("#protokoll-tabelle tbody");
+  if (!tbody || !buttons.length) return;
+  var rows = Array.prototype.slice.call(tbody.querySelectorAll(".protokoll-eintrag"));
+
+  function isoWeek(date) {
+    var copy = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    var day = copy.getUTCDay() || 7;
+    copy.setUTCDate(copy.getUTCDate() + 4 - day);
+    var yearStart = new Date(Date.UTC(copy.getUTCFullYear(), 0, 1));
+    return Math.ceil((((copy - yearStart) / 86400000) + 1) / 7);
+  }
+  function groupKey(value, level) {
+    var date = new Date(value.replace(" ", "T"));
+    if (isNaN(date.getTime())) return "Unbekannt";
+    if (level === "year") return String(date.getFullYear());
+    if (level === "month") return date.toLocaleDateString("de-DE", {year: "numeric", month: "long"});
+    if (level === "week") return "KW " + isoWeek(date) + " / " + date.getFullYear();
+    return date.toLocaleDateString("de-DE", {weekday: "long", day: "2-digit", month: "2-digit", year: "numeric"});
+  }
+  function render(level) {
+    var groups = {};
+    rows.forEach(function (row) {
+      var key = groupKey(row.dataset.protokollDatum, level);
+      (groups[key] = groups[key] || []).push(row);
+    });
+    tbody.innerHTML = "";
+    Object.keys(groups).forEach(function (key) {
+      var heading = document.createElement("tr");
+      heading.className = "verlauf-gruppe";
+      heading.innerHTML = '<th colspan="9"><button type="button" class="verlauf-gruppe-btn" aria-expanded="false">' +
+        '<span class="verlauf-pfeil">▸</span>' + key +
+        '<span class="verlauf-anzahl">' + groups[key].length + ' Aufrufe</span></button></th>';
+      tbody.appendChild(heading);
+      groups[key].forEach(function (row) {
+        row.style.display = "none";
+        tbody.appendChild(row);
+      });
+      heading.querySelector("button").addEventListener("click", function () {
+        var offen = this.getAttribute("aria-expanded") === "true";
+        this.setAttribute("aria-expanded", String(!offen));
+        this.querySelector(".verlauf-pfeil").textContent = offen ? "▸" : "▾";
+        groups[key].forEach(function (row) {
+          row.style.display = offen ? "none" : "table-row";
+        });
+      });
+    });
+  }
+  buttons.forEach(function (button) {
+    button.addEventListener("click", function () {
+      buttons.forEach(function (item) { item.classList.remove("active"); });
+      button.classList.add("active");
+      render(button.dataset.protokollLevel);
+    });
+  });
+  render("year");
+})();
+</script>
+{% endif %}
 {% if not zeilen %}<div class="empty">Noch keine Modellaufrufe.</div>{% endif %}
 {% endblock %}
