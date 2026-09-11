@@ -43,7 +43,7 @@ services:
       - KARO_LOG_LEVEL=INFO
       - KARO_DRIVE_PATH=${KARO_DRIVE_PATH:-}
       - TZ=Europe/Berlin
-      - CLAUDE_CODE_MAX_OUTPUT_TOKENS=4096
+      - CLAUDE_CODE_MAX_OUTPUT_TOKENS=32000
 
     restart: unless-stopped
 

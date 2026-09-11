@@ -191,6 +191,69 @@ h1 + .sub, h2 + .sub { color: var(--muted); font-size: 0.95rem; margin: 0 0 1rem
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .tablewrap { overflow-x: auto; background: var(--surface);
   border: 3px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-clay); }
+.hilfe-kopf { display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; margin-bottom: 1.2rem; }
+.hilfe-kopf h1 { margin-bottom: 0.15rem; }
+.hilfe-kopf .sub { margin-bottom: 0; }
+.help-center-header { padding-bottom: 0.9rem; border-bottom: 1px solid var(--border); }
+.help-doc-label { padding: 0.55rem 0.7rem; border: 1px solid var(--border-firm);
+  color: var(--muted); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+  line-height: 1.4; text-align: right; }
+.help-doc-label span { color: var(--faint); font-size: 0.62rem; font-weight: 600; }
+.help-panel-intro { margin: 0 0 1rem; padding: 0.7rem 0.85rem; color: var(--muted);
+  background: var(--surface-2); border-left: 3px solid var(--ink); font-size: 0.86rem; }
+.help-panel-intro strong { color: var(--text); }
+.hilfe-kopf-marke { display: grid; place-items: center; width: 3rem; height: 3rem;
+  border: 3px solid var(--ink); border-radius: 50%; color: var(--ink);
+  font-size: 1.5rem; font-weight: 700; background: var(--ink-soft); }
+.hilfe-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+  gap: 0.8rem; margin-bottom: 0.8rem; }
+.hilfe-card { margin-bottom: 0.8rem; }
+.hilfe-card h2 { margin-top: 0; font-size: 1.15rem; }
+.hilfe-card p { max-width: 72ch; }
+.hilfe-card-primary { border-left: 5px solid var(--ink); }
+.hilfe-kapitel { display: block; margin-bottom: 0.45rem; color: var(--ink);
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.hilfe-schritte { display: grid; gap: 0.8rem; padding-left: 1.4rem; margin: 0; }
+.hilfe-schritte li { padding-left: 0.25rem; }
+.hilfe-schritte strong, .hilfe-schritte span { display: block; }
+.hilfe-schritte span { margin-top: 0.18rem; color: var(--muted); font-size: 0.86rem; }
+.hilfe-tabelle th, .hilfe-tabelle td { padding: 0.65rem 0.75rem; }
+.hilfe-tabelle td:first-child { font-weight: 700; color: var(--text); white-space: nowrap; }
+.hilfe-timeline { display: grid; gap: 0.8rem; margin-top: 1rem; }
+.hilfe-timeline > div { display: flex; gap: 0.8rem; align-items: flex-start; }
+.hilfe-timeline b { display: grid; place-items: center; flex: 0 0 1.8rem; height: 1.8rem;
+  border-radius: 50%; background: var(--ink); color: #fff; font-size: 0.8rem; }
+.hilfe-timeline strong, .hilfe-timeline small { display: block; }
+.hilfe-timeline small { margin-top: 0.15rem; color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
+.hilfe-notiz { display: flex; gap: 0.7rem; align-items: baseline; border-left: 5px solid var(--ok); }
+.hilfe-notiz span { color: var(--muted); font-size: 0.86rem; }
+.help-section { margin-bottom: 1rem; padding: 1.15rem 1.2rem; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-clay); }
+.help-section > h2 { margin-top: 0; font-size: 1.15rem; }
+.help-section-heading { display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 1rem; }
+.help-section-heading > span { color: var(--ink); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; }
+.help-section-heading h2, .help-section-heading p { margin: 0; }
+.help-section-heading p { margin-top: 0.2rem; color: var(--muted); font-size: 0.86rem; }
+.help-reference { border-top: 1px solid var(--border); }
+.help-reference-row { display: grid; grid-template-columns: minmax(150px, 0.7fr) minmax(220px, 1.4fr) minmax(190px, 1fr);
+  gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
+.help-reference-row strong { color: var(--text); }
+.help-reference-head { color: var(--faint); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
+.help-status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.7rem; }
+.help-status-grid > div { padding: 0.8rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.help-status-grid p { margin: 0.5rem 0 0; color: var(--muted); font-size: 0.82rem; line-height: 1.4; }
+.help-grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.help-compact-list { margin: 0; padding-left: 1.2rem; color: var(--muted); font-size: 0.86rem; line-height: 1.65; }
+@media (max-width: 760px) {
+  .hilfe-grid { grid-template-columns: 1fr; }
+  .hilfe-kopf { align-items: flex-start; }
+  .hilfe-tabelle { min-width: 620px; }
+  .hilfe-notiz { display: block; }
+  .help-reference { overflow-x: auto; }
+  .help-reference-row { min-width: 660px; }
+  .help-grid-two { grid-template-columns: 1fr; }
+}
 .lernstand-kopf { display: flex; align-items: flex-start; justify-content: space-between;
   gap: 1rem; margin-bottom: 1rem; }
 .lernstand-kopf h1 { margin-bottom: 0.15rem; }

@@ -46,6 +46,20 @@ def test_new_navigation_and_empty_pages(client, fake_llm, fake_cli):
     assert client.get("/ui/status", follow_redirects=False).status_code == 303
 
 
+def test_help_page_has_documentation_tabs(client, fake_llm, fake_cli):
+    einrichten(client, fake_llm)
+    page = client.get("/hilfe")
+    assert page.status_code == 200
+    assert 'class="tab-btn" data-tab="start"' in page.text
+    assert 'class="tab-btn" data-tab="ablauf"' in page.text
+    assert 'class="tab-btn" data-tab="bereiche"' in page.text
+    assert 'class="tab-btn" data-tab="flaggen"' in page.text
+    assert 'class="tab-btn" data-tab="datenschutz"' in page.text
+    assert 'class="tab-btn" data-tab="einstellungen"' in page.text
+    assert "KARO HELP CENTER" in page.text
+    assert "Karo verwendet zuerst das Material" in page.text
+
+
 def test_upload_proposals_and_manual_topic_use_rendered_fields(client, fake_llm, fake_cli, app_env, tmp_path):
     einrichten(client, fake_llm)
     image = make_jpeg(tmp_path / "schule.jpg")

@@ -261,6 +261,11 @@ def lernstand(request: Request):
                   rule_min_evidenz=cfg.rule_min_evidenz)
 
 
+@router.get("/hilfe", response_class=HTMLResponse)
+def hilfe(request: Request):
+    return render(request, "hilfe.html")
+
+
 @router.post("/export")
 async def export_jetzt(request: Request):
     pfad = await run_in_threadpool(export.nach_freigabe)

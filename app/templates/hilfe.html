@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Hilfe – Karo{% endblock %}
+{% block content %}
+<div class="hilfe-kopf help-center-header">
+  <div>
+    <p class="eyebrow">KARO HELP CENTER</p>
+    <h1>Dokumentation</h1>
+    <p class="sub">Vollständige Referenz: Arbeitsablauf, Bereiche, Bewertung, Datenschutz und Einstellungen.</p>
+  </div>
+  <div class="help-doc-label">DOCUMENTATION<br><span>VERSION 2.0</span></div>
+</div>
+
+<div class="tabs" data-tabgroup="hilfe" role="tablist" aria-label="Hilfebereiche">
+  <button type="button" class="tab-btn" data-tab="start">Übersicht</button>
+  <button type="button" class="tab-btn" data-tab="ablauf">Arbeitsablauf</button>
+  <button type="button" class="tab-btn" data-tab="bereiche">Bereiche</button>
+  <button type="button" class="tab-btn" data-tab="flaggen">Flaggen &amp; Bewertung</button>
+  <button type="button" class="tab-btn" data-tab="datenschutz">Datenschutz &amp; Recherche</button>
+  <button type="button" class="tab-btn" data-tab="einstellungen">Einstellungen &amp; Support</button>
+</div>
+
+<div class="tab-panel" data-tabgroup="hilfe" data-tab="start">
+  <p class="help-panel-intro"><strong>Übersicht</strong> · Zweck: verstehen, wie Karo Wissensbasis, Themen, Lernen und Lernstand miteinander verbindet.</p>
+  <section class="card hilfe-card hilfe-card-primary">
+    <span class="hilfe-kapitel">Was Karo ist</span>
+    <h2>Ein Lernbegleiter für ein Kind und ein Fach</h2>
+    <p>Karo liest die Blätter aus dem Unterricht, prüft daran den Stand je Thema, erklärt die Lücken mit genau dem Rechenweg aus diesen Blättern und fragt danach nach, bis das Thema sitzt. Karo läuft ausschließlich auf dem eigenen Rechner der Familie.</p>
+  </section>
+  <div class="hilfe-grid">
+    <section class="card hilfe-card hilfe-card-primary">
+      <span class="hilfe-kapitel">01</span>
+      <h2>In drei Schritten loslegen</h2>
+      <ol class="hilfe-schritte">
+        <li><strong>Schulmaterial einlesen</strong><span>Ein Blatt in der Wissensbasis hochladen oder aus dem Ablageordner einlesen.</span></li>
+        <li><strong>Themen freigeben</strong><span>Karo schlägt Themen vor. Sie prüfen die Namen und übernehmen nur, was passt.</span></li>
+        <li><strong>Lernen starten</strong><span>Unter Themen eine Erklärung oder eine Prüfung für das gewünschte Thema starten.</span></li>
+      </ol>
+    </section>
+    <section class="card hilfe-card">
+      <span class="hilfe-kapitel">Wichtig</span>
+      <h2>Die Grundregel</h2>
+      <p>Karo verwendet zuerst das Material aus dem Unterricht. So erklärt die App nach dem Rechenweg, den das Kind tatsächlich lernen soll.</p>
+      <p class="hint">Internetquellen sind eine Ergänzung. Sie werden nie automatisch als Lernstoff verwendet.</p>
+    </section>
+  </div>
+
+  <section class="card hilfe-card">
+    <h2>Was Sie regelmäßig tun</h2>
+    <table class="hilfe-tabelle">
+      <thead><tr><th>Aufgabe</th><th>Wo?</th><th>Ergebnis</th></tr></thead>
+      <tbody>
+        <tr><td>Neues Blatt hinzufügen</td><td>Wissensbasis</td><td>Erklärungen, Regeln und Aufgaben werden erkannt.</td></tr>
+        <tr><td>Themen prüfen</td><td>Themen &gt; Vorschläge</td><td>Nur freigegebene Themen erscheinen im Lernbereich.</td></tr>
+        <tr><td>Antworten freigeben</td><td>Themen &gt; Prüfung</td><td>Erst nach Ihrer Bestätigung fließt eine Antwort in die Flagge ein.</td></tr>
+        <tr><td>Lernstand ansehen</td><td>Lernstand</td><td>Status und Antworten je Thema werden verständlich zusammengefasst.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card hilfe-card hilfe-notiz">
+    <strong>Was Karo bewusst nicht tut</strong>
+    <span>Es löst keine Aufgaben für das Kind, setzt keine Flagge ohne menschliche Freigabe, benutzt keine Fundstelle ohne Freigabe und überträgt nichts an den Hersteller.</span>
+  </section>
+</div>
+
+<div class="tab-panel" data-tabgroup="hilfe" data-tab="ablauf">
+  <p class="help-panel-intro"><strong>Arbeitsablauf</strong> · Zweck: nachvollziehen, was Karo in jeder Phase verarbeitet und welche Entscheidung als Nächstes ansteht.</p>
+  <section class="card hilfe-card">
+    <span class="hilfe-kapitel">Der Lernzyklus</span>
+    <h2>Von der Wissensbasis bis zur Klassenarbeit</h2>
+    <div class="hilfe-timeline">
+      <div><b>1</b><span><strong>Wissensbasis</strong><small>Erklär- und Aufgabenblätter werden eingelesen, in Abschnitte zerlegt und durchsuchbar abgelegt. Das ist die Faktenquelle für alles Weitere — Karo erfindet keinen Rechenweg.</small></span></div>
+      <div><b>2</b><span><strong>Themen</strong><small>Karo schlägt aus den Blättern Themen vor, ein Erwachsener gibt sie frei oder legt eigene an.</small></span></div>
+      <div><b>3</b><span><strong>Prüfen</strong><small>Zu jedem Thema erzeugt Karo Fragen — am Bildschirm oder als druckbares Blatt. Das Kind antwortet.</small></span></div>
+      <div><b>4</b><span><strong>Freigabe</strong><small>Nichts wird gespeichert, bevor ein Mensch jede Frage bestätigt, korrigiert oder bewusst übersprungen hat. Diese Freigabe ist nicht abschaltbar.</small></span></div>
+      <div><b>5</b><span><strong>Flagge</strong><small>Aus den freigegebenen Antworten berechnet Karo je Thema eine Flagge — mit einer festen Regel im Code, nicht durch das Sprachmodell.</small></span></div>
+      <div><b>6</b><span><strong>Erklären</strong><small>Zu roten und gelben Themen baut Karo eine Lerneinheit aus den eigenen Blättern (Fakten) und optional Fundstellen aus dem Netz (nur Anregung, nur nach Freigabe).</small></span></div>
+      <div><b>7</b><span><strong>Gegenprüfung</strong><small>Bevor das Kind die Erklärung sieht, prüft Karo sie gegen das Schulmaterial. Widerspricht sie dem dort gelernten Weg, wird sie verworfen und neu geschrieben — nicht angezeigt.</small></span></div>
+      <div><b>8</b><span><strong>Nachfragen im Kreis</strong><small>Nach dem Lernen kommen Verständnisfragen. Sitzt es noch nicht, erklärt Karo eine Stufe einfacher und fragt neu — bis zur eingestellten Höchstzahl an Runden. Danach hilft ein Mensch mehr als eine weitere Erklärung.</small></span></div>
+      <div><b>9</b><span><strong>Klassenarbeit</strong><small>Vorher friert Karo die Einschätzung ein, nachher wird verglichen — die einzige echte Messung, ob das System funktioniert.</small></span></div>
+    </div>
+  </section>
+  <div class="hilfe-grid">
+    <section class="card hilfe-card">
+      <h2>Mehr zum Thema</h2>
+      <p>Damit können Sie eine neue Erklärung anfordern, ohne alte Texte oder Videos zu verlieren. Die neue Erklärung erhält zusätzlichen Kontext und erscheint als neue Einheit.</p>
+    </section>
+    <section class="card hilfe-card">
+      <h2>Wenn etwas nicht passt</h2>
+      <p>Bei einer Unsicherheit startet Karo eine weitere Runde mit einer angepassten Erklärung. Alte Runden bleiben unter <strong>Runden</strong> abrufbar.</p>
+    </section>
+  </div>
+</div>
+
+<div class="tab-panel" data-tabgroup="hilfe" data-tab="bereiche">
+  <p class="help-panel-intro"><strong>Bereiche</strong> · Zweck: schnell den richtigen Ort für eine Aufgabe finden.</p>
+  <section class="card hilfe-card">
+    <h2>Die wichtigsten Bereiche</h2>
+    <table class="hilfe-tabelle bereiche-tabelle">
+      <thead><tr><th>Bereich</th><th>Wofür er da ist</th><th>Typische Aktion</th></tr></thead>
+      <tbody>
+        <tr><td><a href="/">Übersicht</a></td><td>Einstieg mit Kurzüberblick über offene Aufgaben und Status.</td><td>Nächsten Schritt öffnen</td></tr>
+        <tr><td><a href="/wissen">Wissensbasis</a></td><td>Unterrichtsmaterial als Faktengrundlage sammeln und prüfen.</td><td>Blatt hochladen, Abschnitt ansehen</td></tr>
+        <tr><td><a href="/themen">Themen</a></td><td>Themen freigeben, prüfen und Erklärungen starten.</td><td>Vorschlag übernehmen, lernen</td></tr>
+        <tr><td><a href="/recherche">Recherche</a></td><td>Zusätzliche, erlaubte Lernquellen verwalten und Fundstellen freigeben.</td><td>Quelle aktivieren, Fund freigeben</td></tr>
+        <tr><td><a href="/lernstand">Lernstand</a></td><td>Status, Antwortquoten und zeitlichen Verlauf ansehen.</td><td>Verlauf nach Jahr, Monat, Woche oder Tag gruppieren</td></tr>
+        <tr><td><a href="/klassenarbeit">Klassenarbeit</a></td><td>Prüfungen und Themen für einen Termin vorbereiten.</td><td>Arbeit anlegen, Verlauf prüfen</td></tr>
+        <tr><td><a href="/protokoll">Protokoll</a></td><td>Jeden Modellaufruf im Wortlaut einsehen, inklusive geschätzter Kosten.</td><td>Gesendeten Text prüfen, Trefferquote bewerten</td></tr>
+        <tr><td><a href="/setup">Einstellungen</a></td><td>Kind, Fach, Klassenstufe, Ausgabeformate und Verbindungen verwalten.</td><td>Ausgabeformat auswählen</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card hilfe-card">
+    <h2>Drei Ausgabeformen für das Lernmaterial</h2>
+    <p>Die Wahl fällt je Lerneinheit, nicht einmal bei der Einrichtung — vor dem Erzeugen, auf der Themenseite.</p>
+    <table class="hilfe-tabelle">
+      <thead><tr><th>Modus</th><th>Was entsteht</th><th>Voraussetzung</th></tr></thead>
+      <tbody>
+        <tr><td>Folien mit Stimme</td><td>Autarke HTML-Datei: Folien zum Mitlesen, vorgelesen über die Sprachausgabe des Browsers, blättert selbst weiter.</td><td>Keine — Standard</td></tr>
+        <tr><td>Video (MP4)</td><td>Dieselben Folien als Video mit gesprochener Erklärung, offline erzeugt.</td><td>Volle Docker-Variante und einmal geladene Stimme</td></tr>
+        <tr><td>NotebookLM</td><td>Karo lässt ein Google-NotebookLM-Video-Overview erzeugen und legt es als MP4 ab.</td><td>Einmalige Anmeldung mit einem Google-Konto</td></tr>
+      </tbody>
+    </table>
+    <p class="hint">Fällt NotebookLM aus (Sitzung abgelaufen, Google-Oberfläche geändert), weicht Karo automatisch auf Folien mit Stimme aus und vermerkt das in der Lerneinheit.</p>
+  </section>
+</div>
+
+<div class="tab-panel" data-tabgroup="hilfe" data-tab="flaggen">
+  <p class="help-panel-intro"><strong>Flaggen &amp; Bewertung</strong> · Zweck: verstehen, wie Karo den Lernstand je Thema berechnet — der Kern des Produkts.</p>
+  <section class="help-section">
+    <div class="help-section-heading">
+      <span>REGEL</span>
+      <div>
+        <h2>Eine feste Regel im Code, kein Sprachmodell</h2>
+        <p>Die Flagge entscheidet eine reine Funktion anhand der freigegebenen Antworten — niemals eine Einschätzung des Modells.</p>
+      </div>
+    </div>
+    <div class="help-status-grid">
+      <div><span class="pill rot">Lücke (rot)</span><p>2× derselbe Verständnisfehler in den letzten 5 Antworten.</p></div>
+      <div><span class="pill gelb">wackelig (gelb)</span><p>Gemischtes Bild — der Normalzustand beim Lernen.</p></div>
+      <div><span class="pill gruen">sitzt (grün)</span><p>Die letzten 2 Übungstage vollständig fehlerfrei <strong>und</strong> insgesamt mindestens 3 richtige Antworten.</p></div>
+      <div><span class="pill" style="background:var(--surface-2); color:var(--faint); border:1px solid var(--border)">noch nicht geprüft (weiß)</span><p>Weniger als 2 verwertbare Antworten.</p></div>
+    </div>
+  </section>
+
+  <div class="hilfe-grid">
+    <section class="card hilfe-card hilfe-card-primary">
+      <span class="hilfe-kapitel">Warum in Tagen</span>
+      <h2>Gerechnet wird in Übungstagen, nicht in Zeilen</h2>
+      <p>Ein Blatt liefert fünf bis zehn Antworten am selben Tag — eine zeilenbasierte Regel wäre nie erreichbar. Wer direkt nach der Erklärung dieselben Aufgaben löst, hat sich die Erklärung gemerkt, nicht das Thema gelernt.</p>
+      <p class="hint">Rechenfehler und Flüchtigkeit lösen nie eine Lücke aus — nur derselbe Verständnisfehler, zweimal.</p>
+    </section>
+    <section class="card hilfe-card">
+      <h2>Einstellbar, aber nicht durchs Modell</h2>
+      <p>Alle Schwellen stehen in den Einstellungen. Nach dem Speichern berechnet Karo alle Flaggen sofort neu.</p>
+    </section>
+  </div>
+
+  <section class="card hilfe-card hilfe-notiz">
+    <strong>Warum die Freigabe nicht abschaltbar ist</strong>
+    <span>Wie gut Handschrift erkannt wird, ist die entscheidende Unbekannte. Ohne menschliche Freigabe jeder Antwort gäbe es keine verlässliche Rückmeldung, ob eine Flagge stimmt — die Freigabe ist deshalb die eigentliche Qualitätskontrolle, nicht nur eine Formalie.</span>
+  </section>
+</div>
+
+<div class="tab-panel" data-tabgroup="hilfe" data-tab="datenschutz">
+  <p class="help-panel-intro"><strong>Datenschutz &amp; Recherche</strong> · Zweck: genau wissen, was Karo an das Sprachmodell sendet und was nicht.</p>
+  <div class="hilfe-grid">
+    <section class="card hilfe-card">
+      <h2>Was an Anthropic geht</h2>
+      <ul class="help-compact-list">
+        <li>Das Bild des Blattes, zugeschnitten und verkleinert</li>
+        <li>Klassenstufe, Fach und Thema</li>
+        <li>Der abgelesene Text der Blätter und die Antworten des Kindes im Wortlaut</li>
+        <li>Die Themenliste und, für den Lernplan, die Flaggen samt Fehlerzahlen</li>
+      </ul>
+    </section>
+    <section class="card hilfe-card hilfe-card-primary">
+      <span class="hilfe-kapitel">Nicht übertragen</span>
+      <h2>Name, Schule, Geburtsdatum, Lehrkraft</h2>
+      <p>Soweit Karo sie erkennt. Der eingetragene Vorname wird nur lokal gespeichert und dient genau dazu: Karo entfernt ihn aus allem, was hinausgeht — dazu Kopfzeilenmuster wie „Name:“ und Klassenangaben, Schul- und Lehrkraftangaben, Geburtsdaten, E-Mail-Adressen und Telefonnummern.</p>
+      <p class="hint">Was Karo nicht garantieren kann: einen Namen außerhalb des abgeschnittenen Randes — in einer Fußzeile, auf einem Stempel oder mitten in einer Textaufgabe. Unter <a href="/protokoll">Protokoll</a> sehen Sie zu jedem Aufruf den gesendeten Text im Wortlaut; das gesendete Bild sehen Sie je Blatt auf der Freigabeseite.</p>
+    </section>
+  </div>
+
+  <section class="card hilfe-card">
+    <h2>Wo die Daten liegen</h2>
+    <p>Datenbank, Wissensbasis, Lernmaterial, Protokolle und Zugangsdaten liegen ausschließlich im Docker-Volume auf Ihrem Rechner. Karo hat keinen eigenen Server, keine Telemetrie und keinen Konto-Zwang. Für die private Nutzung in der eigenen Familie greift die Haushaltsausnahme der DSGVO.</p>
+  </section>
+
+  <section class="card hilfe-card">
+    <h2>Recherche: was Karo im Netz sucht</h2>
+    <p>Zwei Quellen gehen in eine Erklärung ein — die eigenen Blätter und, wenn erlaubt, Fundstellen aus dem Netz. Für die Fundstellen gelten drei Regeln:</p>
+    <ol class="hilfe-schritte">
+      <li><strong>Feste Quellenliste</strong><span>Gesucht wird nur auf ausgewählten Seiten für deutschen Schulunterricht und bekannten Schulkanälen bei YouTube. Die Liste zu erweitern ist eine bewusste Codeänderung.</span></li>
+      <li><strong>Freigabe</strong><span>Kein Fund wird automatisch benutzt. Er erscheint unter Recherche als Vorschlag, ein Erwachsener hakt ihn ab.</span></li>
+      <li><strong>Anregung, keine Faktenquelle</strong><span>Auch ein freigegebener Fund geht nur als Titel in die Erklärung ein. Die Fakten kommen aus dem Schulmaterial.</span></li>
+    </ol>
+    <p class="hint">Ohne Recherche funktioniert Karo vollständig — unter Einstellungen &gt; Lernverhalten abschaltbar.</p>
+  </section>
+</div>
+
+<div class="tab-panel" data-tabgroup="hilfe" data-tab="einstellungen">
+  <p class="help-panel-intro"><strong>Einstellungen &amp; Support</strong> · Zweck: Verbindungen, Ausgabeformate, Sicherungen und lokale Daten sicher verwalten.</p>
+  <div class="hilfe-grid">
+    <section class="card hilfe-card">
+      <h2>Claude und NotebookLM</h2>
+      <p>Die Anzeigen oben zeigen den aktuellen Verbindungsstatus. Grün bedeutet verbunden, rot bedeutet nicht verfügbar.</p>
+      <table class="hilfe-tabelle">
+        <thead><tr><th>Verbindung</th><th>Wofür sie gebraucht wird</th><th>Wo ändern?</th></tr></thead>
+        <tbody>
+          <tr><td>Claude</td><td>Erklärungen, Themenvorschläge und Prüfungen.</td><td><a href="/setup#claude-verbindung">Einstellungen</a></td></tr>
+          <tr><td>NotebookLM</td><td>Optionales Videoformat.</td><td><a href="/setup#notebooklm-verbindung">Einstellungen</a></td></tr>
+        </tbody>
+      </table>
+      <p class="hint">Läuft die NotebookLM-Sitzung ab, meldet Karo das auf der Einstellungsseite — „Jetzt anmelden“ reicht dann erneut, direkt im Browser, ohne Terminal.</p>
+    </section>
+    <section class="card hilfe-card">
+      <h2>Weitere Einstellungsbereiche</h2>
+      <table class="hilfe-tabelle">
+        <tbody>
+          <tr><td><a href="/setup#ausgabe">Ausgabeformat</a></td><td>Voreinstellung für neue Lerneinheiten.</td></tr>
+          <tr><td><a href="/setup#lernverhalten">Lernverhalten</a></td><td>Max. Runden pro Thema, Recherche an/aus.</td></tr>
+          <tr><td><a href="/setup#blaetter">Schulblätter &amp; Speicher</a></td><td>Drive-Ordner, Kopfrand-Beschnitt.</td></tr>
+          <tr><td><a href="/setup#passwort">Passwort</a></td><td>Zugang zu dieser Karo-Instanz.</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <section class="card hilfe-card">
+    <h2>Lokale Daten &amp; Zugangsdaten</h2>
+    <p>Zugangsdaten liegen ausschließlich in <code>/data/config.json</code> im Docker-Volume, mit Dateirechten <code>0600</code> — nicht im Image, nicht im Quellcode, nicht in Git. Ein Formatter schwärzt Schlüssel- und Tokenmuster in den Protokollen, bevor eine Zeile geschrieben wird.</p>
+    <p class="hint">Zugang wechseln oder löschen: Einstellungen → „Zugangsdaten löschen und neu eingeben“. Personenbezogene Angaben werden vor Modellaufrufen soweit möglich geschwärzt — teilen Sie die lokalen Datenordner nicht ungeschützt.</p>
+  </section>
+
+  <section class="card hilfe-card">
+    <h2>Sicherung &amp; Wiederherstellung</h2>
+    <p>Auf dem Rechner, auf dem Karo läuft, im Terminal:</p>
+    <table class="hilfe-tabelle">
+      <thead><tr><th>Befehl</th><th>Wirkung</th></tr></thead>
+      <tbody>
+        <tr><td><code>make backup</code></td><td>Sichert nach <code>./sicherung/</code>, ohne Zugangsdaten.</td></tr>
+        <tr><td><code>make backup-alles</code></td><td>Sichert alles, inklusive API-Schlüssel/Token.</td></tr>
+        <tr><td><code>make restore ARCHIV=…</code></td><td>Stellt einen Schnappschuss wieder her.</td></tr>
+      </tbody>
+    </table>
+    <p class="hint">Nach einer Wiederherstellung fragt Karo die Zugangsdaten erneut ab, falls nicht mit gesichert. Testen Sie die Wiederherstellung einmal, solange nichts kaputt ist.</p>
+  </section>
+
+  <section class="card hilfe-card hilfe-notiz">
+    <strong>Bei einem Fehler</strong>
+    <span>Prüfen Sie zuerst den roten Status oben, öffnen Sie die Einstellungen und laden Sie die betroffene Seite anschließend neu. Bereits gespeicherte Lernrunden bleiben erhalten. Bei einer abgelaufenen NotebookLM-Sitzung genügt eine erneute Anmeldung; bei einem ausgeschöpften Abo-Kontingent arbeitet Karo den Vorgang später automatisch erneut ab.</span>
+  </section>
+</div>
+{% endblock %}
