@@ -1,5 +1,7 @@
 """Authentifizierung und Setup."""
 
+import dataclasses
+
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.concurrency import run_in_threadpool
@@ -108,7 +110,12 @@ def _waehle(modelle: list[dict], teil: str) -> str:
 def setup_form(request: Request):
     cfg = config.load_safe()
     modelle = _modelle(cfg) if cfg.has_credentials else []
-    schritt = "modell" if cfg.has_credentials else "start"
+    # Nach abgeschlossener Einrichtung IMMER die Einstellungsseite zeigen,
+    # auch wenn die Zugangsdaten gerade fehlen (z. B. nach „Trennen“) — sonst
+    # faellt die Seite zurueck auf den Einrichtungsassistenten und der Zugriff
+    # auf alle anderen Einstellungen geht verloren. Die Claude-Karte dort
+    # zeigt den fehlenden Zugang ohnehin schon mit einem Verbinden-Formular.
+    schritt = "modell" if cfg.setup_complete or cfg.has_credentials else "start"
     return render(request, "setup.html", schritt=schritt,
                   **_setup_context(cfg, modelle))
 
@@ -179,9 +186,37 @@ def setup_finish(request: Request, model_vision: str = Form(""),
     cfg = config.load()
     erstmalig = not cfg.setup_complete
 
+    # Vor jeder Validierung erst den Entwurf aus dem Formular bilden: schlägt
+    # eine Prüfung (z. B. das Passwort) fehl, zeigt die Seite genau das, was
+    # gerade eingetippt war — nicht den alten, gespeicherten Stand. Sonst
+    # wirkt es, als wäre die Eingabe bei jedem Fehler verworfen worden, auch
+    # wenn tatsächlich nur das Passwortfeld das Problem war.
+    gueltige = {m["id"] for m in _modelle(cfg)}
+    try:
+        crop = max(0, min(25, int(header_crop)))
+    except ValueError:
+        crop = cfg.header_crop_percent
+    try:
+        runden = max(1, min(8, int(max_lernrunden)))
+    except ValueError:
+        runden = cfg.max_lernrunden
+    entwurf = dataclasses.replace(
+        cfg,
+        model_vision=model_vision if model_vision in gueltige else cfg.model_vision,
+        model_text=model_text if model_text in gueltige else cfg.model_text,
+        header_crop_percent=crop,
+        default_ausgabe=(default_ausgabe
+                        if default_ausgabe in {a.value for a in Ausgabe}
+                        else cfg.default_ausgabe),
+        tts_stimme=tts_stimme or cfg.tts_stimme,
+        max_lernrunden=runden,
+        recherche_erlaubt=recherche == "ja",
+    )
+
     def zurueck_setup(meldung: str):
         return render(request, "setup.html", schritt="modell", error=meldung,
-                      status_code=400, **_setup_context(cfg, _modelle(cfg)))
+                      invalid=True, status_code=400, cfg=entwurf.public_dict(),
+                      **_setup_context(entwurf, _modelle(cfg)))
 
     if not cfg.has_credentials:
         return zurueck("/setup")
@@ -195,26 +230,14 @@ def setup_finish(request: Request, model_vision: str = Form(""),
             return zurueck_setup(f"Das Passwort muss mindestens "
                            f"{security.MIN_PASSWORD_LENGTH} Zeichen haben.")
 
-    gueltige = {m["id"] for m in _modelle(cfg)}
-    try:
-        crop = max(0, min(25, int(header_crop)))
-    except ValueError:
-        crop = cfg.header_crop_percent
-    try:
-        runden = max(1, min(8, int(max_lernrunden)))
-    except ValueError:
-        runden = cfg.max_lernrunden
-
     aenderungen = {
-        "model_vision": model_vision if model_vision in gueltige else cfg.model_vision,
-        "model_text": model_text if model_text in gueltige else cfg.model_text,
-        "header_crop_percent": crop,
-        "default_ausgabe": (default_ausgabe
-                            if default_ausgabe in {a.value for a in Ausgabe}
-                            else cfg.default_ausgabe),
-        "tts_stimme": tts_stimme or cfg.tts_stimme,
-        "max_lernrunden": runden,
-        "recherche_erlaubt": recherche == "ja",
+        "model_vision": entwurf.model_vision,
+        "model_text": entwurf.model_text,
+        "header_crop_percent": entwurf.header_crop_percent,
+        "default_ausgabe": entwurf.default_ausgabe,
+        "tts_stimme": entwurf.tts_stimme,
+        "max_lernrunden": entwurf.max_lernrunden,
+        "recherche_erlaubt": entwurf.recherche_erlaubt,
         "setup_complete": True,
     }
     if password:
@@ -233,12 +256,16 @@ def setup_finish(request: Request, model_vision: str = Form(""),
     if aenderungen["default_ausgabe"] == Ausgabe.NOTEBOOKLM.value:
         from ..media import notebooklm
         ok, _ = notebooklm.verfuegbar()
-        if ok and notebooklm.login_start():
+        # Nur anbieten, wenn wirklich noch keine gueltige Anmeldung vorliegt —
+        # sonst wuerde jedes Speichern (auch nur eines unabhaengigen Feldes
+        # wie „Max. Runden") die Google-Anmeldung erneut aufreissen, obwohl
+        # NotebookLM laengst verbunden ist.
+        if not ok and notebooklm.login_start():
             flash(request, meldung + " Die NotebookLM-Anmeldung wird "
                            "vorbereitet — bitte auf dieser Seite anmelden.")
             return zurueck("/setup")
     flash(request, meldung)
-    return zurueck("/")
+    return zurueck("/setup" if not erstmalig else "/")
 
 
 @router.post("/setup/claude/verbinden")

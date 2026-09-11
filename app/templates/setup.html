@@ -133,6 +133,20 @@ claude setup-token                         <span class="c-com"># Token wird ange
   <button type="button" class="setup-nav-btn" data-zeigt="blaetter">Blätter &amp; Speicher</button>
   <button type="button" class="setup-nav-btn" data-zeigt="passwort">Passwort</button>
 </nav>
+
+{#- Claude- und NotebookLM-Verbindung brauchen je ihr eigenes <form> mit
+   eigener action. Ein <form> im <form> ist ungueltiges HTML — der Browser
+   wuerde das aeussere Formular beim ersten schliessenden </section>
+   unbemerkt zuklappen und alles danach aus dem Formular herausfallen
+   lassen. Deshalb stehen beide Verbindungs-Sektionen (Claude, NotebookLM)
+   HIER, vollstaendig VOR dem eigentlichen Einstellungen-Formular weiter
+   unten — jede ihrer <form>s ist damit eine vollstaendige, nicht
+   verschachtelte Geschwister-Sektion. Die zugehoerigen Reiter-Knoepfe oben
+   zeigen trotzdem dieselbe Kategorie: welche Sektion sichtbar ist, richtet
+   sich per JavaScript nach data-kategorie, nicht nach der Reihenfolge im
+   Dokument — siehe das Skript ganz unten. Der "Claude"-Reiter zeigt daher
+   zwei <section data-kategorie="claude">-Bloecke gleichzeitig: die
+   Verbindung hier, die KI-Modelle weiter unten im Formular. -#}
 <div class="setup-panels">
 
 <section class="setup-panel" data-kategorie="claude">
@@ -190,15 +204,21 @@ claude setup-token                         <span class="c-com"># Token wird ange
     umschalten();
   })();
 </script>
+</section>
 
 {% macro nlm_anmelde_knopf(taste_text) %}
-{#- Bewusst KEIN <form>: dieser Knopf steht auch innerhalb der grossen
-   /setup/finish-Form (bei der Ausgabe-Auswahl), und ein <form> im <form>
-   ist ungueltiges HTML mit unvorhersehbarem Absende-Verhalten. Der Klick
-   wird stattdessen per fetch() geschickt (siehe Skript unten). -#}
 <div data-nlm-block>
+  {#- Jetzt ein echtes <form>: die Ausgabe-Sektion steht seit der Aufteilung
+     in ein alleinstehendes settings-form (siehe oben) in keinem umgebenden
+     <form> mehr, also ist das hier gefahrlos moeglich. Der Klick wird
+     trotzdem per fetch() abgefangen (siehe Skript unten) — wegen des
+     eingebetteten VNC-Fensters darf die Seite dabei nicht neu laden. -#}
+  <form method="post" action="/setup/notebooklm/anmelden" id="nlm-anmelden-form"
+        onsubmit="return false">
+    {{ csrf_input() }}
+  </form>
   <div class="actions">
-    <button type="button" class="quiet"
+    <button type="submit" form="nlm-anmelden-form" class="quiet"
             data-nlm-login-btn data-csrf="{{ csrf }}" data-csrf-field="{{ csrf_field }}">
       {{ taste_text }}</button>
     <button type="button" class="quiet" {{ 'disabled' if not nlm_ok }}
@@ -212,34 +232,6 @@ claude setup-token                         <span class="c-com"># Token wird ange
   {% endif %}
 </div>
 {% endmacro %}
-
-<form method="post" action="/setup/finish">
-  {{ csrf_input() }}
-
-  <div class="card">
-    <h3>KI-Modelle {{ hilfe('Stärker für Handschrift, billiger für Texte.') }}</h3>
-    {% if modelle %}
-    <div class="row">
-      <div class="field">
-        <label for="model_vision">Handschrift lesen</label>
-        <select id="model_vision" name="model_vision">
-          {% for m in modelle %}
-          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_vision }}>{{ m.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field">
-        <label for="model_text">Texte erzeugen</label>
-        <select id="model_text" name="model_text">
-          {% for m in modelle %}
-          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_text }}>{{ m.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-    {% endif %}
-  </div>
-</section>
 
 <section class="setup-panel" data-kategorie="notebooklm">
 <div class="card" id="notebooklm-verbindung">
@@ -342,35 +334,79 @@ claude setup-token                         <span class="c-com"># Token wird ange
 </script>
 </section>
 
+{#- Ab hier ist wieder ein ganz normales, durchgehendes <form> moeglich:
+   Claude und NotebookLM mit ihren eigenen <form>s liegen jetzt komplett
+   VOR dieser Stelle (siehe Kommentar oben), also verschachtelt sich hier
+   nichts mehr. -#}
+<form id="settings-form" data-settings-form{% if invalid %} data-invalid="true"{% endif %}
+      method="post" action="/setup/finish">
+  {{ csrf_input() }}
+
+<section class="setup-panel" data-kategorie="claude">
+  <div class="card">
+    <h3>KI-Modelle {{ hilfe('Stärker für Handschrift, billiger für Texte.') }}</h3>
+    {% if modelle %}
+    <div class="row">
+      <div class="field">
+        <label for="model_vision">Handschrift lesen</label>
+        <select id="model_vision" name="model_vision">
+          {% for m in modelle %}
+          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_vision }}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="model_text">Texte erzeugen</label>
+        <select id="model_text" name="model_text">
+          {% for m in modelle %}
+          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_text }}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
 <section class="setup-panel" data-kategorie="ausgabe">
   <div class="card">
     <h3>Ausgabeformat {{ hilfe('Kann bei jeder Runde neu gewählt werden.') }}</h3>
-    {% for wert, label in ausgabe_labels.items() %}
-    <label class="wahl">
-      <input type="radio" name="default_ausgabe" value="{{ wert }}"
-             {{ 'checked' if cfg.default_ausgabe == wert }}>
-      <span>
-        <b>{{ label }}
-          {% if wert == 'notebooklm' %}
-            {{ hilfe(ausgabe_hints[wert] ~ ' Verbinden/Trennen: oben bei „NotebookLM-Verbindung“.') }}
-          {% else %}
-            {{ hilfe(ausgabe_hints[wert]) }}
-          {% endif %}
-        </b>
-      </span>
-    </label>
-    {% if wert == 'mp4' %}
-    <div class="field" style="margin:-.3rem 0 .7rem 2.1rem">
+    {% set nlm_zusatz = ' Verbinden/Trennen: oben bei „NotebookLM-Verbindung“.' %}
+    <div class="field">
+      <label for="default_ausgabe">Voreinstellung</label>
+      <select id="default_ausgabe" name="default_ausgabe" form="settings-form">
+        {% for wert, label in ausgabe_labels.items() %}
+        <option value="{{ wert }}" {{ 'selected' if cfg.default_ausgabe == wert }}
+                data-hinweis="{{ ausgabe_hints[wert] }}{{ nlm_zusatz if wert == 'notebooklm' else '' }}">
+          {{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="hint" id="default-ausgabe-hinweis">{{ ausgabe_hints.get(cfg.default_ausgabe, '') }}{{
+        nlm_zusatz if cfg.default_ausgabe == 'notebooklm' else '' }}</p>
+    </div>
+    <div class="field" id="feld-tts-stimme" style="margin-top:.4rem"
+         {{ 'hidden' if cfg.default_ausgabe != 'mp4' }}>
       <label for="tts_stimme">Stimme für die MP4-Ausgabe</label>
-      <select id="tts_stimme" name="tts_stimme">
+      <select id="tts_stimme" name="tts_stimme" form="settings-form">
         {% for sw, slabel in stimmen.items() %}
         <option value="{{ sw }}" {{ 'selected' if cfg.tts_stimme == sw }}>{{ slabel }}</option>
         {% endfor %}
       </select>
     </div>
-    {% endif %}
-    {% endfor %}
   </div>
+  <script>
+    (function () {
+      var auswahl = document.getElementById("default_ausgabe");
+      var hinweis = document.getElementById("default-ausgabe-hinweis");
+      var stimmeFeld = document.getElementById("feld-tts-stimme");
+      if (!auswahl) return;
+      auswahl.addEventListener("change", function () {
+        var option = auswahl.options[auswahl.selectedIndex];
+        hinweis.textContent = option.dataset.hinweis || "";
+        if (stimmeFeld) stimmeFeld.hidden = auswahl.value !== "mp4";
+      });
+    })();
+  </script>
 </section>
 
 <section class="setup-panel" data-kategorie="lernverhalten">
@@ -379,12 +415,12 @@ claude setup-token                         <span class="c-com"># Token wird ange
     <div class="row">
       <div class="field" style="flex:0 0 190px">
         <label for="max_lernrunden">Max. Runden pro Thema {{ hilfe('Dann: Mensch statt Maschine.') }}</label>
-        <input type="number" id="max_lernrunden" name="max_lernrunden"
+        <input type="number" id="max_lernrunden" name="max_lernrunden" form="settings-form"
                min="1" max="8" value="{{ cfg.max_lernrunden }}">
       </div>
       <div class="field">
         <label for="recherche">Im Netz suchen {{ hilfe('Funde: Vorschlag, der bestätigt wird.') }}</label>
-        <select id="recherche" name="recherche">
+        <select id="recherche" name="recherche" form="settings-form">
           <option value="ja" {{ 'selected' if cfg.recherche_erlaubt }}>Ja</option>
           <option value="nein" {{ 'selected' if not cfg.recherche_erlaubt }}>Nein, nur eigenes Material</option>
         </select>
@@ -413,17 +449,11 @@ claude setup-token                         <span class="c-com"># Token wird ange
     <input type="file" id="drive-ordner-input" webkitdirectory directory multiple hidden>
 
     <div class="field" style="margin-top:1rem">
-      <label for="header_crop">Oberen Blattrand abschneiden
-        {{ hilfe('Auf deutschen Arbeitsblättern steht oben der Name. Was hier abgeschnitten wird, verlässt den Rechner nicht. Antwortblätter werden nie beschnitten.') }}
+      <label for="header_crop">Oberen Blattrand abschneiden (%)
+        {{ hilfe('Auf deutschen Arbeitsblättern steht oben der Name. Was hier abgeschnitten wird, verlässt den Rechner nicht. Antwortblätter werden nie beschnitten. Richtwerte: 0 = nicht abschneiden, 8 % üblicher Namensbereich, 12 % breiter Kopf, 18 % sehr breiter Kopf.') }}
       </label>
-      <select id="header_crop" name="header_crop">
-        {% for wert, label in [(0, 'nicht abschneiden'),
-                               (8, '8 % – üblicher Namensbereich'),
-                               (12, '12 % – breiter Kopf'),
-                               (18, '18 % – sehr breiter Kopf')] %}
-        <option value="{{ wert }}" {{ 'selected' if cfg.header_crop_percent == wert }}>{{ label }}</option>
-        {% endfor %}
-      </select>
+      <input type="number" id="header_crop" name="header_crop" form="settings-form"
+             min="0" max="25" value="{{ cfg.header_crop_percent }}">
     </div>
   </div>
   <script>
@@ -449,12 +479,12 @@ claude setup-token                         <span class="c-com"># Token wird ange
     <div class="row">
       <div class="field">
         <label for="password">{{ 'Neues Passwort' if cfg.has_password else 'Passwort' }} (min. {{ min_password }} Zeichen)</label>
-        <input type="password" id="password" name="password"
+        <input type="password" id="password" name="password" form="settings-form"
                autocomplete="new-password" {{ '' if cfg.has_password else 'required' }}>
       </div>
       <div class="field">
         <label for="password2">Wiederholen</label>
-        <input type="password" id="password2" name="password2"
+        <input type="password" id="password2" name="password2" form="settings-form"
                autocomplete="new-password">
       </div>
     </div>
