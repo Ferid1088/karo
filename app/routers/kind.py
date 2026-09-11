@@ -197,11 +197,22 @@ def lernen_fragen(request: Request, lesson_id: int,
 
 
 @router.post("/lernen/{lesson_id}/abbrechen")
-def lernen_abbrechen(request: Request, lesson_id: int):
-    teaching.abbrechen(lesson_id, "von Hand beendet")
-    flash(request, "Lerneinheit beendet. Ein noch laufender Vorgang stoppt "
-                   "innerhalb weniger Sekunden.")
-    return zurueck("/themen")
+def lernen_abbrechen(request: Request, lesson_id: int,
+                     prompt_wunsch: str = Form("mehr zum Thema")):
+    alte = teaching.holen(lesson_id)
+    if alte is None:
+        flash(request, "Lerneinheit nicht gefunden.", "err")
+        return zurueck("/themen")
+    teaching.abbrechen(lesson_id, "Neue Erklärung angefordert")
+    try:
+        neue_id = teaching.starten(alte["topic_id"], alte["ausgabe"],
+                                   prompt_wunsch)
+    except TeachingError as exc:
+        flash(request, str(exc), "err")
+        return zurueck("/themen")
+    flash(request, "Neue Erklärung wird vorbereitet. Die bisherigen Inhalte "
+           "und Videos bleiben erhalten.")
+    return zurueck(f"/lernen/{neue_id}")
 
 
 @router.post("/lernen/{lesson_id}/runde/weiter")
@@ -226,6 +237,18 @@ def lernen_forschen(request: Request, lesson_id: int):
     else:
         flash(request, "Die Recherche ist ausgeschaltet oder läuft schon "
                        "für heute.", "warn")
+    return zurueck(f"/lernen/{lesson_id}")
+
+
+@router.post("/lernen/{lesson_id}/ausgabe/erneut")
+def lernen_ausgabe_erneut(request: Request, lesson_id: int,
+                          ausgabe: str = Form("")):
+    try:
+        teaching.ausgabe_erneut(lesson_id, ausgabe or None)
+    except TeachingError as exc:
+        flash(request, str(exc), "err")
+    else:
+        flash(request, "Die Ausgabe wird erneut vorbereitet.")
     return zurueck(f"/lernen/{lesson_id}")
 
 

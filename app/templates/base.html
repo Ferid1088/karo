@@ -38,6 +38,22 @@
       <a href="/protokoll" class="{{ 'on' if path.startswith('/protokoll') }}">Protokoll</a>
     </nav>
     <div class="spacer"></div>
+    <div class="verbindungen-kopf" id="verbindungen-widget">
+      <a class="status" id="status-claude" href="/setup#claude-verbindung">Claude</a>
+      <a class="status" id="status-notebooklm" href="/setup#notebooklm-verbindung">NotebookLM</a>
+    </div>
+    <label class="farbwelt-waehler">
+      <span class="sr">Farbwelt aussuchen</span>
+      <select id="farbwelten-auswahl">
+        <option value="lila">🟣 Zauberlila</option>
+        <option value="ozean">🔵 Meeresblau</option>
+        <option value="wiese">🟢 Wiesengrün</option>
+        <option value="sonne">🟠 Sonnenschein</option>
+        <option value="zuckerwatte">🌸 Zuckerwatte</option>
+        <option value="lava">🔴 Feuerrot</option>
+        <option value="dunkel">🌙 Nachtmodus</option>
+      </select>
+    </label>
     <a href="/setup" class="leise">Einstellungen</a>
     <form method="post" action="/logout" style="display:inline">
       {{ csrf_input() }}
@@ -56,52 +72,62 @@
 </main>
 
 {% if show_nav|default(true) %}
-<div class="farbwelten" id="farbwelten" role="group" aria-label="Farbwelt aussuchen">
-  <button type="button" data-farbe="lila" style="background:#4f46e5" title="Zauberlila" aria-label="Zauberlila"></button>
-  <button type="button" data-farbe="ozean" style="background:#0284c7" title="Meeresblau" aria-label="Meeresblau"></button>
-  <button type="button" data-farbe="wiese" style="background:#16a34a" title="Wiesengrün" aria-label="Wiesengrün"></button>
-  <button type="button" data-farbe="sonne" style="background:#ea580c" title="Sonnenschein" aria-label="Sonnenschein"></button>
-  <button type="button" data-farbe="zuckerwatte" style="background:#db2777" title="Zuckerwatte" aria-label="Zuckerwatte"></button>
-  <button type="button" data-farbe="lava" style="background:#dc2626" title="Feuerrot" aria-label="Feuerrot"></button>
-  <button type="button" data-farbe="dunkel" style="background:radial-gradient(circle at 35% 30%, #4c458f 0%, #262353 55%, #1c1a3a 100%)" title="Nachtmodus" aria-label="Nachtmodus"></button>
-</div>
 <script>
 (function () {
   var SCHLUESSEL = "karo-farbwelt";
-  var knoepfe = document.querySelectorAll("#farbwelten button");
+  var auswahl = document.getElementById("farbwelten-auswahl");
 
-  function anwenden(farbe, animieren) {
+  function anwenden(farbe) {
     document.documentElement.setAttribute("data-theme-color", farbe);
-    knoepfe.forEach(function (b) {
-      b.classList.toggle("aktiv", b.dataset.farbe === farbe);
-    });
-    if (animieren) {
-      var aktiv = document.querySelector("#farbwelten button.aktiv");
-      if (aktiv) {
-        aktiv.classList.remove("aktiv");
-        void aktiv.offsetWidth;   // Animation neu anstossen
-        aktiv.classList.add("aktiv");
-      }
-    }
+    if (auswahl) auswahl.value = farbe;
   }
 
   var gespeichert = null;
   try { gespeichert = localStorage.getItem(SCHLUESSEL); } catch (e) {}
-  anwenden(gespeichert || "lila", false);
+  anwenden(gespeichert || "lila");
 
-  knoepfe.forEach(function (b) {
-    b.addEventListener("click", function () {
-      var farbe = b.dataset.farbe;
-      anwenden(farbe, true);
-      try { localStorage.setItem(SCHLUESSEL, farbe); } catch (e) {}
+  if (auswahl) {
+    auswahl.addEventListener("change", function () {
+      anwenden(auswahl.value);
+      try { localStorage.setItem(SCHLUESSEL, auswahl.value); } catch (e) {}
     });
+  }
+})();
+
+// Reiter oben: bedient jede Seite, die das .tabs/.tab-panel-Muster benutzt
+// (Uebersicht, Themen, Recherche, ...) — ein Skript fuer alle, statt eines
+// je Seite.
+(function () {
+  document.querySelectorAll(".tabs[data-tabgroup]").forEach(function (nav) {
+    var gruppe = nav.dataset.tabgroup;
+    var knoepfe = nav.querySelectorAll(".tab-btn");
+    var panels = document.querySelectorAll('.tab-panel[data-tabgroup="' + gruppe + '"]');
+
+    function zeige(tab) {
+      panels.forEach(function (p) { p.classList.toggle("active", p.dataset.tab === tab); });
+      knoepfe.forEach(function (b) { b.classList.toggle("active", b.dataset.tab === tab); });
+    }
+
+    knoepfe.forEach(function (b) {
+      b.addEventListener("click", function () {
+        zeige(b.dataset.tab);
+        try { history.replaceState(null, "", "#" + gruppe + "-" + b.dataset.tab); } catch (e) {}
+      });
+    });
+
+    var start = knoepfe.length ? knoepfe[0].dataset.tab : null;
+    var hashPrefix = gruppe + "-";
+    var hash = location.hash.slice(1);
+    if (hash.indexOf(hashPrefix) === 0) {
+      var ziel = hash.slice(hashPrefix.length);
+      if (Array.prototype.some.call(knoepfe, function (b) { return b.dataset.tab === ziel; })) {
+        start = ziel;
+      }
+    }
+    if (start) zeige(start);
   });
 })();
 </script>
-<div class="verbindungen-widget" id="verbindungen-widget">
-  <a class="status" id="status-claude" href="/setup#claude-verbindung">Claude</a>
-  <a class="status" id="status-notebooklm" href="/setup#notebooklm-verbindung">NotebookLM</a>
-</div>
 <div id="verbindung-popup-slot"></div>
 <script>
 (function () {
@@ -115,7 +141,7 @@
     if (!el) return;
     el.classList.toggle("ok", ok);
     el.classList.toggle("err", !ok);
-    el.innerHTML = '<span class="punkt"></span>' + LABELS[name];
+    el.innerHTML = '<span class="punkt"></span><span class="txt">' + LABELS[name] + '</span>';
   }
 
   function gelesen(schluessel) {

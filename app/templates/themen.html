@@ -5,8 +5,15 @@
 <p class="sub">Die Einheit, in der Karo bewertet und lehrt. Themen kommen aus
 Ihrem Schulmaterial — freigegeben werden sie von Ihnen.</p>
 
+<div class="tabs" data-tabgroup="themen" role="tablist" aria-label="Bereiche">
+  <button type="button" class="tab-btn" data-tab="freigegeben">Freigegebene Themen</button>
+  <button type="button" class="tab-btn" data-tab="vorschlaege">Vorschläge
+    {% if vorschlaege %}<b class="badge">{{ vorschlaege | length }}</b>{% endif %}</button>
+  <button type="button" class="tab-btn" data-tab="neu">Thema anlegen</button>
+</div>
+
+<div class="tab-panel" data-tabgroup="themen" data-tab="vorschlaege">
 {% if vorschlaege %}
-<h2>Vorschläge <span class="badge">{{ vorschlaege | length }}</span></h2>
 <p class="hint">Karo hat diese Themen im eingelesenen Material gefunden. Namen
 lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
 <form method="post" action="/themen/entscheiden">
@@ -31,38 +38,38 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
     <button type="submit">Entscheidungen speichern</button>
   </div>
 </form>
+{% else %}
+<div class="empty">Keine offenen Vorschläge.</div>
 {% endif %}
+</div>
 
-<h2>Freigegebene Themen</h2>
+<div class="tab-panel" data-tabgroup="themen" data-tab="freigegeben">
 {% if aktive %}
-<div class="tablewrap">
-  <table>
+<div class="tablewrap themen-tablewrap">
+  <table class="themen-tabelle">
     <thead>
-      <tr><th>Thema</th><th>Flagge</th><th>Verlauf</th><th class="num">richtig</th>
-        <th>häufigster Fehler</th><th>nächster Schritt</th></tr>
+      <tr><th>Thema</th><th>Lernstand</th><th class="num">Übungsergebnis</th>
+        <th>Aktion</th></tr>
     </thead>
     <tbody>
       {% for t in aktive %}
-      <tr>
-        <td>
-          <strong>{{ t.label }}</strong><br>
-          <span class="klein">{{ t.code }}
-            {% if t.lehr_quellen %}· {{ t.lehr_quellen }} Quellen{% elif t.quellen %}
-            · <span style="color:var(--warn)">nur Aufgaben, keine Erklärung</span>{% else %}
-            · <span style="color:var(--warn)">kein eigenes Material</span>{% endif %}</span>
+      <tr class="thema-zeile flag-{{ t.flag }}">
+        <td class="thema-zelle">
+          <strong class="thema-name">{{ t.label }}</strong>
+          {% if t.offene_lesson %}
+          <a class="thema-fortsetzung" href="/lernen/{{ t.offene_lesson }}">
+            Aktuelle Lerneinheit ansehen</a>
+          {% elif t.neues_material %}
+          <a class="thema-fortsetzung" href="/material/{{ t.neues_material }}"
+             target="_blank" rel="noopener">Neues Lernmaterial ansehen</a>
+          {% endif %}
+          <span class="thema-meta">Material: {{ t.lehr_quellen or 0 }} Erklärungen
+            {% if t.quellen and not t.lehr_quellen %}
+            <span style="color:var(--warn)">· noch keine Erklärung</span>{% endif %}</span>
         </td>
-        <td>{{ flagge(t.flag) }}<br>
-          <span class="klein">{{ t.begruendung or '' }}</span></td>
-        <td>
-          <div class="verlauf">
-            {% for o in t.verlauf %}
-              <span class="dot {{ 'r' if o.richtig else ('k' if o.fehlertyp in ('konzeptfehler','regel_vergessen') else 'f') }}"
-                    title="{{ o.beantwortet_am }} – {{ 'richtig' if o.richtig else error_labels.get(o.fehlertyp, 'falsch') }}"></span>
-            {% else %}<span class="klein">noch nichts</span>{% endfor %}
-          </div>
-        </td>
-        <td class="num">{{ t.richtig }}/{{ t.antworten }}</td>
-        <td class="klein">{{ error_labels.get(t.haupt_fehler, '–') }}</td>
+        <td class="status-zelle">{{ flagge(t.flag) }}</td>
+        <td class="num fortschritt-zelle"><strong>{{ t.richtig }}/{{ t.antworten }}</strong>
+          <span class="thema-meta">richtig beantwortet</span></td>
         <td>
           {% if t.offene_lesson %}
             <a class="btn" href="/lernen/{{ t.offene_lesson }}">Lerneinheit öffnen</a>
@@ -101,8 +108,8 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
   </table>
 </div>
 <p class="hint" style="margin-top:1rem">
-  Grün = richtig · Orange = Verständnisfehler · Rot = anderer Fehler.
-  Ältestes links. Eine einzelne falsche Antwort ändert die Flagge nie.
+  Der Lernstand zeigt, wie sicher das Thema aktuell sitzt. Das Übungsergebnis
+  zeigt richtige Antworten im Verhältnis zu allen bisherigen Antworten.
 </p>
 {% else %}
 <div class="empty">Noch keine freigegebenen Themen.
@@ -112,8 +119,10 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
   {% endif %}
 </div>
 {% endif %}
+</div>
 
-<div class="card" style="margin-top:2rem">
+<div class="tab-panel" data-tabgroup="themen" data-tab="neu">
+<div class="card">
   <h3>Thema selbst anlegen</h3>
   <form method="post" action="/themen/neu" class="row">
     {{ csrf_input() }}
@@ -130,5 +139,6 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
       <button type="submit" class="ghost">Anlegen</button>
     </div>
   </form>
+</div>
 </div>
 {% endblock %}

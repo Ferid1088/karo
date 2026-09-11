@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Quellen prüfen – Karo{% endblock %}
+{% block content %}
+<header class="page-heading"><p class="eyebrow">Für Eltern</p><h1>Passende Erklärungen aus dem Netz</h1><p class="sub">Öffnen Sie eine Quelle, bevor Sie sie für das Lernen freigeben.</p></header>
+{% if not aktiv %}<div class="msg">Die Suche ist ausgeschaltet. <a href="/setup">Einstellungen öffnen</a></div>{% endif %}
+{% for h in vorschlaege %}<article class="card"><p class="eyebrow">{{ h.thema_label }}{% if h.kanal %} · {{ h.kanal }}{% endif %}</p><h2><a href="{{ h.url }}" target="_blank" rel="noopener noreferrer">{{ h.titel }} ↗</a></h2><p>{{ h.warum or '' }}</p><form method="post" action="/vorbereitung/inhalte/sources/entscheiden">{{ csrf_input() }}<div class="actions"><button type="submit" name="hit_{{ h.id }}" value="freigegeben">Quelle freigeben</button><button class="ghost" type="submit" name="hit_{{ h.id }}" value="abgelehnt">Ablehnen</button></div></form></article>
+{% else %}<section class="card"><h2>Keine offenen Vorschläge</h2><p>Sie können vor einer Lernrunde nach zusätzlichen Erklärungen suchen lassen.</p><a href="/lernzyklus">Zum Lernen</a></section>{% endfor %}
+<details class="card"><summary>Wo Karo sucht</summary><p>Die Suche berücksichtigt nur diese Lernquellen:</p><ul>{% for q in erlaubte %}<li>{{ q }}</li>{% endfor %}</ul><p>YouTube-Kanäle: {{ kanaele|join(', ') }}</p></details>
+{% endblock %}

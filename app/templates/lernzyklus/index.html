@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Lernen – Karo{% endblock %}
+{% block content %}
+<header class="page-heading"><p class="eyebrow">Deine Lernzeit</p><h1>Ein Thema. Ein kleiner Schritt.</h1><p class="sub">Mach dort weiter, wo du aufgehört hast, oder wähle etwas Neues.</p></header>
+{% if fortsetzungen %}
+<section class="card"><h2>Hier geht es weiter</h2><div class="task-list">
+{% for schritt in fortsetzungen %}<a class="task-row" href="{{ schritt.url }}">{{ icon('book') }}<span><strong>{{ schritt.titel }}</strong><small>{{ schritt.text }}</small></span>{{ icon('arrow') }}</a>{% endfor %}
+</div></section>
+{% endif %}
+{% if themen %}
+<h2>{{ 'Ein anderes Thema' if fortsetzungen else 'Womit möchtest du anfangen?' }}</h2>
+<div class="topic-grid">{% for t in themen %}
+<a class="card topic-card" href="/lernzyklus/{{ t.id }}"><div>{{ flagge(t.flag) }}<h3>{{ t.label }}</h3><p>{{ 'Erklären lassen und gemeinsam üben' if t.flag in ('rot','gelb') else 'Mit ein paar Fragen loslegen' }}</p></div><span class="topic-link">{{ 'Weiterlernen' if t.offene_lesson else 'Thema öffnen' }} {{ icon('arrow') }}</span></a>
+{% endfor %}</div>
+{% elif not hat_themen %}
+<section class="card empty"><h2>Deine Themen kommen hierhin</h2><p>Zuerst fügt ein Erwachsener ein Schulblatt hinzu und bestätigt die Themen.</p><a class="btn" href="/vorbereitung">Schulblatt hinzufügen</a>{% if offene_vorschlaege %}<a class="secondary-link" href="/vorbereitung/inhalte">Vorhandene Themen bestätigen</a>{% endif %}</section>
+{% endif %}
+{% endblock %}

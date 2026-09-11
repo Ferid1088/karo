@@ -183,7 +183,8 @@ CREATE TABLE IF NOT EXISTS lesson (
     max_runden  INTEGER NOT NULL DEFAULT 4,
     created_at  TEXT NOT NULL,
     finished_at TEXT,
-    abbruch_grund TEXT       -- für Menschen lesbar, warum state='abgebrochen' wurde
+    abbruch_grund TEXT,      -- für Menschen lesbar, warum state='abgebrochen' wurde
+    prompt_wunsch TEXT       -- zusätzlicher Wunsch für diese Erklärungseinheit
 );
 CREATE INDEX IF NOT EXISTS idx_lesson_topic ON lesson(topic_id, created_at);
 
@@ -237,7 +238,7 @@ CREATE TABLE IF NOT EXISTS research_hit (
     -- vorschlag | freigegeben | abgelehnt
     -- Erst nach Freigabe geholt: der eigentliche Lerninhalt der Quelle, damit
     -- sie bei fehlendem eigenem Material auch als Faktengrundlage taugt, nicht
-    -- nur als Titel-Anregung. NULL, solange nicht geholt oder das Holen scheiterte.
+    -- nur als Titel-Anregung. NULL, solange nicht geholt oder das Holen scheitert.
     inhalt          TEXT,
     inhalt_geholt_am TEXT,
     created_at  TEXT NOT NULL,

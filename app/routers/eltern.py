@@ -37,20 +37,29 @@ def dashboard(request: Request):
 @router.get("/wissen", response_class=HTMLResponse)
 def wissen(request: Request):
     docu = [dict(r) for r in db.q(
-        """SELECT id, rolle, zustand, seite, created_at FROM document
-           ORDER BY created_at DESC LIMIT 50""")]
-    return render(request, "wissen.html", dokumente=docu, counts=jobs.counts())
+        """SELECT d.*, (SELECT COUNT(*) FROM kb_chunk k
+                   WHERE k.document_id=d.id) AS abschnitte
+           FROM document d WHERE d.rolle='wissen'
+           ORDER BY d.created_at DESC LIMIT 50""")]
+    return render(request, "wissen.html", blaetter=docu, counts=jobs.counts(),
+                  kb_stat=kb.statistik(), drive_ok=ingest.drive_available(),
+                  inbox_path=ingest.inbox_path())
 
 
 @router.post("/wissen/einlesen")
-async def wissen_einlesen(request: Request, quelle: str = Form("upload")):
+async def wissen_einlesen(request: Request, quelle: str = Form("drive")):
     if quelle == "drive":
         try:
-            ok = await run_in_threadpool(ingest.von_drive)
+            ergebnisse = await run_in_threadpool(ingest.scan_inbox)
+            for ergebnis in ergebnisse:
+                if ergebnis.get("status") == "neu":
+                    doc_id = ergebnis["document_id"]
+                    jobs.enqueue("kb_extract", {"document_id": doc_id},
+                                 dedup_key=f"kb_extract:{doc_id}")
         except ingest.IngestError as exc:
             flash(request, str(exc), "err")
         else:
-            flash(request, "Drive wird gelesen." if ok else
+            flash(request, "Drive wird gelesen." if ergebnisse else
                   "Kein Drive-Ordner eingerichtet oder nichts Neues darin.")
     return zurueck("/wissen")
 
@@ -60,8 +69,12 @@ async def wissen_upload(request: Request, rolle: str = Form("wissen"),
                        datei: UploadFile | None = None):
     formular = await request.form()
     datei = datei or formular.get("datei")
+    themenname = str(formular.get("themenname") or "").strip()[:200]
     if datei is None or not getattr(datei, "filename", ""):
         flash(request, "Es wurde keine Datei ausgewählt.", "err")
+        return zurueck("/wissen")
+    if not themenname:
+        flash(request, "Bitte einen Themennamen angeben.", "err")
         return zurueck("/wissen")
 
     endung = Path(datei.filename).suffix.lower()
@@ -73,11 +86,17 @@ async def wissen_upload(request: Request, rolle: str = Form("wissen"),
             return zurueck("/wissen")
 
     try:
-        await run_in_threadpool(ingest.datei, bytes(puffer), endung, rolle)
+        ergebnis = await run_in_threadpool(
+            ingest.aufnehmen, bytes(puffer), endung, rolle, themenname)
+        if ergebnis["status"] == "neu":
+            jobs.enqueue("kb_extract", {"document_id": ergebnis["document_id"]},
+                         dedup_key=f"kb_extract:{ergebnis['document_id']}")
     except ingest.IngestError as exc:
         flash(request, str(exc), "err")
     else:
-        flash(request, "Datei eingereicht — Karo liest sie jetzt.")
+        flash(request, "Dieses Blatt ist bereits in Ihrer Sammlung." if
+              ergebnis["status"] == "doppelt" else
+              f"Datei eingereicht — sie wird jetzt für „{themenname}“ gelesen.")
     return zurueck("/wissen")
 
 
@@ -163,11 +182,49 @@ def recherche_starten(request: Request, topic_id: int):
 
 @router.get("/recherche", response_class=HTMLResponse)
 def recherche(request: Request):
+    cfg = config.load_safe()
+    quellen = research.erlaubte_quellen()
     return render(request, "recherche.html",
                   vorschlaege=research.vorschlaege(),
-                  erlaubte=sorted(set(research.ERLAUBTE_QUELLEN.values())),
+                  erlaubte=sorted(set(quellen.values())),
+                  quellen=research.quellen_liste(),
+                  quellen_vorschlaege=research.quellen_vorschlaege(
+                      cfg.learner_grade, cfg.subject),
                   kanaele=research.ERLAUBTE_KANAELE,
                   aktiv=config.load_safe().recherche_erlaubt)
+
+
+@router.post("/recherche/quellen/hinzufuegen")
+async def recherche_quelle_hinzufuegen(request: Request):
+    formular = await request.form()
+    domain = str(formular.get("domain") or formular.get("domain_manual") or "") \
+        .strip().lower()
+    label = str(formular.get("label") or "").strip()[:120]
+    domain = domain.removeprefix("https://").removeprefix("http://").split("/", 1)[0]
+    cfg = config.load()
+    quellen = [q for q in cfg.recherche_quellen if q.get("domain") != domain]
+    if not domain or "." not in domain or any(ch in domain for ch in " <>\"'"):
+        flash(request, "Bitte eine gültige Domain eingeben.", "err")
+    else:
+        quellen.append({"domain": domain, "label": label or domain, "active": True})
+        config.update(recherche_quellen=quellen)
+        flash(request, "Quelle hinzugefügt.")
+    return zurueck("/recherche#recherche-quellen")
+
+
+@router.post("/recherche/quellen/aktivieren")
+async def recherche_quelle_aktivieren(request: Request):
+    formular = await request.form()
+    domain = str(formular.get("domain") or "").strip().lower()
+    active = str(formular.get("active") or "") == "1"
+    cfg = config.load()
+    quellen = [dict(q) for q in cfg.recherche_quellen]
+    for quelle in quellen:
+        if quelle.get("domain", "").lower().removeprefix("www.") == domain:
+            quelle["active"] = active
+    config.update(recherche_quellen=quellen)
+    flash(request, "Quelle aktiviert." if active else "Quelle deaktiviert.")
+    return zurueck("/recherche#recherche-quellen")
 
 
 @router.post("/recherche/entscheiden")

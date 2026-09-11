@@ -10,7 +10,41 @@
   Flagge: {{ flag_labels.get(thema.flag, '–') }}
 </p>
 
+<div class="tabs" data-tabgroup="lerneinheit" role="tablist" aria-label="Lerneinheit">
+  <button type="button" class="tab-btn" data-tab="stand">Aktueller Stand</button>
+  <button type="button" class="tab-btn" data-tab="material">Lernmaterial</button>
+  <button type="button" class="tab-btn" data-tab="runden">Runden</button>
+</div>
+
+<div class="tab-panel" data-tabgroup="lerneinheit" data-tab="stand">
+
 {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
+
+{% if r and r.state == 'fehler' and r.pruefung.get('ausgabe_hinweis') %}
+<div class="ausgabe-popup" role="alertdialog" aria-labelledby="ausgabe-problem-titel">
+  <h3 id="ausgabe-problem-titel">NotebookLM konnte das Video nicht erstellen</h3>
+  <p>{{ r.pruefung.ausgabe_hinweis }}</p>
+  <p class="hint">Deine Erklärung ist erhalten. Du kannst NotebookLM verbinden,
+    es erneut versuchen oder ein anderes Ausgabeformat wählen.</p>
+  <div class="actions">
+    <form method="post" action="/lernen/{{ lesson.id }}/ausgabe/erneut">
+      {{ csrf_input() }}
+      <input type="hidden" name="ausgabe" value="notebooklm">
+      <button type="submit">Erneut mit NotebookLM versuchen</button>
+    </form>
+    <a class="btn quiet" href="/setup#notebooklm-verbindung">NotebookLM verbinden</a>
+    <form method="post" action="/lernen/{{ lesson.id }}/ausgabe/erneut" class="actions">
+      {{ csrf_input() }}
+      <select name="ausgabe" aria-label="Anderes Ausgabeformat wählen">
+        {% for wert, label in ausgabe_labels.items() if wert != 'notebooklm' %}
+        <option value="{{ wert }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="ghost">Anderes Format verwenden</button>
+    </form>
+  </div>
+</div>
+{% endif %}
 
 {% if lesson.state == 'abgebrochen' %}
 <div class="msg warn">{{ lesson.abbruch_grund or
@@ -113,7 +147,10 @@
 </div>
 {% endif %}
 
+</div>
+
 {% if r and r.material_pfad %}
+<div class="tab-panel" data-tabgroup="lerneinheit" data-tab="material">
 <div class="card">
   <h3>{{ r.erklaerung.get('titel') or thema.label }}</h3>
   {% if r.erklaerung.get('kernidee') %}
@@ -145,6 +182,7 @@
 </div>
 {% endif %}
 
+<div class="tab-panel" data-tabgroup="lerneinheit" data-tab="runden">
 {% if funde %}
 <div class="card">
   <h3>Freigegebene Fundstellen</h3>
@@ -260,13 +298,15 @@
   {% endif %}
 </div>
 {% endfor %}
+</div>
 
 {% if lesson.state not in ('gelernt', 'abgebrochen') %}
 <form method="post" action="/lernen/{{ lesson.id }}/abbrechen"
       style="margin-top:1rem"
-      onsubmit="return confirm('Lerneinheit beenden?')">
+      onsubmit="return confirm('Mehr zum Thema erzeugen? Die bisherigen Inhalte bleiben erhalten.')">
   {{ csrf_input() }}
-  <button type="submit" class="quiet">Lerneinheit beenden</button>
+  <input type="hidden" name="prompt_wunsch" value="mehr zum Thema">
+  <button type="submit" class="quiet">Mehr zum Thema</button>
 </form>
 {% endif %}
 {% endblock %}

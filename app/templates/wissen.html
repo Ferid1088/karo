@@ -11,6 +11,55 @@ jede Erklärung, die Karo erzeugt, wird gegen genau dieses Material geprüft.</p
   <dl class="kpi"><dt>Aufgaben</dt><dd>{{ kb_stat.aufgaben or 0 }}</dd></dl>
 </div>
 
+<div class="tabs" data-tabgroup="wissen" role="tablist" aria-label="Bereiche">
+  <button type="button" class="tab-btn" data-tab="sammlung">Sammlung</button>
+  <button type="button" class="tab-btn" data-tab="einlesen">Einlesen</button>
+  <button type="button" class="tab-btn" data-tab="hinweise">Hinweise</button>
+</div>
+
+<div class="tab-panel" data-tabgroup="wissen" data-tab="sammlung">
+{% if blaetter %}
+<div class="tablewrap">
+  <table>
+    <thead><tr><th>Datum</th><th>Datei</th><th>Typ</th>
+      <th class="num">Abschnitte</th><th>Stand</th><th>Pfad</th><th></th></tr></thead>
+    <tbody>
+      {% for d in blaetter %}
+      <tr>
+        <td>{{ d.captured_on or '–' }}</td>
+        <td class="klein">{{ d.source_name }}</td>
+        <td>{{ d.doc_type or '–' }}</td>
+        <td class="num">{{ d.abschnitte or 0 }}</td>
+        <td>
+          <span class="pill {{ d.state }}">{{ doc_labels.get(d.state, d.state) }}</span>
+          {% if doc_hints.get(d.state) %}
+          <div class="klein" style="margin-top:.25rem;max-width:24ch">
+            {{ doc_hints[d.state] }}</div>
+          {% endif %}
+        </td>
+        <td>
+          <span class="hilfe pfad-hilfe" tabindex="0" title="{{ d.stored_path }}"
+                aria-label="Pfad: {{ d.stored_path }}">
+            <span class="hilfe-btn" aria-hidden="true">?</span>
+            <span class="hilfe-text pfad-popup" role="tooltip">{{ d.stored_path }}</span>
+          </span>
+        </td>
+        <td><a href="/wissen/{{ d.id }}" class="klein">ansehen</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <p>Noch kein Blatt in der Wissensbasis.</p>
+  <p class="klein">Ein Erklärblatt oder eine Buchseite fotografieren, hochladen —
+  Karo liest sie und schlägt daraus die Themen vor.</p>
+</div>
+{% endif %}
+</div>
+
+<div class="tab-panel" data-tabgroup="wissen" data-tab="einlesen">
 <div class="card">
   <div class="actions">
     <form method="post" action="/wissen/einlesen">{{ csrf_input() }}
@@ -38,37 +87,37 @@ jede Erklärung, die Karo erzeugt, wird gegen genau dieses Material geprüft.</p
   Unterthemen darunter, statt frei zu raten. Der Ordnerweg oben liest mehrere
   Blätter auf einmal ein und kennt daher keinen Themennamen je Blatt.</p>
 </div>
+</div>
 
-{% if blaetter %}
-<div class="tablewrap">
-  <table>
-    <thead><tr><th>Datum</th><th>Datei</th><th>Typ</th>
-      <th class="num">Abschnitte</th><th>Stand</th><th></th></tr></thead>
-    <tbody>
-      {% for d in blaetter %}
-      <tr>
-        <td>{{ d.captured_on or '–' }}</td>
-        <td class="klein">{{ d.source_name }}</td>
-        <td>{{ d.doc_type or '–' }}</td>
-        <td class="num">{{ d.abschnitte or 0 }}</td>
-        <td>
-          <span class="pill {{ d.state }}">{{ doc_labels.get(d.state, d.state) }}</span>
-          {% if doc_hints.get(d.state) %}
-          <div class="klein" style="margin-top:.25rem;max-width:24ch">
-            {{ doc_hints[d.state] }}</div>
-          {% endif %}
-        </td>
-        <td><a href="/wissen/{{ d.id }}" class="klein">ansehen</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="tab-panel" data-tabgroup="wissen" data-tab="hinweise">
+<div class="card">
+  <h3>So arbeitet die Wissensbasis</h3>
+  <p class="hint">Karo verwendet die Blätter aus dem Unterricht als
+  Faktengrundlage. Aus Erklärungen, Regeln und Beispielen entstehen später
+  passende Lerninhalte und Themenvorschläge.</p>
+  <p class="hint">Öffnen Sie ein Blatt über „ansehen“, um das Originalbild und
+  die erkannten Abschnitte zu prüfen.</p>
 </div>
-{% else %}
-<div class="empty">
-  <p>Noch kein Blatt in der Wissensbasis.</p>
-  <p class="klein">Ein Erklärblatt oder eine Buchseite fotografieren, hochladen —
-  Karo liest sie und schlägt daraus die Themen vor.</p>
 </div>
-{% endif %}
+<script>
+(function () {
+  document.querySelectorAll(".pfad-hilfe").forEach(function (hilfe) {
+    var popup = hilfe.querySelector(".pfad-popup");
+    if (!popup) return;
+
+    function zeigen() {
+      var rect = hilfe.getBoundingClientRect();
+      popup.style.left = Math.max(8, rect.left) + "px";
+      popup.style.top = (rect.bottom + 8) + "px";
+      popup.classList.add("sichtbar");
+    }
+
+    function verstecken() { popup.classList.remove("sichtbar"); }
+    hilfe.addEventListener("mouseenter", zeigen);
+    hilfe.addEventListener("mouseleave", verstecken);
+    hilfe.addEventListener("focus", zeigen);
+    hilfe.addEventListener("blur", verstecken);
+  });
+})();
+</script>
 {% endblock %}

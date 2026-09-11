@@ -160,14 +160,95 @@ h1 + .sub, h2 + .sub { color: var(--muted); font-size: 0.95rem; margin: 0 0 1rem
 }
 .card h3 { margin: 0 0 0.5rem; font-size: 1.08rem; }
 
+/* --- Einstellungen: Kategorien-Leiste links, nur die angeklickte Kategorie
+   ist rechts zu sehen — statt alle Karten auf einmal zu zeigen. --- */
+.setup-shell { display: flex; align-items: flex-start; gap: 1.6rem; width: 100%; }
+.setup-nav {
+  flex: 0 0 190px; display: flex; flex-direction: column; gap: 0.25rem;
+  position: sticky; top: 78px;
+}
+.setup-nav-btn {
+  text-align: left; background: none; border: 2px solid transparent;
+  color: var(--muted); font: inherit; font-weight: 700; font-size: 0.92rem;
+  padding: 0.55rem 0.8rem; border-radius: var(--radius-sm);
+  cursor: pointer; box-shadow: none; min-height: 0;
+}
+.setup-nav-btn:hover { background: var(--surface-2); color: var(--text); transform: none; }
+.setup-nav-btn:active { transform: none; box-shadow: none; }
+.setup-nav-btn.active { background: var(--ink-soft); color: var(--ink); border-color: var(--ink); }
+.setup-panels { flex: 1; min-width: 0; }
+.setup-panel { display: none; }
+.setup-panel.active { display: block; }
+@media (max-width: 860px) {
+  .setup-shell { flex-direction: column; }
+  .setup-nav {
+    position: static; flex-direction: row; flex-wrap: wrap; gap: 0.4rem;
+    width: 100%;
+  }
+  .setup-nav-btn { flex: 1 1 auto; text-align: center; }
+}
+
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .tablewrap { overflow-x: auto; background: var(--surface);
   border: 3px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-clay); }
+.lernstand-kopf { display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; margin-bottom: 1rem; }
+.lernstand-kopf h1 { margin-bottom: 0.15rem; }
+.lernstand-kopf .sub { margin-bottom: 0; }
+.export-mini { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap;
+  justify-content: flex-end; }
+.export-mini form { margin: 0; }
+.export-mini button { font-size: 0.82rem; min-height: 36px; padding: 0.4rem 0.75rem; }
+.verlauf-filter { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
+  margin-bottom: 0.8rem; }
+.filter-label { color: var(--muted); font-size: 0.82rem; font-weight: 700;
+  margin-right: 0.25rem; }
+.filter-btn { min-height: 36px; padding: 0.35rem 0.75rem; font-size: 0.82rem;
+  color: var(--muted); background: var(--surface); border-color: var(--border-firm);
+  box-shadow: 0 2px 0 var(--border); }
+.filter-btn.active { color: #fff; background: var(--ink); border-color: var(--ink); }
+.verlauf-gruppe th { background: var(--ink-soft); color: var(--text);
+  font-size: 0.78rem; text-transform: none; letter-spacing: 0; }
+.verlauf-gruppe-btn { display: flex; align-items: center; gap: 0.55rem; width: 100%;
+  min-height: 32px; padding: 0.2rem 0.1rem; border: 0; border-radius: 0;
+  color: var(--text); background: transparent; box-shadow: none; text-align: left;
+  font-size: 0.86rem; }
+.verlauf-gruppe-btn:hover { transform: none; box-shadow: none; color: var(--ink); }
+.verlauf-pfeil { width: 1rem; color: var(--ink); font-size: 1rem; }
+.verlauf-anzahl { margin-left: auto; color: var(--muted); font-size: 0.75rem;
+  font-weight: 400; }
+@media (max-width: 700px) {
+  .lernstand-kopf { flex-direction: column; }
+  .export-mini { justify-content: flex-start; }
+}
 th, td { text-align: left; padding: 0.65rem 0.9rem;
   border-bottom: 1px solid var(--border); vertical-align: top; }
 thead th { background: var(--surface-2); font-size: 0.72rem; text-transform: uppercase;
   letter-spacing: 0.07em; color: var(--muted); white-space: nowrap; font-weight: 700; }
 tbody tr:last-child td { border-bottom: none; }
+
+/* --- Themen: klare Zeilenhierarchie statt gleichgewichtiger Datenspalten --- */
+.themen-tabelle tbody tr { transition: background-color 180ms ease-out; }
+.themen-tabelle tbody tr:hover { background: var(--surface-2); }
+.themen-tabelle tbody tr:focus-within { background: var(--ink-soft); }
+.themen-tabelle tbody tr > td:first-child { border-left: 5px solid var(--border-firm); }
+.themen-tabelle tbody tr.flag-gruen > td:first-child { border-left-color: var(--ok); }
+.themen-tabelle tbody tr.flag-gelb > td:first-child { border-left-color: var(--warn); }
+.themen-tabelle tbody tr.flag-rot > td:first-child { border-left-color: var(--bad); }
+.thema-zelle { min-width: 220px; }
+.thema-name { display: block; color: var(--text); font-size: 1rem; line-height: 1.25; }
+.thema-fortsetzung { display: block; margin-top: 0.3rem; color: var(--ok);
+  font-size: 0.82rem; font-weight: 700; line-height: 1.35; }
+.thema-fortsetzung:hover { color: var(--text); }
+.thema-meta { display: block; margin-top: 0.25rem; color: var(--faint);
+  font-size: 0.76rem; line-height: 1.4; }
+.status-zelle { min-width: 125px; }
+.status-hinweis { display: block; margin-top: 0.35rem; color: var(--faint);
+  font-size: 0.76rem; line-height: 1.35; max-width: 22ch; }
+.fortschritt-zelle strong { display: block; font-size: 1rem; }
+.fortschritt-zelle .thema-meta { text-transform: uppercase; letter-spacing: 0.05em; }
+.antworten-zelle strong { display: block; font-size: 1rem; }
+.themen-tabelle .actions { min-width: 220px; }
 
 /* --- Lernstand: Zeilenfarbe nach Flagge, wie im Tabellenexport --- */
 tr.zeile-gruen td { background: var(--ok-bg); }
@@ -209,6 +290,19 @@ button.quiet, .btn.quiet {
 }
 button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .actions { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
+.quellen-liste { display: grid; gap: 0.55rem; margin: 1rem 0 1.2rem; }
+.quelle-zeile { display: flex; justify-content: space-between; align-items: center;
+  gap: 1rem; padding: 0.7rem 0.85rem; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.quelle-inaktiv { opacity: 0.62; }
+.quelle-zeile strong, .quelle-zeile .klein { display: block; }
+.quellen-form { display: grid; grid-template-columns: 1.4fr 1fr 1.2fr auto;
+  gap: 0.7rem; align-items: end; }
+.quellen-form .field { margin-bottom: 0; }
+@media (max-width: 760px) {
+  .quellen-form { grid-template-columns: 1fr; }
+  .quelle-zeile { align-items: flex-start; flex-direction: column; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   button, .btn { transition: none; }
@@ -354,6 +448,27 @@ textarea { resize: vertical; min-height: 2.6rem; }
 .pruefung ul { margin: 0.5rem 0 0; padding-left: 1.1rem; }
 .pruefung li { margin-bottom: 0.35rem; }
 
+/* --- Reiter oben (Uebersicht, Themen, Recherche, ...): mehrere Abschnitte
+   einer Seite als Tabs statt als langer Scroll. Generisch, per data-tabgroup
+   verknuepft — ein einziges Skript in base.html bedient jede Seite, die
+   dieses Muster benutzt. --- */
+.tabs {
+  display: flex; gap: 0.3rem; flex-wrap: wrap;
+  border-bottom: 2px solid var(--border); margin-bottom: 1.3rem;
+}
+.tab-btn {
+  background: none; border: none; border-bottom: 3px solid transparent;
+  border-radius: 0; margin-bottom: -2px; box-shadow: none; min-height: 0;
+  color: var(--muted); font: inherit; font-weight: 700; font-size: 0.92rem;
+  padding: 0.6rem 0.9rem; cursor: pointer; display: inline-flex;
+  align-items: center; gap: 0.4rem;
+}
+.tab-btn:hover { color: var(--text); background: var(--surface-2); transform: none; }
+.tab-btn:active { transform: none; box-shadow: none; }
+.tab-btn.active { color: var(--ink); border-bottom-color: var(--ink); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
 /* --- Kleinigkeiten --- */
 button.linklike { background: none; border: none; padding: 0; color: var(--faint);
   font-size: .85rem; font-weight: 400; cursor: pointer; }
@@ -378,38 +493,61 @@ pre { background: var(--code-bg, var(--surface-2)); border: 1px solid var(--bord
 .text-gut { color: var(--ok); }
 .text-warn { color: var(--warn); }
 
-/* --- Hilfe-Symbol mit Tooltip (nativer title-Text) --- */
-.hilfe {
+/* --- Hilfe-Knopf: Erklaerung ist per Default unsichtbar und erscheint nur
+   kurz, solange die Maus (oder der Tastaturfokus) auf dem "?" liegt — kein
+   Klick, kein offenbleibendes Fenster, kein JS noetig. --- */
+.hilfe { position: relative; display: inline-block; margin-left: 0.35rem; vertical-align: middle; }
+.hilfe-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 1.3rem; height: 1.3rem; border-radius: 50%;
   background: var(--ink-soft); color: var(--ink); border: 2px solid var(--border-firm);
-  font-size: 0.75rem; font-weight: 700; cursor: help; margin-left: 0.35rem;
-  vertical-align: middle;
+  font-size: 0.75rem; font-weight: 700; cursor: help; user-select: none;
 }
-.hilfe:hover, .hilfe:focus { color: var(--ink); border-color: var(--ink); outline: none; }
+.hilfe > .hilfe-text {
+  display: none; position: absolute; z-index: 5; top: 140%; left: 0;
+  width: max-content; max-width: min(22rem, 80vw);
+  font-size: 0.84rem; font-weight: 400;
+  color: var(--muted); line-height: 1.45; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 7px; padding: 0.55rem 0.75rem;
+  box-shadow: var(--shadow-clay);
+}
+.hilfe:hover .hilfe-text, .hilfe:focus .hilfe-text, .hilfe:focus-within .hilfe-text {
+  display: block;
+}
+.pfad-popup {
+  position: fixed !important;
+  z-index: 20 !important;
+  display: none !important;
+}
+.pfad-popup.sichtbar { display: block !important; }
 
-/* --- Verbindungs-Widget: kleine Ampel-Pillen, auf jeder Seite --- */
-.verbindungen-widget {
-  position: fixed; right: 0.9rem; bottom: 0.9rem; z-index: 20;
-  display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-end;
+/* --- Verbindungs-Ampeln: jetzt Teil der Kopfzeile, nicht mehr freischwebend
+   ausserhalb des 1080px-Rahmens. --- */
+.verbindungen-kopf { display: flex; gap: 0.5rem; align-items: center; }
+.verbindungen-kopf a.status {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.28rem 0.6rem; border-radius: 999px; text-decoration: none;
+  font-size: 0.76rem; font-weight: 700; color: var(--muted);
+  background: var(--surface-2); border: 2px solid var(--border);
 }
-.verbindungen-widget a.status {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 0.35rem 0.75rem; border-radius: 999px; text-decoration: none;
-  font-size: 0.8rem; font-weight: 700; color: var(--text);
-  background: var(--surface); border: 2px solid var(--border);
-  box-shadow: 0 2px 0 var(--border-firm), 0 4px 10px -2px rgba(79, 70, 229, 0.2);
+.verbindungen-kopf a.status:hover { color: var(--text); border-color: var(--border-firm); }
+.verbindungen-kopf a.status.ok {
+  color: var(--ok); background: var(--ok-bg); border-color: var(--ok);
 }
-.verbindungen-widget .punkt {
-  width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--faint);
+.verbindungen-kopf a.status.err {
+  color: var(--bad); background: var(--bad-bg); border-color: var(--bad);
+}
+.verbindungen-kopf .punkt {
+  width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--faint);
   flex: none;
 }
-.verbindungen-widget a.status.ok .punkt { background: var(--ok); }
-.verbindungen-widget a.status.err .punkt { background: var(--bad); }
+.verbindungen-kopf a.status.ok .punkt { background: var(--ok); }
+.verbindungen-kopf a.status.err .punkt { background: var(--bad); }
 
-/* --- Popup bei abgebrochener Verbindung --- */
+/* --- Popup bei abgebrochener Verbindung: bleibt ein kurzlebiger Hinweis,
+   der ueber der Seite erscheint, nicht Teil des festen Rahmens. --- */
 .verbindung-popup {
-  position: fixed; right: 0.9rem; bottom: 3.6rem; z-index: 21;
+  position: fixed; right: 0.9rem; bottom: 0.9rem; z-index: 21;
   max-width: 320px; padding: 1rem 1.1rem; border-radius: var(--radius-sm);
   background: var(--surface); border: 2px solid var(--bad);
   box-shadow: 0 4px 0 var(--bad-bg), 0 10px 24px -6px rgba(225, 29, 72, 0.3); font-size: 0.88rem;
@@ -423,39 +561,25 @@ pre { background: var(--code-bg, var(--surface-2)); border: 1px solid var(--bord
   font-size: 0.84rem; padding: 0;
 }
 .verbindung-popup button:hover { color: var(--text); }
+.ausgabe-popup { margin: 0 0 1rem; padding: 1rem 1.1rem; max-width: 720px;
+  background: var(--surface); border: 2px solid var(--bad);
+  border-left: 6px solid var(--bad); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-clay); }
+.ausgabe-popup h3 { margin: 0 0 0.35rem; color: var(--bad); }
+.ausgabe-popup p { margin: 0.35rem 0 0.7rem; }
+.ausgabe-popup .actions { margin-top: 0.8rem; }
 
-/* --- Farbwelten-Waehler: bunte Kreise am linken Rand, auf jeder Seite --- */
-.farbwelten {
-  position: fixed; left: 0.9rem; top: 50%; transform: translateY(-50%); z-index: 20;
-  display: flex; flex-direction: column; gap: 0.55rem; align-items: center;
-  background: var(--surface); border: 2px solid var(--border); border-radius: 999px;
-  padding: 0.6rem 0.45rem; box-shadow: var(--shadow-clay);
+/* --- Farbwelt-Waehler: Dropdown-Liste in der Kopfzeile statt freischwebender
+   Kreise am Bildschirmrand. --- */
+.farbwelt-waehler { display: inline-flex; align-items: center; }
+.farbwelt-waehler select {
+  width: auto; min-height: 0; padding: 0.3rem 1.6rem 0.3rem 0.6rem;
+  font-size: 0.82rem; border-radius: 999px; border: 2px solid var(--border-firm);
+  background-color: var(--surface); color: var(--text); cursor: pointer;
 }
-.farbwelten button {
-  width: 2.1rem; height: 2.1rem; min-height: 0; padding: 0; border-radius: 50%;
-  border: 3px solid #fff; box-shadow: 0 0 0 2px var(--border-firm);
-  cursor: pointer; transition: transform 200ms cubic-bezier(.34,1.56,.64,1), box-shadow 200ms ease-out;
-}
-.farbwelten button:hover { transform: scale(1.18) rotate(-6deg); }
-.farbwelten button:active { transform: scale(0.92); }
-.farbwelten button.aktiv {
-  box-shadow: 0 0 0 3px var(--surface), 0 0 0 6px var(--ink);
-  transform: scale(1.14);
-  animation: farbe-pop 420ms cubic-bezier(.34,1.56,.64,1);
-}
-@keyframes farbe-pop {
-  0%   { transform: scale(0.7) rotate(0deg); }
-  60%  { transform: scale(1.28) rotate(10deg); }
-  100% { transform: scale(1.14) rotate(0deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .farbwelten button { transition: none; animation: none; }
-  .farbwelten button:hover, .farbwelten button:active { transform: none; }
-}
+.farbwelt-waehler select:focus { box-shadow: 0 0 0 3px var(--ink-soft); }
+
 @media (max-width: 720px) {
-  .farbwelten {
-    left: 0.5rem; top: auto; bottom: 0.9rem; transform: none;
-    flex-direction: row; padding: 0.45rem;
-  }
-  .farbwelten button { width: 1.8rem; height: 1.8rem; }
+  .verbindungen-kopf a.status .txt { display: none; }
+  .verbindungen-kopf a.status { padding: 0.4rem; }
 }

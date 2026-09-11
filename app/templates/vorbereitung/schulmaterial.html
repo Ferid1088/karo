@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Schulblätter – Karo{% endblock %}
+{% block content %}
+<header class="page-heading"><p class="eyebrow">Material</p><h1>Das lernt ihr in der Schule.</h1><p class="sub">Erklärungen passend zu Ihren Schulblättern und dem vertrauten Rechenweg.</p></header>
+<section class="card upload-card"><div class="upload-mark">{{ icon('upload') }}</div><h2>Foto oder PDF hinzufügen</h2><p>Wählen Sie ein Erklärblatt, eine Buchseite oder ein Aufgabenblatt.</p>
+<form method="post" action="/vorbereitung/schulmaterial/hochladen" enctype="multipart/form-data">
+{{ csrf_input() }}<label for="schulblatt">Schulblatt</label><input type="file" name="datei" id="schulblatt" accept="image/*,application/pdf" required aria-describedby="upload-hint"><p id="upload-hint" class="hint">Bis 25 MB. Bei mehrseitigen PDFs bitte den Drive-Import verwenden.</p>
+<details class="options"><summary>Thema vorgeben (optional)</summary><label for="themenname">Worum geht es?</label><input type="text" id="themenname" name="themenname" maxlength="200" placeholder="Zum Beispiel Bruchrechnung"><p class="hint">Ohne Vorgabe schlägt Karo passende Themen aus dem Blatt vor.</p></details>
+<button type="submit">Blatt hinzufügen {{ icon('arrow') }}</button></form>
+<p class="hint">Danach: Karo liest das Blatt → Sie bestätigen die Themen → gemeinsam lernen.</p>
+</section>
+<details class="card"><summary>Mehrere Blätter aus dem Drive-Ordner importieren</summary><p>Legen Sie die Dateien in den Karo-Eingangsordner. Mehrseitige PDFs werden seitenweise eingelesen.</p><form method="post" action="/vorbereitung/schulmaterial/einlesen">{{ csrf_input() }}<input type="hidden" name="quelle" value="drive"><button type="submit" class="ghost">Ordner einlesen</button></form><a class="secondary-link" href="/setup">Drive-Ordner einrichten</a></details>
+{% if offene_vorschlaege %}<a class="notice-link" href="/vorbereitung/inhalte">{{ offene_vorschlaege }} Themenvorschläge sind bereit. Jetzt prüfen {{ icon('arrow') }}</a>{% endif %}
+<section class="card"><div class="section-heading"><h2>Ihre Sammlung</h2><span class="muted">{{ kb_stat.blaetter or 0 }} {{ 'Blatt' if kb_stat.blaetter == 1 else 'Blätter' }} insgesamt</span></div>
+{% if dokumente %}<div class="task-list" {% if counts.get('wartend',0) + counts.get('laeuft',0) %}data-auto-refresh{% endif %}>
+{% for d in dokumente %}<a class="task-row" href="/vorbereitung/schulmaterial/{{ d.id }}">{{ icon('folder') }}<span><strong>{{ d.themenname or d.source_name }}</strong><small>{{ d.captured_on or 'Ohne Datum' }} · {{ doc_labels.get(d.state, d.state) }}{% if d.abschnitte %} · {{ d.abschnitte }} Abschnitte{% endif %}</small></span>{{ icon('arrow') }}</a>{% endfor %}</div><p class="hint">Die letzten 50 Blätter, neueste zuerst.</p>
+{% else %}<p>Noch keine Blätter. Fügen Sie oben das erste hinzu.</p>{% endif %}</section>
+{% endblock %}

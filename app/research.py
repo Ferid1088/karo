@@ -60,6 +60,49 @@ ERLAUBTE_QUELLEN = {
     "www.br.de": "BR (alpha Lernen)",
 }
 
+
+def erlaubte_quellen() -> dict[str, str]:
+    """Gibt nur die aktivierten Domains für die Recherche zurück."""
+    cfg = config.load_safe()
+    quellen = cfg.recherche_quellen or config.RESEARCH_SOURCE_DEFAULTS
+    ergebnis = {}
+    for quelle in quellen:
+        if quelle.get("active", True) is not True:
+            continue
+        domain = str(quelle.get("domain", "")).lower().strip().removeprefix("www.")
+        label = str(quelle.get("label", domain)).strip() or domain
+        if domain:
+            ergebnis[domain] = label
+    return ergebnis
+
+
+def quellen_liste() -> list[dict]:
+    """Alle gespeicherten Quellen inklusive ihres Aktivierungszustands."""
+    cfg = config.load_safe()
+    quellen = cfg.recherche_quellen or config.RESEARCH_SOURCE_DEFAULTS
+    return [{"domain": str(q.get("domain", "")).lower().strip().removeprefix("www."),
+             "label": str(q.get("label", q.get("domain", ""))).strip(),
+             "active": q.get("active", True) is True}
+            for q in quellen if q.get("domain")]
+
+
+def quellen_vorschlaege(grade: int, subject: str) -> list[dict]:
+    """Altersgerechte Vorschläge für den persönlichen Quellenkatalog."""
+    grundschule = grade <= 4
+    vorschlaege = [
+        {"domain": "grundschulkoenig.de", "label": "Grundschulkönig",
+         "hinweis": "Grundschule"},
+        {"domain": "serlo.org", "label": "Serlo",
+         "hinweis": "Klassen 5–13"},
+        {"domain": "studyflix.de", "label": "Studyflix",
+         "hinweis": "Klassen 5–13"},
+        {"domain": "planet-schule.de", "label": "Planet Schule",
+         "hinweis": "Alle Klassen"},
+        {"domain": "simpleclub.com", "label": "simpleclub",
+         "hinweis": f"{subject}, Klassen 5–13"},
+    ]
+    return [q for q in vorschlaege if not grundschule or q["domain"] != "simpleclub.com"]
+
 #: YouTube-Kanäle, die für deutschen Schulunterricht bekannt und geeignet sind.
 #: Ein YouTube-Treffer wird nur vorgeschlagen, wenn einer dieser Namen im Titel
 #: oder Kanal auftaucht.
@@ -90,7 +133,7 @@ def quelle_erlaubt(url: str) -> tuple[bool, str]:
     if not host:
         return False, ""
     host = host.removeprefix("www.")
-    for erlaubt, name in ERLAUBTE_QUELLEN.items():
+    for erlaubt, name in erlaubte_quellen().items():
         if host == erlaubt.removeprefix("www."):
             return True, name
     return False, ""
@@ -216,7 +259,7 @@ def _suchen(begriffe: list[str], grade: int) -> list[dict]:
         },
         "required": ["treffer"],
     }
-    erlaubte = ", ".join(sorted({v for v in ERLAUBTE_QUELLEN.values()}))
+    erlaubte = ", ".join(sorted(set(erlaubte_quellen().values())))
     kanaele = ", ".join(ERLAUBTE_KANAELE[:12])
     prompt = f"""Suche im Netz nach deutschem Lernmaterial für Klassenstufe
 {grade} zu: {', '.join(begriffe[:3])}

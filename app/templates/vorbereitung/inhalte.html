@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Themen – Karo{% endblock %}
+{% block content %}
+<header class="page-heading"><p class="eyebrow">Für Eltern</p><h1>Was soll geübt werden?</h1><p class="sub">Prüfen Sie die erkannten Themen. Sie können jeden Namen anpassen.</p></header>
+{% if vorschlaege %}<section class="card"><h2>{{ vorschlaege|length }} neue Themenvorschläge</h2>
+{% for t in vorschlaege %}<form class="item topic-review" method="post" action="/vorbereitung/inhalte/entscheiden">{{ csrf_input() }}<label for="label-{{ t.id }}">Thema</label><input id="label-{{ t.id }}" name="label_{{ t.id }}" value="{{ t.label }}" maxlength="200" required>{% if t.beschreibung %}<p>{{ t.beschreibung }}</p>{% endif %}<div class="actions"><button name="aktion_{{ t.id }}" value="aktiv" type="submit">Thema übernehmen</button><button name="aktion_{{ t.id }}" value="abgelehnt" type="submit" class="ghost" formnovalidate>Ablehnen</button></div></form>{% endfor %}</section>
+{% else %}<div class="msg">Alle Themenvorschläge sind geprüft.</div>{% endif %}
+<details class="card"><summary>Thema selbst hinzufügen</summary><form method="post" action="/vorbereitung/inhalte/neu">{{ csrf_input() }}<label for="neu-label">Themenname</label><input id="neu-label" name="label" maxlength="200" required placeholder="Zum Beispiel Brüche addieren"><label for="beschreibung">Was soll Ihr Kind können? (optional)</label><input id="beschreibung" name="beschreibung" maxlength="500"><button class="ghost" type="submit">Thema hinzufügen</button></form></details>
+<section class="card"><h2>Bereit zum Lernen</h2>{% for t in aktive %}<a class="task-row" href="/lernzyklus/{{ t.id }}">{{ icon('book') }}<span><strong>{{ t.label }}</strong><small>{{ 'Eigenes Erklärmaterial vorhanden' if t.lehr_quellen else 'Noch kein eigenes Erklärmaterial' }}</small></span>{{ icon('arrow') }}</a>{% else %}<p>Noch keine bestätigten Themen.</p><a href="/vorbereitung">Schulblatt hinzufügen</a>{% endfor %}</section>
+{% endblock %}

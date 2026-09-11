@@ -54,7 +54,8 @@ class TeachingError(Exception):
 # Lerneinheit starten
 # --------------------------------------------------------------------------
 
-def starten(topic_id: int, ausgabe: str | None = None) -> int:
+def starten(topic_id: int, ausgabe: str | None = None,
+            prompt_wunsch: str | None = None) -> int:
     """Legt eine Lerneinheit an — wartet aber auf Bestätigung, bevor Runde 1
     beginnt.
 
@@ -83,11 +84,14 @@ def starten(topic_id: int, ausgabe: str | None = None) -> int:
     if offen is not None:
         return offen["id"]
 
+    prompt_wunsch = (prompt_wunsch or "").strip()[:500] or None
     with db.tx() as c:
         cur = c.execute(
-            """INSERT INTO lesson (topic_id, ausgabe, state, max_runden, created_at)
-               VALUES (?, ?, 'wartet', ?, ?)""",
-            (topic_id, ausgabe, max(1, min(8, cfg.max_lernrunden)), db.now()))
+            """INSERT INTO lesson
+                   (topic_id, ausgabe, state, max_runden, prompt_wunsch, created_at)
+               VALUES (?, ?, 'wartet', ?, ?, ?)""",
+            (topic_id, ausgabe, max(1, min(8, cfg.max_lernrunden)),
+             prompt_wunsch, db.now()))
         lesson_id = cur.lastrowid
 
     return lesson_id
@@ -223,7 +227,7 @@ def job_lesson_build(payload: dict) -> None:
             thema.get("beschreibung") or "", kb.geschwaerzt(quellen),
             runde["stufe"], fehlerbild, fundstellen,
             vorherige_folien=vorherige_folien, runde_nr=runde["nr"],
-            schwaechen=schwaechen),
+            schwaechen=schwaechen, wunsch=lesson["prompt_wunsch"]),
         schema=prompts.LESSON_SCHEMA,
         system=prompts.SYSTEM,
     ).data
@@ -280,7 +284,10 @@ def _render_material(ausgabe: str, titel: str, folien: list[dict], thema: dict,
                      abgebrochen=lambda: False,
                      quelle_bereit=lambda pfad: None,
                      ) -> tuple[str | None, str, str | None]:
-    """Erzeugt die Ausgabedatei im gewählten Modus, mit HTML-Rückfall.
+    """Erzeugt die Ausgabedatei im gewählten Modus.
+
+    NotebookLM-Fehler werden an die Lerneinheit weitergegeben, damit die
+    Familie bewusst erneut versuchen oder ein anderes Format wählen kann.
 
     Gemeinsam genutzt von der normalen Runden-Erzeugung (`job_lesson_render`)
     und von manuell angeforderten Varianten (`job_lesson_variant`).
@@ -317,8 +324,7 @@ def _render_material(ausgabe: str, titel: str, folien: list[dict], thema: dict,
             mp4_pfad = notebooklm.erzeugen(titel, folien, text, abgebrochen=abgebrochen)
             pfad = ingest.commit_material(Path(mp4_pfad))
         except notebooklm.NotebookLmUnavailable as exc:
-            notiz = str(exc)
-            gewaehlt = Ausgabe.HTML.value
+            raise TeachingError(str(exc)) from exc
         except Exception as exc:                        # pragma: no cover
             notiz = f"NotebookLM ist fehlgeschlagen: {exc}"
             gewaehlt = Ausgabe.HTML.value
@@ -372,13 +378,22 @@ def job_lesson_render(payload: dict) -> None:
                 "UPDATE lesson_round SET notebooklm_quelle_pfad=? WHERE id=?",
                 (quelle_pfad, round_id))
 
-    pfad, notiz, notebooklm_quelle_pfad = _render_material(
-        lesson["ausgabe"], titel, folien, thema, basis, arbeit_id=str(round_id),
-        kernidee=erklaerung.get("kernidee") or "",
-        hinweis="" if runde["stufe"] == Stufe.NORMAL.value else
-                f"Erklärung: {runde['stufe'].replace('_', ' ')}.",
-        abgebrochen=lambda: _abgebrochen(lesson["id"]),
-        quelle_bereit=_quelle_sofort_speichern)
+    try:
+        pfad, notiz, notebooklm_quelle_pfad = _render_material(
+            lesson["ausgabe"], titel, folien, thema, basis, arbeit_id=str(round_id),
+            kernidee=erklaerung.get("kernidee") or "",
+            hinweis="" if runde["stufe"] == Stufe.NORMAL.value else
+                    f"Erklärung: {runde['stufe'].replace('_', ' ')}.",
+            abgebrochen=lambda: _abgebrochen(lesson["id"]),
+            quelle_bereit=_quelle_sofort_speichern)
+    except TeachingError as exc:
+        pruefung = json.loads(runde["pruefung"] or "{}")
+        pruefung["ausgabe_hinweis"] = str(exc)
+        with db.tx() as c:
+            c.execute("UPDATE lesson_round SET state='fehler', pruefung=? WHERE id=?",
+                      (json.dumps(pruefung, ensure_ascii=False), round_id))
+            c.execute("UPDATE lesson SET state='bereit' WHERE id=?", (lesson["id"],))
+        return
 
     if _abgebrochen(lesson["id"]):
         return
@@ -397,6 +412,26 @@ def job_lesson_render(payload: dict) -> None:
             p["ausgabe_hinweis"] = notiz.strip()
             c.execute("UPDATE lesson_round SET pruefung=? WHERE id=?",
                       (json.dumps(p, ensure_ascii=False), round_id))
+
+
+def ausgabe_erneut(lesson_id: int, ausgabe: str | None = None) -> None:
+    """Startet die letzte Runde mit NotebookLM erneut oder anderem Format."""
+    lesson = db.q1("SELECT * FROM lesson WHERE id = ?", lesson_id)
+    runde = db.q1(
+        "SELECT * FROM lesson_round WHERE lesson_id=? ORDER BY nr DESC LIMIT 1",
+        lesson_id)
+    if lesson is None or runde is None or runde["state"] != "fehler":
+        raise TeachingError("Für diese Lerneinheit gibt es keinen Ausgabe-Fehler.")
+    ausgabe = (ausgabe or lesson["ausgabe"]).strip()
+    if ausgabe not in {a.value for a in Ausgabe}:
+        raise TeachingError("Unbekanntes Ausgabeformat.")
+    with db.tx() as c:
+        c.execute("UPDATE lesson SET ausgabe=?, state='material' WHERE id=?",
+                  (ausgabe, lesson_id))
+        c.execute("UPDATE lesson_round SET state='geprueft' WHERE id=?",
+                  (runde["id"],))
+    jobs.enqueue("lesson_render", {"round_id": runde["id"]},
+                 dedup_key=f"lesson_render:{runde['id']}")
 
 
 # --------------------------------------------------------------------------
@@ -658,7 +693,7 @@ def holen(lesson_id: int) -> dict | None:
     d = dict(lesson)
     d["thema"] = topics.get(lesson["topic_id"])
     d["runden_liste"] = []
-    for r in db.q("SELECT * FROM lesson_round WHERE lesson_id=? ORDER BY nr",
+    for r in db.q("SELECT * FROM lesson_round WHERE lesson_id=? ORDER BY nr DESC",
                   lesson_id):
         runde = dict(r)
         runde["erklaerung"] = _json(runde.get("erklaerung"))
@@ -682,7 +717,7 @@ def holen(lesson_id: int) -> dict | None:
             f"lesson_build:{runde['id']}", f"lesson_render:{runde['id']}")
         runde["job_fehler"] = fehlgeschlagen["last_error"] if fehlgeschlagen else None
         d["runden_liste"].append(runde)
-    d["aktuelle"] = d["runden_liste"][-1] if d["runden_liste"] else None
+    d["aktuelle"] = d["runden_liste"][0] if d["runden_liste"] else None
     return d
 
 

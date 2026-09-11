@@ -6,6 +6,13 @@
 Arbeit tragen Sie ein, was tatsächlich saß. Daraus entsteht die einzige echte
 Messung, ob dieses System funktioniert.</p>
 
+<div class="tabs" data-tabgroup="klassenarbeit" role="tablist" aria-label="Bereiche">
+  <button type="button" class="tab-btn" data-tab="neu">Neu anlegen</button>
+  <button type="button" class="tab-btn" data-tab="verlauf">Verlauf
+    {% if zeilen %}<b class="badge">{{ zeilen | length }}</b>{% endif %}</button>
+</div>
+
+<div class="tab-panel" data-tabgroup="klassenarbeit" data-tab="neu">
 <form method="post" action="/klassenarbeit" class="card">
   {{ csrf_input() }}
   <div class="row">
@@ -23,7 +30,9 @@ Messung, ob dieses System funktioniert.</p>
   </div>
   <button type="submit">Anlegen und Prognose einfrieren</button>
 </form>
+</div>
 
+<div class="tab-panel" data-tabgroup="klassenarbeit" data-tab="verlauf">
 {% for e in zeilen %}
 <div class="card">
   <h3>{{ e.exam_date }}
@@ -71,4 +80,5 @@ Messung, ob dieses System funktioniert.</p>
 {% else %}
 <div class="empty">Noch keine Klassenarbeit angelegt.</div>
 {% endfor %}
+</div>
 {% endblock %}

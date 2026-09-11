@@ -16,7 +16,7 @@ import json
 import os
 import secrets
 import tempfile
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 DATA_DIR = Path(os.environ.get("KARO_DATA_DIR", "/data"))
@@ -26,6 +26,19 @@ _SESSION_SECRET_PATH = DATA_DIR / "session.key"
 
 SECRET_FIELDS = ("anthropic_api_key", "claude_oauth_token",
                  "app_password_hash", "app_password_salt")
+
+RESEARCH_SOURCE_DEFAULTS = [
+    {"domain": "studyflix.de", "label": "Studyflix"},
+    {"domain": "simpleclub.com", "label": "simpleclub"},
+    {"domain": "serlo.org", "label": "Serlo"},
+    {"domain": "mathe-lerntipps.de", "label": "Mathe-Lerntipps"},
+    {"domain": "bettermarks.com", "label": "bettermarks"},
+    {"domain": "schlaukopf.de", "label": "Schlaukopf"},
+    {"domain": "grundschulkoenig.de", "label": "Grundschulkönig"},
+    {"domain": "planet-schule.de", "label": "Planet Schule"},
+    {"domain": "br.de", "label": "BR (alpha Lernen)"},
+    {"domain": "youtube.com", "label": "YouTube (nur die Kanäle unten)"},
+]
 
 
 class ConfigUnreadable(RuntimeError):
@@ -62,6 +75,8 @@ class Config:
     # --- Recherche ---------------------------------------------------------
     recherche_erlaubt: bool = True
     recherche_freigabe_pflicht: bool = True
+    recherche_quellen: list = field(
+        default_factory=lambda: [dict(q) for q in RESEARCH_SOURCE_DEFAULTS])
 
     # --- Ablage ------------------------------------------------------------
     drive_subdir: str = ""

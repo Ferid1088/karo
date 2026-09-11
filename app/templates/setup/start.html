@@ -1,0 +1,37 @@
+<form method="post" action="/setup/credentials" data-backend-form>
+  {{ csrf_input() }}
+
+  <div class="card">
+    <h3>Claude API-Schlüssel</h3>
+    <div class="field">
+      <label for="api_key">Anthropic-API-Schlüssel</label>
+      <input type="password" id="api_key" name="api_key" autocomplete="off"
+             placeholder="sk-..." required>
+      <p class="hint">Kostenlos ab 5 $ Guthaben. Zu finden auf <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Wer lernt hier?</h3>
+    <div class="row">
+      <div class="field">
+        <label for="learner_name">Vorname</label>
+        <input type="text" id="learner_name" name="learner_name" maxlength="60"
+               value="{{ cfg.learner_name }}" required>
+        <p class="hint">Karo entfernt diesen Namen aus allen Daten, die an Claude gesendet werden.</p>
+      </div>
+      <div class="field" style="flex:0 0 130px">
+        <label for="grade">Klasse</label>
+        <input type="number" id="grade" name="grade" min="1" max="13"
+               value="{{ cfg.learner_grade }}" required>
+      </div>
+      <div class="field">
+        <label for="subject">Fach</label>
+        <input type="text" id="subject" name="subject" maxlength="60"
+               value="{{ cfg.subject }}" required>
+      </div>
+    </div>
+  </div>
+
+  <button type="submit">Verbindung prüfen</button>
+</form>

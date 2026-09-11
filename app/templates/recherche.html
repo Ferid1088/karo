@@ -11,6 +11,13 @@ Karo arbeitet dann ausschließlich mit Ihrem eigenen Material — das funktionie
 vollständig.</div>
 {% endif %}
 
+<div class="tabs" data-tabgroup="recherche" role="tablist" aria-label="Bereiche">
+  <button type="button" class="tab-btn" data-tab="vorschlaege">Vorschläge
+    {% if vorschlaege %}<b class="badge">{{ vorschlaege | length }}</b>{% endif %}</button>
+  <button type="button" class="tab-btn" data-tab="quellen">Erlaubte Quellen</button>
+</div>
+
+<div class="tab-panel" data-tabgroup="recherche" data-tab="vorschlaege">
 {% if vorschlaege %}
 <form method="post" action="/recherche/entscheiden">
   {{ csrf_input() }}
@@ -42,16 +49,55 @@ vollständig.</div>
   Lerneinheit anstoßen — vor Runde 1 oder vor jeder weiteren Runde.</p>
 </div>
 {% endif %}
+</div>
 
-<div class="card" style="margin-top:2rem">
+<div class="tab-panel" data-tabgroup="recherche" data-tab="quellen">
+<div class="card">
   <h3>Wo Karo überhaupt suchen darf</h3>
-  <p class="hint">Eine Erlaubnisliste, keine Sperrliste: was hier nicht steht,
-  kommt nicht vor. Erweitern ist eine Codeänderung — das ist Absicht, weil am
-  Ende der Kette ein Kind sitzt.</p>
-  <ul class="klein">
-    {% for q in erlaubte %}<li>{{ q }}</li>{% endfor %}
-  </ul>
+  <p class="hint">Diese Liste gilt für die Websuche. Nur hier eingetragene
+  Seiten können vorgeschlagen werden; jede Fundstelle muss zusätzlich von
+  Ihnen freigegeben werden.</p>
+  <div class="quellen-liste">
+    {% for q in quellen %}
+    <div class="quelle-zeile {{ 'quelle-inaktiv' if not q.active }}">
+      <div><strong>{{ q.label }}</strong><span class="klein">{{ q.domain }}</span></div>
+      <form method="post" action="/recherche/quellen/aktivieren">
+        {{ csrf_input() }}
+        <input type="hidden" name="domain" value="{{ q.domain }}">
+        <input type="hidden" name="active" value="{{ '0' if q.active else '1' }}">
+        <button type="submit" class="quiet">{{ 'Deaktivieren' if q.active else 'Aktivieren' }}</button>
+      </form>
+    </div>
+    {% else %}<p class="empty">Noch keine Quelle erlaubt.</p>{% endfor %}
+  </div>
+  <form method="post" action="/recherche/quellen/hinzufuegen" class="quellen-form">
+    {{ csrf_input() }}
+    <div class="field">
+      <label for="quellen-vorschlag">Vorschlag auswählen</label>
+      <select id="quellen-vorschlag" name="domain">
+        <option value="">Eigene Domain eingeben</option>
+        {% for q in quellen_vorschlaege %}
+        <option value="{{ q.domain }}">{{ q.label }} · {{ q.hinweis }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="quellen-label">Name</label>
+      <input id="quellen-label" type="text" name="label" maxlength="120"
+             placeholder="z. B. Schulportal NRW">
+    </div>
+    <div class="field">
+      <label for="quellen-domain">Eigene Domain</label>
+      <input id="quellen-domain" type="text" name="domain_manual"
+             maxlength="200" placeholder="beispiel.de">
+    </div>
+    <button type="submit">Quelle hinzufügen</button>
+  </form>
+  <p class="hint">Vorschläge werden anhand der Klassenstufe {{ cfg.learner_grade }}
+  und des Fachs {{ cfg.subject }} ausgewählt. YouTube bleibt auf bekannte
+  Lernkanäle begrenzt.</p>
   <p class="klein" style="margin-top:.7rem"><strong>YouTube nur diese
   Kanäle:</strong> {{ kanaele | join(', ') }}</p>
+</div>
 </div>
 {% endblock %}

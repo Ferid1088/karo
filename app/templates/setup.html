@@ -1,17 +1,16 @@
 {% extends "base.html" %}
 {% set show_nav = cfg.setup_complete %}
 {% block title %}Einrichtung – Karo{% endblock %}
-{% block mainclass %}narrow{% endblock %}
+{% block mainclass %}{{ '' if cfg.setup_complete else 'narrow' }}{% endblock %}
 
 {% block content %}
 <h1>{{ 'Einstellungen' if cfg.setup_complete else 'Karo einrichten' }}</h1>
-<p class="sub">Ihre Zugangsdaten bleiben auf diesem Rechner. Sie werden nicht an
-den Hersteller übertragen und stehen weder im Programm noch in den Protokollen.</p>
+<p class="sub">Ihre Zugangsdaten bleiben auf diesem Rechner und werden nie übertragen.</p>
 
 {% if not cfg.setup_complete %}
 <div class="steps">
-  <span class="{{ 'on' if schritt == 'start' }}">1 · Zugang</span>
-  <span class="{{ 'on' if schritt == 'modell' }}">2 · Modell, Ausgabe, Passwort</span>
+  <span class="{{ 'on' if schritt == 'start' }}">1 · Claude & Lernperson</span>
+  <span class="{{ 'on' if schritt == 'modell' }}">2 · Einstellungen</span>
 </div>
 {% endif %}
 
@@ -124,12 +123,25 @@ claude setup-token                         <span class="c-com"># Token wird ange
 </script>
 
 {% else %}
+{% macro hilfe(text) %}<span class="hilfe" tabindex="0"><span class="hilfe-btn" aria-hidden="true">?</span><span class="hilfe-text" role="tooltip">{{ text }}</span></span>{% endmacro %}
+<div class="setup-shell">
+<nav class="setup-nav" aria-label="Einstellungs-Kategorien">
+  <button type="button" class="setup-nav-btn" data-zeigt="claude">Claude</button>
+  <button type="button" class="setup-nav-btn" data-zeigt="notebooklm">NotebookLM</button>
+  <button type="button" class="setup-nav-btn" data-zeigt="ausgabe">Ausgabeformat</button>
+  <button type="button" class="setup-nav-btn" data-zeigt="lernverhalten">Lernverhalten</button>
+  <button type="button" class="setup-nav-btn" data-zeigt="blaetter">Blätter &amp; Speicher</button>
+  <button type="button" class="setup-nav-btn" data-zeigt="passwort">Passwort</button>
+</nav>
+<div class="setup-panels">
+
+<section class="setup-panel" data-kategorie="claude">
 <div class="card" id="claude-verbindung">
   <h3>Claude-Verbindung
     <span class="pill {{ 'gruen' if claude_ok else 'rot' }}">{{ 'verbunden' if claude_ok else 'getrennt' }}</span>
   </h3>
-  <p class="hint">{{ claude_note }}</p>
-  <form method="post" action="/setup/claude/verbinden">
+  {% if claude_note %}<p class="hint">{{ claude_note }}</p>{% endif %}
+  <form method="post" action="/setup/claude/verbinden" id="claude-verbinden-form">
     {{ csrf_input() }}
     <label class="wahl">
       <input type="radio" name="backend" value="abo" id="v-abo"
@@ -144,31 +156,27 @@ claude setup-token                         <span class="c-com"># Token wird ange
 
     <div class="field" id="vfeld-abo" style="margin-top:.8rem">
       <label for="v-token">Abo-Token
-        <span class="hilfe" tabindex="0"
-              title="Einmal am Rechner im Terminal: „claude setup-token“ ausführen (nach „claude auth login“, falls noch nicht angemeldet). Den kompletten, langlebigen OAuth-Token hier einfügen — er beginnt meist mit „sk-ant-oat...“. Wird sofort mit einem echten Aufruf geprüft und nur bei Erfolg gespeichert.">?</span>
+        {{ hilfe('Einmal am Rechner im Terminal: „claude setup-token“ ausführen (nach „claude auth login“, falls noch nicht angemeldet). Den kompletten, langlebigen OAuth-Token hier einfügen — er beginnt meist mit „sk-ant-oat...“. Wird sofort mit einem echten Aufruf geprüft und nur bei Erfolg gespeichert.') }}
       </label>
       <input type="password" id="v-token" name="token" autocomplete="off"
              placeholder="sk-ant-oat...">
     </div>
     <div class="field" id="vfeld-api" style="margin-top:.8rem">
       <label for="v-api-key">Anthropic-API-Schlüssel
-        <span class="hilfe" tabindex="0"
-              title="Zu holen unter console.anthropic.com → API Keys. Wird sofort mit einem echten Aufruf geprüft und nur bei Erfolg gespeichert.">?</span>
+        {{ hilfe('Zu holen unter console.anthropic.com → API Keys. Wird sofort mit einem echten Aufruf geprüft und nur bei Erfolg gespeichert.') }}
       </label>
       <input type="password" id="v-api-key" name="api_key" autocomplete="off"
              placeholder="sk-ant-api03-...">
     </div>
-    <div class="actions" style="margin-top:.6rem">
-      <button type="submit">Verbinden</button>
-    </div>
   </form>
-  {% if claude_ok %}
-  <form method="post" action="/setup/claude/trennen" style="margin-top:.5rem"
-        onsubmit="return confirm('Claude-Verbindung wirklich trennen? Der gespeicherte Token/Schlüssel wird gelöscht — danach neu verbinden nötig.')">
-    {{ csrf_input() }}
-    <button type="submit" class="quiet">Trennen</button>
-  </form>
-  {% endif %}
+  <div class="actions" style="margin-top:.6rem">
+    <button type="submit" form="claude-verbinden-form">Verbinden</button>
+    <form method="post" action="/setup/claude/trennen" style="display:contents"
+          onsubmit="return confirm('Claude-Verbindung wirklich trennen? Der gespeicherte Token/Schlüssel wird gelöscht — danach neu verbinden nötig.')">
+      {{ csrf_input() }}
+      <button type="submit" class="quiet" {{ 'disabled' if not claude_ok }}>Trennen</button>
+    </form>
+  </div>
 </div>
 <script>
   (function () {
@@ -193,11 +201,9 @@ claude setup-token                         <span class="c-com"># Token wird ange
     <button type="button" class="quiet"
             data-nlm-login-btn data-csrf="{{ csrf }}" data-csrf-field="{{ csrf_field }}">
       {{ taste_text }}</button>
-    {% if nlm_ok %}
-    <button type="button" class="quiet"
+    <button type="button" class="quiet" {{ 'disabled' if not nlm_ok }}
             data-nlm-trennen-btn data-csrf="{{ csrf }}" data-csrf-field="{{ csrf_field }}">
       Trennen</button>
-    {% endif %}
   </div>
   <p class="hint" data-nlm-login-hinweis style="margin-top:.4rem">Öffnet ein
   eigenes Browserfenster für die Google-Anmeldung.</p>
@@ -206,6 +212,42 @@ claude setup-token                         <span class="c-com"># Token wird ange
   {% endif %}
 </div>
 {% endmacro %}
+
+<form method="post" action="/setup/finish">
+  {{ csrf_input() }}
+
+  <div class="card">
+    <h3>KI-Modelle {{ hilfe('Stärker für Handschrift, billiger für Texte.') }}</h3>
+    {% if modelle %}
+    <div class="row">
+      <div class="field">
+        <label for="model_vision">Handschrift lesen</label>
+        <select id="model_vision" name="model_vision">
+          {% for m in modelle %}
+          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_vision }}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="model_text">Texte erzeugen</label>
+        <select id="model_text" name="model_text">
+          {% for m in modelle %}
+          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_text }}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="setup-panel" data-kategorie="notebooklm">
+<div class="card" id="notebooklm-verbindung">
+  <h3>NotebookLM-Verbindung {{ hilfe(nlm_warnung) }}
+    <span class="pill {{ 'gruen' if nlm_ok else 'rot' }}">{{ 'verbunden' if nlm_ok else 'getrennt' }}</span>
+  </h3>
+  {{ nlm_anmelde_knopf('Jetzt anmelden' if not nlm_ok else 'Anmeldedaten erneut holen') }}
+</div>
 
 <script>
   // DOMContentLoaded, nicht sofort: dieses Skript steht vor dem eigentlichen
@@ -298,135 +340,82 @@ claude setup-token                         <span class="c-com"># Token wird ange
     });
   });
 </script>
+</section>
 
-<div class="card" id="notebooklm-verbindung">
-  <h3>NotebookLM-Verbindung
-    <span class="pill {{ 'gruen' if nlm_ok else 'rot' }}">{{ 'verbunden' if nlm_ok else 'getrennt' }}</span>
-  </h3>
-  <p class="hint">{{ nlm_warnung }}</p>
-  <p class="{{ 'text-gut' if nlm_ok else 'text-warn' }}">{{ nlm_grund }}</p>
-  <em class="klein">An- oder erneut anmelden: Knopf weiter unten bei
-  „NotebookLM-Video“.</em>
-</div>
-
-<form method="post" action="/setup/finish">
-  {{ csrf_input() }}
-
+<section class="setup-panel" data-kategorie="ausgabe">
   <div class="card">
-    <h3>Modelle</h3>
-    <p class="hint" style="margin-bottom:.8rem">
-      Zugang über <b>{{ backends.get(cfg.llm_backend, cfg.llm_backend) }}</b>.
-      Für das Lesen der Handschrift lohnt sich das stärkere Modell, für Texte
-      reicht das günstige.
-    </p>
-    {% if modelle %}
-    <div class="row">
-      <div class="field">
-        <label for="model_vision">Handschrift lesen</label>
-        <select id="model_vision" name="model_vision">
-          {% for m in modelle %}
-          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_vision }}>{{ m.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field">
-        <label for="model_text">Texte erzeugen</label>
-        <select id="model_text" name="model_text">
-          {% for m in modelle %}
-          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_text }}>{{ m.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-    {% else %}
-    <div class="msg warn">Die Modelliste konnte nicht abgerufen werden. Die
-    bisherige Auswahl bleibt: <code>{{ cfg.model_vision or '–' }}</code> /
-    <code>{{ cfg.model_text or '–' }}</code>.</div>
-    {% endif %}
-  </div>
-
-  <div class="card">
-    <h3>Wie soll Lernmaterial ausgegeben werden?</h3>
-    <p class="hint" style="margin-bottom:.8rem">Das ist nur die Voreinstellung —
-    bei jeder Lerneinheit können Sie neu wählen.</p>
+    <h3>Ausgabeformat {{ hilfe('Kann bei jeder Runde neu gewählt werden.') }}</h3>
     {% for wert, label in ausgabe_labels.items() %}
     <label class="wahl">
       <input type="radio" name="default_ausgabe" value="{{ wert }}"
              {{ 'checked' if cfg.default_ausgabe == wert }}>
       <span>
-        <b>{{ label }}</b>
-        <em>{{ ausgabe_hints[wert] }}</em>
-        {% if wert == 'mp4' %}
-          <em class="{{ 'gut' if mp4_ok else 'warn' }}">{{ mp4_grund }}</em>
-        {% elif wert == 'notebooklm' %}
-          <em class="{{ 'gut' if nlm_ok else 'warn' }}">{{ nlm_grund }}</em>
-          <div style="margin-top:.5rem">
-            {{ nlm_anmelde_knopf('Jetzt anmelden' if not nlm_ok else 'Anmeldedaten erneut holen') }}
-          </div>
-        {% endif %}
+        <b>{{ label }}
+          {% if wert == 'notebooklm' %}
+            {{ hilfe(ausgabe_hints[wert] ~ ' Verbinden/Trennen: oben bei „NotebookLM-Verbindung“.') }}
+          {% else %}
+            {{ hilfe(ausgabe_hints[wert]) }}
+          {% endif %}
+        </b>
       </span>
     </label>
-    {% endfor %}
-
-    <div class="field" style="margin-top:1rem">
+    {% if wert == 'mp4' %}
+    <div class="field" style="margin:-.3rem 0 .7rem 2.1rem">
       <label for="tts_stimme">Stimme für die MP4-Ausgabe</label>
       <select id="tts_stimme" name="tts_stimme">
-        {% for wert, label in stimmen.items() %}
-        <option value="{{ wert }}" {{ 'selected' if cfg.tts_stimme == wert }}>{{ label }}</option>
+        {% for sw, slabel in stimmen.items() %}
+        <option value="{{ sw }}" {{ 'selected' if cfg.tts_stimme == sw }}>{{ slabel }}</option>
         {% endfor %}
       </select>
-      <p class="hint">Der HTML-Modus benutzt die Stimme Ihres Betriebssystems
-      und braucht das hier nicht.</p>
     </div>
+    {% endif %}
+    {% endfor %}
   </div>
+</section>
 
+<section class="setup-panel" data-kategorie="lernverhalten">
   <div class="card">
-    <h3>Lernzyklus und Recherche</h3>
+    <h3>Lernverhalten</h3>
     <div class="row">
       <div class="field" style="flex:0 0 190px">
-        <label for="max_lernrunden">Runden je Thema, höchstens</label>
+        <label for="max_lernrunden">Max. Runden pro Thema {{ hilfe('Dann: Mensch statt Maschine.') }}</label>
         <input type="number" id="max_lernrunden" name="max_lernrunden"
                min="1" max="8" value="{{ cfg.max_lernrunden }}">
-        <p class="hint">Danach hört Karo auf — an dieser Stelle hilft ein
-        Mensch mehr als eine vierte Erklärung.</p>
       </div>
       <div class="field">
-        <label for="recherche">Im Netz nach Lernmaterial suchen</label>
+        <label for="recherche">Im Netz suchen {{ hilfe('Funde: Vorschlag, der bestätigt wird.') }}</label>
         <select id="recherche" name="recherche">
-          <option value="ja" {{ 'selected' if cfg.recherche_erlaubt }}>ja, auf geprüften Schulseiten</option>
-          <option value="nein" {{ 'selected' if not cfg.recherche_erlaubt }}>nein, nur eigenes Material</option>
+          <option value="ja" {{ 'selected' if cfg.recherche_erlaubt }}>Ja</option>
+          <option value="nein" {{ 'selected' if not cfg.recherche_erlaubt }}>Nein, nur eigenes Material</option>
         </select>
-        <p class="hint">Funde erscheinen als Vorschlag und müssen freigegeben
-        werden. Die Fakten kommen immer aus Ihrem Schulmaterial.</p>
       </div>
     </div>
   </div>
+</section>
 
+<section class="setup-panel" data-kategorie="blaetter">
   <div class="card">
-    <h3>Blätter und Ablage</h3>
+    <h3>Schulblätter & Speicher</h3>
     {% if drive_ok and drive_writable %}
-      <div class="msg ok">Drive-Ordner gefunden: <code>{{ drive_path }}</code></div>
+      <p class="hint">✓ Drive-Ordner: <code>{{ drive_path }}</code></p>
     {% elif drive_ok %}
-      <div class="msg warn">Ordner gefunden, aber nicht beschreibbar:
-      <code>{{ drive_path }}</code>.</div>
+      <p class="hint">⚠ Ordner existiert, aber nicht beschreibbar: <code>{{ drive_path }}</code></p>
     {% else %}
-      <div class="msg warn">Unter <code>{{ drive_path }}</code> ist kein
-      nutzbarer Ordner eingehängt. Karo funktioniert trotzdem — Blätter laden
-      Sie dann direkt hoch. Zum Nachrüsten <code>KARO_DRIVE_PATH</code> in der
-      <code>.env</code> setzen und neu starten.</div>
+      <p class="hint">Kein Google Drive gefunden. Blätter können direkt hochgeladen werden.</p>
     {% endif %}
-    {% if not heif_ok %}
-      <div class="msg warn">HEIC-Dateien können nicht gelesen werden. Am iPhone
-      unter Einstellungen › Kamera › Formate auf „Maximale Kompatibilität“
-      stellen.</div>
-    {% endif %}
-    {% if not xlsx_ok %}
-      <div class="msg warn">Der Tabellenexport (Lernstand.xlsx) ist nicht
-      verfügbar — <code>openpyxl</code> fehlt im Image.</div>
-    {% endif %}
+    {% if not heif_ok %}<p class="hint klein">HEIC (iPhone): Kamera › Formate › Maximale Kompatibilität</p>{% endif %}
+
+    <div class="actions" style="margin-top:.7rem">
+      <button type="button" class="quiet" id="drive-ordner-waehlen">Ordner wählen…</button>
+      {{ hilfe('Zeigt nur den gewählten Ordnernamen — Browser können aus Sicherheitsgründen keinen vollen Pfad herausgeben. Der tatsächlich genutzte Ordner wird über KARO_DRIVE_PATH in der .env gesetzt (danach neu starten).') }}
+      <span class="hint" id="drive-ordner-gewaehlt" style="margin:0"></span>
+    </div>
+    <input type="file" id="drive-ordner-input" webkitdirectory directory multiple hidden>
 
     <div class="field" style="margin-top:1rem">
-      <label for="header_crop">Oberen Blattrand abschneiden</label>
+      <label for="header_crop">Oberen Blattrand abschneiden
+        {{ hilfe('Auf deutschen Arbeitsblättern steht oben der Name. Was hier abgeschnitten wird, verlässt den Rechner nicht. Antwortblätter werden nie beschnitten.') }}
+      </label>
       <select id="header_crop" name="header_crop">
         {% for wert, label in [(0, 'nicht abschneiden'),
                                (8, '8 % – üblicher Namensbereich'),
@@ -435,17 +424,31 @@ claude setup-token                         <span class="c-com"># Token wird ange
         <option value="{{ wert }}" {{ 'selected' if cfg.header_crop_percent == wert }}>{{ label }}</option>
         {% endfor %}
       </select>
-      <p class="hint">Auf deutschen Arbeitsblättern steht oben der Name. Was
-      hier abgeschnitten wird, verlässt den Rechner nicht. Antwortblätter
-      werden nie beschnitten.</p>
     </div>
   </div>
+  <script>
+    (function () {
+      var btn = document.getElementById("drive-ordner-waehlen");
+      var input = document.getElementById("drive-ordner-input");
+      var out = document.getElementById("drive-ordner-gewaehlt");
+      if (!btn || !input) return;
+      btn.addEventListener("click", function () { input.click(); });
+      input.addEventListener("change", function () {
+        if (input.files && input.files.length) {
+          var ordner = input.files[0].webkitRelativePath.split("/")[0];
+          out.textContent = "Gewählt: " + ordner;
+        }
+      });
+    })();
+  </script>
+</section>
 
+<section class="setup-panel" data-kategorie="passwort">
   <div class="card">
-    <h3>Passwort für diese Instanz</h3>
+    <h3>Passwort {{ hilfe('Schützt Karo auf diesem Rechner.') }}</h3>
     <div class="row">
       <div class="field">
-        <label for="password">{{ 'Neues Passwort' if cfg.has_password else 'Passwort' }}</label>
+        <label for="password">{{ 'Neues Passwort' if cfg.has_password else 'Passwort' }} (min. {{ min_password }} Zeichen)</label>
         <input type="password" id="password" name="password"
                autocomplete="new-password" {{ '' if cfg.has_password else 'required' }}>
       </div>
@@ -456,17 +459,51 @@ claude setup-token                         <span class="c-com"># Token wird ange
       </div>
     </div>
     <p class="hint">
-      {% if cfg.has_password %}Leer lassen, um das bestehende Passwort zu behalten.
-      {% else %}Pflichtfeld, mindestens {{ min_password }} Zeichen.{% endif %}
-      Karo ist nur von diesem Rechner aus erreichbar — das Passwort schützt vor
-      anderen Personen, die an demselben Rechner sitzen.
+      {% if cfg.has_password %}Leer lassen zum Behalten.{% else %}Erforderlich.{% endif %}
     </p>
   </div>
+</section>
+
+</div>
+</div>
 
   <div class="actions">
     <button type="submit">{{ 'Speichern' if cfg.setup_complete else 'Einrichtung abschließen' }}</button>
   </div>
 </form>
+
+<script>
+  (function () {
+    var nav = document.querySelector('.setup-nav');
+    if (!nav) return;
+    var knoepfe = nav.querySelectorAll('.setup-nav-btn');
+    var panels = document.querySelectorAll('.setup-panel');
+
+    function zeige(kategorie) {
+      panels.forEach(function (p) {
+        p.classList.toggle('active', p.dataset.kategorie === kategorie);
+      });
+      knoepfe.forEach(function (b) {
+        b.classList.toggle('active', b.dataset.zeigt === kategorie);
+      });
+    }
+
+    knoepfe.forEach(function (b) {
+      b.addEventListener('click', function () {
+        zeige(b.dataset.zeigt);
+        try { history.replaceState(null, '', '#' + b.dataset.zeigt); } catch (e) {}
+      });
+    });
+
+    // Bestehende Sprungziele (z.B. aus dem Verbindungs-Widget in der
+    // Kopfzeile) zeigen weiterhin die passende Kategorie an.
+    var alias = {'claude-verbindung': 'claude', 'notebooklm-verbindung': 'notebooklm'};
+    var bekannt = Array.prototype.map.call(knoepfe, function (b) { return b.dataset.zeigt; });
+    var ziel = location.hash.slice(1);
+    ziel = alias[ziel] || ziel;
+    zeige(bekannt.indexOf(ziel) !== -1 ? ziel : 'claude');
+  })();
+</script>
 
 <form method="post" action="/setup/reset" style="margin-top:1rem"
       onsubmit="return confirm('Zugangsdaten wirklich löschen? Die Lerndaten bleiben erhalten.')">

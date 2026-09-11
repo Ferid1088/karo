@@ -124,6 +124,7 @@ _ADDED_COLUMNS = [
     ("question", "auswert_call_id", "INTEGER"),
     ("lesson_round_variant", "ausgabe", "TEXT"),
     ("lesson", "abbruch_grund", "TEXT"),
+    ("lesson", "prompt_wunsch", "TEXT"),
     ("document", "themenname", "TEXT"),
     ("research_hit", "inhalt", "TEXT"),
     ("research_hit", "inhalt_geholt_am", "TEXT"),

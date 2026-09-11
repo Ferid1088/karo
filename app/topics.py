@@ -107,7 +107,11 @@ def liste(state: str | None = None) -> list[dict]:
                         AS lehr_quellen,
                     (SELECT id FROM lesson l WHERE l.topic_id = t.id
                        AND l.state NOT IN ('gelernt','abgebrochen')
-                      ORDER BY l.id DESC LIMIT 1) AS offene_lesson
+                                            ORDER BY l.id DESC LIMIT 1) AS offene_lesson,
+                                        (SELECT r.id FROM lesson_round r
+                                             JOIN lesson l ON l.id = r.lesson_id
+                                            WHERE l.topic_id = t.id AND r.material_pfad IS NOT NULL
+                                            ORDER BY r.id DESC LIMIT 1) AS neues_material
                FROM topic t
                LEFT JOIN topic_flag f ON f.topic_id = t.id""".format(
         lehr_platzhalter=",".join("?" * len(kb.LEHR_ARTEN)))
