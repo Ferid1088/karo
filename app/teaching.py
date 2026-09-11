@@ -326,8 +326,13 @@ def _render_material(ausgabe: str, titel: str, folien: list[dict], thema: dict,
         except notebooklm.NotebookLmUnavailable as exc:
             raise TeachingError(str(exc)) from exc
         except Exception as exc:                        # pragma: no cover
-            notiz = f"NotebookLM ist fehlgeschlagen: {exc}"
-            gewaehlt = Ausgabe.HTML.value
+            # Bewusst kein stiller Rückfall mehr auf HTML: die Familie hat
+            # NotebookLM ausgewählt, also muss sie erfahren, dass es nicht
+            # geklappt hat, und selbst entscheiden — erneut versuchen oder
+            # ein anderes Format wählen (siehe /lernen/{id}/ausgabe/erneut
+            # und das Popup in lernen.html). Genau dieselbe Behandlung wie
+            # bei NotebookLmUnavailable oben.
+            raise TeachingError(f"NotebookLM ist fehlgeschlagen: {exc}") from exc
 
     if gewaehlt == Ausgabe.MP4.value:
         arbeit = config.media_dir() / f"bau-{arbeit_id}"
@@ -719,6 +724,65 @@ def holen(lesson_id: int) -> dict | None:
         d["runden_liste"].append(runde)
     d["aktuelle"] = d["runden_liste"][0] if d["runden_liste"] else None
     return d
+
+
+def materialien_fuer_thema(topic_id: int) -> list[dict]:
+    """Alle je erzeugten Lernmaterialien zu einem Thema, neueste zuerst.
+
+    Bewusst über alle Lerneinheiten hinweg, nicht nur die aktuell offene:
+    „Mehr zum Thema“ beendet die bisherige Lerneinheit und legt eine neue
+    an (siehe `starten()`/`abbrechen()` in kind.lernen_abbrechen) — ohne
+    diese Übersicht verschwänden Folien und Videos früherer Runden aus der
+    Oberfläche, obwohl sie in der Datenbank und im Drive-Ordner erhalten
+    bleiben.
+    """
+    zeilen = db.q(
+        """SELECT lr.id AS id, 'runde' AS art, lr.lesson_id AS lesson_id,
+                  lr.nr AS round_nr, l.ausgabe AS lesson_ausgabe,
+                  lr.material_pfad AS material_pfad,
+                  lr.notebooklm_quelle_pfad AS notebooklm_quelle_pfad,
+                  lr.erklaerung AS erklaerung, lr.stufe AS stufe,
+                  lr.created_at AS created_at,
+                  NULL AS variant_wunsch, NULL AS variant_ausgabe
+             FROM lesson_round lr
+             JOIN lesson l ON l.id = lr.lesson_id
+            WHERE l.topic_id = ? AND lr.material_pfad IS NOT NULL
+            UNION ALL
+           SELECT lrv.id AS id, 'variante' AS art, lr.lesson_id AS lesson_id,
+                  lr.nr AS round_nr, l.ausgabe AS lesson_ausgabe,
+                  lrv.material_pfad AS material_pfad,
+                  lrv.notebooklm_quelle_pfad AS notebooklm_quelle_pfad,
+                  lr.erklaerung AS erklaerung, lr.stufe AS stufe,
+                  lrv.created_at AS created_at,
+                  lrv.wunsch AS variant_wunsch, lrv.ausgabe AS variant_ausgabe
+             FROM lesson_round_variant lrv
+             JOIN lesson_round lr ON lr.id = lrv.lesson_round_id
+             JOIN lesson l ON l.id = lr.lesson_id
+            WHERE l.topic_id = ? AND lrv.material_pfad IS NOT NULL
+              AND lrv.state = 'bereit'
+            ORDER BY created_at DESC, id DESC""",
+        topic_id, topic_id)
+
+    ergebnis = []
+    for z in zeilen:
+        m = dict(z)
+        erklaerung = _json(m.pop("erklaerung"))
+        ausgabe = m.pop("variant_ausgabe") or m.pop("lesson_ausgabe")
+        wunsch = m.pop("variant_wunsch")
+        if m["art"] == "variante":
+            titel = f"Variante: {wunsch}" if wunsch else "Variante"
+        else:
+            titel = erklaerung.get("titel") or f"Runde {m['round_nr']}"
+        m["titel"] = titel
+        m["ausgabe"] = ausgabe
+        m["oeffnen_url"] = (f"/material/{m['id']}" if m["art"] == "runde"
+                            else f"/material/variante/{m['id']}")
+        m["notebooklm_quelle_url"] = (
+            (f"/material/{m['id']}/notebooklm-quelle" if m["art"] == "runde"
+             else f"/material/variante/{m['id']}/notebooklm-quelle")
+            if m["notebooklm_quelle_pfad"] else None)
+        ergebnis.append(m)
+    return ergebnis
 
 
 def _json(text):

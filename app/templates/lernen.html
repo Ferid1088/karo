@@ -149,8 +149,8 @@
 
 </div>
 
-{% if r and r.material_pfad %}
 <div class="tab-panel" data-tabgroup="lerneinheit" data-tab="material">
+{% if r and r.material_pfad %}
 <div class="card">
   <h3>{{ r.erklaerung.get('titel') or thema.label }}</h3>
   {% if r.erklaerung.get('kernidee') %}
@@ -181,6 +181,35 @@
   {% endif %}
 </div>
 {% endif %}
+
+{% if alle_materialien %}
+<div class="card">
+  <h3>Alle Materialien zu diesem Thema</h3>
+  <p class="hint">Neueste zuerst. Bleibt erhalten, auch nach „Mehr zum Thema“.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Wann</th><th>Titel</th><th>Ausgabe</th><th></th></tr></thead>
+      <tbody>
+        {% for m in alle_materialien %}
+        <tr>
+          <td class="klein">{{ m.created_at[5:16] | replace('T', ' ') }}</td>
+          <td>{{ m.titel }}{% if m.art == 'variante' %} <span class="klein">· Variante</span>{% endif %}</td>
+          <td class="klein">{{ ausgabe_labels.get(m.ausgabe, m.ausgabe) }}</td>
+          <td class="actions" style="gap:.4rem; justify-content:flex-end">
+            <a class="btn quiet" href="{{ m.oeffnen_url }}" target="_blank" rel="noopener">öffnen</a>
+            {% if m.notebooklm_quelle_url %}
+            <a class="btn quiet" href="{{ m.notebooklm_quelle_url }}" target="_blank"
+               rel="noopener">gesendeter Text</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+</div>
 
 <div class="tab-panel" data-tabgroup="lerneinheit" data-tab="runden">
 {% if funde %}

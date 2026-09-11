@@ -181,7 +181,8 @@ def lernen_seite(request: Request, lesson_id: int):
                   funde=research.freigegebene(lesson["topic_id"]),
                   vorschlaege=research.vorschlaege(lesson["topic_id"]),
                   recherche_erlaubt=config.load_safe().recherche_erlaubt,
-                  hat_material=hat_material)
+                  hat_material=hat_material,
+                  alle_materialien=teaching.materialien_fuer_thema(lesson["topic_id"]))
 
 
 @router.post("/lernen/{lesson_id}/fragen")

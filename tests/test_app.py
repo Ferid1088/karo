@@ -775,12 +775,13 @@ def test_variante_mit_wunsch_durchlaeuft_dieselbe_gegenpruefung(
     assert material.status_code == 200
 
 
-def test_variante_kann_eine_andere_ausgabeart_waehlen(
+def test_variante_meldet_notebooklm_fehler_statt_stillem_ruckfall(
         client, fake_llm, fake_cli, app_env):
     """Eine Variante darf in einer anderen Ausgabeart erzeugt werden als die
     Runde selbst — z. B. einmalig ein Video statt Folien mit Stimme.
-    NotebookLM ist im Test nicht installiert, deshalb faellt sie auf HTML
-    zurueck, aber die gewaehlte Art muss trotzdem gespeichert bleiben."""
+    NotebookLM ist im Test nicht installiert: die Variante muss das klar als
+    Fehler melden (mit Grund, direkt in der Rundenliste sichtbar), statt
+    unbemerkt HTML abzuliefern — genau wie bei der Haupterklärung."""
     topic_id = _bis_rot(client, fake_llm, app_env)
     lernen_starten(client, app_env, topic_id, "html")
     run_jobs(app_env, fake_llm)
@@ -800,9 +801,12 @@ def test_variante_kann_eine_andere_ausgabeart_waehlen(
     variante = app_env.db.q1(
         "SELECT * FROM lesson_round_variant WHERE lesson_round_id=?", runde["id"])
     assert variante["ausgabe"] == "notebooklm"
-    assert variante["state"] == "bereit"
-    assert variante["material_pfad"].endswith(".html")
+    assert variante["state"] == "fehler"
+    assert variante["material_pfad"] is None
     assert "notebooklm" in (variante["fehler"] or "").lower()
+
+    seite = client.get(f"/lernen/{lesson['id']}")
+    assert variante["fehler"] in seite.text
 
 
 def test_variante_mit_injektionsversuch_wird_bei_widerspruch_verworfen(
@@ -1014,15 +1018,66 @@ def test_mp4_faellt_auf_html_zurueck_wenn_werkzeuge_fehlen(
     assert client.get(f"/material/{runde['id']}").status_code == 200
 
 
-def test_notebooklm_faellt_auf_html_zurueck(client, fake_llm, fake_cli, app_env):
+def test_mehr_zum_thema_behaelt_bisheriges_material_sichtbar(client, fake_llm, fake_cli, app_env):
+    """„Mehr zum Thema“ legt intern eine neue Lerneinheit an (siehe
+    kind.lernen_abbrechen) — ohne eine themenweite Materialliste würden die
+    Folien/Videos der vorigen Lerneinheit aus der Oberfläche verschwinden,
+    obwohl sie erhalten bleiben. Die neue Lerneinheit muss beide Materialien
+    zeigen, neuestes zuerst."""
+    from app import teaching
+
+    topic_id = _bis_rot(client, fake_llm, app_env)
+    lesson1_id = lernen_starten(client, app_env, topic_id, "html")
+    run_jobs(app_env, fake_llm)
+    runde1 = app_env.db.q1(
+        "SELECT * FROM lesson_round WHERE lesson_id=? ORDER BY nr DESC LIMIT 1",
+        lesson1_id)
+    assert runde1["material_pfad"] is not None
+
+    seite = client.get(f"/lernen/{lesson1_id}")
+    client.post(f"/lernen/{lesson1_id}/abbrechen",
+               data={"_csrf": csrf_from(seite.text), "prompt_wunsch": "mehr zum Thema"},
+               follow_redirects=True)
+    lesson2_id = app_env.db.q1(
+        "SELECT id FROM lesson WHERE topic_id=? ORDER BY id DESC LIMIT 1",
+        topic_id)["id"]
+    assert lesson2_id != lesson1_id
+
+    client.post(f"/lernen/{lesson2_id}/runde/weiter",
+               data={"_csrf": csrf_from(client.get(f'/lernen/{lesson2_id}').text)})
+    run_jobs(app_env, fake_llm)
+    runde2 = app_env.db.q1(
+        "SELECT * FROM lesson_round WHERE lesson_id=? ORDER BY nr DESC LIMIT 1",
+        lesson2_id)
+    assert runde2["material_pfad"] is not None
+
+    materialien = teaching.materialien_fuer_thema(topic_id)
+    assert [m["id"] for m in materialien] == [runde2["id"], runde1["id"]]
+
+    seite = client.get(f"/lernen/{lesson2_id}")
+    assert f"/material/{runde1['id']}" in seite.text
+    assert f"/material/{runde2['id']}" in seite.text
+
+
+def test_notebooklm_fehler_zeigt_popup_statt_stillem_ruckfall(client, fake_llm, fake_cli, app_env):
+    """Ein NotebookLM-Fehler darf nie unbemerkt zu einem anderen Format
+    wechseln — die Familie hat NotebookLM ausgewählt und muss es erfahren,
+    mit der Wahl, es erneut zu versuchen oder bewusst umzuschalten (siehe
+    das Popup in lernen.html und /lernen/{id}/ausgabe/erneut)."""
     topic_id = _bis_rot(client, fake_llm, app_env)
     lernen_starten(client, app_env, topic_id, "notebooklm")
     run_jobs(app_env, fake_llm)
 
     runde = app_env.db.q1("SELECT * FROM lesson_round ORDER BY id DESC LIMIT 1")
-    assert runde["material_pfad"].endswith(".html")
+    assert runde["material_pfad"] is None
+    assert runde["state"] == "fehler"
     pruefung = json.loads(runde["pruefung"])
     assert "notebooklm" in pruefung["ausgabe_hinweis"].lower()
+
+    lesson = app_env.db.q1("SELECT * FROM lesson WHERE id=?", runde["lesson_id"])
+    seite = client.get(f"/lernen/{lesson['id']}")
+    assert "NotebookLM konnte das Video nicht erstellen" in seite.text
+    assert 'name="ausgabe" value="notebooklm"' in seite.text
 
     # Der an NotebookLM geschickte (bzw. zu schickende) Text wird trotzdem
     # abgelegt und ist über die Lerneinheit-Seite abrufbar — auch wenn die
@@ -1037,6 +1092,15 @@ def test_notebooklm_faellt_auf_html_zurueck(client, fake_llm, fake_cli, app_env)
     assert antwort.status_code == 200
     assert antwort.headers["content-type"].startswith("text/plain")
     assert antwort.text == text
+
+    # Auf einen anderen Modus umschalten funktioniert weiterhin.
+    csrf = csrf_from(seite.text)
+    umschalten = client.post(f"/lernen/{lesson['id']}/ausgabe/erneut",
+                             data={"_csrf": csrf, "ausgabe": "html"})
+    assert umschalten.status_code in (200, 303)
+    run_jobs(app_env, fake_llm)
+    runde = app_env.db.q1("SELECT * FROM lesson_round WHERE id=?", runde["id"])
+    assert runde["material_pfad"].endswith(".html")
 
 
 def test_notebooklm_quelle_vor_dem_versand_sichtbar(client, fake_llm, fake_cli,
@@ -1063,14 +1127,13 @@ def test_notebooklm_quelle_vor_dem_versand_sichtbar(client, fake_llm, fake_cli,
         gespeichert.append(pfad)
 
     folien = [{"nr": 1, "titel": "Start", "punkte": ["a"], "sprechtext": "Hallo"}]
-    pfad, notiz, quelle_pfad = teaching._render_material(
-        "notebooklm", "Testtitel", folien, thema, "test-basis",
-        arbeit_id="t1", quelle_bereit=quelle_bereit)
+    with pytest.raises(teaching.TeachingError):
+        teaching._render_material(
+            "notebooklm", "Testtitel", folien, thema, "test-basis",
+            arbeit_id="t1", quelle_bereit=quelle_bereit)
 
     assert reihenfolge == ["quelle_bereit", "erzeugen"]
-    assert quelle_pfad == gespeichert[0]
-    assert Path(quelle_pfad).exists()
-    assert pfad.endswith(".html")
+    assert gespeichert and Path(gespeichert[0]).exists()
 
 
 # ==========================================================================
