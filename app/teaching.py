@@ -78,10 +78,21 @@ def starten(topic_id: int, ausgabe: str | None = None,
         raise TeachingError("Unbekannte Ausgabeart.")
 
     offen = db.q1(
-        """SELECT id FROM lesson WHERE topic_id=?
+        """SELECT id, ausgabe FROM lesson WHERE topic_id=?
              AND state NOT IN ('gelernt','abgebrochen') ORDER BY id DESC LIMIT 1""",
         topic_id)
     if offen is not None:
+        # Eine schon laufende Lerneinheit wird nicht doppelt angelegt — aber
+        # das Ausgabeformat soll trotzdem immer dem aktuellen Stand folgen
+        # (Einstellungen oder die bewusste Wahl gerade eben), statt für immer
+        # am Format der allerersten Runde festzuhaengen. Schon fertiges
+        # Material bleibt unberuehrt; erst die naechste Runde benutzt das
+        # neue Format — job_lesson_render liest lesson.ausgabe ohnehin frisch
+        # aus der Datenbank, nicht aus einem beim Einreihen eingefrorenen Wert.
+        if offen["ausgabe"] != ausgabe:
+            with db.tx() as c:
+                c.execute("UPDATE lesson SET ausgabe=? WHERE id=?",
+                          (ausgabe, offen["id"]))
         return offen["id"]
 
     prompt_wunsch = (prompt_wunsch or "").strip()[:500] or None

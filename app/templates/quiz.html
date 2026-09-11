@@ -16,8 +16,9 @@
     <h3>Die Fragen werden erstellt</h3>
     <p>Karo schreibt gerade {{ 4 if quiz.anlass == 'lernrunde' else 5 }} Fragen
     aus Ihrem Schulmaterial. Das dauert etwa eine halbe Minute.</p>
-    <p class="hint">Diese Seite in einem Moment neu laden.
+    <p class="hint">Diese Seite aktualisiert sich von selbst, sobald die Fragen fertig sind.
     {% if offen %}({{ offen }} Vorgang läuft){% endif %}</p>
+    <script>karoAutoRefresh("/quiz/{{ quiz.id }}/status", "{{ signatur }}");</script>
   </div>
 
 {% elif quiz.state == 'bereit' and quiz.modus == 'papier' %}
@@ -76,8 +77,9 @@
     <h3>Die Antworten werden ausgewertet</h3>
     <p>Karo beurteilt jede Antwort und schlägt einen Fehlertyp vor. Danach
     geben Sie frei.</p>
-    <p class="hint">Diese Seite in einem Moment neu laden.
+    <p class="hint">Diese Seite aktualisiert sich von selbst, sobald die Auswertung fertig ist.
     {% if offen %}({{ offen }} Vorgang läuft){% endif %}</p>
+    <script>karoAutoRefresh("/quiz/{{ quiz.id }}/status", "{{ signatur }}");</script>
   </div>
 
 {% else %}

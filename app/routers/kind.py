@@ -26,13 +26,31 @@ def quiz_starten(request: Request, topic_id: int, modus: str = Form("bildschirm"
     return zurueck(f"/quiz/{quiz_id}")
 
 
+def _quiz_signatur(quiz_id: int) -> str:
+    """Fingerabdruck für /quiz/{id}/status — analog zu _lernen_signatur."""
+    quiz = db.q1("SELECT state FROM quiz WHERE id=?", quiz_id)
+    if quiz is None:
+        return "weg"
+    offen = jobs.counts()
+    return "|".join([
+        quiz["state"],
+        str(offen.get("wartend", 0) + offen.get("laeuft", 0)),
+    ])
+
+
 @router.get("/quiz/{quiz_id}", response_class=HTMLResponse)
 def quiz_seite(request: Request, quiz_id: int):
     quiz = quizzes.holen(quiz_id)
     if quiz is None:
         flash(request, "Fragerunde nicht gefunden.", "err")
         return zurueck("/")
-    return render(request, "quiz.html", quiz=quiz, counts=jobs.counts())
+    return render(request, "quiz.html", quiz=quiz, counts=jobs.counts(),
+                  signatur=_quiz_signatur(quiz_id))
+
+
+@router.get("/quiz/{quiz_id}/status")
+def quiz_status(quiz_id: int):
+    return {"signatur": _quiz_signatur(quiz_id)}
 
 
 @router.post("/quiz/{quiz_id}/antworten")
@@ -167,6 +185,25 @@ def lernen_starten(request: Request, topic_id: int, ausgabe: str = Form("html"))
     return zurueck(f"/lernen/{lesson_id}")
 
 
+def _lernen_signatur(lesson_id: int) -> str:
+    """Kurzer Fingerabdruck aus allem, was die Lerneinheit-Seite anders
+    rendern würde — für das automatische Neuladen unter /lernen/{id}/status,
+    ohne bei jeder Prüfung die ganze Seite neu zu bauen."""
+    lesson = db.q1("SELECT state FROM lesson WHERE id=?", lesson_id)
+    if lesson is None:
+        return "weg"
+    runde = db.q1(
+        """SELECT state, material_pfad FROM lesson_round
+            WHERE lesson_id=? ORDER BY nr DESC LIMIT 1""", lesson_id)
+    offen = jobs.counts()
+    return "|".join([
+        lesson["state"],
+        runde["state"] if runde else "-",
+        "m" if runde and runde["material_pfad"] else "-",
+        str(offen.get("wartend", 0) + offen.get("laeuft", 0)),
+    ])
+
+
 @router.get("/lernen/{lesson_id}", response_class=HTMLResponse)
 def lernen_seite(request: Request, lesson_id: int):
     lesson = teaching.holen(lesson_id)
@@ -182,7 +219,13 @@ def lernen_seite(request: Request, lesson_id: int):
                   vorschlaege=research.vorschlaege(lesson["topic_id"]),
                   recherche_erlaubt=config.load_safe().recherche_erlaubt,
                   hat_material=hat_material,
-                  alle_materialien=teaching.materialien_fuer_thema(lesson["topic_id"]))
+                  alle_materialien=teaching.materialien_fuer_thema(lesson["topic_id"]),
+                  signatur=_lernen_signatur(lesson_id))
+
+
+@router.get("/lernen/{lesson_id}/status")
+def lernen_status(lesson_id: int):
+    return {"signatur": _lernen_signatur(lesson_id)}
 
 
 @router.post("/lernen/{lesson_id}/fragen")
@@ -206,8 +249,11 @@ def lernen_abbrechen(request: Request, lesson_id: int,
         return zurueck("/themen")
     teaching.abbrechen(lesson_id, "Neue Erklärung angefordert")
     try:
-        neue_id = teaching.starten(alte["topic_id"], alte["ausgabe"],
-                                   prompt_wunsch)
+        # Bewusst KEIN alte["ausgabe"]: das wuerde das Format der allerersten
+        # Runde fuer immer festschreiben. starten() ohne eigene Angabe greift
+        # auf die aktuellen Einstellungen zurueck — "Mehr zum Thema" benutzt
+        # also immer das, was gerade unter Einstellungen gewaehlt ist.
+        neue_id = teaching.starten(alte["topic_id"], None, prompt_wunsch)
     except TeachingError as exc:
         flash(request, str(exc), "err")
         return zurueck("/themen")

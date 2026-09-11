@@ -1059,6 +1059,34 @@ def test_mehr_zum_thema_behaelt_bisheriges_material_sichtbar(client, fake_llm, f
     assert f"/material/{runde2['id']}" in seite.text
 
 
+def test_lernen_seite_aktualisiert_sich_ohne_manuellen_reload(client, fake_llm, fake_cli, app_env):
+    """Solange eine Runde noch erzeugt wird, bettet die Seite karoAutoRefresh()
+    ein und /lernen/{id}/status liefert eine Signatur, die sich ändert,
+    sobald die Runde fertig ist — die Familie muss nicht mehr von Hand
+    neu laden."""
+    topic_id = _bis_rot(client, fake_llm, app_env)
+    seite = client.get("/themen")
+    client.post(f"/themen/{topic_id}/lernen",
+               data={"_csrf": csrf_from(seite.text), "ausgabe": "html"})
+    lesson = app_env.db.q1(
+        "SELECT * FROM lesson WHERE topic_id=? ORDER BY id DESC LIMIT 1", topic_id)
+    seite = client.get(f"/lernen/{lesson['id']}")
+    client.post(f"/lernen/{lesson['id']}/runde/weiter",
+               data={"_csrf": csrf_from(seite.text)})
+
+    aufruf = f'karoAutoRefresh("/lernen/{lesson["id"]}/status"'
+    seite = client.get(f"/lernen/{lesson['id']}")
+    assert aufruf in seite.text
+    vorher = client.get(f"/lernen/{lesson['id']}/status").json()["signatur"]
+
+    run_jobs(app_env, fake_llm)
+    nachher = client.get(f"/lernen/{lesson['id']}/status").json()["signatur"]
+    assert nachher != vorher
+
+    seite = client.get(f"/lernen/{lesson['id']}")
+    assert aufruf not in seite.text
+
+
 def test_notebooklm_fehler_zeigt_popup_statt_stillem_ruckfall(client, fake_llm, fake_cli, app_env):
     """Ein NotebookLM-Fehler darf nie unbemerkt zu einem anderen Format
     wechseln — die Familie hat NotebookLM ausgewählt und muss es erfahren,

@@ -141,8 +141,9 @@
        rel="noopener">An NotebookLM gesendeter Text (vor dem Versand einsehbar)</a>
   </p>
   {% endif %}
-  <p class="hint">Diese Seite in einem Moment neu laden.
+  <p class="hint">Diese Seite aktualisiert sich von selbst, sobald es weitergeht.
   {% if offen %}({{ offen }} Vorgang läuft){% endif %}</p>
+  <script>karoAutoRefresh("/lernen/{{ lesson.id }}/status", "{{ signatur }}");</script>
   {% endif %}
 </div>
 {% endif %}

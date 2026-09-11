@@ -199,5 +199,26 @@
 })();
 </script>
 {% endif %}
+<script>
+  // Pollt eine kleine JSON-Statusroute und lädt die Seite automatisch neu,
+  // sobald sich die Signatur ändert (z. B. Material fertig, Runde
+  // fehlgeschlagen) — Seiten mit laufender Erzeugung müssen dafür nicht
+  // mehr von Hand aktualisiert werden. Läuft nur, solange das aufrufende
+  // Fragment noch im DOM steht: nach dem automatischen Neuladen entscheidet
+  // die Seite selbst per Jinja, ob der Aufruf erneut eingebettet wird.
+  function karoAutoRefresh(url, anfangssignatur, intervallMs) {
+    var intervall = setInterval(function () {
+      fetch(url, {headers: {"Accept": "application/json"}})
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (daten) {
+          if (daten && daten.signatur && daten.signatur !== anfangssignatur) {
+            clearInterval(intervall);
+            location.reload();
+          }
+        })
+        .catch(function () {});
+    }, intervallMs || 4000);
+  }
+</script>
 </body>
 </html>
