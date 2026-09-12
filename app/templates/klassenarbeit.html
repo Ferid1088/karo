@@ -13,22 +13,56 @@ Messung, ob dieses System funktioniert.</p>
 </div>
 
 <div class="tab-panel" data-tabgroup="klassenarbeit" data-tab="neu">
+
+<div class="card">
+  <h3>Themenblatt einlesen</h3>
+  <p class="hint">Foto oder Scan des Ankündigungsblatts hochladen — Karo liest
+  Themen und, falls lesbar, den Termin heraus und trägt beides unten ein.
+  Geprüft und angelegt wird trotzdem erst von Hand.</p>
+  <form method="post" action="/klassenarbeit/themenblatt" enctype="multipart/form-data"
+        class="row" style="align-items:flex-end">
+    {{ csrf_input() }}
+    <div class="field" style="flex:1 1 260px">
+      <label for="themenblatt-datei" class="sr">Themenblatt</label>
+      <input type="file" id="themenblatt-datei" name="datei"
+             accept="image/*,application/pdf" required>
+    </div>
+    <button type="submit" class="ghost">Blatt einlesen</button>
+  </form>
+
+  {% if scan and scan.state == 'offen' %}
+  <div class="msg" style="margin-top:.8rem">Karo liest das Blatt gerade ein …</div>
+  <script>karoAutoRefresh("/klassenarbeit/themenblatt/status?scan_id={{ scan.id }}", "{{ scan.state }}");</script>
+  {% elif scan and scan.state == 'fehler' %}
+  <div class="msg warn" style="margin-top:.8rem">Konnte das Blatt nicht lesen:
+  {{ scan.fehler }}</div>
+  {% elif scan and scan.state == 'gelesen' %}
+  <div class="msg ok" style="margin-top:.8rem">Aus dem Blatt gelesen — bitte
+  unten prüfen, bevor die Klassenarbeit angelegt wird.</div>
+  {% endif %}
+</div>
+
 <form method="post" action="/klassenarbeit" class="card">
   {{ csrf_input() }}
+  {% if scan and scan.state == 'gelesen' %}
+  <input type="hidden" name="scan_id" value="{{ scan.id }}">
+  {% endif %}
   <div class="row">
     <div class="field">
       <label for="exam_date">Termin</label>
-      <input type="date" id="exam_date" name="exam_date" required min="{{ today }}">
+      <input type="date" id="exam_date" name="exam_date" required min="{{ today }}"
+             value="{{ scan.exam_date if scan and scan.state == 'gelesen' and scan.exam_date else '' }}">
     </div>
     <div class="field" style="flex:2 1 300px">
       <label for="themen">Angekündigte Themen</label>
       <input type="text" id="themen" name="themen"
-             placeholder="Brüche addieren, Brüche kürzen, Textaufgaben">
+             placeholder="Brüche addieren, Brüche kürzen, Textaufgaben"
+             value="{{ (scan.themen_liste | join(', ')) if scan and scan.state == 'gelesen' else '' }}">
       <p class="hint">Mit Komma trennen. Keine Namen von Lehrkräften eintragen —
       Karo filtert sie heraus, aber sie gehören gar nicht erst hierher.</p>
     </div>
   </div>
-  <button type="submit">Anlegen und Prognose einfrieren</button>
+  <button type="submit">Anlegen, Prognose einfrieren und Lernplan erstellen</button>
 </form>
 </div>
 
@@ -43,6 +77,39 @@ Messung, ob dieses System funktioniert.</p>
     {% endif %}
   </h3>
   <p class="klein">{{ e.themen_liste | join(', ') or 'keine Themen angegeben' }}</p>
+
+  {% if e.plan and e.plan.state == 'offen' %}
+  <div class="msg" style="margin:.7rem 0">Karo erstellt gerade den Lernplan …</div>
+  <script>karoAutoRefresh("/klassenarbeit/{{ e.id }}/plan/status", "{{ e.plan.state }}");</script>
+  {% elif e.plan and e.plan.state == 'fehler' %}
+  <div class="msg warn" style="margin:.7rem 0">Lernplan konnte nicht erstellt
+  werden: {{ e.plan.fehler }}</div>
+  <form method="post" action="/klassenarbeit/{{ e.id }}/plan/neu" style="margin:.3rem 0 .7rem">
+    {{ csrf_input() }}
+    <button type="submit" class="ghost">Erneut versuchen</button>
+  </form>
+  {% elif e.plan and e.plan.state == 'bereit' %}
+  <details style="margin:.7rem 0" open>
+    <summary style="cursor:pointer"><strong>Lernplan</strong></summary>
+    {% if e.plan.einschaetzung %}<p class="hint" style="margin-top:.5rem">{{ e.plan.einschaetzung }}</p>{% endif %}
+    {% if e.plan.tagesplan_liste %}
+    <div class="tablewrap" style="margin:.5rem 0">
+      <table>
+        <thead><tr><th>Tag</th><th>Inhalt</th><th class="num">Minuten</th></tr></thead>
+        <tbody>
+          {% for tag in e.plan.tagesplan_liste %}
+          <tr><td>{{ tag.tag }}</td><td>{{ tag.inhalt }}</td><td class="num">{{ tag.minuten }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+    <form method="post" action="/klassenarbeit/{{ e.id }}/plan/neu">
+      {{ csrf_input() }}
+      <button type="submit" class="quiet">Lernplan neu erstellen</button>
+    </form>
+  </details>
+  {% endif %}
 
   {% if e.kalibrierung.zeilen %}
   <form method="post" action="/klassenarbeit/{{ e.id }}/ergebnis">

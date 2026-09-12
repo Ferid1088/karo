@@ -268,6 +268,36 @@ CREATE TABLE IF NOT EXISTS prediction (
     UNIQUE (exam_id, topic_id)
 );
 
+-- Ein fotografiertes Themen-Ankuendigungsblatt, bevor daraus eine
+-- Klassenarbeit angelegt wird. Eigene Tabelle statt eines Felds an `exam`,
+-- weil beim Hochladen noch keine Klassenarbeit existiert — erst wenn ein
+-- Mensch die gelesenen Themen (und ggf. das erkannte Datum) prueft und die
+-- Arbeit anlegt, gilt der Scan als uebernommen.
+CREATE TABLE IF NOT EXISTS exam_scan (
+    id          INTEGER PRIMARY KEY,
+    document_id INTEGER NOT NULL REFERENCES document(id),
+    state       TEXT NOT NULL DEFAULT 'offen',  -- offen | gelesen | fehler | uebernommen
+    themen      TEXT,             -- JSON-Liste, von Karo aus dem Blatt gelesen
+    exam_date   TEXT,             -- erkanntes Datum (ISO), falls auf dem Blatt lesbar
+    fehler      TEXT,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_exam_scan_state ON exam_scan(state);
+
+-- Lernplan zu einer Klassenarbeit: Tag-fuer-Tag-Empfehlung aus den
+-- angekuendigten Themen und dem aktuellen Profil je Thema. Ein Plan pro
+-- Klassenarbeit; erneutes Anfordern ersetzt den vorherigen.
+CREATE TABLE IF NOT EXISTS exam_plan (
+    id            INTEGER PRIMARY KEY,
+    exam_id       INTEGER NOT NULL REFERENCES exam(id) ON DELETE CASCADE,
+    state         TEXT NOT NULL DEFAULT 'offen',  -- offen | bereit | fehler
+    einschaetzung TEXT,
+    tagesplan     TEXT,           -- JSON-Liste {tag, inhalt, minuten, topic_code}
+    fehler        TEXT,
+    created_at    TEXT NOT NULL,
+    UNIQUE (exam_id)
+);
+
 -- ==========================================================================
 -- 9. Protokoll jedes Modellaufrufs
 -- ==========================================================================

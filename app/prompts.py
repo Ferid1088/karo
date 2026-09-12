@@ -11,6 +11,8 @@ Zwei Regeln gelten fuer jeden Prompt in dieser Datei:
 
 from __future__ import annotations
 
+import datetime as _dt
+
 from .domain import ErrorType, Flag, Stufe
 
 ERROR_ENUM = [e.value for e in ErrorType]
@@ -764,3 +766,37 @@ Erstelle einen realistischen Lernplan. Randbedingungen:
 
 Sei bei der Einschätzung ehrlich. Ist die Datenlage für eine Aussage zu dünn,
 schreibe das, statt eine Zahl zu erfinden."""
+
+
+# ==========================================================================
+# 9. Themenblatt vor einer Klassenarbeit lesen
+# ==========================================================================
+
+EXAM_SCAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "themen": {
+            "type": "array", "maxItems": 20,
+            "items": {"type": "string"},
+        },
+        "exam_date": {"type": ["string", "null"]},
+    },
+    "required": ["themen", "exam_date"],
+}
+
+
+def exam_scan_prompt(grade: int, subject: str) -> str:
+    return f"""Dies ist ein Ankündigungsblatt für eine Klassenarbeit in
+{subject}, Klassenstufe {grade} in Deutschland — von der Lehrkraft ausgeteilt
+oder ins Heft diktiert und dann abfotografiert.
+
+Lies daraus:
+- die angekündigten Themen, als kurze Stichworte, so wie im Unterricht
+  genannt (z. B. „Brüche addieren", nicht ganze Sätze) — leere Liste, wenn
+  keine erkennbar sind
+- das Datum der Arbeit, falls auf dem Blatt lesbar, als ISO-Datum
+  (JJJJ-MM-TT); sonst null. Das aktuelle Jahr ist {_dt.date.today().year},
+  falls auf dem Blatt kein Jahr steht.
+
+Kein Name, keine Schule, keine Lehrkraft — falls auf dem Blatt vorhanden,
+einfach ignorieren."""
