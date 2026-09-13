@@ -2,10 +2,8 @@
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 
-from .. import config, db, quizzes, teaching, topics
-from ..domain import FLAG_ORDER
+from .. import config, db, teaching, topics
 from ..services import workflow
-from . import kind
 from .shared import render, flash, zurueck
 
 router = APIRouter(prefix="/lernzyklus", tags=["learning"])
@@ -32,8 +30,7 @@ def _check_quiz(topic_id: int, quiz_id: int):
 @router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
 def lernzyklus_index(request: Request):
-    from .dashboard import lernen
-    return lernen(request)
+    return workflow.render_lernen_uebersicht(request)
 
 
 @router.get("/{topic_id}", response_class=HTMLResponse)
@@ -66,11 +63,7 @@ def lernzyklus_start(request: Request, topic_id: int, ausgabe: str = Form("")):
 
 @router.post("/{topic_id}/quiz/starten")
 def lernzyklus_quiz_starten(request: Request, topic_id: int, modus: str = Form("bildschirm")):
-    lesson_id = _lesson_id(topic_id)
-    lesson = teaching.holen(lesson_id) if lesson_id is not None else None
-    if lesson and lesson["state"] not in ("gelernt", "abgebrochen"):
-        return kind.lernen_fragen(request, lesson_id, modus)
-    return kind.quiz_starten(request, topic_id, modus)
+    return workflow.handle_quiz_or_lernen_start(request, topic_id, modus)
 
 
 @router.get("/{topic_id}/quiz/{quiz_id}", response_class=HTMLResponse)
@@ -89,7 +82,7 @@ async def lernzyklus_quiz_antworten(request: Request, topic_id: int, quiz_id: in
 async def lernzyklus_quiz_blatt(request: Request, topic_id: int, quiz_id: int,
                               datei: UploadFile | None = None):
     _check_quiz(topic_id, quiz_id)
-    return await kind.quiz_blatt(request, quiz_id, datei)
+    return await workflow.handle_quiz_blatt(request, quiz_id, datei)
 
 
 @router.post("/{topic_id}/quiz/{quiz_id}/freigabe")
@@ -100,17 +93,17 @@ async def lernzyklus_quiz_freigabe(request: Request, topic_id: int, quiz_id: int
 
 @router.post("/{topic_id}/runde/weiter")
 def lernzyklus_runde_weiter(request: Request, topic_id: int):
-    return kind.lernen_naechste_runde(request, _require_lesson(topic_id))
+    return workflow.handle_lernen_naechste_runde(request, _require_lesson(topic_id))
 
 
 @router.post("/{topic_id}/forschen")
 def lernzyklus_forschen(request: Request, topic_id: int):
-    return kind.lernen_forschen(request, _require_lesson(topic_id))
+    return workflow.handle_lernen_forschen(request, _require_lesson(topic_id))
 
 
 @router.post("/{topic_id}/abbrechen")
 def lernzyklus_abbrechen(request: Request, topic_id: int):
-    return kind.lernen_abbrechen(request, _require_lesson(topic_id), "mehr zum Thema")
+    return workflow.handle_lernen_abbrechen(request, _require_lesson(topic_id), "mehr zum Thema")
 
 
 @router.get("/{topic_id}/material/{round_id}", response_class=HTMLResponse)
@@ -118,4 +111,4 @@ def lernzyklus_material(topic_id: int, round_id: int):
     row = db.q1("SELECT l.topic_id FROM lesson_round r JOIN lesson l ON l.id=r.lesson_id WHERE r.id=?", round_id)
     if not row or row["topic_id"] != topic_id:
         raise HTTPException(404, "Material nicht gefunden.")
-    return kind.material(round_id)
+    return workflow.render_material(round_id)

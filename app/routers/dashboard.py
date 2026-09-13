@@ -20,8 +20,7 @@ def dashboard(request: Request):
 
 @router.get('/lernen', response_class=HTMLResponse)
 def lernen(request: Request):
-    themen, schritte, reviews = workflow.offene_schritte()
-    return render(request, 'lernen_start.html', themen=themen, schritte=schritte, reviews=reviews)
+    return workflow.render_lernen_uebersicht(request)
 
 
 @router.get('/eltern', response_class=HTMLResponse)

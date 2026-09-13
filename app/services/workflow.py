@@ -8,13 +8,17 @@ Router rufen sie auf (siehe KaroRefactoring_Plan.md, Abschnitt 10/14).
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 
-from fastapi import Request
+from fastapi import Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
-from .. import config, db, exam_learning, export, jobs, kb, quizzes, research, teaching, topics
+from .. import (config, db, exam_learning, export, ingest, jobs, kb, materials,
+                quizzes, research, teaching, topics)
 from ..domain import FLAG_ORDER, Flag
 from ..quizzes import QuizError
+from ..teaching import TeachingError
 from ..routers.shared import flash, render, zurueck
 
 
@@ -61,6 +65,57 @@ async def handle_quiz_antworten(request: Request, quiz_id: int):
         return zurueck(f"/quiz/{quiz_id}")
     flash(request, f"{n} Antworten aufgenommen. Die Auswertung läuft.")
     return zurueck(f"/quiz/{quiz_id}")
+
+
+async def handle_quiz_blatt(request: Request, quiz_id: int,
+                            datei: UploadFile | None = None):
+    formular = await request.form()
+    datei = datei or formular.get("datei")
+    if datei is None or not getattr(datei, "filename", ""):
+        flash(request, "Es wurde keine Datei ausgewählt.", "err")
+        return zurueck(f"/quiz/{quiz_id}")
+
+    endung = Path(datei.filename).suffix.lower()
+    puffer = bytearray()
+    while stueck := await datei.read(1 << 20):
+        puffer.extend(stueck)
+        if len(puffer) > 25 * 1024 * 1024:
+            flash(request, "Die Datei ist zu groß.", "err")
+            return zurueck(f"/quiz/{quiz_id}")
+
+    try:
+        await run_in_threadpool(quizzes.blatt_hochladen, quiz_id, bytes(puffer), endung)
+    except (QuizError, ingest.IngestError) as exc:
+        flash(request, str(exc), "err")
+        return zurueck(f"/quiz/{quiz_id}")
+
+    flash(request, "Antwortblatt aufgenommen. Karo liest es jetzt ab.")
+    return zurueck(f"/quiz/{quiz_id}")
+
+
+def handle_quiz_starten(request: Request, topic_id: int, modus: str):
+    try:
+        quiz_id = quizzes.anfordern(topic_id, anlass="evaluation", modus=modus)
+    except QuizError as exc:
+        flash(request, str(exc), "err")
+        return zurueck("/themen")
+    flash(request, "Die Fragen werden erstellt.")
+    return zurueck(f"/quiz/{quiz_id}")
+
+
+def handle_quiz_or_lernen_start(request: Request, topic_id: int, modus: str):
+    """Der Themenzyklus kennt nur EIN „Fragen starten" — je nachdem, ob
+    schon eine Lernrunde laeuft, ist das entweder eine Verstaendnisfrage zur
+    Lernrunde oder eine eigenstaendige Themenpruefung. Frueher entschied
+    lernzyklus.py das und rief dafuer zwei kind.py-Router-Funktionen auf;
+    die Entscheidung gehoert hierher, nicht in einen Router."""
+    row = db.q1("SELECT id FROM lesson WHERE topic_id=? ORDER BY id DESC LIMIT 1",
+               topic_id)
+    lesson_id = row["id"] if row else None
+    lesson = teaching.holen(lesson_id) if lesson_id is not None else None
+    if lesson and lesson["state"] not in ("gelernt", "abgebrochen"):
+        return handle_lernen_fragen(request, lesson_id, modus)
+    return handle_quiz_starten(request, topic_id, modus)
 
 
 # --- Nach der Quiz-Freigabe: wohin geht es weiter? --------------------------
@@ -180,6 +235,140 @@ def lernen_status_signatur(lesson_id: int) -> str:
     return _lernen_signatur(lesson_id)
 
 
+def handle_lernen_fragen(request: Request, lesson_id: int, modus: str):
+    try:
+        quiz_id = teaching.fragen_anfordern(lesson_id, modus)
+    except (TeachingError, QuizError) as exc:
+        flash(request, str(exc), "err")
+        return zurueck(f"/lernen/{lesson_id}")
+    flash(request, "Die Verständnisfragen werden erstellt.")
+    return zurueck(f"/quiz/{quiz_id}")
+
+
+def handle_lernen_abbrechen(request: Request, lesson_id: int, prompt_wunsch: str):
+    alte = teaching.holen(lesson_id)
+    if alte is None:
+        flash(request, "Lerneinheit nicht gefunden.", "err")
+        return zurueck("/themen")
+    teaching.abbrechen(lesson_id, "Neue Erklärung angefordert")
+    try:
+        # Bewusst KEIN alte["ausgabe"]: das wuerde das Format der allerersten
+        # Runde fuer immer festschreiben. starten() ohne eigene Angabe greift
+        # auf die aktuellen Einstellungen zurueck — "Mehr zum Thema" benutzt
+        # also immer das, was gerade unter Einstellungen gewaehlt ist.
+        neue_id = teaching.starten(alte["topic_id"], None, prompt_wunsch)
+    except TeachingError as exc:
+        flash(request, str(exc), "err")
+        return zurueck("/themen")
+    flash(request, "Neue Erklärung wird vorbereitet. Die bisherigen Inhalte "
+           "und Videos bleiben erhalten.")
+    return zurueck(f"/lernen/{neue_id}")
+
+
+def handle_lernen_naechste_runde(request: Request, lesson_id: int):
+    try:
+        teaching.naechste_runde_bestaetigen(lesson_id)
+    except TeachingError as exc:
+        flash(request, str(exc), "err")
+    return zurueck(f"/lernen/{lesson_id}")
+
+
+def handle_lernen_forschen(request: Request, lesson_id: int):
+    try:
+        ok = teaching.forschung_anfordern(lesson_id)
+    except TeachingError as exc:
+        flash(request, str(exc), "err")
+        return zurueck(f"/lernen/{lesson_id}")
+    if ok:
+        flash(request, "Karo sucht auf den zugelassenen Seiten. Diese Seite "
+                       "in ein bis zwei Minuten neu laden.")
+    else:
+        flash(request, "Die Recherche ist ausgeschaltet oder läuft schon "
+                       "für heute.", "warn")
+    return zurueck(f"/lernen/{lesson_id}")
+
+
+# --- Material ----------------------------------------------------------------
+
+def _material_antwort(pfad_text: str | None):
+    if not pfad_text:
+        return HTMLResponse("<p>Noch kein Material vorhanden.</p>",
+                            status_code=404)
+    pfad = Path(pfad_text)
+    if not pfad.is_file():
+        return HTMLResponse("<p>Die Datei ist nicht mehr da.</p>",
+                            status_code=404)
+    if pfad.suffix.lower() == ".mp4":
+        return FileResponse(pfad, media_type="video/mp4", filename=pfad.name)
+    if pfad.suffix.lower() == ".txt":
+        return PlainTextResponse(pfad.read_text(encoding="utf-8"))
+    return HTMLResponse(pfad.read_text(encoding="utf-8"))
+
+
+def _archiv_antwort(art: str, referenz: int):
+    import hashlib
+    import os
+    import tempfile
+    from urllib.parse import quote
+    m = materials.holen(art, referenz)
+    if m is None:
+        # Bestehende Materialien beim ersten Öffnen ebenfalls archivieren.
+        table = "lesson_round" if art == "runde" else "lesson_round_variant"
+        row = db.q1(f"SELECT material_pfad FROM {table} WHERE id=?", referenz)
+        if not row or not row["material_pfad"] or not Path(row["material_pfad"]).is_file():
+            return None
+        materials.bestand_uebernehmen()
+        m = materials.holen(art, referenz)
+        if m is None:
+            return None
+    if m["mime"] == "video/mp4":
+        # FileResponse unterstützt Range-Requests für Springen/Spulen im Video.
+        digest = hashlib.sha256(m["inhalt"]).hexdigest()
+        cache = config.media_dir() / f"archiv-{digest}.mp4"
+        if not cache.exists():
+            fd, temp = tempfile.mkstemp(dir=cache.parent, prefix=".video-")
+            try:
+                with os.fdopen(fd, "wb") as f:
+                    f.write(m["inhalt"])
+                os.replace(temp, cache)
+            finally:
+                Path(temp).unlink(missing_ok=True)
+        return FileResponse(cache, media_type=m["mime"], filename=m["dateiname"],
+                            content_disposition_type="inline")
+    return HTMLResponse(m["inhalt"], headers={
+        "Content-Disposition": "inline; filename*=UTF-8''" + quote(m["dateiname"])})
+
+
+def render_material(round_id: int):
+    archiv = _archiv_antwort("runde", round_id)
+    if archiv is not None:
+        return archiv
+    runde = db.q1("SELECT material_pfad FROM lesson_round WHERE id = ?", round_id)
+    return _material_antwort(runde["material_pfad"] if runde else None)
+
+
+def render_material_notebooklm_quelle(round_id: int):
+    runde = db.q1(
+        "SELECT notebooklm_quelle_pfad FROM lesson_round WHERE id = ?", round_id)
+    return _material_antwort(runde["notebooklm_quelle_pfad"] if runde else None)
+
+
+def render_material_variante(variant_id: int):
+    archiv = _archiv_antwort("variante", variant_id)
+    if archiv is not None:
+        return archiv
+    v = db.q1("SELECT material_pfad FROM lesson_round_variant WHERE id = ?",
+             variant_id)
+    return _material_antwort(v["material_pfad"] if v else None)
+
+
+def render_material_variante_notebooklm_quelle(variant_id: int):
+    v = db.q1(
+        "SELECT notebooklm_quelle_pfad FROM lesson_round_variant WHERE id = ?",
+        variant_id)
+    return _material_antwort(v["notebooklm_quelle_pfad"] if v else None)
+
+
 # --- „Heute": ein zentraler naechster Schritt ------------------------------
 #
 # Vorher hatte nur dashboard.py diese Logik, aber schon dreifach genutzt
@@ -212,6 +401,15 @@ def offene_schritte():
                          'url': url, 'topic_id': l['topic_id'], 'bereit': l['state'] == 'bereit'})
     schritte.sort(key=lambda s: not s['bereit'])
     return themen, schritte, [q for q in quizze if q['state'] == 'geprueft']
+
+
+def render_lernen_uebersicht(request: Request):
+    """Die Lernuebersicht (/lernen) — auch der Einstiegspunkt fuer
+    /lernzyklus (Index), damit der Lernzyklus-Router nicht dashboard.py's
+    Routen-Funktion direkt aufrufen muss."""
+    themen, schritte, reviews = offene_schritte()
+    return render(request, 'lernen_start.html', themen=themen, schritte=schritte,
+                  reviews=reviews)
 
 
 def get_next_action(themen: list[dict], schritte: list[dict]) -> dict | None:
