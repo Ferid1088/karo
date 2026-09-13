@@ -32,6 +32,24 @@ log = logging.getLogger("karo.quiz")
 BILDSCHIRM = "bildschirm"
 PAPIER = "papier"
 
+# --- Zustandsmaschine (KaroRefactoring_Plan.md, Abschnitt 13) --------------
+# offen -> bereit -> [beantwortet ->] ausgewertet.
+#   offen:       Karo erstellt die Fragen noch (anfordern/job_quiz_build).
+#   bereit:      Fragen stehen. Beim Bildschirmweg antwortet jetzt das Kind;
+#                bei einer muendlichen Lernkontrolle (exam_learning) kann
+#                die Lernbegleitung auch direkt von hier aus freigeben, ohne
+#                dass das Kind digital tippt.
+#   beantwortet: Antworten da (antworten_speichern); Karo schlaegt eine
+#                Bewertung vor (job_quiz_check).
+#   ausgewertet: der Vorschlag steht — heisst noch nicht "freigegeben".
+# Der wirkliche Endzustand ist `finished_at` (siehe freigeben()), nicht
+# dieses Feld — deshalb pruefen antworten_speichern()/freigeben() beide auf
+# das jeweils Noetige statt auf einen einzelnen erwarteten Vorzustand.
+STATE_OFFEN = "offen"
+STATE_BEREIT = "bereit"
+STATE_BEANTWORTET = "beantwortet"
+STATE_AUSGEWERTET = "ausgewertet"
+
 
 def client() -> ClaudeClient:
     return ClaudeClient.from_config(config.load())
@@ -80,7 +98,7 @@ def job_quiz_build(payload: dict) -> None:
     quiz_id = int(payload["quiz_id"])
     anzahl = int(payload.get("anzahl") or 5)
     quiz = db.q1("SELECT * FROM quiz WHERE id = ?", quiz_id)
-    if quiz is None or quiz["state"] != "offen":
+    if quiz is None or quiz["state"] != STATE_OFFEN:
         return
     if db.q1("SELECT 1 FROM question WHERE quiz_id = ?", quiz_id):
         return                                  # schon gebaut
@@ -177,7 +195,7 @@ def antworten_speichern(quiz_id: int, antworten: dict[int, str]) -> int:
     quiz = db.q1("SELECT * FROM quiz WHERE id = ?", quiz_id)
     if quiz is None:
         raise QuizError("Fragerunde nicht gefunden.")
-    if quiz["state"] == "ausgewertet":
+    if quiz["state"] == STATE_AUSGEWERTET:
         raise QuizError("Diese Fragerunde ist bereits ausgewertet.")
 
     gueltig = {r["id"] for r in db.q(
@@ -202,7 +220,7 @@ def job_quiz_check(payload: dict) -> None:
     """Wertet die Antworten aus — als Vorschlag, nicht als Ergebnis."""
     quiz_id = int(payload["quiz_id"])
     quiz = db.q1("SELECT * FROM quiz WHERE id = ?", quiz_id)
-    if quiz is None or quiz["state"] != "beantwortet":
+    if quiz is None or quiz["state"] != STATE_BEANTWORTET:
         return
 
     thema = topics.get(quiz["topic_id"])
@@ -320,7 +338,7 @@ def blatt_hochladen(quiz_id: int, daten: bytes, endung: str) -> int:
     quiz = db.q1("SELECT * FROM quiz WHERE id = ?", quiz_id)
     if quiz is None:
         raise QuizError("Fragerunde nicht gefunden.")
-    if quiz["state"] not in ("bereit", "beantwortet"):
+    if quiz["state"] not in (STATE_BEREIT, STATE_BEANTWORTET):
         raise QuizError("Zu dieser Fragerunde passt kein Antwortblatt mehr.")
 
     aufnahme = ingest.aufnehmen(daten, endung, rolle="bearbeitet")
@@ -342,7 +360,7 @@ def job_quiz_read_sheet(payload: dict) -> None:
     doc = db.q1("SELECT * FROM document WHERE id = ?", doc_id)
     if quiz is None or doc is None:
         return
-    if quiz["state"] not in ("bereit", "beantwortet"):
+    if quiz["state"] not in (STATE_BEREIT, STATE_BEANTWORTET):
         return
 
     fragen = [dict(r) for r in db.q(
