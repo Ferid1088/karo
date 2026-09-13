@@ -796,6 +796,64 @@ def test_fremde_frage_kann_nicht_untergeschoben_werden(client, fake_llm,
     assert app_env.db.q1("SELECT 1 FROM answer_log WHERE question_id=99999") is None
 
 
+def test_zweite_freigabe_hat_keine_zusaetzlichen_seiteneffekte(
+        client, fake_llm, fake_cli, app_env):
+    """Zustandsmaschine bis FREIGEGEBEN + Atomaritaet (change.txt, Aufgabe 3/4):
+    zwei Freigaben fuer dieselbe Fragerunde duerfen `answer_log` nicht
+    doppelt schreiben und die zweite muss als `bereits` erkannt werden,
+    ohne irgendetwas neu zu schreiben."""
+    from app import quizzes as quizzes_mod
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    seite = client.get("/themen")
+    client.post(f"/themen/{topic_id}/pruefen",
+                data={"_csrf": csrf_from(seite.text), "modus": "bildschirm"})
+    run_jobs(app_env, fake_llm)
+    quiz = app_env.db.q1("SELECT * FROM quiz ORDER BY id DESC LIMIT 1")
+    quiz_beantworten(client, app_env, quiz["id"], {1: "3/4", 2: "5/9", 3: "2/9"})
+    run_jobs(app_env, fake_llm)
+
+    fragen = app_env.db.q("SELECT id FROM question WHERE quiz_id=?", quiz["id"])
+    entscheidungen = [{"frage_id": f["id"], "skip": False, "richtig": True,
+                       "fehlertyp": None, "begruendung": "", "konfidenz": None,
+                       "llm_call_id": None, "geaendert": False} for f in fragen]
+
+    erstes = quizzes_mod.freigeben(quiz["id"], entscheidungen)
+    assert erstes["bereits"] is False
+    assert erstes["geschrieben"] == len(fragen)
+    nach_erstem = app_env.db.q1("SELECT state, finished_at FROM quiz WHERE id=?",
+                                quiz["id"])
+    assert nach_erstem["state"] == quizzes_mod.STATE_FREIGEGEBEN
+    assert nach_erstem["finished_at"]
+    anzahl = app_env.db.q1("SELECT COUNT(*) AS n FROM answer_log")["n"]
+    assert anzahl == len(fragen)
+
+    zweites = quizzes_mod.freigeben(quiz["id"], entscheidungen)
+    assert zweites == {"geschrieben": 0, "uebersprungen": 0, "bereits": True}
+    assert app_env.db.q1("SELECT COUNT(*) AS n FROM answer_log")["n"] == anzahl
+
+
+def test_zweite_freigabe_ueber_http_loest_keine_neue_auswertung_aus(
+        client, fake_llm, fake_cli, app_env):
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    seite = client.get("/themen")
+    client.post(f"/themen/{topic_id}/pruefen",
+                data={"_csrf": csrf_from(seite.text), "modus": "bildschirm"})
+    run_jobs(app_env, fake_llm)
+    quiz = app_env.db.q1("SELECT * FROM quiz ORDER BY id DESC LIMIT 1")
+    quiz_beantworten(client, app_env, quiz["id"], {1: "3/4", 2: "5/9", 3: "2/9"})
+    run_jobs(app_env, fake_llm)
+    quiz_freigeben(client, app_env, quiz["id"])
+    anzahl = app_env.db.q1("SELECT COUNT(*) AS n FROM answer_log")["n"]
+
+    r = quiz_freigeben(client, app_env, quiz["id"])
+    assert "bereits freigegeben" in r.text
+    assert app_env.db.q1("SELECT COUNT(*) AS n FROM answer_log")["n"] == anzahl
+
+
 # ==========================================================================
 # Prüfung auf Papier
 # ==========================================================================

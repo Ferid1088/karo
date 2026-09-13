@@ -42,13 +42,16 @@ PAPIER = "papier"
 #   beantwortet: Antworten da (antworten_speichern); Karo schlaegt eine
 #                Bewertung vor (job_quiz_check).
 #   ausgewertet: der Vorschlag steht — heisst noch nicht "freigegeben".
-# Der wirkliche Endzustand ist `finished_at` (siehe freigeben()), nicht
-# dieses Feld — deshalb pruefen antworten_speichern()/freigeben() beide auf
-# das jeweils Noetige statt auf einen einzelnen erwarteten Vorzustand.
+#   freigegeben: der Endzustand. `finished_at` bleibt der Zeitstempel dazu,
+#                ist aber nicht mehr die Quelle der Wahrheit — freigeben()
+#                setzt beide Felder in derselben atomaren Bedingung.
+# antworten_speichern()/freigeben() pruefen beide auf das jeweils Noetige
+# statt auf einen einzelnen erwarteten Vorzustand (siehe deren Docstrings).
 STATE_OFFEN = "offen"
 STATE_BEREIT = "bereit"
 STATE_BEANTWORTET = "beantwortet"
 STATE_AUSGEWERTET = "ausgewertet"
+STATE_FREIGEGEBEN = "freigegeben"
 
 
 def client() -> ClaudeClient:
@@ -426,6 +429,11 @@ def freigeben(quiz_id: int, entscheidungen: list[dict]) -> dict:
       * Jede Frage braucht eine Entscheidung — ein leeres Formular schließt
         keine Fragerunde ab.
       * Eine bereits bewertete Frage wird nicht doppelt gezählt.
+      * Die Freigabe selbst ist atomar: zwei nahezu gleichzeitige Aufrufe
+        duerfen `answer_log` nicht doppelt schreiben und duerfen die
+        Folgeschritte (Lernstand, Export, naechster Workflow-Schritt) nicht
+        zweimal auslösen. Das erledigt die bedingte UPDATE unten — sie
+        gewinnt genau einmal, unabhaengig von der fruehen Vorab-Pruefung.
     """
     quiz = db.q1("SELECT * FROM quiz WHERE id = ?", quiz_id)
     if quiz is None:
@@ -449,6 +457,16 @@ def freigeben(quiz_id: int, entscheidungen: list[dict]) -> dict:
     tag = db.today()
     geschrieben = uebersprungen = 0
     with db.tx() as c:
+        # Atomare Beanspruchung: gewinnt nur, wer die Zeile von "noch nicht
+        # fertig" auf "freigegeben" dreht. BEGIN IMMEDIATE (siehe db.tx())
+        # serialisiert das gegen jeden anderen gleichzeitigen Aufruf — die
+        # zweite Freigabe sieht hier affected=0 und schreibt nichts mehr.
+        beansprucht = c.execute(
+            "UPDATE quiz SET state=?, finished_at=? WHERE id=? AND finished_at IS NULL",
+            (STATE_FREIGEGEBEN, db.now(), quiz_id)).rowcount == 1
+        if not beansprucht:
+            return {"geschrieben": 0, "uebersprungen": 0, "bereits": True}
+
         for e in entscheidungen:
             frage_id = int(e["frage_id"])
             if frage_id not in gueltig:
@@ -474,8 +492,6 @@ def freigeben(quiz_id: int, entscheidungen: list[dict]) -> dict:
                  0 if e.get("geaendert") else 1,
                  e.get("llm_call_id"), db.now()))
             geschrieben += 1
-        c.execute("UPDATE quiz SET state='ausgewertet', finished_at=? WHERE id=?",
-                  (db.now(), quiz_id))
 
     flagge_neu(quiz["topic_id"])
     return {"geschrieben": geschrieben, "uebersprungen": uebersprungen,
@@ -555,8 +571,8 @@ def offene() -> list[dict]:
         """SELECT q.*, t.label AS thema_label, t.code AS thema_code,
                   (SELECT COUNT(*) FROM question x WHERE x.quiz_id = q.id) AS n
              FROM quiz q JOIN topic t ON t.id = q.topic_id
-            WHERE q.finished_at IS NULL
-            ORDER BY q.id DESC LIMIT 30""")]
+            WHERE q.state != ?
+            ORDER BY q.id DESC LIMIT 30""", STATE_FREIGEGEBEN)]
 
 
 def verlauf(topic_id: int, limit: int = 14) -> list[dict]:

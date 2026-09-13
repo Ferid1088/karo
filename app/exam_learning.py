@@ -10,7 +10,8 @@ _start_lock = threading.RLock()
 def punktestand(quiz_id: int | None) -> dict | None:
     if quiz_id is None:
         return None
-    quiz = db.q1("SELECT * FROM quiz WHERE id=? AND finished_at IS NOT NULL", quiz_id)
+    quiz = db.q1("SELECT * FROM quiz WHERE id=? AND state=?",
+                quiz_id, quizzes.STATE_FREIGEGEBEN)
     if not quiz:
         return None
     row = db.q1("""SELECT COUNT(q.id) AS gesamt, COUNT(a.id) AS bewertet,
@@ -31,8 +32,9 @@ def starten(exam_id: int, row_key: str, ausgabe: str) -> int:
         for m in fuer_zeile(exam_id, row_key):
             if m["ausgabe"] == ausgabe and m["state"] in ("offen", "wartet"):
                 return m["id"]
-        vorher = db.q1("""SELECT id FROM quiz WHERE topic_id=? AND finished_at IS NOT NULL
-                           ORDER BY finished_at DESC, id DESC LIMIT 1""", tag["topic_id"])
+        vorher = db.q1("""SELECT id FROM quiz WHERE topic_id=? AND state=?
+                           ORDER BY finished_at DESC, id DESC LIMIT 1""",
+                      tag["topic_id"], quizzes.STATE_FREIGEGEBEN)
         lesson_id = teaching.starten(tag["topic_id"], ausgabe,
                                      prompt_wunsch=tag["inhalt"], neue_einheit=True)
         with db.tx() as c:
