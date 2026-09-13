@@ -526,6 +526,42 @@ def test_messung_zeigt_dieselben_inhalte_wie_die_alten_seiten(
 
 
 # ==========================================================================
+# „Heute“ — naechster Schritt (Phase 5: ein zentraler Orchestrator)
+# ==========================================================================
+
+def test_heute_zeigt_keinen_naechsten_schritt_ohne_themen(client, fake_llm, fake_cli):
+    einrichten(client, fake_llm)
+    assert "DEIN NÄCHSTER SCHRITT" not in client.get("/").text
+
+
+def test_heute_schlaegt_ein_bestaetigtes_thema_zum_start_vor(
+        client, fake_llm, fake_cli, app_env):
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    r = client.get("/")
+    assert "DEIN NÄCHSTER SCHRITT" in r.text
+    assert f'href="/lernzyklus/{topic_id}"' in r.text
+    assert "Los geht" in r.text
+
+
+def test_heute_bevorzugt_ein_offenes_quiz_vor_einem_neuen_thema(
+        client, fake_llm, fake_cli, app_env):
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    seite = client.get("/themen")
+    client.post(f"/themen/{topic_id}/pruefen",
+                data={"_csrf": csrf_from(seite.text), "modus": "bildschirm"})
+    run_jobs(app_env, fake_llm)
+
+    quiz = app_env.db.q1("SELECT id FROM quiz ORDER BY id DESC LIMIT 1")
+    r = client.get("/")
+    assert f'href="/quiz/{quiz["id"]}"' in r.text
+    assert "Weiterlernen" in r.text
+
+
+# ==========================================================================
 # Wissensbasis und Themen
 # ==========================================================================
 

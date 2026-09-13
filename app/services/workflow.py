@@ -13,7 +13,7 @@ from fastapi import Request
 from starlette.concurrency import run_in_threadpool
 
 from .. import config, db, exam_learning, jobs, kb, quizzes, research, teaching, topics
-from ..domain import Flag
+from ..domain import FLAG_ORDER, Flag
 from ..quizzes import QuizError
 from ..routers.shared import flash, render, zurueck
 
@@ -178,6 +178,52 @@ def _lernen_signatur(lesson_id: int) -> str:
 
 def lernen_status_signatur(lesson_id: int) -> str:
     return _lernen_signatur(lesson_id)
+
+
+# --- „Heute": ein zentraler naechster Schritt ------------------------------
+#
+# Vorher hatte nur dashboard.py diese Logik, aber schon dreifach genutzt
+# (/, /lernen, /eltern) — jetzt lebt sie hier, wie in Abschnitt 15 des Plans
+# vorgesehen, und alle Dashboards rufen dieselbe Funktion auf.
+
+def offene_schritte():
+    """Alle offenen Lernschritte, dringlichste zuerst — fuer die Uebersichten
+    unter /lernen und /eltern sowie als Basis fuer `get_next_action()`."""
+    themen = topics.liste(topics.AKTIV)
+    themen.sort(key=lambda t: (FLAG_ORDER.index(t['flag']), t['sort']))
+    quizze = quizzes.offene()
+    lessons = teaching.offene()
+    schritte = []
+    # Ein Material aus dem Lernplan führt immer zurück zu seinem Materialtab.
+    material = {r['lesson_id']: r['id'] for r in db.q('SELECT id, lesson_id FROM exam_material')}
+    for q in quizze:
+        if q['state'] == 'geprueft':
+            continue
+        text = {'bereit': 'Deine Fragen sind da', 'offen': 'Deine Fragen werden vorbereitet',
+                'beantwortet': 'Deine Antworten werden angeschaut'}.get(q['state'], 'Weiterlernen')
+        schritte.append({'titel': q['thema_label'], 'text': text, 'url': f"/quiz/{q['id']}",
+                         'topic_id': q['topic_id'], 'bereit': q['state'] == 'bereit'})
+    quiz_themen = {q['topic_id'] for q in quizze}
+    for l in lessons:
+        if l['topic_id'] in quiz_themen:
+            continue
+        url = f"/klassenarbeit/material/{material[l['id']]}" if l['id'] in material else f"/lernen/{l['id']}"
+        schritte.append({'titel': l['thema_label'], 'text': 'Hier geht deine Lernrunde weiter',
+                         'url': url, 'topic_id': l['topic_id'], 'bereit': l['state'] == 'bereit'})
+    schritte.sort(key=lambda s: not s['bereit'])
+    return themen, schritte, [q for q in quizze if q['state'] == 'geprueft']
+
+
+def get_next_action(themen: list[dict], schritte: list[dict]) -> dict | None:
+    """Der eine naechste Schritt fuer die „Heute"-Kachel: ein offener Schritt
+    (Quiz vor Lernrunde, siehe `offene_schritte()`) hat Vorrang; sonst ein
+    neues, bereits bestaetigtes Thema; sonst gibt es gerade nichts zu tun."""
+    if schritte:
+        return {**schritte[0], 'button': 'Weiterlernen'}
+    if themen:
+        return {'titel': themen[0]['label'], 'text': 'Ein kleiner Schritt für heute.',
+                'url': f"/lernzyklus/{themen[0]['id']}", 'button': 'Los geht’s'}
+    return None
 
 
 def render_lernen_page(request: Request, lesson_id: int):
