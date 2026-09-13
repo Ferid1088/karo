@@ -12,7 +12,14 @@ router = APIRouter()
 @router.get('/', response_class=HTMLResponse)
 def dashboard(request: Request):
     themen, schritte, reviews = workflow.offene_schritte()
-    naechstes = workflow.get_next_action(themen, schritte)
+    # "Heute" ist die Kind-Seite (KaroRefactoring_Plan.md, Abschnitt 9) —
+    # das gilt unabhaengig davon, wer gerade eingeloggt ist. Eltern haben
+    # zwar vollen Zugriff und koennen hier mitlesen, aber die Kachel zeigt
+    # immer den naechsten Schritt fuers Kind, nie eine Freigabe-Erinnerung
+    # (die gehoert auf /eltern, wo `reviews` ohnehin schon vollstaendig
+    # aufgelistet wird).
+    aktion = workflow.get_next_action('child', themen, schritte, reviews)
+    naechstes = workflow.next_action_display(aktion)
     return render(request, 'dashboard.html', naechstes=naechstes, reviews=reviews,
                   themen=themen, kb_stat=kb.statistik(),
                   exam=db.q1('SELECT * FROM exam WHERE exam_date>=? ORDER BY exam_date LIMIT 1', db.today()))

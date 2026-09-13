@@ -207,7 +207,11 @@ def test_home_prefers_child_ready_work_to_parent_review(client, fake_llm, fake_c
     first = quizzes.anfordern(topic_id)
     run_jobs(app_env, fake_llm)
     with app_env.db.tx() as c:
-        c.execute("UPDATE quiz SET state='geprueft' WHERE id=?", (first,))
+        # 'ausgewertet' ist der echte Zustand, den job_quiz_check nach der
+        # LLM-Auswertung setzt — eine Fragerunde, die auf die Freigabe der
+        # Lernbegleitung wartet (siehe quizzes.py, STATE_AUSGEWERTET).
+        c.execute("UPDATE quiz SET state=? WHERE id=?",
+                 (quizzes.STATE_AUSGEWERTET, first))
     second = quizzes.anfordern(topic_id)
     run_jobs(app_env, fake_llm)
     page = client.get('/')

@@ -386,7 +386,13 @@ def offene_schritte():
     # Ein Material aus dem Lernplan führt immer zurück zu seinem Materialtab.
     material = {r['lesson_id']: r['id'] for r in db.q('SELECT id, lesson_id FROM exam_material')}
     for q in quizze:
-        if q['state'] == 'geprueft':
+        # Ausgewertet heisst: der LLM-Vorschlag steht, ein Erwachsener muss
+        # freigeben — das Kind kann hier nichts mehr tun (siehe `reviews`
+        # unten, das genau diese Faelle sammelt). Frueher stand hier
+        # faelschlich 'geprueft', ein Zustand, den ein Quiz nie annimmt —
+        # ausgewertete Fragerunden erschienen dadurch weiterhin als
+        # Kind-Schritt, obwohl schon die Lernbegleitung am Zug war.
+        if q['state'] == quizzes.STATE_AUSGEWERTET:
             continue
         text = {'bereit': 'Deine Fragen sind da', 'offen': 'Deine Fragen werden vorbereitet',
                 'beantwortet': 'Deine Antworten werden angeschaut'}.get(q['state'], 'Weiterlernen')
@@ -400,7 +406,8 @@ def offene_schritte():
         schritte.append({'titel': l['thema_label'], 'text': 'Hier geht deine Lernrunde weiter',
                          'url': url, 'topic_id': l['topic_id'], 'bereit': l['state'] == 'bereit'})
     schritte.sort(key=lambda s: not s['bereit'])
-    return themen, schritte, [q for q in quizze if q['state'] == 'geprueft']
+    reviews = [q for q in quizze if q['state'] == quizzes.STATE_AUSGEWERTET]
+    return themen, schritte, reviews
 
 
 def render_lernen_uebersicht(request: Request):
@@ -412,16 +419,80 @@ def render_lernen_uebersicht(request: Request):
                   reviews=reviews)
 
 
-def get_next_action(themen: list[dict], schritte: list[dict]) -> dict | None:
-    """Der eine naechste Schritt fuer die „Heute"-Kachel: ein offener Schritt
-    (Quiz vor Lernrunde, siehe `offene_schritte()`) hat Vorrang; sonst ein
-    neues, bereits bestaetigtes Thema; sonst gibt es gerade nichts zu tun."""
+def _schritt_kategorie(schritt: dict) -> str:
+    if schritt['url'].startswith('/quiz/'):
+        return 'quiz'
+    if schritt['url'].startswith('/klassenarbeit/material/'):
+        return 'exam_material'
+    return 'lesson'
+
+
+# Rangfolge aus change.txt, Aufgabe 5 — niedrigere Zahl gewinnt. "review"
+# und "new_topic" werden separat behandelt (siehe get_next_action), diese
+# drei sind die Kategorien innerhalb von `schritte`.
+_SCHRITT_RANG = {'quiz': 0, 'lesson': 1, 'exam_material': 2}
+
+
+def get_next_action(role: str, themen: list[dict], schritte: list[dict],
+                    reviews: list[dict] | None = None) -> NextAction:
+    """Die eine deterministische Prioritaet fuer „Heute" — dieselbe Funktion
+    fuer jedes Dashboard, damit es nur einen Ort gibt, an dem diese
+    Entscheidung getroffen wird (KaroRefactoring_Plan.md Abschnitt 15;
+    change.txt Aufgabe 5):
+
+      1. eine ausstehende Freigabe — nur relevant fuer die Eltern-Rolle
+      2. ein bereites/offenes Quiz
+      3. eine laufende Lernrunde
+      4. aktives Klassenarbeits-Material
+      5. ein neues, bestaetigtes Thema
+      6. nichts zu tun
+    """
+    if role != 'child' and reviews:
+        q = reviews[0]
+        return NextAction(
+            kind='review', url=f"/quiz/{q['id']}",
+            reason='Eine Fragerunde wartet auf die Freigabe der Lernbegleitung',
+            context={'quiz': q})
+
     if schritte:
-        return {**schritte[0], 'button': 'Weiterlernen'}
+        geordnet = sorted(
+            schritte, key=lambda s: (_SCHRITT_RANG.get(_schritt_kategorie(s), 9),
+                                     not s['bereit']))
+        top = geordnet[0]
+        kategorie = _schritt_kategorie(top)
+        begruendung = {
+            'quiz': 'Ein Quiz wartet auf Antworten oder Auswertung',
+            'lesson': 'Eine Lernrunde laeuft bereits',
+            'exam_material': 'Klassenarbeits-Lernmaterial ist aktiv',
+        }[kategorie]
+        return NextAction(kind=kategorie, url=top['url'], reason=begruendung,
+                          context={'schritt': top})
+
     if themen:
-        return {'titel': themen[0]['label'], 'text': 'Ein kleiner Schritt für heute.',
-                'url': f"/lernzyklus/{themen[0]['id']}", 'button': 'Los geht’s'}
-    return None
+        return NextAction(
+            kind='new_topic', url=f"/lernzyklus/{themen[0]['id']}",
+            reason='Ein bestaetigtes Thema wartet auf den Start',
+            context={'thema': themen[0]})
+
+    return NextAction(kind='none', url='', reason='Nichts Offenes', context={})
+
+
+def next_action_display(action: NextAction) -> dict | None:
+    """Wandelt eine `NextAction` in die Kachel-Felder um, die dashboard.html
+    erwartet (titel/text/url/button). Reine Praesentation — die Prioritaet
+    selbst steht ausschliesslich in `get_next_action()`."""
+    if action.kind == 'none':
+        return None
+    if action.kind == 'review':
+        q = action.context['quiz']
+        return {'titel': q['thema_label'], 'text': 'Die Antworten warten auf deine Freigabe.',
+                'url': action.url, 'button': 'Jetzt prüfen'}
+    if action.kind == 'new_topic':
+        thema = action.context['thema']
+        return {'titel': thema['label'], 'text': 'Ein kleiner Schritt für heute.',
+                'url': action.url, 'button': 'Los geht’s'}
+    schritt = action.context['schritt']
+    return {**schritt, 'url': action.url, 'button': 'Weiterlernen'}
 
 
 def render_lernen_page(request: Request, lesson_id: int):

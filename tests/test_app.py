@@ -595,6 +595,66 @@ def test_heute_bevorzugt_ein_offenes_quiz_vor_einem_neuen_thema(
 
 
 # ==========================================================================
+# get_next_action — Prioritaets-Policy (change.txt, Aufgabe 5)
+# ==========================================================================
+
+_THEMA = {"id": 1, "label": "Neues Thema"}
+_QUIZ_SCHRITT = {"titel": "Quiz-Thema", "text": "Deine Fragen sind da",
+                 "url": "/quiz/9", "topic_id": 2, "bereit": True}
+_LERNRUNDE_SCHRITT = {"titel": "Lernrunde-Thema", "text": "Hier geht's weiter",
+                      "url": "/lernen/9", "topic_id": 3, "bereit": True}
+_EXAM_MATERIAL_SCHRITT = {"titel": "Klassenarbeits-Thema", "text": "Hier geht's weiter",
+                          "url": "/klassenarbeit/material/9", "topic_id": 4,
+                          "bereit": True}
+
+
+def test_next_action_quiz_gewinnt_gegen_neues_thema():
+    from app.services import workflow
+    aktion = workflow.get_next_action("child", [_THEMA], [_QUIZ_SCHRITT], [])
+    assert aktion.kind == "quiz" and aktion.url == "/quiz/9"
+
+
+def test_next_action_lernrunde_gewinnt_gegen_neues_thema():
+    from app.services import workflow
+    aktion = workflow.get_next_action("child", [_THEMA], [_LERNRUNDE_SCHRITT], [])
+    assert aktion.kind == "lesson" and aktion.url == "/lernen/9"
+
+
+def test_next_action_klassenarbeitsmaterial_gewinnt_gegen_neues_thema():
+    from app.services import workflow
+    aktion = workflow.get_next_action("child", [_THEMA], [_EXAM_MATERIAL_SCHRITT], [])
+    assert aktion.kind == "exam_material" and aktion.url == "/klassenarbeit/material/9"
+
+
+def test_next_action_quiz_gewinnt_gegen_lernrunde_und_klassenarbeitsmaterial():
+    from app.services import workflow
+    schritte = [_EXAM_MATERIAL_SCHRITT, _LERNRUNDE_SCHRITT, _QUIZ_SCHRITT]
+    aktion = workflow.get_next_action("child", [_THEMA], schritte, [])
+    assert aktion.kind == "quiz"
+
+
+def test_next_action_ohne_irgendetwas_offenes():
+    from app.services import workflow
+    aktion = workflow.get_next_action("child", [], [], [])
+    assert aktion.kind == "none"
+    assert workflow.next_action_display(aktion) is None
+
+
+def test_next_action_freigabe_hat_vorrang_fuer_eltern():
+    from app.services import workflow
+    review = {"id": 5, "thema_label": "Zu prüfen"}
+    aktion = workflow.get_next_action("parent", [_THEMA], [_QUIZ_SCHRITT], [review])
+    assert aktion.kind == "review" and aktion.url == "/quiz/5"
+
+
+def test_next_action_freigabe_erscheint_nie_fuer_kind():
+    from app.services import workflow
+    review = {"id": 5, "thema_label": "Zu prüfen"}
+    aktion = workflow.get_next_action("child", [_THEMA], [_QUIZ_SCHRITT], [review])
+    assert aktion.kind != "review"
+
+
+# ==========================================================================
 # Wissensbasis und Themen
 # ==========================================================================
 
