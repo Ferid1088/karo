@@ -482,6 +482,50 @@ def test_erneutes_eltern_login_stellt_rolle_eltern_wieder_her(client, fake_llm, 
 
 
 # ==========================================================================
+# Vorbereitung / Messung — konsolidierte Eltern-Router (Phase 2)
+# ==========================================================================
+
+def test_vorbereitung_zeigt_dieselben_inhalte_wie_die_alten_seiten(
+        client, fake_llm, fake_cli, app_env):
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+
+    assert client.get("/vorbereitung").text == client.get("/wissen").text
+    assert (client.get("/vorbereitung/inhalte").text
+            == client.get("/themen").text)
+    assert (client.get("/vorbereitung/inhalte/sources").text
+            == client.get("/recherche").text)
+
+    # Schreibende Aktionen laufen wirklich durch dieselbe Logik: ein Thema,
+    # das über /vorbereitung angelegt wird, taucht unter /themen auf.
+    seite = client.get("/vorbereitung/inhalte")
+    client.post("/vorbereitung/inhalte/neu",
+               data={"_csrf": csrf_from(seite.text), "label": "Dreisatz",
+                     "beschreibung": "Verhältnisse berechnen"})
+    assert "Dreisatz" in client.get("/themen").text
+
+
+def _hauptinhalt(html: str) -> str:
+    """Nur der <main>-Block — die Kopfzeile markiert den aktiven Nav-Tab
+    anhand der aufgerufenen Adresse, das darf sich zwischen einer Seite und
+    ihrem Alias unterscheiden, ohne dass die Inhalte selbst abweichen."""
+    import re
+    m = re.search(r"<main\b.*?</main>", html, re.DOTALL)
+    assert m, "kein <main>-Block gefunden"
+    return m.group(0)
+
+
+def test_messung_zeigt_dieselben_inhalte_wie_die_alten_seiten(
+        client, fake_llm, fake_cli):
+    einrichten(client, fake_llm)
+    client.get("/")  # verbraucht die Flash-Meldung aus der Einrichtung
+    assert (_hauptinhalt(client.get("/messung/fortschritt").text)
+            == _hauptinhalt(client.get("/lernstand").text))
+    assert (_hauptinhalt(client.get("/messung/examen").text)
+            == _hauptinhalt(client.get("/klassenarbeit").text))
+
+
+# ==========================================================================
 # Wissensbasis und Themen
 # ==========================================================================
 

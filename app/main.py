@@ -25,7 +25,8 @@ from starlette.status import HTTP_303_SEE_OTHER
 
 from . import config, db, jobs, security
 from .config import ConfigUnreadable
-from .routers import auth, eltern, kind, admin, dashboard, lernzyklus
+from .routers import (auth, eltern, kind, admin, dashboard, lernzyklus,
+                      vorbereitung, messung)
 
 security.configure_logging(os.environ.get("KARO_LOG_LEVEL", "INFO"))
 log = logging.getLogger("karo")
@@ -86,6 +87,8 @@ app.include_router(lernzyklus.router)
 app.include_router(eltern.router)
 app.include_router(kind.router)
 app.include_router(admin.router)
+app.include_router(vorbereitung.router)
+app.include_router(messung.router)
 
 
 class Gate:
