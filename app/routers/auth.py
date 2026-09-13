@@ -47,19 +47,35 @@ def login(request: Request, password: str = Form("")):
     cfg = config.load()
     if security.verify_password(password, cfg.app_password_hash,
                                cfg.app_password_salt):
-        token = request.session.get("csrf")
-        request.session.clear()
-        request.session["auth"] = True
-        request.session["csrf"] = token or security.new_csrf_token()
-        return zurueck("/")
-    return render(request, "login.html", error="Passwort stimmt nicht.",
-                  status_code=401)
+        rolle = "parent"
+    elif cfg.child_password_hash and security.verify_password(
+            password, cfg.child_password_hash, cfg.child_password_salt):
+        rolle = "child"
+    else:
+        return render(request, "login.html", error="Passwort stimmt nicht.",
+                      status_code=401)
+    token = request.session.get("csrf")
+    request.session.clear()
+    request.session["auth"] = True
+    request.session["role"] = rolle
+    request.session["csrf"] = token or security.new_csrf_token()
+    return zurueck("/")
 
 
 @router.post("/logout")
 def logout(request: Request):
     request.session.clear()
     return zurueck("/login")
+
+
+@router.post("/eltern/kind-modus")
+def kind_modus(request: Request):
+    """Schaltet die laufende Eltern-Session in den eingeschraenkten Kind-Modus.
+
+    Zurueck geht es nur ueber ein erneutes Login mit dem Eltern-Passwort —
+    ein Kind in dieser Session kann sich also nicht selbst hochstufen."""
+    request.session["role"] = "child"
+    return zurueck("/")
 
 
 def _setup_context(cfg, modelle=None) -> dict:
@@ -185,7 +201,8 @@ def setup_finish(request: Request, model_vision: str = Form(""),
                  recherche: str = Form(""),
                  drive_unterordner: str = Form(""),
                  material_db_path: str | None = Form(None),
-                 password: str = Form(""), password2: str = Form("")):
+                 password: str = Form(""), password2: str = Form(""),
+                 child_password: str = Form(""), child_password2: str = Form("")):
     cfg = config.load()
     erstmalig = not cfg.setup_complete
 
@@ -240,6 +257,12 @@ def setup_finish(request: Request, model_vision: str = Form(""),
         if len(password) < security.MIN_PASSWORD_LENGTH:
             return zurueck_setup(f"Das Passwort muss mindestens "
                            f"{security.MIN_PASSWORD_LENGTH} Zeichen haben.")
+    if child_password:
+        if child_password != child_password2:
+            return zurueck_setup("Die beiden Kind-Passwörter stimmen nicht überein.")
+        if len(child_password) < security.MIN_PASSWORD_LENGTH:
+            return zurueck_setup(f"Das Kind-Passwort muss mindestens "
+                           f"{security.MIN_PASSWORD_LENGTH} Zeichen haben.")
 
     aenderungen = {
         "model_vision": entwurf.model_vision,
@@ -257,6 +280,10 @@ def setup_finish(request: Request, model_vision: str = Form(""),
         h, s = security.hash_password(password)
         aenderungen["app_password_hash"] = h
         aenderungen["app_password_salt"] = s
+    if child_password:
+        h2, s2 = security.hash_password(child_password)
+        aenderungen["child_password_hash"] = h2
+        aenderungen["child_password_salt"] = s2
 
     try:
         materials.einstellungen_speichern(aenderungen)
@@ -267,6 +294,7 @@ def setup_finish(request: Request, model_vision: str = Form(""),
     ingest.ensure_folders()
     jobs.start()
     request.session["auth"] = True
+    request.session["role"] = "parent"
 
     meldung = "Einrichtung abgeschlossen." if erstmalig else "Einstellungen gespeichert."
     if aenderungen["default_ausgabe"] == Ausgabe.NOTEBOOKLM.value:

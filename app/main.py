@@ -45,6 +45,19 @@ PUBLIC_EXACT = frozenset({"/health", "/login", "/logout", "/setup",
                           "/setup/credentials", "/setup/finish", "/setup/reset"})
 PUBLIC_PREFIX = ("/static/",)
 
+# Kinder duerfen ausschliesslich ihren eigenen Lernbereich verwenden — das
+# wird hier zentral erzwungen, nicht nur durch ausgeblendete Menuepunkte.
+CHILD_ALLOWED_EXACT = frozenset({"/", "/hilfe"})
+CHILD_ALLOWED_PREFIXES = ("/lernen", "/lernzyklus", "/quiz", "/material",
+                          "/klassenarbeit/material")
+
+
+def _kind_erlaubt(path: str) -> bool:
+    if path in CHILD_ALLOWED_EXACT:
+        return True
+    return any(path == p or path.startswith(p + "/")
+              for p in CHILD_ALLOWED_PREFIXES)
+
 MAX_BODY_BYTES = 30 * 1024 * 1024
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
@@ -113,6 +126,10 @@ class Gate:
             if not oeffentlich and not authed:
                 return await self._send(send, scope, RedirectResponse(
                     "/login", HTTP_303_SEE_OTHER))
+            if (not oeffentlich and authed
+                    and request.session.get("role", "parent") == "child"
+                    and not _kind_erlaubt(path)):
+                return await self._send(send, scope, self._kind_gesperrt())
 
         if request.method in security.SAFE_METHODS:
             return await self.app(scope, receive, send)
@@ -171,6 +188,13 @@ class Gate:
         return HTMLResponse(
             "<h1>Zu groß</h1><p>Die gesendeten Daten überschreiten "
             f"{MAX_BODY_BYTES // 1_048_576} MB.</p>", status_code=413)
+
+    @staticmethod
+    def _kind_gesperrt() -> HTMLResponse:
+        return HTMLResponse(
+            "<h1>Das ist ein Eltern-Bereich</h1><p>Bitte einen Erwachsenen "
+            "holen oder mit dem Eltern-Passwort neu anmelden.</p>",
+            status_code=403)
 
     @staticmethod
     def _replay(body: bytes):

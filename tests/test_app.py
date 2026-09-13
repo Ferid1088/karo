@@ -256,6 +256,24 @@ def lernen_starten(client, app_env, topic_id, ausgabe="html"):
     return lesson["id"]
 
 
+def kind_modus_aktivieren(client):
+    seite = client.get("/eltern")
+    r = client.post("/eltern/kind-modus",
+                    data={"_csrf": csrf_from(seite.text)},
+                    follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/"
+
+
+def kind_passwort_setzen(client, kindpasswort="kindpw123"):
+    seite = client.get("/setup")
+    r = client.post("/setup/finish", data={
+        "_csrf": csrf_from(seite.text), "header_crop": "8",
+        "default_ausgabe": "html", "max_lernrunden": "3", "recherche": "ja",
+        "child_password": kindpasswort, "child_password2": kindpasswort},
+        follow_redirects=False)
+    assert r.status_code == 303, r.text[:600]
+
+
 # ==========================================================================
 # Einrichtung — beide Wege
 # ==========================================================================
@@ -403,6 +421,64 @@ def test_post_von_fremder_seite_wird_abgelehnt(client, fake_llm, fake_cli):
     r = client.post("/wissen/einlesen", data={"_csrf": token},
                     headers={"sec-fetch-site": "cross-site"})
     assert r.status_code == 403
+
+
+# ==========================================================================
+# Rollen: Eltern vs. Kind
+# ==========================================================================
+
+def test_kind_modus_beschraenkt_auf_kindbereiche(client, fake_llm, fake_cli):
+    einrichten(client, fake_llm)
+    kind_modus_aktivieren(client)
+
+    for pfad in ("/eltern", "/wissen", "/themen", "/recherche", "/lernstand",
+                 "/protokoll", "/vorbereitung", "/messung", "/klassenarbeit",
+                 "/setup"):
+        r = client.get(pfad, follow_redirects=False)
+        assert r.status_code == 403, pfad
+
+    for pfad in ("/", "/lernen", "/lernzyklus"):
+        r = client.get(pfad, follow_redirects=False)
+        assert r.status_code == 200, pfad
+
+    # Diese Pfade existieren fuer das Kind, auch wenn die konkrete ID fehlt —
+    # die Rollensperre darf hier nicht dazwischenfunken (kein 403).
+    assert client.get("/quiz/999", follow_redirects=False).status_code == 303
+    assert client.get("/material/999", follow_redirects=False).status_code == 404
+    assert client.get("/klassenarbeit/material/999",
+                      follow_redirects=False).status_code == 404
+
+    seite = client.get("/")
+    r = client.post("/logout", data={"_csrf": csrf_from(seite.text)},
+                    follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/login"
+
+
+def test_eigenes_kind_passwort_setzt_rolle_kind(client, fake_llm, fake_cli):
+    einrichten(client, fake_llm, passwort="elternpw123")
+    kind_passwort_setzen(client, "kindpw123")
+
+    client.cookies.clear()
+    seite = client.get("/login")
+    r = client.post("/login", data={"_csrf": csrf_from(seite.text),
+                                    "password": "kindpw123"},
+                    follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/"
+    assert client.get("/", follow_redirects=False).status_code == 200
+    assert client.get("/wissen", follow_redirects=False).status_code == 403
+
+
+def test_erneutes_eltern_login_stellt_rolle_eltern_wieder_her(client, fake_llm, fake_cli):
+    einrichten(client, fake_llm, passwort="elternpw123")
+    kind_modus_aktivieren(client)
+    assert client.get("/wissen", follow_redirects=False).status_code == 403
+
+    seite = client.get("/login")
+    r = client.post("/login", data={"_csrf": csrf_from(seite.text),
+                                    "password": "elternpw123"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    assert client.get("/wissen", follow_redirects=False).status_code == 200
 
 
 # ==========================================================================

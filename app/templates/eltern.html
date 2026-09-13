@@ -27,6 +27,7 @@
 <details class="card disclosure"><summary>Aussehen und Anmeldung</summary>
 <label for="farbwelten-auswahl">Farbe der App</label><select id="farbwelten-auswahl">
 {% for wert, name in [('lila','Lila'),('ozean','Blau'),('wiese','Grün'),('sonne','Orange'),('zuckerwatte','Rosa'),('lava','Rot'),('dunkel','Dunkel')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
+<form method="post" action="/eltern/kind-modus" class="section-space"><p class="hint">Gerät ans Kind übergeben? Zurück geht es nur mit dem Eltern-Passwort.</p>{{ csrf_input() }}<button type="submit" class="ghost">Kind-Modus starten</button></form>
 <form method="post" action="/logout" class="section-space" data-logout>{{ csrf_input() }}<button type="submit" class="ghost">Abmelden</button></form>
 </details>
 {% endblock %}

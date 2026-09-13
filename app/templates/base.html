@@ -51,9 +51,9 @@
   <nav class="simple-nav" aria-label="Hauptnavigation">
     <a href="/" {{ 'aria-current=page' if path == '/' }}>Heute</a>
     <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/klassenarbeit')) }}>Lernen</a>
-    <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>
+    {% if role != 'child' %}<a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>{% endif %}
   </nav>
-  <a class="parent-link" href="/eltern" {{ 'aria-current=page' if adult_page }}>Für Eltern</a>
+  {% if role != 'child' %}<a class="parent-link" href="/eltern" {{ 'aria-current=page' if adult_page }}>Für Eltern</a>{% endif %}
 </header>
 {% endif %}
 
@@ -69,7 +69,7 @@
 </main>
 
 {% if show_nav|default(true) %}
-<footer class="simple-footer"><a href="/hilfe">Brauchst du Hilfe?</a><span>Ein Schritt nach dem anderen.</span></footer>
+<footer class="simple-footer"><a href="/hilfe">Brauchst du Hilfe?</a><span>Ein Schritt nach dem anderen.</span>{% if request.session.get('auth') %}<form method="post" action="/logout" class="footer-logout">{{ csrf_input() }}<button type="submit" class="ghost">Abmelden</button></form>{% endif %}</footer>
 <script>
 (function () {
   var SCHLUESSEL = "karo-farbwelt";

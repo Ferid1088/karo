@@ -494,6 +494,27 @@ claude setup-token                         <span class="c-com"># Token wird ange
   </div>
 </details>
 
+<details class="card disclosure setup-group" id="kind-passwort"><summary>Kind-Passwort {% if cfg.has_child_password %}(eingerichtet){% endif %}</summary>
+  <div class="card">
+    <h3>Kind-Passwort {{ hilfe('Optional: eigenes Login fürs Kind, direkt im Kind-Bereich.') }}</h3>
+    <div class="row">
+      <div class="field">
+        <label for="child_password">{{ 'Neues Kind-Passwort' if cfg.has_child_password else 'Kind-Passwort' }} (min. {{ min_password }} Zeichen)</label>
+        <input type="password" id="child_password" name="child_password" form="settings-form"
+               autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label for="child_password2">Wiederholen</label>
+        <input type="password" id="child_password2" name="child_password2" form="settings-form"
+               autocomplete="new-password">
+      </div>
+    </div>
+    <p class="hint">
+      {% if cfg.has_child_password %}Leer lassen zum Behalten.{% else %}Optional — ohne eigenes Kind-Passwort schaltet ein Klick auf „Kind-Modus starten“ im Eltern-Bereich die gleiche Session um.{% endif %}
+    </p>
+  </div>
+</details>
+
 
 
 

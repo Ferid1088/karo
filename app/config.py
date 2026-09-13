@@ -25,7 +25,8 @@ CONFIG_PATH = DATA_DIR / "config.json"
 _SESSION_SECRET_PATH = DATA_DIR / "session.key"
 
 SECRET_FIELDS = ("anthropic_api_key", "claude_oauth_token",
-                 "app_password_hash", "app_password_salt")
+                 "app_password_hash", "app_password_salt",
+                 "child_password_hash", "child_password_salt")
 
 RESEARCH_SOURCE_DEFAULTS = [
     {"domain": "studyflix.de", "label": "Studyflix"},
@@ -57,6 +58,8 @@ class Config:
     # --- Zugang zur App ---------------------------------------------------
     app_password_hash: str = ""
     app_password_salt: str = ""
+    child_password_hash: str = ""   # optional: eigenes Login fuers Kind
+    child_password_salt: str = ""
 
     # --- Lernende Person ---------------------------------------------------
     learner_name: str = ""          # bleibt lokal, dient dem Schwärzen
@@ -110,6 +113,7 @@ class Config:
         d = {k: v for k, v in asdict(self).items() if k not in SECRET_FIELDS}
         d["has_credentials"] = self.has_credentials
         d["has_password"] = bool(self.app_password_hash)
+        d["has_child_password"] = bool(self.child_password_hash)
         return d
 
 
