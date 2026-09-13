@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse
 
 from .. import config, db, quizzes, teaching, topics
 from ..domain import FLAG_ORDER
+from ..services import workflow
 from . import kind
 from .shared import render, flash, zurueck
 
@@ -43,7 +44,7 @@ def lernzyklus_seite(request: Request, topic_id: int):
         return zurueck("/themen")
     lesson_id = _lesson_id(topic_id)
     if lesson_id is not None:
-        return kind.lernen_seite(request, lesson_id)
+        return workflow.render_lernen_page(request, lesson_id)
     return render(request, "lernzyklus/start.html", topic=topic)
 
 
@@ -75,13 +76,13 @@ def lernzyklus_quiz_starten(request: Request, topic_id: int, modus: str = Form("
 @router.get("/{topic_id}/quiz/{quiz_id}", response_class=HTMLResponse)
 def lernzyklus_quiz(request: Request, topic_id: int, quiz_id: int):
     _check_quiz(topic_id, quiz_id)
-    return kind.quiz_seite(request, quiz_id)
+    return workflow.render_quiz_page(request, quiz_id)
 
 
 @router.post("/{topic_id}/quiz/{quiz_id}/antworten")
 async def lernzyklus_quiz_antworten(request: Request, topic_id: int, quiz_id: int):
     _check_quiz(topic_id, quiz_id)
-    return await kind.quiz_antworten(request, quiz_id)
+    return await workflow.handle_quiz_antworten(request, quiz_id)
 
 
 @router.post("/{topic_id}/quiz/{quiz_id}/blatt")
@@ -94,7 +95,7 @@ async def lernzyklus_quiz_blatt(request: Request, topic_id: int, quiz_id: int,
 @router.post("/{topic_id}/quiz/{quiz_id}/freigabe")
 async def lernzyklus_quiz_freigabe(request: Request, topic_id: int, quiz_id: int):
     _check_quiz(topic_id, quiz_id)
-    return await kind.quiz_freigabe(request, quiz_id)
+    return await workflow.handle_quiz_freigabe(request, quiz_id)
 
 
 @router.post("/{topic_id}/runde/weiter")

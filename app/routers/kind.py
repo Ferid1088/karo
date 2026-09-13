@@ -6,8 +6,9 @@ from fastapi import APIRouter, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse, FileResponse
 from starlette.concurrency import run_in_threadpool
 
-from .. import config, db, ingest, jobs, kb, quizzes, research, teaching
+from .. import config, db, ingest, quizzes, teaching
 from ..quizzes import QuizError
+from ..services import workflow
 from ..teaching import TeachingError
 from .shared import render, flash, zurueck
 
@@ -26,50 +27,19 @@ def quiz_starten(request: Request, topic_id: int, modus: str = Form("bildschirm"
     return zurueck(f"/quiz/{quiz_id}")
 
 
-def _quiz_signatur(quiz_id: int) -> str:
-    """Fingerabdruck für /quiz/{id}/status — analog zu _lernen_signatur."""
-    quiz = db.q1("SELECT state FROM quiz WHERE id=?", quiz_id)
-    if quiz is None:
-        return "weg"
-    offen = jobs.counts()
-    return "|".join([
-        quiz["state"],
-        str(offen.get("wartend", 0) + offen.get("laeuft", 0)),
-    ])
-
-
 @router.get("/quiz/{quiz_id}", response_class=HTMLResponse)
 def quiz_seite(request: Request, quiz_id: int):
-    quiz = quizzes.holen(quiz_id)
-    if quiz is None:
-        flash(request, "Fragerunde nicht gefunden.", "err")
-        return zurueck("/")
-    return render(request, "quiz.html", quiz=quiz, counts=jobs.counts(),
-                  signatur=_quiz_signatur(quiz_id))
+    return workflow.render_quiz_page(request, quiz_id)
 
 
 @router.get("/quiz/{quiz_id}/status")
 def quiz_status(quiz_id: int):
-    return {"signatur": _quiz_signatur(quiz_id)}
+    return {"signatur": workflow.quiz_status_signatur(quiz_id)}
 
 
 @router.post("/quiz/{quiz_id}/antworten")
 async def quiz_antworten(request: Request, quiz_id: int):
-    formular = await request.form()
-    antworten: dict[int, str] = {}
-    for schluessel in formular.keys():
-        if not schluessel.startswith("antwort_"):
-            continue
-        roh = schluessel[8:]
-        if roh.isdigit():
-            antworten[int(roh)] = str(formular.get(schluessel) or "")
-    try:
-        n = quizzes.antworten_speichern(quiz_id, antworten)
-    except QuizError as exc:
-        flash(request, str(exc), "err")
-        return zurueck(f"/quiz/{quiz_id}")
-    flash(request, f"{n} Antworten aufgenommen. Die Auswertung läuft.")
-    return zurueck(f"/quiz/{quiz_id}")
+    return await workflow.handle_quiz_antworten(request, quiz_id)
 
 
 @router.post("/quiz/{quiz_id}/blatt")
@@ -113,69 +83,7 @@ def quiz_drucken(quiz_id: int, loesungen: str = ""):
 
 @router.post("/quiz/{quiz_id}/freigabe")
 async def quiz_freigabe(request: Request, quiz_id: int):
-    formular = await request.form()
-    frage_ids = [int(v) for v in formular.getlist("frage_id")
-                 if str(v).isdigit()]
-    entscheidungen = []
-    for frage_id in frage_ids:
-        urteil = formular.get(f"urteil_{frage_id}")
-        if urteil is None:
-            continue
-        vorschlag = formular.get(f"v_urteil_{frage_id}", "")
-        fehler = formular.get(f"fehler_{frage_id}") or None
-        v_fehler = formular.get(f"v_fehler_{frage_id}") or None
-        call_roh = str(formular.get(f"call_{frage_id}") or "")
-        entscheidungen.append({
-            "frage_id": frage_id,
-            "skip": urteil == "skip",
-            "richtig": urteil == "ja",
-            "fehlertyp": None if urteil == "ja" else fehler,
-            "begruendung": formular.get(f"grund_{frage_id}", "")[:1000],
-            "konfidenz": None,
-            "llm_call_id": int(call_roh) if call_roh.isdigit() else None,
-            "geaendert": urteil != vorschlag or fehler != v_fehler,
-        })
-
-    try:
-        ergebnis = quizzes.freigeben(quiz_id, entscheidungen)
-    except QuizError as exc:
-        flash(request, str(exc), "err")
-        return zurueck(f"/quiz/{quiz_id}")
-
-    if ergebnis["bereits"]:
-        flash(request, "Diese Fragerunde war bereits freigegeben.", "warn")
-        return zurueck("/themen")
-
-    await run_in_threadpool(__import__("app.export", fromlist=["nach_freigabe"]).nach_freigabe)
-
-    n = ergebnis["geschrieben"]
-    meldung = f"{n} Antwort bewertet" if n == 1 else f"{n} Antworten bewertet"
-    if ergebnis["uebersprungen"]:
-        meldung += f", {ergebnis['uebersprungen']} übersprungen"
-
-    if ergebnis.get("lesson_id") and ergebnis.get("anlass") == "lernrunde":
-        weiter = teaching.nach_freigabe(ergebnis["lesson_id"],
-                                        ergebnis["topic_id"],
-                                        auto_weiter=False)
-        flash(request, f"{meldung}. {weiter['grund']}",
-              "ok" if weiter.get("erfolg") or weiter.get("weiter") else "warn")
-        material = db.q1("SELECT id FROM exam_material WHERE lesson_id=?", ergebnis["lesson_id"])
-        if material:
-            from .. import exam_learning
-            original = exam_learning.status(material["id"])
-            if original["quiz"] and original["quiz"]["id"] == quiz_id:
-                return zurueck(f"/klassenarbeit/material/{material['id']}")
-        return zurueck(f"/lernen/{ergebnis['lesson_id']}")
-
-    from .. import topics
-    from ..domain import Flag
-    thema = topics.get(ergebnis["topic_id"])
-    flagge = (thema or {}).get("flag")
-    if flagge in (Flag.ROT.value, Flag.GELB.value):
-        flash(request, f"{meldung}. Schau dir jetzt eine Erklärung an und übe weiter.", "ok")
-    else:
-        flash(request, f"{meldung}. Deine Ergebnisse sind gespeichert.")
-    return zurueck(f"/lernzyklus/{ergebnis['topic_id']}")
+    return await workflow.handle_quiz_freigabe(request, quiz_id)
 
 
 @router.post("/themen/{topic_id}/lernen")
@@ -190,47 +98,14 @@ def lernen_starten(request: Request, topic_id: int, ausgabe: str = Form("html"))
     return zurueck(f"/lernen/{lesson_id}")
 
 
-def _lernen_signatur(lesson_id: int) -> str:
-    """Kurzer Fingerabdruck aus allem, was die Lerneinheit-Seite anders
-    rendern würde — für das automatische Neuladen unter /lernen/{id}/status,
-    ohne bei jeder Prüfung die ganze Seite neu zu bauen."""
-    lesson = db.q1("SELECT state FROM lesson WHERE id=?", lesson_id)
-    if lesson is None:
-        return "weg"
-    runde = db.q1(
-        """SELECT state, material_pfad FROM lesson_round
-            WHERE lesson_id=? ORDER BY nr DESC LIMIT 1""", lesson_id)
-    offen = jobs.counts()
-    return "|".join([
-        lesson["state"],
-        runde["state"] if runde else "-",
-        "m" if runde and runde["material_pfad"] else "-",
-        str(offen.get("wartend", 0) + offen.get("laeuft", 0)),
-    ])
-
-
 @router.get("/lernen/{lesson_id}", response_class=HTMLResponse)
 def lernen_seite(request: Request, lesson_id: int):
-    lesson = teaching.holen(lesson_id)
-    if lesson is None:
-        flash(request, "Lerneinheit nicht gefunden.", "err")
-        return zurueck("/themen")
-    thema = lesson.get("thema") or {}
-    hat_material = bool(
-        kb.lehrmaterial(lesson["topic_id"], thema.get("label", ""), limit=1)
-        or research.material_fuer(lesson["topic_id"]))
-    return render(request, "lernen.html", lesson=lesson, counts=jobs.counts(),
-                  funde=research.freigegebene(lesson["topic_id"]),
-                  vorschlaege=research.vorschlaege(lesson["topic_id"]),
-                  recherche_erlaubt=config.load_safe().recherche_erlaubt,
-                  hat_material=hat_material,
-                  alle_materialien=teaching.materialien_fuer_thema(lesson["topic_id"]),
-                  signatur=_lernen_signatur(lesson_id))
+    return workflow.render_lernen_page(request, lesson_id)
 
 
 @router.get("/lernen/{lesson_id}/status")
 def lernen_status(lesson_id: int):
-    return {"signatur": _lernen_signatur(lesson_id)}
+    return {"signatur": workflow.lernen_status_signatur(lesson_id)}
 
 
 @router.post("/lernen/{lesson_id}/fragen")
