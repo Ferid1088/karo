@@ -14,7 +14,7 @@
 {% if quiz.state == 'offen' %}
   <div class="card">
     <h3>Die Fragen werden erstellt</h3>
-    <p>Karo schreibt gerade {{ 4 if quiz.anlass == 'lernrunde' else 5 }} Fragen
+    <p>Karo schreibt gerade passende Fragen
     aus Ihrem Schulmaterial. Das dauert etwa eine halbe Minute.</p>
     <p class="hint">Diese Seite aktualisiert sich von selbst, sobald die Fragen fertig sind.
     {% if offen %}({{ offen }} Vorgang läuft){% endif %}</p>

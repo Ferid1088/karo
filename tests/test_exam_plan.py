@@ -13,6 +13,20 @@ PLAN_ANTWORT = {
 }
 
 
+def test_klassenarbeit_ohne_gelesenes_themenblatt_wird_nicht_angelegt(
+        client, fake_llm, fake_cli, app_env):
+    einrichten(client, fake_llm)
+    seite = client.get("/klassenarbeit")
+    r = client.post("/klassenarbeit", data={
+        "_csrf": csrf_from(seite.text),
+        "exam_date": "2026-10-01",
+        "themen": "Ein vorhandenes Thema",
+    }, follow_redirects=True)
+    assert r.status_code == 200
+    assert "zuerst das Themenblatt" in r.text
+    assert app_env.db.q("SELECT id FROM exam") == []
+
+
 def test_themenblatt_hochladen_liest_themen_und_datum(client, fake_llm, fake_cli,
                                                        app_env, tmp_path):
     einrichten(client, fake_llm)

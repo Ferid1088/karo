@@ -188,6 +188,16 @@ CREATE TABLE IF NOT EXISTS lesson (
 );
 CREATE INDEX IF NOT EXISTS idx_lesson_topic ON lesson(topic_id, created_at);
 
+CREATE TABLE IF NOT EXISTS exam_material (
+    id INTEGER PRIMARY KEY,
+    exam_id INTEGER NOT NULL REFERENCES exam(id),
+    row_key TEXT NOT NULL,
+    lesson_id INTEGER NOT NULL UNIQUE REFERENCES lesson(id),
+    vorher TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_exam_material_row ON exam_material(exam_id, row_key);
+
 CREATE TABLE IF NOT EXISTS lesson_round (
     id            INTEGER PRIMARY KEY,
     lesson_id     INTEGER NOT NULL REFERENCES lesson(id) ON DELETE CASCADE,

@@ -95,6 +95,27 @@ def normalize_code(text: str) -> str:
 # Lesen
 # --------------------------------------------------------------------------
 
+def passende(themen: list[str], zeilen: list[dict]) -> list[dict]:
+    """Von `zeilen` (Themen-Datensätze mit 'label') die, deren Bezeichnung zu
+    einem der angekündigten Themen passt (Groß-/Kleinschreibung egal, als
+    Teilstring in beide Richtungen — Ankündigungen und Themenkatalog nennen
+    dieselbe Sache oft leicht unterschiedlich).
+
+    Für die Klassenarbeit: ohne diesen Abgleich würde jede Arbeit sich mit
+    ALLEN farbig geflaggten Themen im Fach befassen, auch mit Themen, die auf
+    dem Ankündigungsblatt gar nicht standen. Ohne Angabe oder ohne Treffer
+    bleibt es bei der vollen Liste — besser eine zu breite Auswahl als gar
+    keine, wenn die Ankündigung leer oder schlecht lesbar war.
+    """
+    if not themen:
+        return zeilen
+    gesucht = [t.lower() for t in themen]
+    treffer = [z for z in zeilen
+               if any(g in z["label"].lower() or z["label"].lower() in g
+                      for g in gesucht)]
+    return treffer or zeilen
+
+
 def liste(state: str | None = None) -> list[dict]:
     sql = """SELECT t.*, COALESCE(f.flag, ?) AS flag,
                     COALESCE(f.antworten, 0) AS antworten,

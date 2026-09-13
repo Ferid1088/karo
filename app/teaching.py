@@ -55,7 +55,7 @@ class TeachingError(Exception):
 # --------------------------------------------------------------------------
 
 def starten(topic_id: int, ausgabe: str | None = None,
-            prompt_wunsch: str | None = None) -> int:
+            prompt_wunsch: str | None = None, *, neue_einheit: bool = False) -> int:
     """Legt eine Lerneinheit an — wartet aber auf Bestätigung, bevor Runde 1
     beginnt.
 
@@ -81,7 +81,7 @@ def starten(topic_id: int, ausgabe: str | None = None,
         """SELECT id, ausgabe FROM lesson WHERE topic_id=?
              AND state NOT IN ('gelernt','abgebrochen') ORDER BY id DESC LIMIT 1""",
         topic_id)
-    if offen is not None:
+    if offen is not None and not neue_einheit:
         # Eine schon laufende Lerneinheit wird nicht doppelt angelegt — aber
         # das Ausgabeformat soll trotzdem immer dem aktuellen Stand folgen
         # (Einstellungen oder die bewusste Wahl gerade eben), statt für immer
@@ -386,7 +386,9 @@ def job_lesson_render(payload: dict) -> None:
     erklaerung = json.loads(runde["erklaerung"] or "{}")
     folien = erklaerung.get("folien") or []
     titel = erklaerung.get("titel") or thema["label"]
-    basis = f"{db.today()}_{thema['code']}_R{runde['nr']}"
+    from . import materials
+    titel = materials.titel(thema['label'], titel, runde['nr'], round_id)
+    basis = materials.dateiname(titel)
 
     def _quelle_sofort_speichern(quelle_pfad: str) -> None:
         with db.tx() as c:
@@ -402,6 +404,7 @@ def job_lesson_render(payload: dict) -> None:
                     f"Erklärung: {runde['stufe'].replace('_', ' ')}.",
             abgebrochen=lambda: _abgebrochen(lesson["id"]),
             quelle_bereit=_quelle_sofort_speichern)
+        materials.speichern("runde", round_id, titel, pfad)
     except TeachingError as exc:
         pruefung = json.loads(runde["pruefung"] or "{}")
         pruefung["ausgabe_hinweis"] = str(exc)
@@ -665,7 +668,10 @@ def job_lesson_variant(payload: dict) -> None:
             return
 
         titel = erklaerung.get("titel") or thema["label"]
-        basis = f"{db.today()}_{thema['code']}_R{runde['nr']}_V{variant_id}"
+        from . import materials
+        titel = materials.titel(thema['label'], titel, runde['nr'],
+                                 runde['id'], variant_id)
+        basis = materials.dateiname(titel)
 
         def _quelle_sofort_speichern(quelle_pfad: str) -> None:
             with db.tx() as c:
@@ -678,6 +684,8 @@ def job_lesson_variant(payload: dict) -> None:
             arbeit_id=f"v{variant_id}", kernidee=erklaerung.get("kernidee") or "",
             abgebrochen=lambda: _abgebrochen(lesson["id"]),
             quelle_bereit=_quelle_sofort_speichern)
+
+        materials.speichern("variante", variant_id, titel, pfad)
 
         if _abgebrochen(lesson["id"]):
             _fehlschlag("Abgebrochen.")

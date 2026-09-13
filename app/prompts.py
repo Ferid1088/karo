@@ -733,6 +733,11 @@ PLAN_SCHEMA = {
                     "inhalt": {"type": "string"},
                     "minuten": {"type": "integer"},
                     "topic_code": {"type": ["string", "null"]},
+                    "diagnose_fragen": {"type": "array", "maxItems": 5,
+                        "items": {"type": "string"}},
+                    "erklaerung": {"type": "string"},
+                    "neue_fragen": {"type": "array", "maxItems": 5,
+                        "items": {"type": "string"}},
                 },
                 "required": ["tag", "inhalt", "minuten", "topic_code"],
             },
@@ -760,12 +765,29 @@ Aktueller Stand:
 
 Erstelle einen realistischen Lernplan. Randbedingungen:
 - höchstens 30 Minuten Übung pro Tag, an manchen Tagen bewusst null
+- plane für jeden Lerntag eine eigene Lernreihe: zuerst fünf kurze
+    Diagnosefragen, damit das Kind nichts übt, was es bereits sicher kann;
+    danach eine Erklärung nur für erkannte Lücken und anschließend fünf neue
+    Fragen zur Kontrolle
+- schreibe diagnose_fragen, erklaerung und neue_fragen in jeden Lerntag
 - Themen mit Flagge „rot“ zuerst, danach „gelb“
 - Themen mit Flagge „gruen“ bekommen höchstens eine kurze Wiederholung
-- der Tag unmittelbar vor der Arbeit ohne neuen Stoff
+- reserviere den letzten Lerntag ausschließlich für Wiederholung und
+    Verbesserungen. Erzeuge dafür eine kurze Gesamtwiederholung mit Erklärung
+    und Stimme/Video, aber keinen neuen Stoff
+- schreibe das Datum als TT.MM.JJJJ in tag
+- der Tagesplan darf sich ausschließlich mit den oben angekündigten Themen
+  befassen; „Aktueller Stand“ dient nur dazu, die passenden Einträge den
+  angekündigten Themen zuzuordnen (auch bei leicht abweichendem Wortlaut)
+  und deren Flagge zur Priorisierung zu nutzen. Themen aus „Aktueller Stand“,
+  die nicht angekündigt sind, gehören nicht in den Tagesplan. Sind keine
+  Themen angekündigt, plane stattdessen eine allgemeine Wiederholung über
+  den aktuellen Stand.
 
-Sei bei der Einschätzung ehrlich. Ist die Datenlage für eine Aussage zu dünn,
-schreibe das, statt eine Zahl zu erfinden."""
+Sei bei der Einschätzung ehrlich. Der Plan soll das Kind auf die bestmögliche
+Leistung (Zielnote 1) vorbereiten, darf aber keine Sicherheit vortäuschen.
+Ist die Datenlage für eine Aussage zu dünn, schreibe das, statt eine Zahl zu
+erfinden."""
 
 
 # ==========================================================================
@@ -795,7 +817,7 @@ Lies daraus:
   genannt (z. B. „Brüche addieren", nicht ganze Sätze) — leere Liste, wenn
   keine erkennbar sind
 - das Datum der Arbeit, falls auf dem Blatt lesbar, als ISO-Datum
-  (JJJJ-MM-TT); sonst null. Das aktuelle Jahr ist {_dt.date.today().year},
+    (JJJJ-MM-TT); sonst null. Das aktuelle Jahr ist {_dt.datetime.now(tz=_dt.timezone.utc).year},
   falls auf dem Blatt kein Jahr steht.
 
 Kein Name, keine Schule, keine Lehrkraft — falls auf dem Blatt vorhanden,

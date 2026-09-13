@@ -80,6 +80,7 @@ class Config:
 
     # --- Ablage ------------------------------------------------------------
     drive_subdir: str = ""
+    material_db_path: str = ""  # leer: DATA_DIR / lernmaterialien.sqlite3
     header_crop_percent: int = 8
 
     # --- Regel für die Flaggen --------------------------------------------

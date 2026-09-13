@@ -19,7 +19,7 @@ from . import config
 log = logging.getLogger("karo.db")
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _local = threading.local()
 

@@ -4,12 +4,12 @@ import datetime as dt
 import json
 import logging
 from pathlib import Path
-from fastapi import APIRouter, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse
 
-from .. import db, config, exam_plan, ingest
+from .. import db, config, exam_plan, exam_learning, ingest, jobs, teaching
 from ..domain import Flag
-from ..topics import liste, AKTIV
+from ..topics import liste, passende, AKTIV
 from .shared import render, flash, zurueck
 
 log = logging.getLogger("karo.admin")
@@ -28,7 +28,7 @@ def klassenarbeit(request: Request):
         e["kalibrierung"] = _kalibrierung(e["id"])
         e["plan"] = exam_plan.holen_plan(e["id"])
     return render(request, "klassenarbeit.html", zeilen=zeilen,
-                  scan=exam_plan.offene_scan())
+                  scan=exam_plan.offene_scan(), counts=jobs.counts())
 
 
 def _kalibrierung(exam_id: int) -> dict:
@@ -38,19 +38,40 @@ def _kalibrierung(exam_id: int) -> dict:
             WHERE p.exam_id=? ORDER BY t.sort""", exam_id)]
     bewertet = [z for z in zeilen if z["tatsaechlich"]]
     treffer = sum(1 for z in bewertet if z["prognose"] == z["tatsaechlich"])
+    niveau = {"gruen": 100, "gelb": 70, "rot": 30}
+    vorbereitet = (sum(niveau.get(z["tatsaechlich"], 0) for z in bewertet)
+                   / len(bewertet) if bewertet else None)
     return {"zeilen": zeilen, "bewertet": len(bewertet), "treffer": treffer,
-            "quote": round(treffer / len(bewertet), 2) if bewertet else None}
+            "quote": round(treffer / len(bewertet), 2) if bewertet else None,
+            "vorbereitet": round(vorbereitet) if vorbereitet is not None else None}
 
 
 @router.post("/klassenarbeit")
 def klassenarbeit_neu(request: Request, exam_date: str = Form(...),
                       themen: str = Form(""), scan_id: str = Form("")):
+    if not scan_id.isdigit():
+        flash(request, "Bitte zuerst das Themenblatt hochladen und vollständig einlesen lassen.",
+              "warn")
+        return zurueck("/klassenarbeit")
+    scan = db.q1("SELECT * FROM exam_scan WHERE id = ?", int(scan_id))
+    if scan is None or scan["state"] != "gelesen":
+        flash(request, "Das Themenblatt wird noch gelesen oder konnte nicht gelesen werden. "
+              "Bitte warten oder ein neues Blatt hochladen.", "warn")
+        return zurueck("/klassenarbeit")
+    try:
+        scan_themen = json.loads(scan["themen"] or "[]")
+    except json.JSONDecodeError:
+        scan_themen = []
+    liste_themen = [str(t).strip()[:120] for t in scan_themen if str(t).strip()][:20]
+    if not liste_themen:
+        flash(request, "Im hochgeladenen Themenblatt wurden keine Themen erkannt. "
+              "Bitte ein klareres Blatt hochladen.", "warn")
+        return zurueck("/klassenarbeit")
     try:
         dt.date.fromisoformat(exam_date)
     except ValueError:
         flash(request, "Ungültiges Datum.", "err")
         return zurueck("/klassenarbeit")
-    liste_themen = [t.strip()[:120] for t in themen.split(",") if t.strip()][:20]
     cfg = config.load_safe()
     with db.tx() as c:
         cur = c.execute(
@@ -60,17 +81,15 @@ def klassenarbeit_neu(request: Request, exam_date: str = Form(...),
              db.now()))
         exam_id = cur.lastrowid
         n = 0
-        for t in liste(AKTIV):
-            if t["flag"] == Flag.WEISS.value:
-                continue
+        aktiv = [t for t in liste(AKTIV) if t["flag"] != Flag.WEISS.value]
+        for t in passende(liste_themen, aktiv):
             cur2 = c.execute(
                 """INSERT INTO prediction (exam_id, topic_id, prognose, frozen_at)
                    VALUES (?, ?, ?, ?)
                    ON CONFLICT(exam_id, topic_id) DO NOTHING""",
                 (exam_id, t["id"], t["flag"], db.now()))
             n += cur2.rowcount
-    if scan_id.isdigit():
-        exam_plan.scan_uebernehmen(int(scan_id))
+    exam_plan.scan_uebernehmen(int(scan_id))
     exam_plan.plan_anfordern(exam_id)
     flash(request, f"Prognose für {n} Themen eingefroren. Karo erstellt jetzt "
                    "einen Lernplan.")
@@ -117,6 +136,50 @@ def klassenarbeit_plan_neu(request: Request, exam_id: int):
     exam_plan.plan_anfordern(exam_id)
     flash(request, "Lernplan wird neu erstellt.")
     return zurueck("/klassenarbeit")
+
+
+@router.post("/klassenarbeit/{exam_id}/lerntag")
+def klassenarbeit_lerntag(request: Request, exam_id: int,
+                          row_key: str = Form(...), ausgabe: str = Form("")):
+    as_json = "application/json" in request.headers.get("accept", "")
+    try:
+        material_id = exam_learning.starten(exam_id, row_key,
+                                            ausgabe or config.load_safe().default_ausgabe)
+    except teaching.TeachingError as exc:
+        if as_json:
+            return JSONResponse({"fehler": str(exc)}, status_code=400)
+        return render(request, "material_fehler.html", error=str(exc), status_code=400)
+    if as_json:
+        return exam_learning.status(material_id)
+    return zurueck(f"/klassenarbeit/material/{material_id}")
+
+
+@router.get("/klassenarbeit/material/{material_id}", response_class=HTMLResponse)
+def klassenarbeit_material(request: Request, material_id: int):
+    material = exam_learning.status(material_id)
+    if material is None:
+        raise HTTPException(404, "Lernmaterial nicht gefunden.")
+    return render(request, "klassenarbeit_material.html", material=material,
+                  auswertung=exam_learning.auswertung(material))
+
+
+@router.get("/klassenarbeit/material/{material_id}/status")
+def klassenarbeit_material_status(material_id: int):
+    material = exam_learning.status(material_id)
+    if material is None:
+        raise HTTPException(404, "Lernmaterial nicht gefunden.")
+    material["signatur"] = material["state"]
+    return material
+
+
+@router.post("/klassenarbeit/material/{material_id}/fragen")
+def klassenarbeit_material_fragen(request: Request, material_id: int):
+    try:
+        quiz_id = exam_learning.fragen_anfordern(material_id)
+    except teaching.TeachingError as exc:
+        flash(request, str(exc), "err")
+        return zurueck(f"/klassenarbeit/material/{material_id}")
+    return zurueck(f"/quiz/{quiz_id}")
 
 
 @router.get("/klassenarbeit/{exam_id}/plan/status")

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Klassenarbeit – Karo{% endblock %}
 {% block content %}
+{% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
 <h1>Klassenarbeit</h1>
 <p class="sub">Beim Anlegen werden die aktuellen Flaggen eingefroren. Nach der
 Arbeit tragen Sie ein, was tatsächlich saß. Daraus entsteht die einzige echte
@@ -15,7 +16,7 @@ Messung, ob dieses System funktioniert.</p>
 <div class="tab-panel" data-tabgroup="klassenarbeit" data-tab="neu">
 
 <div class="card">
-  <h3>Themenblatt einlesen</h3>
+  <h3><span class="klein">Schritt 1 (optional)</span><br>Themenblatt einlesen</h3>
   <p class="hint">Foto oder Scan des Ankündigungsblatts hochladen — Karo liest
   Themen und, falls lesbar, den Termin heraus und trägt beides unten ein.
   Geprüft und angelegt wird trotzdem erst von Hand.</p>
@@ -31,7 +32,9 @@ Messung, ob dieses System funktioniert.</p>
   </form>
 
   {% if scan and scan.state == 'offen' %}
-  <div class="msg" style="margin-top:.8rem">Karo liest das Blatt gerade ein …</div>
+  <div class="msg" style="margin-top:.8rem">Karo liest das Blatt gerade ein …
+  <br><span class="hint">Diese Seite aktualisiert sich von selbst, sobald das
+  Blatt gelesen ist{% if offen %} ({{ offen }} Vorgang läuft){% endif %}.</span></div>
   <script>karoAutoRefresh("/klassenarbeit/themenblatt/status?scan_id={{ scan.id }}", "{{ scan.state }}");</script>
   {% elif scan and scan.state == 'fehler' %}
   <div class="msg warn" style="margin-top:.8rem">Konnte das Blatt nicht lesen:
@@ -39,11 +42,16 @@ Messung, ob dieses System funktioniert.</p>
   {% elif scan and scan.state == 'gelesen' %}
   <div class="msg ok" style="margin-top:.8rem">Aus dem Blatt gelesen — bitte
   unten prüfen, bevor die Klassenarbeit angelegt wird.</div>
+  {% else %}
+  <div class="msg warn" style="margin-top:.8rem">Bitte zuerst das Themenblatt
+  hochladen und vollständig einlesen lassen. Erst danach kann der Lernplan
+  ausschließlich aus den erkannten Themen erstellt werden.</div>
   {% endif %}
 </div>
 
 <form method="post" action="/klassenarbeit" class="card">
   {{ csrf_input() }}
+  <h3><span class="klein">Schritt 2</span><br>Klassenarbeit anlegen</h3>
   {% if scan and scan.state == 'gelesen' %}
   <input type="hidden" name="scan_id" value="{{ scan.id }}">
   {% endif %}
@@ -54,32 +62,41 @@ Messung, ob dieses System funktioniert.</p>
              value="{{ scan.exam_date if scan and scan.state == 'gelesen' and scan.exam_date else '' }}">
     </div>
     <div class="field" style="flex:2 1 300px">
-      <label for="themen">Angekündigte Themen</label>
+          <label for="themen">Erkannte Themen aus dem Themenblatt</label>
       <input type="text" id="themen" name="themen"
              placeholder="Brüche addieren, Brüche kürzen, Textaufgaben"
-             value="{{ (scan.themen_liste | join(', ')) if scan and scan.state == 'gelesen' else '' }}">
-      <p class="hint">Mit Komma trennen. Keine Namen von Lehrkräften eintragen —
-      Karo filtert sie heraus, aber sie gehören gar nicht erst hierher.</p>
+              value="{{ (scan.themen_liste | join(', ')) if scan and scan.state == 'gelesen' else '' }}"
+              readonly>
+            <p class="hint">Diese Themen stammen ausschließlich aus dem hochgeladenen
+            Themenblatt. Für eine Änderung bitte ein korrigiertes Blatt hochladen.</p>
     </div>
   </div>
-  <button type="submit">Anlegen, Prognose einfrieren und Lernplan erstellen</button>
+  <button type="submit" {{ 'disabled' if not (scan and scan.state == 'gelesen') }}>
+    Anlegen, Prognose einfrieren und Lernplan erstellen</button>
 </form>
 </div>
 
 <div class="tab-panel" data-tabgroup="klassenarbeit" data-tab="verlauf">
 {% for e in zeilen %}
-<div class="card">
-  <h3>{{ e.exam_date }}
+<details class="card">
+  <summary style="cursor:pointer; font-weight:700; font-size:1.08rem">{{ e.exam_date[8:10] }}.{{ e.exam_date[5:7] }}.{{ e.exam_date[0:4] }}
     {% if e.kalibrierung.quote is not none %}
       <span class="pill {{ 'gruen' if e.kalibrierung.quote >= 0.7 else 'gelb' }}">
         Treffer {{ (e.kalibrierung.quote * 100) | round | int }} %
         ({{ e.kalibrierung.treffer }}/{{ e.kalibrierung.bewertet }})</span>
     {% endif %}
-  </h3>
-  <p class="klein">{{ e.themen_liste | join(', ') or 'keine Themen angegeben' }}</p>
+    {% if e.kalibrierung.vorbereitet is not none %}
+      <span class="pill {{ 'gruen' if e.kalibrierung.vorbereitet >= 85 else ('gelb' if e.kalibrierung.vorbereitet >= 60 else 'rot') }}">
+        Vorbereitung {{ e.kalibrierung.vorbereitet }} %
+      </span>
+    {% endif %}
+  </summary>
+  <p class="klein" style="margin-top:.7rem">{{ e.themen_liste | join(', ') or 'keine Themen angegeben' }}</p>
 
   {% if e.plan and e.plan.state == 'offen' %}
-  <div class="msg" style="margin:.7rem 0">Karo erstellt gerade den Lernplan …</div>
+  <div class="msg" style="margin:.7rem 0">Karo erstellt gerade den Lernplan …
+  <br><span class="hint">Diese Seite aktualisiert sich von selbst, sobald der
+  Lernplan fertig ist{% if offen %} ({{ offen }} Vorgang läuft){% endif %}.</span></div>
   <script>karoAutoRefresh("/klassenarbeit/{{ e.id }}/plan/status", "{{ e.plan.state }}");</script>
   {% elif e.plan and e.plan.state == 'fehler' %}
   <div class="msg warn" style="margin:.7rem 0">Lernplan konnte nicht erstellt
@@ -89,16 +106,59 @@ Messung, ob dieses System funktioniert.</p>
     <button type="submit" class="ghost">Erneut versuchen</button>
   </form>
   {% elif e.plan and e.plan.state == 'bereit' %}
-  <details style="margin:.7rem 0" open>
+  <details style="margin:.7rem 0">
     <summary style="cursor:pointer"><strong>Lernplan</strong></summary>
     {% if e.plan.einschaetzung %}<p class="hint" style="margin-top:.5rem">{{ e.plan.einschaetzung }}</p>{% endif %}
     {% if e.plan.tagesplan_liste %}
     <div class="tablewrap" style="margin:.5rem 0">
       <table>
-        <thead><tr><th>Tag</th><th>Inhalt</th><th class="num">Minuten</th></tr></thead>
+        <thead><tr><th>Tag</th><th>Thema und Lernreihe</th><th>Lernmaterial</th><th class="num">Minuten</th></tr></thead>
         <tbody>
           {% for tag in e.plan.tagesplan_liste %}
-          <tr><td>{{ tag.tag }}</td><td>{{ tag.inhalt }}</td><td class="num">{{ tag.minuten }}</td></tr>
+          <tr>
+            <td><strong>{{ tag.tag }}</strong></td>
+            <td>
+              <strong>{{ tag.inhalt }}</strong>
+              {% if tag.erklaerung %}<p class="klein">Erklärung: {{ tag.erklaerung }}</p>{% endif %}
+              {% if tag.diagnose_fragen %}
+              <details class="plan-fragen"><summary>5 Diagnosefragen</summary>
+                <ol>{% for frage in tag.diagnose_fragen %}<li>{{ frage }}</li>{% endfor %}</ol>
+              </details>
+              {% endif %}
+              {% if tag.neue_fragen %}
+              <details class="plan-fragen"><summary>5 neue Kontrollfragen</summary>
+                <ol>{% for frage in tag.neue_fragen %}<li>{{ frage }}</li>{% endfor %}</ol>
+              </details>
+              {% endif %}
+            </td>
+            <td class="plan-material-cell" data-plan-material>
+              {% if tag.topic_id %}
+              <form method="post" action="/klassenarbeit/{{ e.id }}/lerntag"
+                    class="actions plan-start" target="_blank" rel="noopener" data-material-form>
+                {{ csrf_input() }}
+                <input type="hidden" name="row_key" value="{{ tag.row_key }}">
+                <select name="ausgabe" class="mini" aria-label="Ausgabeformat">
+                  {% for wert, label in ausgabe_labels.items() %}
+                  <option value="{{ wert }}" {{ 'selected' if cfg.default_ausgabe == wert }}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="quiet">Neues Lernmaterial erstellen</button>
+              </form>
+              <p class="hint" data-material-message role="status" aria-live="polite"></p>
+              <div data-material-list>
+                {% for m in tag.materialien %}
+                <p data-material-id="{{ m.id }}" data-status-url="{{ m.url }}/status" data-state="{{ m.state }}">
+                  <a href="{{ m.url }}" target="_blank" rel="noopener">{{ m.meldung }}</a>
+                  <span class="klein">{{ m.titel }} · {{ ausgabe_labels.get(m.ausgabe, m.ausgabe) }}{% if m.ergebnis %} · {{ m.ergebnis }}{% endif %}</span>
+                </p>
+                {% endfor %}
+              </div>
+              {% elif tag.minuten %}
+              <p class="hint">Bitte das passende Thema unter „Themen“ freigeben, um Lernmaterial zu erstellen.</p>
+              {% endif %}
+            </td>
+            <td class="num">{{ tag.minuten }}</td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
@@ -143,9 +203,10 @@ Messung, ob dieses System funktioniert.</p>
   <p class="hint">Zum Zeitpunkt des Anlegens gab es keine bewerteten Themen —
   es gibt also nichts zu vergleichen.</p>
   {% endif %}
-</div>
+</details>
 {% else %}
 <div class="empty">Noch keine Klassenarbeit angelegt.</div>
 {% endfor %}
 </div>
+<script src="/static/exam-material.js?v={{ asset_version }}" defer></script>
 {% endblock %}

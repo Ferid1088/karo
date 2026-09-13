@@ -1,12 +1,13 @@
 """Authentifizierung und Setup."""
 
 import dataclasses
+import sqlite3
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from .. import config, connections, export, ingest, jobs, quizzes, security
+from .. import config, connections, export, ingest, jobs, quizzes, security, materials, teaching
 from ..config import ConfigUnreadable
 from ..domain import Ausgabe
 from ..llm import BACKENDS, ClaudeClient, ClaudeError, models_for
@@ -182,6 +183,8 @@ def setup_finish(request: Request, model_vision: str = Form(""),
                  tts_stimme: str = Form(""),
                  max_lernrunden: str = Form("4"),
                  recherche: str = Form(""),
+                 drive_unterordner: str = Form(""),
+                 material_db_path: str | None = Form(None),
                  password: str = Form(""), password2: str = Form("")):
     cfg = config.load()
     erstmalig = not cfg.setup_complete
@@ -200,6 +203,11 @@ def setup_finish(request: Request, model_vision: str = Form(""),
         runden = max(1, min(8, int(max_lernrunden)))
     except ValueError:
         runden = cfg.max_lernrunden
+    # Nie ".." oder eine fuehrende "/" zulassen — sonst koennte das Unterver-
+    # zeichnis aus dem Drive-Ordner heraus zeigen (siehe config.drive_root()).
+    unterordner = "/".join(
+        teil for teil in drive_unterordner.strip().strip("/\\").split("/")
+        if teil not in ("", ".", ".."))[:100]
     entwurf = dataclasses.replace(
         cfg,
         model_vision=model_vision if model_vision in gueltige else cfg.model_vision,
@@ -211,6 +219,9 @@ def setup_finish(request: Request, model_vision: str = Form(""),
         tts_stimme=tts_stimme or cfg.tts_stimme,
         max_lernrunden=runden,
         recherche_erlaubt=recherche == "ja",
+        drive_subdir=unterordner,
+        material_db_path=(material_db_path.strip() if material_db_path is not None
+                          else cfg.material_db_path),
     )
 
     def zurueck_setup(meldung: str):
@@ -238,6 +249,8 @@ def setup_finish(request: Request, model_vision: str = Form(""),
         "tts_stimme": entwurf.tts_stimme,
         "max_lernrunden": entwurf.max_lernrunden,
         "recherche_erlaubt": entwurf.recherche_erlaubt,
+        "drive_subdir": entwurf.drive_subdir,
+        "material_db_path": entwurf.material_db_path,
         "setup_complete": True,
     }
     if password:
@@ -245,7 +258,10 @@ def setup_finish(request: Request, model_vision: str = Form(""),
         aenderungen["app_password_hash"] = h
         aenderungen["app_password_salt"] = s
 
-    config.update(**aenderungen)
+    try:
+        materials.einstellungen_speichern(aenderungen)
+    except (ValueError, OSError, sqlite3.Error, teaching.TeachingError) as exc:
+        return zurueck_setup(f"Materialdatenbank: {exc}")
     if not erstmalig:
         quizzes.alle_flaggen_neu()
     ingest.ensure_folders()

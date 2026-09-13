@@ -14,6 +14,7 @@ wirksam:
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -118,14 +119,24 @@ def scan_uebernehmen(scan_id: int) -> None:
 # Lernplan
 # --------------------------------------------------------------------------
 
-def _profil() -> list[dict]:
-    """Aktueller Stand je Thema, so wie `prompts.plan_prompt` ihn erwartet."""
-    return [
+def _profil(themen: list[str]) -> list[dict]:
+    """Aktueller Stand je angekündigtem Thema, so wie `prompts.plan_prompt`
+    ihn erwartet.
+
+    Nur die zu den angekündigten Themen passenden Einträge — sonst würde der
+    Lernplan sich mit ALLEN farbig geflaggten Themen im Fach befassen, auch
+    mit längst vergangenen, die auf dieser Ankündigung gar nicht stehen (die
+    eigentliche Beschränkung steht zusätzlich im Prompt selbst, siehe
+    `prompts.plan_prompt` — das hier ist die zweite Absicherung, die nicht
+    von der Befolgung einer Anweisung abhängt).
+    """
+    aktiv = [
         {"code": t["code"], "label": t["label"], "flag": t["flag"],
          "richtig": t["richtig"], "antworten": t["antworten"],
          "haupt_fehler": t["haupt_fehler"]}
         for t in topics.liste(topics.AKTIV) if t["flag"] != "weiss"
     ]
+    return topics.passende(themen, aktiv)
 
 
 def plan_anfordern(exam_id: int) -> None:
@@ -167,7 +178,7 @@ def job_exam_plan_build(payload: dict) -> None:
         ergebnis = client().complete(
             purpose="exam_plan_build",
             prompt=prompts.plan_prompt(cfg.learner_grade, cfg.subject, tage,
-                                       themen, _profil()),
+                                       themen, _profil(themen)),
             schema=prompts.PLAN_SCHEMA,
             system=prompts.SYSTEM,
         )
@@ -196,4 +207,12 @@ def holen_plan(exam_id: int) -> dict | None:
         d["tagesplan_liste"] = json.loads(d["tagesplan"] or "[]")
     except json.JSONDecodeError:
         d["tagesplan_liste"] = []
+    from . import exam_learning
+    for index, tag in enumerate(d["tagesplan_liste"]):
+        code = tag.get("topic_code")
+        thema = db.q1("SELECT id FROM topic WHERE code = ?", code) if code else None
+        tag["topic_id"] = thema["id"] if thema else None
+        key = json.dumps([index, tag.get("tag"), code, tag.get("inhalt")], ensure_ascii=False)
+        tag["row_key"] = hashlib.sha256(key.encode()).hexdigest()[:24]
+        tag["materialien"] = exam_learning.fuer_zeile(exam_id, tag["row_key"])
     return d

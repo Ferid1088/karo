@@ -58,8 +58,9 @@ def anfordern(topic_id: int, anlass: str = "evaluation", modus: str = BILDSCHIRM
         offen = c.execute(
             """SELECT id FROM quiz WHERE topic_id=? AND anlass=? AND state='offen'
                  AND COALESCE(lesson_id, -1) = COALESCE(?, -1)
+                 AND COALESCE(round_nr, -1) = COALESCE(?, -1)
                 ORDER BY id DESC LIMIT 1""",
-            (topic_id, anlass, lesson_id)).fetchone()
+            (topic_id, anlass, lesson_id, round_nr)).fetchone()
         if offen is not None:
             return offen["id"]
         cur = c.execute(
@@ -94,11 +95,23 @@ def job_quiz_build(payload: dict) -> None:
                  limit=8, topic_id=quiz["topic_id"]))
 
     fehlerbild = ERROR_LABELS.get(thema.get("haupt_fehler") or "")
+    beschreibung = thema.get("beschreibung") or ""
+    if quiz["anlass"] == "lernrunde" and quiz["lesson_id"]:
+        runde = db.q1("SELECT erklaerung FROM lesson_round WHERE lesson_id=? AND nr=?",
+                      quiz["lesson_id"], quiz["round_nr"])
+        if runde and runde["erklaerung"]:
+            beschreibung += "\nGerade gelerntes Material:\n" + runde["erklaerung"]
+        alte_fragen = db.q("""SELECT q.frage FROM question q JOIN quiz z ON z.id=q.quiz_id
+                             WHERE z.topic_id=? AND z.id<>? ORDER BY q.id DESC LIMIT 20""",
+                           quiz["topic_id"], quiz_id)
+        if alte_fragen:
+            beschreibung += "\nVerwende neue Aufgaben mit anderen Zahlen als diese bisherigen Fragen:\n"
+            beschreibung += "\n".join(r["frage"] for r in alte_fragen)
     ergebnis = client().complete(
         purpose=f"quiz_{quiz['anlass']}",
         prompt=prompts.quiz_prompt(
             cfg.learner_grade, cfg.subject, thema["label"],
-            thema.get("beschreibung") or "", quellen, quiz["anlass"],
+            pii.scrub(beschreibung, cfg.learner_name), quellen, quiz["anlass"],
             anzahl=anzahl, bekannte_fehler=fehlerbild),
         schema=prompts.QUIZ_SCHEMA,
         system=prompts.SYSTEM,

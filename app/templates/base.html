@@ -10,6 +10,27 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Comic+Neue:wght@400;700&display=swap">
   <link rel="stylesheet" href="/static/karo.css?v={{ asset_version|default('0') }}">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📐</text></svg>">
+<script>
+  // Pollt eine kleine JSON-Statusroute und lädt die Seite automatisch neu,
+  // sobald sich die Signatur ändert (z. B. Material fertig, Runde
+  // fehlgeschlagen) — Seiten mit laufender Erzeugung müssen dafür nicht
+  // mehr von Hand aktualisiert werden. Läuft nur, solange das aufrufende
+  // Fragment noch im DOM steht: nach dem automatischen Neuladen entscheidet
+  // die Seite selbst per Jinja, ob der Aufruf erneut eingebettet wird.
+  function karoAutoRefresh(url, anfangssignatur, intervallMs) {
+    var intervall = setInterval(function () {
+      fetch(url, {headers: {"Accept": "application/json"}})
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (daten) {
+          if (daten && daten.signatur && daten.signatur !== anfangssignatur) {
+            clearInterval(intervall);
+            location.reload();
+          }
+        })
+        .catch(function () {});
+    }, intervallMs || 4000);
+  }
+</script>
 </head>
 <body>
 {% macro csrf_input() -%}
@@ -199,26 +220,6 @@
 })();
 </script>
 {% endif %}
-<script>
-  // Pollt eine kleine JSON-Statusroute und lädt die Seite automatisch neu,
-  // sobald sich die Signatur ändert (z. B. Material fertig, Runde
-  // fehlgeschlagen) — Seiten mit laufender Erzeugung müssen dafür nicht
-  // mehr von Hand aktualisiert werden. Läuft nur, solange das aufrufende
-  // Fragment noch im DOM steht: nach dem automatischen Neuladen entscheidet
-  // die Seite selbst per Jinja, ob der Aufruf erneut eingebettet wird.
-  function karoAutoRefresh(url, anfangssignatur, intervallMs) {
-    var intervall = setInterval(function () {
-      fetch(url, {headers: {"Accept": "application/json"}})
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (daten) {
-          if (daten && daten.signatur && daten.signatur !== anfangssignatur) {
-            clearInterval(intervall);
-            location.reload();
-          }
-        })
-        .catch(function () {});
-    }, intervallMs || 4000);
-  }
-</script>
+
 </body>
 </html>

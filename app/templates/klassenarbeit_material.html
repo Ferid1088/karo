@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ material.titel }} – Karo{% endblock %}
+{% block content %}
+<h1>{{ material.titel }}</h1>
+<p class="hint">Dein Klassenarbeit-Tab bleibt geöffnet. Hier lernst du und prüfst anschließend dein Verständnis.</p>
+{% if material.state == 'bereit' %}
+  {% if material.mime == 'video/mp4' %}
+  <video class="lernmaterial-video" controls preload="metadata" src="/material/{{ material.round_id }}">Dein Browser unterstützt dieses Video nicht.</video>
+  {% else %}
+  <iframe class="lernmaterial-frame" title="{{ material.titel }}" src="/material/{{ material.round_id }}" sandbox="allow-scripts"></iframe>
+  {% endif %}
+  <div class="card">
+    <h2>Was hast du gelernt?</h2>
+    <p>{{ auswertung.text }}</p>
+    {% if auswertung.vorher %}<p>Vor dem Material ({{ auswertung.vorher.datum }}):
+      <strong>{{ auswertung.vorher.richtig }} von {{ auswertung.vorher.gesamt }} richtig</strong>
+      · {{ auswertung.vorher.bewertet }} bewertet.</p>{% endif %}
+    {% if auswertung.nachher %}<p>Nach dem Material:
+      <strong>{{ auswertung.nachher.richtig }} von {{ auswertung.nachher.gesamt }} richtig</strong>
+      · {{ auswertung.nachher.bewertet }} bewertet.</p>{% endif %}
+    {% if auswertung.differenz is not none %}<p>Veränderung: <strong>{{ '%+d'|format(auswertung.differenz) }} Prozentpunkte</strong>.</p>
+    <p class="hint">Verglichen werden unterschiedliche Aufgaben zum selben Thema. Das ist ein Hinweis auf deinen Lernstand, kein sicherer Nachweis für die Wirkung dieses Materials.</p>{% endif %}
+    {% if not material.quiz %}
+    <form method="post" action="{{ material.url }}/fragen">{{ csrf_input() }}
+      <button type="submit">Material gelernt – Verständnis prüfen</button>
+    </form>
+    {% else %}
+    <a class="btn" href="/quiz/{{ material.quiz.id }}">{{ 'Antworten ansehen' if material.quiz.finished_at else 'Lernkontrolle fortsetzen' }}</a>
+    {% endif %}
+    {% if auswertung.nachher %}<p><a href="/lernen/{{ material.lesson_id }}">Weiter üben und unsichere Stellen klären</a></p>{% endif %}
+  </div>
+{% else %}
+  <div class="card" role="status"><p>{{ material.meldung }}</p>
+    {% if material.fehler %}<p>{{ material.fehler }}</p>{% endif %}
+    {% if material.state in ('wartet', 'fehler') %}
+    <a class="btn" href="/lernen/{{ material.lesson_id }}">{{ 'Quellen ergänzen und Erstellung starten' if material.state == 'wartet' else 'Fehler prüfen und erneut versuchen' }}</a>
+    {% endif %}
+    <p class="hint">Die Seite zeigt das Material automatisch, sobald es fertig ist.</p>
+  </div>
+  <script>document.addEventListener('DOMContentLoaded', function () {
+    karoAutoRefresh("{{ material.url }}/status", "{{ material.state }}");
+  });</script>
+{% endif %}
+{% endblock %}

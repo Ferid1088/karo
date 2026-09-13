@@ -432,6 +432,16 @@ claude setup-token                         <span class="c-com"># Token wird ange
 <section class="setup-panel" data-kategorie="blaetter">
   <div class="card">
     <h3>Schulblätter & Speicher</h3>
+    <div class="field">
+      <label for="material_db_path">Datenbank für Lernmaterialien</label>
+      <input type="text" id="material_db_path" name="material_db_path" form="settings-form"
+             value="{{ cfg.material_db_path }}" placeholder="Standard: lernmaterialien.sqlite3 im Karo-Datenordner">
+      <p class="hint">Absoluter Dateipfad auf dem Rechner, auf dem Karo läuft, z. B.
+        <code>/data/lernmaterialien.sqlite3</code>. Leer lassen für den Standardpfad.
+        Bei einem Pfadwechsel werden vorhandene Materialien samt Inhalt übernommen;
+        die bisherige Datenbank bleibt als Sicherung erhalten. In Docker muss der
+        Zielordner als dauerhaftes Volume eingebunden sein.</p>
+    </div>
     {% if drive_ok and drive_writable %}
       <p class="hint">✓ Drive-Ordner: <code>{{ drive_path }}</code></p>
     {% elif drive_ok %}
@@ -454,6 +464,15 @@ claude setup-token                         <span class="c-com"># Token wird ange
       </label>
       <input type="number" id="header_crop" name="header_crop" form="settings-form"
              min="0" max="25" value="{{ cfg.header_crop_percent }}">
+    </div>
+
+    <div class="field" style="margin-top:1rem">
+      <label for="drive_unterordner">Unterordner für Lernmaterial
+        {{ hilfe('Videos, Folien und Sprachaufnahmen landen in diesem Unterordner des Drive-Ordners (siehe oben) — leer lassen für den Drive-Ordner selbst. Nur der Unterordner, nicht der ganze Pfad — der wird weiterhin über KARO_DRIVE_PATH gesetzt.') }}
+      </label>
+      <input type="text" id="drive_unterordner" name="drive_unterordner" form="settings-form"
+             placeholder="z. B. Karo-Material" maxlength="100"
+             value="{{ cfg.drive_subdir }}">
     </div>
   </div>
   <script>

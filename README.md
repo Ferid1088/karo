@@ -223,6 +223,31 @@ eingeben*.
 
 ## Drei Ausgabeformen für das Lernmaterial
 
+Im Bereich **Klassenarbeit → Verlauf → Lernplan** lässt sich neues Material
+direkt in der Themenzeile erstellen. Der Fortschritt erscheint in dieser Zeile;
+der fertige Link öffnet das Material mit Lernkontrolle in einem eigenen Tab.
+Der Klassenarbeit-Tab bleibt dabei unverändert. Jede Erstellung gehört zu ihrer
+Lernplanzeile und erhält einen Namen mit Thema, Erklärungsinhalt, Datum und
+eindeutiger Materialkennung.
+
+Die Lernkontrolle vergleicht bestätigte Antworten nach dem Material mit der
+zuletzt bewerteten Fragerunde vor der Erstellung. Ohne vollständigen
+Ausgangswert wird nur das aktuelle Verständnis ausgewiesen; ein Lernzuwachs wird
+dann nicht behauptet.
+
+Unter **Einstellungen → Schulblätter & Speicher → Datenbank für Lernmaterialien**
+kann ein absoluter Pfad zu einer SQLite-Datei festgelegt werden. Standard:
+`/data/lernmaterialien.sqlite3` (bzw. im mit `KARO_DATA_DIR` gewählten Ordner).
+Diese Datenbank enthält auch die fertigen HTML-/Videodateien. Beim Pfadwechsel
+übernimmt Karo das Archiv und vorhandene ältere Materialdateien; die bisherige
+Datenbank bleibt als Sicherung liegen. Das neue Ziel muss ein freier Dateiname
+sein. In Docker beziehen sich die Pfade auf den Container; externe Zielordner
+müssen als dauerhaftes Volume eingebunden sein.
+
+Die Materialdatenbank zusätzlich in die eigene Sicherung aufnehmen, besonders
+bei einem Pfad außerhalb von `/data`. Das bisherige `make backup` sichert die
+Hauptdatenbank und Schulblätter, nicht automatisch ein externes Materialarchiv.
+
 Die Wahl fällt **je Lerneinheit**, nicht einmal bei der Einrichtung — vor dem
 Erzeugen, auf der Themenseite.
 

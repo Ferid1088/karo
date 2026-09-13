@@ -159,6 +159,12 @@ async def quiz_freigabe(request: Request, quiz_id: int):
                                         auto_weiter=False)
         flash(request, f"{meldung}. {weiter['grund']}",
               "ok" if weiter.get("erfolg") or weiter.get("weiter") else "warn")
+        material = db.q1("SELECT id FROM exam_material WHERE lesson_id=?", ergebnis["lesson_id"])
+        if material:
+            from .. import exam_learning
+            original = exam_learning.status(material["id"])
+            if original["quiz"] and original["quiz"]["id"] == quiz_id:
+                return zurueck(f"/klassenarbeit/material/{material['id']}")
         return zurueck(f"/lernen/{ergebnis['lesson_id']}")
 
     from .. import topics
@@ -328,6 +334,9 @@ def _material_antwort(pfad_text: str | None):
 
 @router.get("/material/{round_id}", response_class=HTMLResponse)
 def material(round_id: int):
+    archiv = _archiv_antwort("runde", round_id)
+    if archiv is not None:
+        return archiv
     runde = db.q1("SELECT material_pfad FROM lesson_round WHERE id = ?", round_id)
     return _material_antwort(runde["material_pfad"] if runde else None)
 
@@ -341,9 +350,47 @@ def material_notebooklm_quelle(round_id: int):
 
 @router.get("/material/variante/{variant_id}", response_class=HTMLResponse)
 def material_variante(variant_id: int):
+    archiv = _archiv_antwort("variante", variant_id)
+    if archiv is not None:
+        return archiv
     v = db.q1("SELECT material_pfad FROM lesson_round_variant WHERE id = ?",
              variant_id)
     return _material_antwort(v["material_pfad"] if v else None)
+
+
+def _archiv_antwort(art: str, referenz: int):
+    import hashlib
+    import os
+    import tempfile
+    from urllib.parse import quote
+    from .. import materials
+    m = materials.holen(art, referenz)
+    if m is None:
+        # Bestehende Materialien beim ersten Öffnen ebenfalls archivieren.
+        table = "lesson_round" if art == "runde" else "lesson_round_variant"
+        row = db.q1(f"SELECT material_pfad FROM {table} WHERE id=?", referenz)
+        if not row or not row["material_pfad"] or not Path(row["material_pfad"]).is_file():
+            return None
+        materials.bestand_uebernehmen()
+        m = materials.holen(art, referenz)
+        if m is None:
+            return None
+    if m["mime"] == "video/mp4":
+        # FileResponse unterstützt Range-Requests für Springen/Spulen im Video.
+        digest = hashlib.sha256(m["inhalt"]).hexdigest()
+        cache = config.media_dir() / f"archiv-{digest}.mp4"
+        if not cache.exists():
+            fd, temp = tempfile.mkstemp(dir=cache.parent, prefix=".video-")
+            try:
+                with os.fdopen(fd, "wb") as f:
+                    f.write(m["inhalt"])
+                os.replace(temp, cache)
+            finally:
+                Path(temp).unlink(missing_ok=True)
+        return FileResponse(cache, media_type=m["mime"], filename=m["dateiname"],
+                            content_disposition_type="inline")
+    return HTMLResponse(m["inhalt"], headers={
+        "Content-Disposition": "inline; filename*=UTF-8''" + quote(m["dateiname"])})
 
 
 @router.get("/material/variante/{variant_id}/notebooklm-quelle",
