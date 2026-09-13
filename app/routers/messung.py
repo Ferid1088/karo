@@ -1,24 +1,18 @@
 """Messung — konsolidierter Eltern-Einstieg fuer Lernfortschritt und
 Klassenarbeiten (siehe KaroRefactoring_Plan.md, Abschnitt 7/9).
 
-Fortschritt ruft dieselbe Logik wie /lernstand auf (eltern.py). Klassenar-
-beiten laufen ueber admin.py, das inzwischen den KI-Lernplan, Themenblatt-
-Scan und die Klassenarbeits-Material-Pipeline mitbringt — das war in einer
-eigenstaendigen Kopie hier nicht mehr abgebildet. Statt diese neuere Logik
-zu duplizieren (und dadurch zwei auseinanderlaufende Implementierungen
-derselben Entscheidung zu riskieren), zeigt /messung/examen dieselbe Seite
-wie /klassenarbeit; ihre Formulare fuehren bewusst dorthin weiter.
+Ruft dieselben Service-Funktionen wie /lernstand und /klassenarbeit auf
+(services/measurement.py) statt eltern.py's/admin.py's Router-Funktionen
+direkt anzusprechen (change.txt Aufgabe 2). Die Klassenarbeit-Verwaltung
+selbst (Themenblatt-Scan, KI-Lernplan, Lernmaterial: admin.py) bleibt
+bewusst nur unter /klassenarbeit — /messung/examen zeigt dieselbe
+Uebersicht, hat aber keine eigenen Formulare dafuer.
 """
-
-from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
-from starlette.concurrency import run_in_threadpool
 
-from .. import export
-from . import admin, eltern
-from .shared import flash, zurueck
+from ..services import measurement
 
 router = APIRouter(prefix="/messung", tags=["measurement"])
 
@@ -29,21 +23,16 @@ router = APIRouter(prefix="/messung", tags=["measurement"])
 @router.get("/", response_class=HTMLResponse)
 @router.get("/fortschritt", response_class=HTMLResponse)
 def fortschritt(request: Request):
-    return eltern.lernstand(request)
+    return measurement.render_lernstand(request)
 
 
 @router.post("/export")
 async def fortschritt_export(request: Request):
-    pfad = await run_in_threadpool(export.nach_freigabe)
-    if pfad:
-        flash(request, f"Tabelle geschrieben: {Path(pfad).name}")
-    else:
-        flash(request, "Export nicht verfügbar.", "warn")
-    return zurueck("/messung/fortschritt")
+    return await measurement.handle_export(request, "/messung/fortschritt")
 
 
 # --- Klassenarbeiten (== /klassenarbeit, admin.py) -------------------------
 
 @router.get("/examen", response_class=HTMLResponse)
 def examen(request: Request):
-    return admin.klassenarbeit(request)
+    return measurement.render_klassenarbeit(request)

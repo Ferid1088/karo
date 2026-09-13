@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from .. import db, config, exam_plan, exam_learning, ingest, jobs, teaching
 from ..domain import Flag
+from ..services import measurement
 from ..topics import liste, passende, AKTIV
 from .shared import render, flash, zurueck
 
@@ -18,32 +19,7 @@ router = APIRouter()
 
 @router.get("/klassenarbeit", response_class=HTMLResponse)
 def klassenarbeit(request: Request):
-    zeilen = [dict(r) for r in db.q(
-        "SELECT * FROM exam ORDER BY exam_date DESC LIMIT 20")]
-    for e in zeilen:
-        try:
-            e["themen_liste"] = json.loads(e["themen"] or "[]")
-        except json.JSONDecodeError:
-            e["themen_liste"] = []
-        e["kalibrierung"] = _kalibrierung(e["id"])
-        e["plan"] = exam_plan.holen_plan(e["id"])
-    return render(request, "klassenarbeit.html", zeilen=zeilen,
-                  scan=exam_plan.offene_scan(), counts=jobs.counts())
-
-
-def _kalibrierung(exam_id: int) -> dict:
-    zeilen = [dict(r) for r in db.q(
-        """SELECT p.topic_id, p.prognose, p.tatsaechlich, t.label, t.code
-             FROM prediction p JOIN topic t ON t.id = p.topic_id
-            WHERE p.exam_id=? ORDER BY t.sort""", exam_id)]
-    bewertet = [z for z in zeilen if z["tatsaechlich"]]
-    treffer = sum(1 for z in bewertet if z["prognose"] == z["tatsaechlich"])
-    niveau = {"gruen": 100, "gelb": 70, "rot": 30}
-    vorbereitet = (sum(niveau.get(z["tatsaechlich"], 0) for z in bewertet)
-                   / len(bewertet) if bewertet else None)
-    return {"zeilen": zeilen, "bewertet": len(bewertet), "treffer": treffer,
-            "quote": round(treffer / len(bewertet), 2) if bewertet else None,
-            "vorbereitet": round(vorbereitet) if vorbereitet is not None else None}
+    return measurement.render_klassenarbeit(request)
 
 
 @router.post("/klassenarbeit")
