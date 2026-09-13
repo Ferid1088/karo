@@ -1,6 +1,7 @@
 """Authentifizierung und Setup."""
 
 import dataclasses
+import os
 import sqlite3
 
 from fastapi import APIRouter, Form, Request
@@ -26,7 +27,7 @@ def health() -> JSONResponse:
     return JSONResponse({"ok": ok, "note": notiz,
                          "setup_complete": cfg.setup_complete,
                          "backend": cfg.llm_backend,
-                         "drive": __import__("app.ingest", fromlist=["drive_available"]).drive_available(),
+                         "drive": ingest.drive_available(),
                          "jobs": jobs.counts()})
 
 
@@ -94,7 +95,7 @@ def _setup_context(cfg, modelle=None) -> dict:
         "claude_note": claude_status.get("note", ""),
         "drive_ok": ingest.drive_available(),
         "drive_writable": ingest.drive_writable(),
-        "drive_path": __import__("os").environ.get("KARO_DRIVE_PATH") or str(config.DRIVE_DIR),
+        "drive_path": os.environ.get("KARO_DRIVE_PATH") or str(config.DRIVE_DIR),
         "heif_ok": ingest.HEIF_OK,
         "mp4_ok": mp4_ok, "mp4_grund": mp4_grund,
         "nlm_ok": nlm_ok, "nlm_grund": nlm_grund,

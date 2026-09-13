@@ -10,6 +10,8 @@ derselben Entscheidung zu riskieren), zeigt /messung/examen dieselbe Seite
 wie /klassenarbeit; ihre Formulare fuehren bewusst dorthin weiter.
 """
 
+from pathlib import Path
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from starlette.concurrency import run_in_threadpool
@@ -34,7 +36,7 @@ def fortschritt(request: Request):
 async def fortschritt_export(request: Request):
     pfad = await run_in_threadpool(export.nach_freigabe)
     if pfad:
-        flash(request, f"Tabelle geschrieben: {__import__('pathlib').Path(pfad).name}")
+        flash(request, f"Tabelle geschrieben: {Path(pfad).name}")
     else:
         flash(request, "Export nicht verfügbar.", "warn")
     return zurueck("/messung/fortschritt")

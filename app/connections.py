@@ -10,13 +10,14 @@ ausloesen.
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 
 from . import config
 from .llm import ClaudeClient, ClaudeError
 
-log = __import__("logging").getLogger("karo.connections")
+log = logging.getLogger("karo.connections")
 
 #: Etwas kuerzer als das Abfrageintervall im Browser (siehe base.html), damit
 #: eine Anfrage kurz nach Ablauf nie auf einen veralteten Stand trifft.

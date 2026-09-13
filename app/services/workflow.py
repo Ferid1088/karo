@@ -12,7 +12,7 @@ import dataclasses
 from fastapi import Request
 from starlette.concurrency import run_in_threadpool
 
-from .. import config, db, exam_learning, jobs, kb, quizzes, research, teaching, topics
+from .. import config, db, exam_learning, export, jobs, kb, quizzes, research, teaching, topics
 from ..domain import FLAG_ORDER, Flag
 from ..quizzes import QuizError
 from ..routers.shared import flash, render, zurueck
@@ -135,7 +135,7 @@ async def handle_quiz_freigabe(request: Request, quiz_id: int):
         flash(request, "Diese Fragerunde war bereits freigegeben.", "warn")
         return zurueck("/themen")
 
-    await run_in_threadpool(__import__("app.export", fromlist=["nach_freigabe"]).nach_freigabe)
+    await run_in_threadpool(export.nach_freigabe)
 
     n = ergebnis["geschrieben"]
     meldung = f"{n} Antwort bewertet" if n == 1 else f"{n} Antworten bewertet"
