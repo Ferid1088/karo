@@ -1,0 +1,486 @@
+# Karo – Remaining Refactoring Tasks
+
+You are working on the repository `Ferid1088/karo`, branch `kind_eltern`.
+
+The app has already been refactored significantly. Do NOT rewrite working parts unnecessarily. Preserve all current behavior and existing tests. Your task is to finish the remaining architecture and correctness work described below.
+
+## Overall goals
+
+The app must have:
+
+- parent role with full access
+- child role restricted to child-safe learning routes
+- no router-to-router business delegation
+- one centralized workflow service layer
+- deterministic “Heute” next-action logic
+- atomic/idempotent quiz release
+- explicit workflow states
+- full test coverage for the new behavior
+
+Do not break existing routes unless you add compatibility redirects or aliases.
+
+---
+
+## Task 1 — Make authorization fail closed
+
+Current code in `app/main.py` uses logic equivalent to:
+
+```python
+request.session.get("role", "parent")
+```
+
+This is unsafe because an authenticated session without a role becomes parent implicitly.
+
+Change this behavior.
+
+### Required behavior
+
+If:
+
+```python
+request.session["auth"] == True
+```
+
+but the session role is missing or invalid, the request must NOT receive parent privileges.
+
+Valid roles:
+
+```text
+parent
+child
+```
+
+For authenticated sessions with any other role value or missing role:
+
+- clear the session OR invalidate auth
+- redirect to `/login`
+- do not grant access
+- do not silently default to `parent`
+
+Add tests for:
+
+```text
+auth=True, role missing
+auth=True, role="unknown"
+auth=True, role=""
+```
+
+Expected result: user is not authorized as parent.
+
+---
+
+## Task 2 — Remove remaining router-to-router calls
+
+The refactoring introduced `app/services/workflow.py`, which is good, but `app/routers/lernzyklus.py` still directly calls functions from `app/routers/kind.py`.
+
+Examples currently include calls conceptually like:
+
+```python
+kind.lernen_fragen(...)
+kind.quiz_starten(...)
+kind.quiz_blatt(...)
+kind.lernen_naechste_runde(...)
+kind.lernen_forschen(...)
+kind.lernen_abbrechen(...)
+kind.material(...)
+```
+
+This must be eliminated.
+
+Also `vorbereitung.py` currently delegates directly to `eltern.py`, and `messung.py` delegates directly to `eltern.py` and `admin.py`.
+
+### Target architecture
+
+Routers should only do:
+
+```text
+HTTP input
+validation
+authorization
+call service
+return response
+```
+
+Business logic must live in services.
+
+Recommended structure:
+
+```text
+app/services/
+├── workflow.py
+├── learning.py
+├── quiz.py
+├── preparation.py
+└── measurement.py
+```
+
+You may keep fewer files if that is cleaner, but do not leave router-to-router business calls.
+
+### Required migration
+
+Move shared logic out of router handlers into services.
+
+Then both old and new routes can call the same service.
+
+Example target:
+
+```python
+# /wissen
+return preparation_service.render_materials(...)
+
+# /vorbereitung
+return preparation_service.render_materials(...)
+```
+
+NOT:
+
+```python
+return eltern.wissen(...)
+```
+
+Likewise:
+
+```python
+# /klassenarbeit
+return measurement_service.render_exam_page(...)
+
+# /messung/examen
+return measurement_service.render_exam_page(...)
+```
+
+Do this for all remaining router-to-router calls.
+
+---
+
+## Task 3 — Finish quiz state machine
+
+Current quiz states are approximately:
+
+```text
+offen
+bereit
+beantwortet
+ausgewertet
+```
+
+but final completion is represented separately through `finished_at`.
+
+This creates two state systems.
+
+Add an explicit final state:
+
+```python
+STATE_FREIGEGEBEN = "freigegeben"
+```
+
+Target flow:
+
+```text
+OFFEN
+  ↓
+BEREIT
+  ↓
+BEANTWORTET
+  ↓
+AUSGEWERTET
+  ↓
+FREIGEGEBEN
+```
+
+Optional failure/cancel states may remain if already supported.
+
+### Required behavior
+
+When `freigeben()` successfully completes:
+
+```python
+state = STATE_FREIGEGEBEN
+finished_at = now()
+```
+
+`finished_at` remains the timestamp, not the source of truth.
+
+All logic that currently checks only `finished_at` should be reviewed and converted to explicit state checks where appropriate.
+
+Do not break paper quiz or direct/manual review behavior.
+
+Add tests for the full state lifecycle.
+
+---
+
+## Task 4 — Make quiz release fully atomic and idempotent
+
+Current code checks whether a quiz was already released before entering the full write transaction.
+
+This can race if two requests arrive at nearly the same time.
+
+### Required behavior
+
+Two concurrent release requests must never cause duplicate side effects.
+
+These must execute at most once:
+
+```text
+answer_log writes
+quiz finalization
+flag recalculation
+teaching.nach_freigabe(...)
+export.nach_freigabe(...)
+next workflow transition
+```
+
+Use a DB-level atomic claim or conditional update.
+
+Example concept:
+
+```sql
+UPDATE quiz
+SET state = 'freigegeben', finished_at = ?
+WHERE id = ?
+  AND state != 'freigegeben'
+```
+
+Then verify affected row count.
+
+Or use an equivalent transaction-safe mechanism.
+
+The first request performs the release.
+
+All later requests return:
+
+```python
+{"bereits": True}
+```
+
+without rerunning downstream side effects.
+
+### Important
+
+`after_quiz_release()` or `teaching.nach_freigabe()` must not run twice for the same quiz.
+
+Add a regression test that simulates calling release twice.
+
+If practical, add a concurrency-oriented test too.
+
+---
+
+## Task 5 — Make “Heute” a real priority-based orchestrator
+
+Current `get_next_action()` is centralized, which is good, but it mainly does:
+
+```text
+if open steps:
+    first open step
+else:
+    first topic
+```
+
+It does not yet model all priorities explicitly.
+
+Create one deterministic next-action policy.
+
+Recommended priority:
+
+```text
+1. pending parent review / approval, if this is relevant to the current role
+2. ready/open quiz
+3. active learning round
+4. active exam material
+5. new confirmed topic
+6. nothing to do
+```
+
+For the child role, parent-only review tasks must not appear.
+
+The return object should remain explicit, preferably using a dataclass like:
+
+```python
+@dataclass(frozen=True)
+class NextAction:
+    kind: str
+    url: str
+    reason: str
+    context: dict
+```
+
+Use this same function for all dashboards that need a “next step”.
+
+Do not duplicate priority logic elsewhere.
+
+Add tests for conflicting states, for example:
+
+```text
+quiz + new topic -> quiz wins
+active lesson + new topic -> lesson wins
+exam material + new topic -> exam material wins
+nothing open -> no action
+```
+
+---
+
+## Task 6 — Remove duplicate business implementations in preparation and measurement
+
+`vorbereitung.py` and `messung.py` are now registered, but they currently act mostly as wrappers around older routers.
+
+Keep backward compatibility, but make the new architecture the real source of truth.
+
+### Target
+
+Old routes:
+
+```text
+/wissen
+/themen
+/recherche
+/lernstand
+/klassenarbeit
+```
+
+and new routes:
+
+```text
+/vorbereitung/*
+/messung/*
+```
+
+must both call the same service functions.
+
+There should be one implementation per business operation.
+
+Example:
+
+```text
+preparation service
+├── list materials
+├── upload material
+├── read drive
+├── approve topics
+├── create topic
+└── manage research sources
+
+measurement service
+├── render progress
+├── export progress
+├── render exams
+├── create exam
+└── save exam result
+```
+
+Do not duplicate SQL or domain logic between old and new route families.
+
+---
+
+## Task 7 — Clarify legacy route strategy
+
+Do not delete old URLs immediately.
+
+Keep compatibility for now.
+
+Choose one of these strategies consistently:
+
+### Strategy A
+Old routes remain working aliases that call the same service layer.
+
+### Strategy B
+Old routes respond with HTTP 303 redirects to the new canonical URLs.
+
+Preferred long-term canonical routes:
+
+```text
+/vorbereitung
+/vorbereitung/inhalte
+/vorbereitung/inhalte/sources
+
+/messung/fortschritt
+/messung/examen
+```
+
+If redirects are used, ensure POST routes preserve intended behavior via appropriate 303 flow.
+
+Document the chosen approach in code comments or architecture docs.
+
+---
+
+## Task 8 — Expand tests
+
+Add or update tests for all changes above.
+
+Minimum required tests:
+
+```text
+invalid/missing role never becomes parent
+child forbidden on parent routes
+parent allowed on child routes
+no remaining router-to-router delegation
+quiz lifecycle reaches freigegeben
+second quiz release has no side effects
+next-action priority is deterministic
+old and new route families behave equivalently
+legacy route compatibility remains intact
+```
+
+If tests currently compare complete HTML between alias routes, prefer comparing relevant behavior/content rather than fragile full-document equality where possible.
+
+---
+
+## Task 9 — Run the full test suite
+
+Run:
+
+```bash
+pytest -q
+```
+
+Fix all failures.
+
+Do not mark the task complete unless the full suite passes.
+
+Also run a focused subset for new changes if useful.
+
+At the end report:
+
+```text
+- files changed
+- architecture changes
+- tests added
+- test result
+- any remaining technical debt
+```
+
+---
+
+## Constraints
+
+Do not:
+
+- rewrite unrelated code
+- remove working routes without compatibility
+- weaken CSRF protection
+- weaken authentication
+- expose parent pages to child role
+- duplicate business logic
+- introduce large frameworks unnecessarily
+- change user-facing behavior unless required by this plan
+
+Prefer small, explicit, testable changes.
+
+Keep comments and docstrings concise and useful.
+
+---
+
+## Definition of done
+
+This work is complete only when:
+
+```text
+[ ] authenticated session without valid role is rejected
+[ ] no router directly calls another router for business logic
+[ ] quiz has explicit final FREIGEGEBEN state
+[ ] quiz release is atomic/idempotent
+[ ] downstream quiz side effects run only once
+[ ] Heute uses one explicit priority policy
+[ ] preparation and measurement use shared services
+[ ] legacy routes remain compatible
+[ ] tests cover all above behavior
+[ ] pytest -q passes
+```

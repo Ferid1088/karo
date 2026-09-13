@@ -46,6 +46,11 @@ PUBLIC_EXACT = frozenset({"/health", "/login", "/logout", "/setup",
                           "/setup/credentials", "/setup/finish", "/setup/reset"})
 PUBLIC_PREFIX = ("/static/",)
 
+# Jede authentifizierte Session braucht eine dieser Rollen. Fehlt sie oder
+# steht dort etwas anderes, gilt die Session als ungueltig — niemals als
+# "parent" (fail closed statt fail open).
+VALID_ROLES = frozenset({"parent", "child"})
+
 # Kinder duerfen ausschliesslich ihren eigenen Lernbereich verwenden — das
 # wird hier zentral erzwungen, nicht nur durch ausgeblendete Menuepunkte.
 CHILD_ALLOWED_EXACT = frozenset({"/", "/hilfe"})
@@ -129,10 +134,14 @@ class Gate:
             if not oeffentlich and not authed:
                 return await self._send(send, scope, RedirectResponse(
                     "/login", HTTP_303_SEE_OTHER))
-            if (not oeffentlich and authed
-                    and request.session.get("role", "parent") == "child"
-                    and not _kind_erlaubt(path)):
-                return await self._send(send, scope, self._kind_gesperrt())
+            if not oeffentlich and authed:
+                role = request.session.get("role")
+                if role not in VALID_ROLES:
+                    request.session.clear()
+                    return await self._send(send, scope, RedirectResponse(
+                        "/login", HTTP_303_SEE_OTHER))
+                if role == "child" and not _kind_erlaubt(path):
+                    return await self._send(send, scope, self._kind_gesperrt())
 
         if request.method in security.SAFE_METHODS:
             return await self.app(scope, receive, send)

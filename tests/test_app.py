@@ -12,8 +12,10 @@ und — der wichtigste — eine Erklärung, die vom Rechenweg der Schule abweich
 from __future__ import annotations
 
 import json
+from base64 import b64encode
 from pathlib import Path
 
+import itsdangerous
 import pytest
 
 from .conftest import csrf_from, make_jpeg, run_jobs
@@ -256,6 +258,16 @@ def lernen_starten(client, app_env, topic_id, ausgabe="html"):
     return lesson["id"]
 
 
+def session_cookie_faelschen(app_env, **daten) -> str:
+    """Baut eine gueltig signierte, aber inhaltlich frei waehlbare
+    Session-Cookie — fuer Tests, die einen Session-Zustand brauchen, den
+    die App selbst nie erzeugen wuerde (z. B. eine kaputte Rolle)."""
+    secret = app_env.config.session_secret().hex()
+    signer = itsdangerous.TimestampSigner(secret)
+    payload = b64encode(json.dumps(daten).encode("utf-8"))
+    return signer.sign(payload).decode("utf-8")
+
+
 def kind_modus_aktivieren(client):
     seite = client.get("/eltern")
     r = client.post("/eltern/kind-modus",
@@ -479,6 +491,27 @@ def test_erneutes_eltern_login_stellt_rolle_eltern_wieder_her(client, fake_llm, 
                     follow_redirects=False)
     assert r.status_code == 303
     assert client.get("/wissen", follow_redirects=False).status_code == 200
+
+
+@pytest.mark.parametrize("kaputte_session", [
+    {"auth": True},                       # role fehlt ganz
+    {"auth": True, "role": "unbekannt"},  # role ist kein gueltiger Wert
+    {"auth": True, "role": ""},           # role ist leer
+])
+def test_authentifizierte_session_ohne_gueltige_rolle_wird_nie_eltern(
+        client, fake_llm, fake_cli, app_env, kaputte_session):
+    """Fail closed: auth=True allein darf niemals Eltern-Rechte geben —
+    weder auf einer Kind-Route noch auf einer Eltern-Route."""
+    einrichten(client, fake_llm)
+    client.cookies.clear()
+    client.cookies.set("karo_session",
+                       session_cookie_faelschen(app_env, **kaputte_session))
+
+    r = client.get("/wissen", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/login"
+
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/login"
 
 
 # ==========================================================================
