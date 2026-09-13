@@ -1,25 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Hilfe – Karo{% endblock %}
 {% block content %}
-<div class="hilfe-kopf help-center-header">
-  <div>
-    <p class="eyebrow">KARO HELP CENTER</p>
-    <h1>Dokumentation</h1>
-    <p class="sub">Vollständige Referenz: Arbeitsablauf, Bereiche, Bewertung, Datenschutz und Einstellungen.</p>
-  </div>
-  <div class="help-doc-label">DOCUMENTATION<br><span>VERSION 2.0</span></div>
-</div>
-
-<div class="tabs" data-tabgroup="hilfe" role="tablist" aria-label="Hilfebereiche">
-  <button type="button" class="tab-btn" data-tab="start">Übersicht</button>
-  <button type="button" class="tab-btn" data-tab="ablauf">Arbeitsablauf</button>
-  <button type="button" class="tab-btn" data-tab="bereiche">Bereiche</button>
-  <button type="button" class="tab-btn" data-tab="flaggen">Flaggen &amp; Bewertung</button>
-  <button type="button" class="tab-btn" data-tab="datenschutz">Datenschutz &amp; Recherche</button>
-  <button type="button" class="tab-btn" data-tab="einstellungen">Einstellungen &amp; Support</button>
-</div>
-
-<div class="tab-panel" data-tabgroup="hilfe" data-tab="start">
+<h1>So geht Karo</h1><p class="sub">Du brauchst immer nur den nächsten Schritt.</p>
+<ol class="simple-steps card"><li><strong>Thema wählen</strong><span>Tippe auf „Lernen“ und such dir ein Thema aus.</span></li><li><strong>Anschauen und üben</strong><span>Karo erklärt es dir. Danach beantwortest du Fragen.</span></li><li><strong>Gemeinsam nachsehen</strong><span>Ein Erwachsener schaut deine Antworten an. Unter „Erfolge“ siehst du deinen Lernstand.</span></li></ol>
+<a class="btn" href="/lernen">Zum Lernen</a>
+<details class="card disclosure section-space"><summary>Für Eltern: alle Funktionen und Erklärungen</summary>
+<section id="hilfe-start">
   <p class="help-panel-intro"><strong>Übersicht</strong> · Zweck: verstehen, wie Karo Wissensbasis, Themen, Lernen und Lernstand miteinander verbindet.</p>
   <section class="card hilfe-card hilfe-card-primary">
     <span class="hilfe-kapitel">Was Karo ist</span>
@@ -31,9 +17,9 @@
       <span class="hilfe-kapitel">01</span>
       <h2>In drei Schritten loslegen</h2>
       <ol class="hilfe-schritte">
-        <li><strong>Schulmaterial einlesen</strong><span>Ein Blatt in der Wissensbasis hochladen oder aus dem Ablageordner einlesen.</span></li>
+        <li><strong>Schulmaterial einlesen</strong><span>Unter „Für Eltern → Schulblätter“ ein Blatt hochladen oder aus dem Ablageordner einlesen.</span></li>
         <li><strong>Themen freigeben</strong><span>Karo schlägt Themen vor. Sie prüfen die Namen und übernehmen nur, was passt.</span></li>
-        <li><strong>Lernen starten</strong><span>Unter Themen eine Erklärung oder eine Prüfung für das gewünschte Thema starten.</span></li>
+        <li><strong>Lernen starten</strong><span>Unter „Lernen“ ein Thema auswählen und eine Erklärung oder Fragen starten.</span></li>
       </ol>
     </section>
     <section class="card hilfe-card">
@@ -49,9 +35,9 @@
     <table class="hilfe-tabelle">
       <thead><tr><th>Aufgabe</th><th>Wo?</th><th>Ergebnis</th></tr></thead>
       <tbody>
-        <tr><td>Neues Blatt hinzufügen</td><td>Wissensbasis</td><td>Erklärungen, Regeln und Aufgaben werden erkannt.</td></tr>
-        <tr><td>Themen prüfen</td><td>Themen &gt; Vorschläge</td><td>Nur freigegebene Themen erscheinen im Lernbereich.</td></tr>
-        <tr><td>Antworten freigeben</td><td>Themen &gt; Prüfung</td><td>Erst nach Ihrer Bestätigung fließt eine Antwort in die Flagge ein.</td></tr>
+        <tr><td>Neues Blatt hinzufügen</td><td>Für Eltern &gt; Schulblätter</td><td>Erklärungen, Regeln und Aufgaben werden erkannt.</td></tr>
+        <tr><td>Themen prüfen</td><td>Für Eltern &gt; Themen</td><td>Nur freigegebene Themen erscheinen im Lernbereich.</td></tr>
+        <tr><td>Antworten freigeben</td><td>Für Eltern &gt; Antworten prüfen</td><td>Erst nach Ihrer Bestätigung fließt eine Antwort in die Flagge ein.</td></tr>
         <tr><td>Lernstand ansehen</td><td>Lernstand</td><td>Status und Antworten je Thema werden verständlich zusammengefasst.</td></tr>
       </tbody>
     </table>
@@ -61,9 +47,9 @@
     <strong>Was Karo bewusst nicht tut</strong>
     <span>Es löst keine Aufgaben für das Kind, setzt keine Flagge ohne menschliche Freigabe, benutzt keine Fundstelle ohne Freigabe und überträgt nichts an den Hersteller.</span>
   </section>
-</div>
+</section>
 
-<div class="tab-panel" data-tabgroup="hilfe" data-tab="ablauf">
+<details class="card disclosure" id="hilfe-ablauf"><summary>Wie läuft das Lernen ab?</summary>
   <p class="help-panel-intro"><strong>Arbeitsablauf</strong> · Zweck: nachvollziehen, was Karo in jeder Phase verarbeitet und welche Entscheidung als Nächstes ansteht.</p>
   <section class="card hilfe-card">
     <span class="hilfe-kapitel">Der Lernzyklus</span>
@@ -87,20 +73,22 @@
     </section>
     <section class="card hilfe-card">
       <h2>Wenn etwas nicht passt</h2>
-      <p>Bei einer Unsicherheit startet Karo eine weitere Runde mit einer angepassten Erklärung. Alte Runden bleiben unter <strong>Runden</strong> abrufbar.</p>
+      <p>Bei einer Unsicherheit startet Karo eine weitere Runde mit einer angepassten Erklärung. Alte Runden bleiben unter <strong>Frühere Runden und weitere Optionen</strong> abrufbar.</p>
     </section>
   </div>
-</div>
+</details>
 
-<div class="tab-panel" data-tabgroup="hilfe" data-tab="bereiche">
+<details class="card disclosure" id="hilfe-bereiche"><summary>Wo finde ich welche Funktion?</summary>
   <p class="help-panel-intro"><strong>Bereiche</strong> · Zweck: schnell den richtigen Ort für eine Aufgabe finden.</p>
   <section class="card hilfe-card">
     <h2>Die wichtigsten Bereiche</h2>
     <table class="hilfe-tabelle bereiche-tabelle">
       <thead><tr><th>Bereich</th><th>Wofür er da ist</th><th>Typische Aktion</th></tr></thead>
       <tbody>
-        <tr><td><a href="/">Übersicht</a></td><td>Einstieg mit Kurzüberblick über offene Aufgaben und Status.</td><td>Nächsten Schritt öffnen</td></tr>
-        <tr><td><a href="/wissen">Wissensbasis</a></td><td>Unterrichtsmaterial als Faktengrundlage sammeln und prüfen.</td><td>Blatt hochladen, Abschnitt ansehen</td></tr>
+        <tr><td><a href="/">Heute</a></td><td>Ein klarer nächster Lernschritt.</td><td>Weiterlernen</td></tr>
+        <tr><td><a href="/lernen">Lernen</a></td><td>Themen und angefangene Lernrunden.</td><td>Thema aussuchen</td></tr>
+        <tr><td><a href="/eltern">Für Eltern</a></td><td>Vorbereitung, Freigaben und alle weiteren Funktionen.</td><td>Antworten prüfen, Karo einstellen</td></tr>
+        <tr><td><a href="/wissen">Schulblätter</a></td><td>Unterrichtsmaterial als Faktengrundlage sammeln und prüfen.</td><td>Blatt hochladen, Abschnitt ansehen</td></tr>
         <tr><td><a href="/themen">Themen</a></td><td>Themen freigeben, prüfen und Erklärungen starten.</td><td>Vorschlag übernehmen, lernen</td></tr>
         <tr><td><a href="/recherche">Recherche</a></td><td>Zusätzliche, erlaubte Lernquellen verwalten und Fundstellen freigeben.</td><td>Quelle aktivieren, Fund freigeben</td></tr>
         <tr><td><a href="/lernstand">Lernstand</a></td><td>Status, Antwortquoten und zeitlichen Verlauf ansehen.</td><td>Verlauf nach Jahr, Monat, Woche oder Tag gruppieren</td></tr>
@@ -124,9 +112,9 @@
     </table>
     <p class="hint">Fällt NotebookLM aus (Sitzung abgelaufen, Google-Oberfläche geändert), weicht Karo automatisch auf Folien mit Stimme aus und vermerkt das in der Lerneinheit.</p>
   </section>
-</div>
+</details>
 
-<div class="tab-panel" data-tabgroup="hilfe" data-tab="flaggen">
+<details class="card disclosure" id="hilfe-flaggen"><summary>Wie wird der Lernstand bewertet?</summary>
   <p class="help-panel-intro"><strong>Flaggen &amp; Bewertung</strong> · Zweck: verstehen, wie Karo den Lernstand je Thema berechnet — der Kern des Produkts.</p>
   <section class="help-section">
     <div class="help-section-heading">
@@ -161,9 +149,9 @@
     <strong>Warum die Freigabe nicht abschaltbar ist</strong>
     <span>Wie gut Handschrift erkannt wird, ist die entscheidende Unbekannte. Ohne menschliche Freigabe jeder Antwort gäbe es keine verlässliche Rückmeldung, ob eine Flagge stimmt — die Freigabe ist deshalb die eigentliche Qualitätskontrolle, nicht nur eine Formalie.</span>
   </section>
-</div>
+</details>
 
-<div class="tab-panel" data-tabgroup="hilfe" data-tab="datenschutz">
+<details class="card disclosure" id="hilfe-datenschutz"><summary>Datenschutz und Internetquellen</summary>
   <p class="help-panel-intro"><strong>Datenschutz &amp; Recherche</strong> · Zweck: genau wissen, was Karo an das Sprachmodell sendet und was nicht.</p>
   <div class="hilfe-grid">
     <section class="card hilfe-card">
@@ -198,9 +186,9 @@
     </ol>
     <p class="hint">Ohne Recherche funktioniert Karo vollständig — unter Einstellungen &gt; Lernverhalten abschaltbar.</p>
   </section>
-</div>
+</details>
 
-<div class="tab-panel" data-tabgroup="hilfe" data-tab="einstellungen">
+<details class="card disclosure" id="hilfe-einstellungen"><summary>Einstellungen und Hilfe bei Problemen</summary>
   <p class="help-panel-intro"><strong>Einstellungen &amp; Support</strong> · Zweck: Verbindungen, Ausgabeformate, Sicherungen und lokale Daten sicher verwalten.</p>
   <div class="hilfe-grid">
     <section class="card hilfe-card">
@@ -250,7 +238,8 @@
 
   <section class="card hilfe-card hilfe-notiz">
     <strong>Bei einem Fehler</strong>
-    <span>Prüfen Sie zuerst den roten Status oben, öffnen Sie die Einstellungen und laden Sie die betroffene Seite anschließend neu. Bereits gespeicherte Lernrunden bleiben erhalten. Bei einer abgelaufenen NotebookLM-Sitzung genügt eine erneute Anmeldung; bei einem ausgeschöpften Abo-Kontingent arbeitet Karo den Vorgang später automatisch erneut ab.</span>
+    <span>Öffnen Sie „Für Eltern → Betrieb und Protokoll“ oder die Einstellungen, um das Problem anzusehen. Laden Sie die betroffene Seite anschließend neu. Bereits gespeicherte Lernrunden bleiben erhalten. Bei einer abgelaufenen NotebookLM-Sitzung genügt eine erneute Anmeldung; bei einem ausgeschöpften Abo-Kontingent arbeitet Karo den Vorgang später automatisch erneut ab.</span>
   </section>
-</div>
+</details>
+</details>
 {% endblock %}

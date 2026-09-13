@@ -168,15 +168,14 @@ async def quiz_freigabe(request: Request, quiz_id: int):
         return zurueck(f"/lernen/{ergebnis['lesson_id']}")
 
     from .. import topics
-    from ..domain import Flag, FLAG_LABELS
+    from ..domain import Flag
     thema = topics.get(ergebnis["topic_id"])
     flagge = (thema or {}).get("flag")
     if flagge in (Flag.ROT.value, Flag.GELB.value):
-        flash(request, f"{meldung}. Flagge: {FLAG_LABELS.get(flagge)} — "
-                       "eine Lerneinheit wäre jetzt sinnvoll.", "warn")
+        flash(request, f"{meldung}. Schau dir jetzt eine Erklärung an und übe weiter.", "ok")
     else:
-        flash(request, f"{meldung}. Flagge: {FLAG_LABELS.get(flagge, '–')}.")
-    return zurueck("/themen")
+        flash(request, f"{meldung}. Deine Ergebnisse sind gespeichert.")
+    return zurueck(f"/lernzyklus/{ergebnis['topic_id']}")
 
 
 @router.post("/themen/{topic_id}/lernen")

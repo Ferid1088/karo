@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Für Eltern – Karo{% endblock %}
+{% block content %}
+<p class="eyebrow">GEMEINSAM VORBEREITEN</p><h1>Für Eltern</h1>
+<p class="sub">Material vorbereiten, Antworten prüfen und Karo einstellen.</p>
+{% if reviews or offene_vorschlaege or offene_funde %}
+<section class="card"><h2>Das braucht Ihre Hilfe</h2><div class="simple-list">
+{% for q in reviews %}<a class="simple-list-link" href="/quiz/{{ q.id }}"><span><strong>Antworten prüfen</strong><small>{{ q.thema_label }}</small></span><span aria-hidden="true">→</span></a>{% endfor %}
+{% if offene_vorschlaege %}<a class="simple-list-link" href="/themen#themen-vorschlaege"><span><strong>{{ offene_vorschlaege }} Themen bestätigen</strong><small>Karo hat Themen auf den Schulblättern gefunden.</small></span><span aria-hidden="true">→</span></a>{% endif %}
+{% if offene_funde %}<a class="simple-list-link" href="/recherche"><span><strong>{{ offene_funde }} Internetquellen prüfen</strong><small>Sie entscheiden, was verwendet wird.</small></span><span aria-hidden="true">→</span></a>{% endif %}
+</div></section>{% endif %}
+<div class="choice-grid parent-choices">
+<a class="choice-card" href="/wissen"><h2>Schulblätter</h2><p>Fotos und PDFs hinzufügen und ansehen.</p></a>
+<a class="choice-card" href="/themen"><h2>Themen</h2><p>Themen bestätigen, benennen oder selbst anlegen.</p></a>
+<a class="choice-card" href="/klassenarbeit"><h2>Klassenarbeit</h2><p>Themenblatt einlesen, Lernplan und Ergebnisse.</p></a>
+<a class="choice-card" href="/lernstand#ausfuehrlich"><h2>Lernstand &amp; Export</h2><p>Entwicklung, Antworten und die Tabelle für Drive.</p></a>
+<a class="choice-card" href="/recherche"><h2>Internetquellen</h2><p>Fundstellen prüfen und erlaubte Seiten verwalten.</p></a>
+<a class="choice-card" href="/setup"><h2>Einstellungen</h2><p>Verbindungen, Lernmaterial, Speicherort und Passwort.</p></a>
+</div>
+<details class="card disclosure" id="betrieb"><summary>Betrieb und Protokoll{% if fehler %} · {{ fehler|length }} Problem{{ 'e' if fehler|length != 1 }}{% endif %}</summary>
+<p>{{ counts.get('wartend', 0) + counts.get('laeuft', 0) }} Vorgänge werden gerade bearbeitet.</p>
+<div class="actions"><a class="btn ghost" href="/protokoll">Protokoll ansehen</a><a href="/hilfe">Alle Funktionen erklärt</a></div>
+<div id="verbindungen-widget" class="actions"><a class="status" id="status-claude" href="/setup#claude-verbindung">Claude</a><a class="status" id="status-notebooklm" href="/setup#notebooklm-verbindung">NotebookLM</a></div>
+{% for j in fehler %}<div class="item"><strong>Ein Vorgang braucht Hilfe</strong><p>{{ j.last_error }}</p><details><summary>Technische Angaben</summary><code>{{ j.type }}</code></details><form method="post" action="/vorgang/{{ j.id }}/erneut">{{ csrf_input() }}<button class="ghost" type="submit">Erneut versuchen</button></form></div>{% endfor %}
+{% if einig.gesamt %}<p class="hint">Karo und Lernbegleitung waren sich bei {{ (einig.quote * 100)|round|int }} % der letzten {{ einig.gesamt }} Antworten einig.</p>{% endif %}
+</details>
+<details class="card disclosure"><summary>Aussehen und Anmeldung</summary>
+<label for="farbwelten-auswahl">Farbe der App</label><select id="farbwelten-auswahl">
+{% for wert, name in [('lila','Lila'),('ozean','Blau'),('wiese','Grün'),('sonne','Orange'),('zuckerwatte','Rosa'),('lava','Rot'),('dunkel','Dunkel')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
+<form method="post" action="/logout" class="section-space" data-logout>{{ csrf_input() }}<button type="submit" class="ghost">Abmelden</button></form>
+</details>
+{% endblock %}

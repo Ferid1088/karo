@@ -368,7 +368,7 @@ def test_geschuetzte_seiten_funktionieren_mit_passwort(client, fake_llm, fake_cl
                                     "password": "geheim123"},
                     follow_redirects=False)
     assert r.status_code == 303
-    assert "Übersicht" in client.get("/").text
+    assert "Heute" in client.get("/").text
 
 
 def test_setup_ist_nach_einrichtung_nicht_mehr_offen(client, fake_llm, fake_cli):
@@ -483,7 +483,7 @@ def test_themen_werden_vorgeschlagen_und_freigegeben(client, fake_llm, fake_cli,
 
     vorschlaege = app_env.db.q("SELECT * FROM topic WHERE state='vorschlag'")
     assert len(vorschlaege) == 2
-    assert "Vorschläge" in client.get("/themen").text
+    assert "Neue Themen bestätigen" in client.get("/themen").text
 
     themen_freigeben(client, app_env)
     aktive = app_env.db.q("SELECT * FROM topic WHERE state='aktiv'")
@@ -1104,7 +1104,7 @@ def test_notebooklm_fehler_zeigt_popup_statt_stillem_ruckfall(client, fake_llm, 
 
     lesson = app_env.db.q1("SELECT * FROM lesson WHERE id=?", runde["lesson_id"])
     seite = client.get(f"/lernen/{lesson['id']}")
-    assert "NotebookLM konnte das Video nicht erstellen" in seite.text
+    assert "Die Erklärung braucht noch Hilfe" in seite.text
     assert 'name="ausgabe" value="notebooklm"' in seite.text
 
     # Der an NotebookLM geschickte (bzw. zu schickende) Text wird trotzdem

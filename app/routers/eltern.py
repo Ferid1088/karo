@@ -4,7 +4,7 @@ import json
 import logging
 from pathlib import Path
 from fastapi import APIRouter, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from .. import config, db, export, ingest, kb, quizzes, research, topics, jobs
@@ -13,25 +13,6 @@ from .shared import render, flash, zurueck
 
 log = logging.getLogger("karo.eltern")
 router = APIRouter()
-
-
-@router.get("/", response_class=HTMLResponse)
-def dashboard(request: Request):
-    themen = topics.liste(topics.AKTIV)
-    themen.sort(key=lambda t: (FLAG_ORDER.index(t["flag"])
-                               if t["flag"] in FLAG_ORDER else 9, t["sort"]))
-    zaehler = {f: sum(1 for t in themen if t["flag"] == f) for f in FLAG_ORDER}
-    return render(
-        request, "dashboard.html",
-        themen=themen, zaehler=zaehler,
-        kb_stat=kb.statistik(),
-        offene_quizze=quizzes.offene(),
-        offene_lessons=__import__("app.teaching", fromlist=["offene"]).offene(),
-        fehler=[dict(r) for r in db.q(
-            "SELECT * FROM job WHERE state='fehler' ORDER BY id DESC LIMIT 20")],
-        counts=jobs.counts(),
-        einig=quizzes.uebereinstimmung(),
-    )
 
 
 @router.get("/wissen", response_class=HTMLResponse)
@@ -102,8 +83,10 @@ async def wissen_upload(request: Request, rolle: str = Form("wissen"),
 
 @router.get("/scan/{doc_id}.jpg")
 def scan(doc_id: int):
-    from ..media import ingest_view
-    return ingest_view.scan_thumbnail(doc_id)
+    doc = db.q1("SELECT stored_path FROM document WHERE id=?", doc_id)
+    if not doc or not Path(doc["stored_path"]).is_file():
+        return HTMLResponse("Blatt nicht gefunden.", status_code=404)
+    return FileResponse(doc["stored_path"], media_type="image/jpeg")
 
 
 @router.get("/wissen/{doc_id}", response_class=HTMLResponse)

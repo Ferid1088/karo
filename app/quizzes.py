@@ -522,7 +522,9 @@ def holen(quiz_id: int) -> dict | None:
     d["thema"] = topics.get(quiz["topic_id"])
     d["fragen"] = [dict(r) for r in db.q(
         """SELECT q.*, (SELECT MAX(id) FROM answer_log a
-                          WHERE a.question_id = q.id) AS antwort_id
+                          WHERE a.question_id = q.id) AS antwort_id,
+                    (SELECT richtig FROM answer_log a WHERE a.question_id=q.id ORDER BY id DESC LIMIT 1) AS bestaetigt_richtig,
+                    (SELECT fehlertyp FROM answer_log a WHERE a.question_id=q.id ORDER BY id DESC LIMIT 1) AS bestaetigt_fehler
              FROM question q WHERE q.quiz_id=? ORDER BY q.position""", quiz_id)]
     for f in d["fragen"]:
         f["grund"] = grund_teile(f.get("vorschlag_grund"))

@@ -1,163 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Übersicht – Karo{% endblock %}
+{% block title %}Heute – Karo{% endblock %}
 {% block content %}
-<h1>Übersicht</h1>
-<p class="sub">Was gerade Aufmerksamkeit braucht.</p>
-
-{% if kb_stat.n == 0 %}
-<div class="card leer-start">
-  <h3>Karo braucht zuerst Ihr Schulmaterial</h3>
-  <p>Legen Sie ein Erklärblatt, eine Buchseite oder ein Arbeitsblatt in die
-  Wissensbasis. Daraus schlägt Karo die Themen vor und erklärt später ausschließlich
-  auf dieser Grundlage — nicht mit einem beliebigen Rechenweg aus dem Netz.</p>
-  <a class="btn" href="/wissen">Erstes Blatt einlesen</a>
-</div>
-{% endif %}
-
-<div class="grid2">
-  {% for f in flag_order %}
-  <dl class="kpi {{ f }}">
-    <dt>{{ flag_labels[f] }}</dt>
-    <dd>{{ zaehler.get(f, 0) }}<span class="note"> Themen</span></dd>
-  </dl>
-  {% endfor %}
-</div>
-
-{% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
-{% if offen %}
-<div class="msg">{{ offen }} Vorgang/Vorgänge laufen gerade. Diese Seite in ein
-paar Sekunden neu laden.</div>
-{% endif %}
-
-{% if fehler %}
-<div class="card">
-  <h3 style="color:var(--bad)">Fehlgeschlagene Vorgänge</h3>
-  <div class="tablewrap">
-    <table>
-      <thead><tr><th>Art</th><th>Meldung</th><th></th></tr></thead>
-      <tbody>
-        {% for j in fehler %}
-        <tr>
-          <td><code>{{ j.type }}</code></td>
-          <td style="color:var(--muted)">{{ j.last_error }}</td>
-          <td><form method="post" action="/vorgang/{{ j.id }}/erneut">
-            {{ csrf_input() }}
-            <button class="quiet" type="submit">Erneut</button></form></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% endif %}
-
-<div class="tabs" data-tabgroup="uebersicht" role="tablist" aria-label="Bereiche">
-  <button type="button" class="tab-btn" data-tab="fragerunden">Fragerunden
-    {% if offene_quizze %}<b class="badge">{{ offene_quizze | length }}</b>{% endif %}</button>
-  <button type="button" class="tab-btn" data-tab="lerneinheiten">Lerneinheiten
-    {% if offene_lessons %}<b class="badge">{{ offene_lessons | length }}</b>{% endif %}</button>
-  <button type="button" class="tab-btn" data-tab="themen">Themen</button>
-</div>
-
-<div class="tab-panel" data-tabgroup="uebersicht" data-tab="fragerunden">
-{% if offene_quizze %}
-<div class="tablewrap">
-  <table>
-    <thead><tr><th>Thema</th><th>Anlass</th><th>Weg</th><th>Stand</th>
-      <th class="num">Fragen</th><th></th></tr></thead>
-    <tbody>
-      {% for q in offene_quizze %}
-      <tr>
-        <td>{{ q.thema_label }}</td>
-        <td>{{ 'Lernrunde' if q.anlass == 'lernrunde' else 'Prüfung' }}</td>
-        <td>{{ 'am Bildschirm' if q.modus == 'bildschirm' else 'auf Papier' }}</td>
-        <td><span class="pill {{ q.state }}">{{ q.state }}</span></td>
-        <td class="num">{{ q.n }}</td>
-        <td><a class="btn" href="/quiz/{{ q.id }}">öffnen</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+<div class="welcome"><p class="eyebrow">DEINE LERNZEIT</p><h1>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</h1><p class="sub">Was möchtest du heute lernen?</p></div>
+{% if naechstes %}
+<section class="next-step card">
+  <span class="step-number" aria-hidden="true">1</span>
+  <div><p class="eyebrow">DEIN NÄCHSTER SCHRITT</p><h2>{{ naechstes.titel }}</h2><p>{{ naechstes.text }}</p>
+  <a class="btn gross" href="{{ naechstes.url }}">{{ naechstes.button }} <span aria-hidden="true">→</span></a></div>
+</section>
 {% else %}
-<div class="empty">Keine offenen Fragerunden.</div>
+<section class="card next-step"><span class="step-number" aria-hidden="true">1</span><div><h2>Wir machen Karo startklar</h2>
+<p>Hol einen Erwachsenen dazu. Gemeinsam fügt ihr dein erstes Schulblatt hinzu.</p>
+<a class="btn" href="/wissen">Erstes Blatt hinzufügen</a></div></section>
 {% endif %}
+<div class="choice-grid">
+<a class="choice-card" href="/lernen"><span class="choice-kicker">LERNEN</span><h2>Thema aussuchen</h2><p>Du entscheidest, was du übst.</p><span class="choice-arrow" aria-hidden="true">→</span></a>
+<a class="choice-card" href="/klassenarbeit"><span class="choice-kicker">DEIN LERNPLAN</span><h2>Für die Klassenarbeit üben</h2><p>{% if exam %}Deine nächste Arbeit: {{ exam.exam_date[8:10] }}.{{ exam.exam_date[5:7] }}.{{ exam.exam_date[:4] }}{% else %}Schau nach, was als Nächstes dran ist.{% endif %}</p><span class="choice-arrow" aria-hidden="true">→</span></a>
 </div>
-
-<div class="tab-panel" data-tabgroup="uebersicht" data-tab="lerneinheiten">
-{% if offene_lessons %}
-<div class="tablewrap">
-  <table>
-    <thead><tr><th>Thema</th><th>Flagge</th><th class="num">Runde</th>
-      <th>Ausgabe</th><th>Stand</th><th></th></tr></thead>
-    <tbody>
-      {% for l in offene_lessons %}
-      <tr>
-        <td>{{ l.thema_label }}</td>
-        <td>{{ flagge(l.flag) }}</td>
-        <td class="num">{{ l.runden }}/{{ l.max_runden }}</td>
-        <td style="font-size:.85rem">{{ ausgabe_labels.get(l.ausgabe, l.ausgabe) }}</td>
-        <td><span class="pill {{ l.state }}">{{ l.state }}</span></td>
-        <td><a class="btn" href="/lernen/{{ l.id }}">öffnen</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% else %}
-<div class="empty">Keine laufenden Lerneinheiten.</div>
-{% endif %}
-</div>
-
-<div class="tab-panel" data-tabgroup="uebersicht" data-tab="themen">
-{% if themen %}
-<div class="tablewrap">
-  <table>
-    <thead><tr><th>Thema</th><th>Flagge</th><th class="num">richtig</th>
-      <th>häufigster Fehler</th><th></th></tr></thead>
-    <tbody>
-      {% for t in themen[:12] %}
-      <tr>
-        <td><strong>{{ t.label }}</strong><br>
-          <span class="klein">{{ t.begruendung or '' }}</span></td>
-        <td>{{ flagge(t.flag) }}</td>
-        <td class="num">{{ t.richtig }}/{{ t.antworten }}</td>
-        <td class="klein">{{ error_labels.get(t.haupt_fehler, '–') }}</td>
-        <td><a href="/themen" class="klein">im Themenblatt</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% if themen | length > 12 %}
-<p class="hint">{{ themen | length - 12 }} weitere unter „Themen“.</p>
-{% endif %}
-{% else %}
-<div class="empty">Noch keine freigegebenen Themen.
-{% if offene_vorschlaege %}
-  <p><a class="btn" href="/themen">{{ offene_vorschlaege }} Vorschläge ansehen</a></p>
-{% endif %}
-</div>
-{% endif %}
-
-<div class="card" style="margin-top:2rem">
-  <div class="actions" style="justify-content:space-between">
-    <div>
-      <h3 style="margin:0">Lernstand als Tabelle</h3>
-      <span class="klein">In Karo ansehen — der Export als Google Sheet ist
-      dort ein zusätzlicher, freiwilliger Knopf.</span>
-    </div>
-    <a class="ghost btn" href="/lernstand">Ansehen</a>
-  </div>
-</div>
-
-{% if einig.gesamt %}
-<p class="hint" style="margin-top:1.4rem">
-  Übereinstimmung Modell / Lernbegleitung:
-  <strong>{{ (einig.quote * 100) | round | int }} %</strong>
-  bei den letzten {{ einig.gesamt }} Antworten. Je niedriger dieser Wert, desto
-  vorsichtiger sind die Flaggen zu lesen.
-</p>
-{% endif %}
-</div>
+{% if reviews %}<p class="quiet-note">Ein Erwachsener schaut sich noch {{ reviews|length }} Fragerunde{{ 'n' if reviews|length != 1 }} an. <a href="/eltern">Gemeinsam ansehen</a></p>{% endif %}
 {% endblock %}

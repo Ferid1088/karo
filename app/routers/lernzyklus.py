@@ -31,26 +31,8 @@ def _check_quiz(topic_id: int, quiz_id: int):
 @router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
 def lernzyklus_index(request: Request):
-    themen = topics.liste(topics.AKTIV)
-    themen.sort(key=lambda t: (FLAG_ORDER.index(t["flag"]), t["sort"]))
-    fortsetzungen = {}
-    offene_quizze = quizzes.offene()
-    priority = {"geprueft": 0, "bereit": 1, "beantwortet": 2, "offen": 3}
-    offene_quizze.sort(key=lambda q: priority.get(q["state"], 4))
-    labels = {"offen": "Karo bereitet Fragen vor", "bereit": "Fragen beantworten",
-              "beantwortet": "Karo prüft die Antworten", "geprueft": "Für Eltern: Antworten prüfen"}
-    for quiz in offene_quizze:
-        fortsetzungen.setdefault(quiz["topic_id"], {
-            "titel": quiz["thema_label"], "text": labels.get(quiz["state"], "Weiterlernen"),
-            "url": f"/quiz/{quiz['id']}"})
-    for lesson in teaching.offene():
-        fortsetzungen.setdefault(lesson["topic_id"], {
-            "titel": lesson["thema_label"],
-            "text": "Lernrunde vorbereiten" if lesson["state"] == "wartet" else "Mit der Erklärung weiterlernen",
-            "url": f"/lernen/{lesson['id']}"})
-    return render(request, "lernzyklus/index.html", hat_themen=bool(themen),
-                  themen=[t for t in themen if t["id"] not in fortsetzungen],
-                  fortsetzungen=list(fortsetzungen.values()))
+    from .dashboard import lernen
+    return lernen(request)
 
 
 @router.get("/{topic_id}", response_class=HTMLResponse)
@@ -58,7 +40,7 @@ def lernzyklus_seite(request: Request, topic_id: int):
     topic = topics.get(topic_id)
     if not topic or topic["state"] != topics.AKTIV:
         flash(request, "Bitte zuerst das Thema bestätigen.", "warn")
-        return zurueck("/vorbereitung/inhalte")
+        return zurueck("/themen")
     lesson_id = _lesson_id(topic_id)
     if lesson_id is not None:
         return kind.lernen_seite(request, lesson_id)
@@ -72,6 +54,12 @@ def lernzyklus_start(request: Request, topic_id: int, ausgabe: str = Form("")):
     except teaching.TeachingError as exc:
         flash(request, str(exc), "err")
         return zurueck("/lernzyklus")
+    lesson = teaching.holen(lesson_id)
+    if lesson and lesson['state'] == 'wartet' and lesson['runden'] == 0:
+        try:
+            teaching.naechste_runde_bestaetigen(lesson_id)
+        except teaching.TeachingError:
+            pass  # Die Lernseite zeigt den Weg zum fehlenden Schulmaterial.
     return zurueck(f"/lernen/{lesson_id}")
 
 
@@ -121,7 +109,7 @@ def lernzyklus_forschen(request: Request, topic_id: int):
 
 @router.post("/{topic_id}/abbrechen")
 def lernzyklus_abbrechen(request: Request, topic_id: int):
-    return kind.lernen_abbrechen(request, _require_lesson(topic_id))
+    return kind.lernen_abbrechen(request, _require_lesson(topic_id), "mehr zum Thema")
 
 
 @router.get("/{topic_id}/material/{round_id}", response_class=HTMLResponse)

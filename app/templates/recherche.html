@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Recherche – Karo{% endblock %}
 {% block content %}
-<h1>Recherche</h1>
+<h1>Internetquellen</h1>
 <p class="sub">Zusätzliches Lernmaterial aus dem Netz — nur von geprüften
 Schulseiten, und nur nach Ihrer Freigabe.</p>
 
@@ -11,13 +11,9 @@ Karo arbeitet dann ausschließlich mit Ihrem eigenen Material — das funktionie
 vollständig.</div>
 {% endif %}
 
-<div class="tabs" data-tabgroup="recherche" role="tablist" aria-label="Bereiche">
-  <button type="button" class="tab-btn" data-tab="vorschlaege">Vorschläge
-    {% if vorschlaege %}<b class="badge">{{ vorschlaege | length }}</b>{% endif %}</button>
-  <button type="button" class="tab-btn" data-tab="quellen">Erlaubte Quellen</button>
-</div>
 
-<div class="tab-panel" data-tabgroup="recherche" data-tab="vorschlaege">
+
+<section id="recherche-vorschlaege">
 {% if vorschlaege %}
 <form method="post" action="/recherche/entscheiden">
   {{ csrf_input() }}
@@ -49,9 +45,9 @@ vollständig.</div>
   Lerneinheit anstoßen — vor Runde 1 oder vor jeder weiteren Runde.</p>
 </div>
 {% endif %}
-</div>
+</section>
 
-<div class="tab-panel" data-tabgroup="recherche" data-tab="quellen">
+<details class="card disclosure" id="recherche-quellen"><summary>Erlaubte Internetseiten ändern</summary>
 <div class="card">
   <h3>Wo Karo überhaupt suchen darf</h3>
   <p class="hint">Diese Liste gilt für die Websuche. Nur hier eingetragene
@@ -99,5 +95,5 @@ vollständig.</div>
   <p class="klein" style="margin-top:.7rem"><strong>YouTube nur diese
   Kanäle:</strong> {{ kanaele | join(', ') }}</p>
 </div>
-</div>
+</details>
 {% endblock %}

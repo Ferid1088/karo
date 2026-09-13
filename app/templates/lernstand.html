@@ -1,9 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Lernstand – Karo{% endblock %}
 {% block content %}
+<h1>Deine Erfolge</h1><p class="sub">Du lernst Schritt für Schritt. Hier siehst du, was schon gut klappt.</p>
+{% if zeilen %}<div class="choice-grid">
+{% for t in zeilen %}<section class="card progress-card"><span class="child-status {{ t.flag }}">{{ child_flags[t.flag] }}</span><h2>{{ t.label }}</h2>
+<p>{% if t.antworten %}{{ t.richtig }} von {{ t.antworten }} zuletzt bewerteten Antworten richtig.{% else %}Mit ein paar Fragen geht es los.{% endif %}</p>
+<a href="/lernzyklus/{{ t.id }}">{{ 'Kurz wiederholen' if t.flag == 'gruen' else 'Zusammen weiterüben' }} →</a></section>{% endfor %}
+</div>{% else %}<section class="card"><h2>Deine ersten Schritte kommen noch</h2><p>Jede Übung hilft dir weiter.</p><a class="btn" href="/lernen">Zum Lernen</a></section>{% endif %}
+<details class="card disclosure" id="ausfuehrlich"><summary>Für Eltern: Lernstand, Verlauf und Export</summary>
 <div class="lernstand-kopf">
   <div>
-    <h1>Lernstand</h1>
+    <h2>Ausführlicher Lernstand</h2>
     <p class="sub">Eine kompakte Übersicht über Sicherheit und Übung je Thema.</p>
   </div>
   <div class="export-mini">
@@ -23,13 +30,9 @@
   </div>
 </div>
 
-<div class="tabs" data-tabgroup="lernstand" role="tablist" aria-label="Bereiche">
-  <button type="button" class="tab-btn" data-tab="uebersicht">Übersicht</button>
-  <button type="button" class="tab-btn" data-tab="verlauf">Verlauf
-    {% if verlauf %}<b class="badge">{{ verlauf | length }}</b>{% endif %}</button>
-</div>
 
-<div class="tab-panel" data-tabgroup="lernstand" data-tab="uebersicht">
+
+<div>
 {% if zeilen %}
 <div class="row" style="align-items:flex-start;flex-wrap:wrap">
   <div class="tablewrap" style="flex:3 1 680px">
@@ -73,7 +76,7 @@ etwas, sobald welche freigegeben sind.</div>
 
 </div>
 
-<div class="tab-panel" data-tabgroup="lernstand" data-tab="verlauf">
+<h2>Alle bewerteten Antworten</h2><div>
 {% if verlauf %}
 <div class="verlauf-filter" role="group" aria-label="Verlauf gruppieren">
   <span class="filter-label">Gruppieren nach</span>
@@ -165,4 +168,5 @@ etwas, sobald welche freigegeben sind.</div>
   render("year");
 })();
 </script>
+</details>
 {% endblock %}

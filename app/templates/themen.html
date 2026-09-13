@@ -2,17 +2,11 @@
 {% block title %}Themen – Karo{% endblock %}
 {% block content %}
 <h1>Themen</h1>
-<p class="sub">Die Einheit, in der Karo bewertet und lehrt. Themen kommen aus
-Ihrem Schulmaterial — freigegeben werden sie von Ihnen.</p>
+<p class="sub">Verwalten Sie die Themen, die Ihr Kind unter „Lernen“ sieht.</p>
 
-<div class="tabs" data-tabgroup="themen" role="tablist" aria-label="Bereiche">
-  <button type="button" class="tab-btn" data-tab="freigegeben">Freigegebene Themen</button>
-  <button type="button" class="tab-btn" data-tab="vorschlaege">Vorschläge
-    {% if vorschlaege %}<b class="badge">{{ vorschlaege | length }}</b>{% endif %}</button>
-  <button type="button" class="tab-btn" data-tab="neu">Thema anlegen</button>
-</div>
 
-<div class="tab-panel" data-tabgroup="themen" data-tab="vorschlaege">
+
+<details class="card disclosure" id="themen-vorschlaege" open><summary>Neue Themen bestätigen</summary>
 {% if vorschlaege %}
 <p class="hint">Karo hat diese Themen im eingelesenen Material gefunden. Namen
 lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
@@ -20,9 +14,9 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
   {{ csrf_input() }}
   {% for t in vorschlaege %}
   <div class="item">
-    <div class="pos">{{ t.code }}</div>
+    <label for="thema-label-{{ t.id }}">Name des Themas</label>
     <div class="field" style="margin-bottom:.5rem">
-      <input type="text" name="label_{{ t.id }}" value="{{ t.label }}"
+      <input type="text" id="thema-label-{{ t.id }}" name="label_{{ t.id }}" value="{{ t.label }}"
              maxlength="200">
     </div>
     {% if t.beschreibung %}<p class="grund">{{ t.beschreibung }}</p>{% endif %}
@@ -41,9 +35,9 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
 {% else %}
 <div class="empty">Keine offenen Vorschläge.</div>
 {% endif %}
-</div>
+</details>
 
-<div class="tab-panel" data-tabgroup="themen" data-tab="freigegeben">
+<section id="themen-freigegeben">
 {% if aktive %}
 <div class="tablewrap themen-tablewrap">
   <table class="themen-tabelle">
@@ -78,7 +72,7 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
             <form method="post" action="/themen/{{ t.id }}/pruefen" class="actions"
                   style="gap:.3rem">
               {{ csrf_input() }}
-              <select name="modus" class="mini">
+              <select name="modus" class="mini" aria-label="Antwortweg">
                 <option value="bildschirm">am Bildschirm</option>
                 <option value="papier">auf Papier</option>
               </select>
@@ -88,7 +82,7 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
               <form method="post" action="/themen/{{ t.id }}/lernen" class="actions"
                     style="gap:.3rem">
                 {{ csrf_input() }}
-                <select name="ausgabe" class="mini">
+                <select name="ausgabe" class="mini" aria-label="Format der Erklärung">
                   {% for wert, label in ausgabe_labels.items() %}
                   <option value="{{ wert }}" {{ 'selected' if cfg.default_ausgabe == wert }}>{{ label }}</option>
                   {% endfor %}
@@ -119,9 +113,9 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
   {% endif %}
 </div>
 {% endif %}
-</div>
+</section>
 
-<div class="tab-panel" data-tabgroup="themen" data-tab="neu">
+<details class="card disclosure" id="themen-neu"><summary>Thema selbst hinzufügen</summary>
 <div class="card">
   <h3>Thema selbst anlegen</h3>
   <form method="post" action="/themen/neu" class="row">
@@ -140,5 +134,5 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
     </div>
   </form>
 </div>
-</div>
+</details>
 {% endblock %}

@@ -5,7 +5,7 @@
 
 {% block content %}
 <h1>{{ 'Einstellungen' if cfg.setup_complete else 'Karo einrichten' }}</h1>
-<p class="sub">Ihre Zugangsdaten bleiben auf diesem Rechner und werden nie übertragen.</p>
+<p class="sub">Öffnen Sie nur den Bereich, den Sie ändern möchten. Speichern Sie Ihre Änderungen unten.</p>
 
 {% if not cfg.setup_complete %}
 <div class="steps">
@@ -59,7 +59,7 @@ claude setup-token                         <span class="c-com"># Token wird ange
     <div class="field" style="margin-top:.8rem">
       <label for="token">Abo-Token</label>
       <input type="password" id="token" name="token" autocomplete="off"
-             placeholder="sk-ant-oat...">
+             placeholder="Abo-Token einfügen">
       <p class="hint">Der Token wird sofort mit einem echten Aufruf geprüft und
       nur bei Erfolg gespeichert.</p>
     </div>
@@ -78,7 +78,7 @@ claude setup-token                         <span class="c-com"># Token wird ange
     <div class="field">
       <label for="api_key">Anthropic-API-Schlüssel</label>
       <input type="password" id="api_key" name="api_key" autocomplete="off"
-             placeholder="sk-ant-api03-...">
+             placeholder="API-Schlüssel einfügen">
       <p class="hint">Zu holen unter <code>console.anthropic.com</code> →
       API Keys.</p>
     </div>
@@ -124,32 +124,13 @@ claude setup-token                         <span class="c-com"># Token wird ange
 
 {% else %}
 {% macro hilfe(text) %}<span class="hilfe" tabindex="0"><span class="hilfe-btn" aria-hidden="true">?</span><span class="hilfe-text" role="tooltip">{{ text }}</span></span>{% endmacro %}
-<div class="setup-shell">
-<nav class="setup-nav" aria-label="Einstellungs-Kategorien">
-  <button type="button" class="setup-nav-btn" data-zeigt="claude">Claude</button>
-  <button type="button" class="setup-nav-btn" data-zeigt="notebooklm">NotebookLM</button>
-  <button type="button" class="setup-nav-btn" data-zeigt="ausgabe">Ausgabeformat</button>
-  <button type="button" class="setup-nav-btn" data-zeigt="lernverhalten">Lernverhalten</button>
-  <button type="button" class="setup-nav-btn" data-zeigt="blaetter">Blätter &amp; Speicher</button>
-  <button type="button" class="setup-nav-btn" data-zeigt="passwort">Passwort</button>
-</nav>
 
-{#- Claude- und NotebookLM-Verbindung brauchen je ihr eigenes <form> mit
-   eigener action. Ein <form> im <form> ist ungueltiges HTML — der Browser
-   wuerde das aeussere Formular beim ersten schliessenden </section>
-   unbemerkt zuklappen und alles danach aus dem Formular herausfallen
-   lassen. Deshalb stehen beide Verbindungs-Sektionen (Claude, NotebookLM)
-   HIER, vollstaendig VOR dem eigentlichen Einstellungen-Formular weiter
-   unten — jede ihrer <form>s ist damit eine vollstaendige, nicht
-   verschachtelte Geschwister-Sektion. Die zugehoerigen Reiter-Knoepfe oben
-   zeigen trotzdem dieselbe Kategorie: welche Sektion sichtbar ist, richtet
-   sich per JavaScript nach data-kategorie, nicht nach der Reihenfolge im
-   Dokument — siehe das Skript ganz unten. Der "Claude"-Reiter zeigt daher
-   zwei <section data-kategorie="claude">-Bloecke gleichzeitig: die
-   Verbindung hier, die KI-Modelle weiter unten im Formular. -#}
-<div class="setup-panels">
 
-<section class="setup-panel" data-kategorie="claude">
+
+{# Verbindungen haben eigene Formulare; die Einstellungen darunter werden gemeinsam gespeichert. #}
+
+
+<details class="card disclosure setup-group" id="claude" {{ 'open' if not cfg.has_credentials }}><summary>Claude verbinden</summary>
 <div class="card" id="claude-verbindung">
   <h3>Claude-Verbindung
     <span class="pill {{ 'gruen' if claude_ok else 'rot' }}">{{ 'verbunden' if claude_ok else 'getrennt' }}</span>
@@ -170,17 +151,17 @@ claude setup-token                         <span class="c-com"># Token wird ange
 
     <div class="field" id="vfeld-abo" style="margin-top:.8rem">
       <label for="v-token">Abo-Token
-        {{ hilfe('Einmal am Rechner im Terminal: „claude setup-token“ ausführen (nach „claude auth login“, falls noch nicht angemeldet). Den kompletten, langlebigen OAuth-Token hier einfügen — er beginnt meist mit „sk-ant-oat...“. Wird sofort mit einem echten Aufruf geprüft und nur bei Erfolg gespeichert.') }}
+        {{ hilfe('Einmal am Rechner im Terminal: „claude setup-token“ ausführen (nach „claude auth login“, falls noch nicht angemeldet). Den kompletten, langlebigen OAuth-Token hier einfügen. Wird sofort mit einem echten Aufruf geprüft und nur bei Erfolg gespeichert.') }}
       </label>
       <input type="password" id="v-token" name="token" autocomplete="off"
-             placeholder="sk-ant-oat...">
+             placeholder="Abo-Token einfügen">
     </div>
     <div class="field" id="vfeld-api" style="margin-top:.8rem">
       <label for="v-api-key">Anthropic-API-Schlüssel
         {{ hilfe('Zu holen unter console.anthropic.com → API Keys. Wird sofort mit einem echten Aufruf geprüft und nur bei Erfolg gespeichert.') }}
       </label>
       <input type="password" id="v-api-key" name="api_key" autocomplete="off"
-             placeholder="sk-ant-api03-...">
+             placeholder="API-Schlüssel einfügen">
     </div>
   </form>
   <div class="actions" style="margin-top:.6rem">
@@ -204,7 +185,7 @@ claude setup-token                         <span class="c-com"># Token wird ange
     umschalten();
   })();
 </script>
-</section>
+</details>
 
 {% macro nlm_anmelde_knopf(taste_text) %}
 <div data-nlm-block>
@@ -233,7 +214,7 @@ claude setup-token                         <span class="c-com"># Token wird ange
 </div>
 {% endmacro %}
 
-<section class="setup-panel" data-kategorie="notebooklm">
+<details class="card disclosure setup-group" id="notebooklm"><summary>Videos mit NotebookLM</summary>
 <div class="card" id="notebooklm-verbindung">
   <h3>NotebookLM-Verbindung {{ hilfe(nlm_warnung) }}
     <span class="pill {{ 'gruen' if nlm_ok else 'rot' }}">{{ 'verbunden' if nlm_ok else 'getrennt' }}</span>
@@ -332,7 +313,7 @@ claude setup-token                         <span class="c-com"># Token wird ange
     });
   });
 </script>
-</section>
+</details>
 
 {#- Ab hier ist wieder ein ganz normales, durchgehendes <form> moeglich:
    Claude und NotebookLM mit ihren eigenen <form>s liegen jetzt komplett
@@ -342,7 +323,7 @@ claude setup-token                         <span class="c-com"># Token wird ange
       method="post" action="/setup/finish">
   {{ csrf_input() }}
 
-<section class="setup-panel" data-kategorie="claude">
+<details class="card disclosure setup-group" id="ki-modelle"><summary>Weitere Modell-Einstellungen</summary>
   <div class="card">
     <h3>KI-Modelle {{ hilfe('Stärker für Handschrift, billiger für Texte.') }}</h3>
     {% if modelle %}
@@ -366,9 +347,9 @@ claude setup-token                         <span class="c-com"># Token wird ange
     </div>
     {% endif %}
   </div>
-</section>
+</details>
 
-<section class="setup-panel" data-kategorie="ausgabe">
+<details class="card disclosure setup-group" id="ausgabe"><summary>So sieht das Lernmaterial aus</summary>
   <div class="card">
     <h3>Ausgabeformat {{ hilfe('Kann bei jeder Runde neu gewählt werden.') }}</h3>
     {% set nlm_zusatz = ' Verbinden/Trennen: oben bei „NotebookLM-Verbindung“.' %}
@@ -407,9 +388,9 @@ claude setup-token                         <span class="c-com"># Token wird ange
       });
     })();
   </script>
-</section>
+</details>
 
-<section class="setup-panel" data-kategorie="lernverhalten">
+<details class="card disclosure setup-group" id="lernverhalten"><summary>Lernen und Internetquellen</summary>
   <div class="card">
     <h3>Lernverhalten</h3>
     <div class="row">
@@ -427,9 +408,9 @@ claude setup-token                         <span class="c-com"># Token wird ange
       </div>
     </div>
   </div>
-</section>
+</details>
 
-<section class="setup-panel" data-kategorie="blaetter">
+<details class="card disclosure setup-group" id="blaetter"><summary>Schulblätter und Speicherort</summary>
   <div class="card">
     <h3>Schulblätter & Speicher</h3>
     <div class="field">
@@ -490,9 +471,9 @@ claude setup-token                         <span class="c-com"># Token wird ange
       });
     })();
   </script>
-</section>
+</details>
 
-<section class="setup-panel" data-kategorie="passwort">
+<details class="card disclosure setup-group" id="passwort" {{ 'open' if not cfg.setup_complete or invalid|default(false) }}><summary>Passwort ändern</summary>
   <div class="card">
     <h3>Passwort {{ hilfe('Schützt Karo auf diesem Rechner.') }}</h3>
     <div class="row">
@@ -511,53 +492,23 @@ claude setup-token                         <span class="c-com"># Token wird ange
       {% if cfg.has_password %}Leer lassen zum Behalten.{% else %}Erforderlich.{% endif %}
     </p>
   </div>
-</section>
+</details>
 
-</div>
-</div>
+
+
 
   <div class="actions">
     <button type="submit">{{ 'Speichern' if cfg.setup_complete else 'Einrichtung abschließen' }}</button>
   </div>
 </form>
 
-<script>
-  (function () {
-    var nav = document.querySelector('.setup-nav');
-    if (!nav) return;
-    var knoepfe = nav.querySelectorAll('.setup-nav-btn');
-    var panels = document.querySelectorAll('.setup-panel');
 
-    function zeige(kategorie) {
-      panels.forEach(function (p) {
-        p.classList.toggle('active', p.dataset.kategorie === kategorie);
-      });
-      knoepfe.forEach(function (b) {
-        b.classList.toggle('active', b.dataset.zeigt === kategorie);
-      });
-    }
 
-    knoepfe.forEach(function (b) {
-      b.addEventListener('click', function () {
-        zeige(b.dataset.zeigt);
-        try { history.replaceState(null, '', '#' + b.dataset.zeigt); } catch (e) {}
-      });
-    });
-
-    // Bestehende Sprungziele (z.B. aus dem Verbindungs-Widget in der
-    // Kopfzeile) zeigen weiterhin die passende Kategorie an.
-    var alias = {'claude-verbindung': 'claude', 'notebooklm-verbindung': 'notebooklm'};
-    var bekannt = Array.prototype.map.call(knoepfe, function (b) { return b.dataset.zeigt; });
-    var ziel = location.hash.slice(1);
-    ziel = alias[ziel] || ziel;
-    zeige(bekannt.indexOf(ziel) !== -1 ? ziel : 'claude');
-  })();
-</script>
-
+<details class="disclosure"><summary>Verbindung zurücksetzen</summary>
 <form method="post" action="/setup/reset" style="margin-top:1rem"
       onsubmit="return confirm('Zugangsdaten wirklich löschen? Die Lerndaten bleiben erhalten.')">
   {{ csrf_input() }}
   <button type="submit" class="quiet">Zugangsdaten löschen und neu eingeben</button>
-</form>
+</form></details>
 {% endif %}
 {% endblock %}

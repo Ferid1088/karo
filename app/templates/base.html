@@ -9,6 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Comic+Neue:wght@400;700&display=swap">
   <link rel="stylesheet" href="/static/karo.css?v={{ asset_version|default('0') }}">
+  <link rel="stylesheet" href="/static/simple.css?v={{ asset_version|default('0') }}">
+  <script src="/static/simple.js?v={{ asset_version|default('0') }}" defer></script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📐</text></svg>">
 <script>
   // Pollt eine kleine JSON-Statusroute und lädt die Seite automatisch neu,
@@ -41,51 +43,24 @@
 <span class="pill {{ wert }}">{{ flag_labels.get(wert, wert) }}</span>
 {%- endmacro %}
 
+{% macro icon(name) -%}<svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>{%- endmacro %}
 {% if show_nav|default(true) %}
-<header class="top">
-  <div class="top-inner">
-    <a class="brand" href="/">Ka<span>ro</span></a>
-    <nav class="main">
-      <a href="/" class="{{ 'on' if path == '/' }}">Übersicht</a>
-      <a href="/themen" class="{{ 'on' if path.startswith('/themen') }}">Themen
-        {% if offene_vorschlaege %}<b class="badge">{{ offene_vorschlaege }}</b>{% endif %}
-      </a>
-      <a href="/wissen" class="{{ 'on' if path.startswith('/wissen') }}">Wissensbasis</a>
-      <a href="/recherche" class="{{ 'on' if path.startswith('/recherche') }}">Recherche
-        {% if offene_funde %}<b class="badge">{{ offene_funde }}</b>{% endif %}
-      </a>
-      <a href="/klassenarbeit" class="{{ 'on' if path.startswith('/klassenarbeit') }}">Klassenarbeit</a>
-      <a href="/lernstand" class="{{ 'on' if path.startswith('/lernstand') }}">Lernstand</a>
-      <a href="/protokoll" class="{{ 'on' if path.startswith('/protokoll') }}">Protokoll</a>
-      <a href="/hilfe" class="{{ 'on' if path.startswith('/hilfe') }}">Help</a>
-    </nav>
-    <div class="spacer"></div>
-    <div class="verbindungen-kopf" id="verbindungen-widget">
-      <a class="status" id="status-claude" href="/setup#claude-verbindung">Claude</a>
-      <a class="status" id="status-notebooklm" href="/setup#notebooklm-verbindung">NotebookLM</a>
-    </div>
-    <label class="farbwelt-waehler">
-      <span class="sr">Farbwelt aussuchen</span>
-      <select id="farbwelten-auswahl">
-        <option value="lila">🟣 Zauberlila</option>
-        <option value="ozean">🔵 Meeresblau</option>
-        <option value="wiese">🟢 Wiesengrün</option>
-        <option value="sonne">🟠 Sonnenschein</option>
-        <option value="zuckerwatte">🌸 Zuckerwatte</option>
-        <option value="lava">🔴 Feuerrot</option>
-        <option value="dunkel">🌙 Nachtmodus</option>
-      </select>
-    </label>
-    <a href="/setup" class="leise">Einstellungen</a>
-    <form method="post" action="/logout" style="display:inline">
-      {{ csrf_input() }}
-      <button type="submit" class="linklike">Abmelden</button>
-    </form>
-  </div>
+<a class="skip-link" href="#inhalt">Zum Inhalt</a>
+<header class="simple-header">
+  <a class="brand" href="/" aria-label="Karo – Startseite">Karo<span class="brand-dot" aria-hidden="true">.</span></a>
+  <nav class="simple-nav" aria-label="Hauptnavigation">
+    <a href="/" {{ 'aria-current=page' if path == '/' }}>Heute</a>
+    <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/klassenarbeit')) }}>Lernen</a>
+    <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>
+  </nav>
+  <a class="parent-link" href="/eltern" {{ 'aria-current=page' if adult_page }}>Für Eltern</a>
 </header>
 {% endif %}
 
-<main class="{% block mainclass %}{% endblock %}">
+<main id="inhalt" tabindex="-1" class="simple-main {% block mainclass %}{% endblock %}">
+  {% if adult_page and path != '/eltern' and show_nav|default(true) %}
+  <a class="back-link" href="/eltern">← Für Eltern</a>
+  {% endif %}
   {% set flash_msg = request.session.pop('flash', None) %}
   {% set flash_kind = request.session.pop('flash_kind', 'ok') %}
   {% if flash_msg %}<div class="msg {{ flash_kind }}">{{ flash_msg }}</div>{% endif %}
@@ -94,6 +69,7 @@
 </main>
 
 {% if show_nav|default(true) %}
+<footer class="simple-footer"><a href="/hilfe">Brauchst du Hilfe?</a><span>Ein Schritt nach dem anderen.</span></footer>
 <script>
 (function () {
   var SCHLUESSEL = "karo-farbwelt";
@@ -150,6 +126,7 @@
   });
 })();
 </script>
+{% if adult_page %}
 <div id="verbindung-popup-slot"></div>
 <script>
 (function () {
@@ -219,6 +196,7 @@
   setInterval(pruefen, 120000);
 })();
 </script>
+{% endif %}
 {% endif %}
 
 </body>

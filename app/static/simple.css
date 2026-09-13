@@ -1,0 +1,111 @@
+/* Calm, readable learning screens. Existing themes and all utility pages remain. */
+html { scroll-padding-top: 1rem; }
+body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 17px; line-height: 1.65; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+.simple-header { display: flex; align-items: center; gap: 2rem; padding: 1.15rem max(1.2rem, calc((100vw - 1080px) / 2)); background: var(--surface); border-bottom: 1px solid var(--border); }
+.simple-header .brand { font-size: 2rem; text-decoration: none; white-space: nowrap; }
+.brand-dot { color: var(--ink); }
+.simple-nav { display: flex; gap: .5rem; flex: 1; }
+.simple-nav a, .parent-link { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: .5rem 1rem; border-radius: 12px; text-decoration: none; font-weight: 650; color: var(--text); }
+.simple-nav a[aria-current], .simple-nav a:hover { background: var(--ink-soft); color: var(--text); }
+.parent-link { font-size: .9rem; border: 1px solid var(--border); white-space: nowrap; }
+.parent-link[aria-current] { background: var(--ink-soft); }
+main.simple-main { max-width: 1024px; width: calc(100% - 3rem); margin: 0 auto; padding: 2.5rem 0 1rem; }
+main.simple-main:focus { outline: none; }
+main.simple-main.focus-view { max-width: 720px; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.65rem); line-height: 1.2; margin-bottom: .7rem; overflow-wrap: anywhere; }
+h2 { font-size: 1.4rem; line-height: 1.4; }
+h3 { font-size: 1.15rem; }
+p.sub { max-width: 64ch; font-size: 1.05rem; margin-bottom: 1.8rem; }
+.eyebrow, .choice-kicker { color: var(--muted); font-size: .75rem; letter-spacing: .09em; font-weight: 750; }
+.card { padding: 1.6rem; border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 2px 5px rgba(20, 20, 60, .035); margin-bottom: 1rem; }
+.card .card { padding: 1rem 0; border: 0; box-shadow: none; background: transparent; }
+.btn, button, input, select { font: inherit; }
+button, .btn { min-height: 48px; padding: .65rem 1.1rem; border-radius: 12px; box-shadow: none; white-space: normal; line-height: 1.4; }
+button:hover, .btn:hover { transform: none; box-shadow: none; }
+button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+input:not([type=radio]):not([type=checkbox]):not([type=hidden]), select { min-height: 48px; max-width: 100%; }
+input[type=radio], input[type=checkbox] { min-width: 20px; min-height: 20px; }
+label { font-weight: 600; }
+.actions { gap: .65rem; }
+.next-step { display: flex; align-items: flex-start; gap: 1.5rem; padding: 2.1rem; border: 2px solid var(--border-firm); }
+.next-step h2 { font-size: 1.65rem; margin: .35rem 0 .7rem; }
+.next-step .btn { margin-top: .5rem; }
+.step-number { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; flex: 0 0 52px; background: var(--ink-soft); color: var(--text); font-size: 1.5rem; font-weight: 750; }
+.choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1.3rem 0; }
+.choice-card { display: block; position: relative; padding: 1.5rem; border: 1px solid var(--border); background: var(--surface); border-radius: 20px; text-decoration: none; color: var(--text); transition: border-color .15s, background .15s; overflow-wrap: anywhere; }
+a.choice-card:hover { border-color: var(--ink); background: var(--surface-2); }
+.choice-card h2 { margin: .55rem 0; }
+.choice-card p { font-size: .98rem; color: var(--muted); margin: .4rem 0 1.4rem; }
+.choice-arrow, .topic-link { display: block; font-weight: 650; color: var(--text); }
+.choice-arrow { font-size: 1.4rem; }
+.simple-list-link { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 56px; padding: 1rem .1rem; text-decoration: none; color: var(--text); }
+.simple-list-link + .simple-list-link { border-top: 1px solid var(--border); }
+.simple-list-link small { display: block; color: var(--muted); margin-top: .2rem; }
+.simple-list-link.card { padding: 1.3rem; }
+.quiet-note { color: var(--muted); font-size: .95rem; padding: .7rem 0; }
+.child-status { display: inline-flex; padding: .3rem .65rem; border-radius: 9px; background: var(--surface-2); color: var(--text); font-size: .82rem; font-weight: 650; border-left: 4px solid var(--border-firm); }
+.child-status.gruen { border-left-color: var(--ok); }
+.child-status.gelb { border-left-color: var(--warn); }
+.child-status.rot { border-left-color: var(--ink); }
+.progress-card { margin: 0; }
+.progress-card p { font-size: .94rem; }
+summary { cursor: pointer; min-height: 44px; padding: .6rem 0; font-weight: 650; line-height: 1.5; }
+.disclosure { margin-top: 1rem; }
+.disclosure > summary { color: var(--text); }
+.disclosure[open] > summary { margin-bottom: .8rem; }
+.back-link { display: inline-block; color: var(--muted); padding: .4rem 0; margin-bottom: 1.25rem; font-size: .95rem; }
+.secondary-link { display: inline-block; padding: .75rem 0; font-size: .9rem; }
+.section-space { margin-top: 1.2rem; }
+.learning-path { display: flex; flex-wrap: wrap; list-style: none; gap: .6rem 1.1rem; padding: 0; color: var(--muted); font-size: .85rem; margin: 1.2rem 0 1.8rem; }
+.simple-steps { list-style: none; counter-reset: steps; }
+.simple-steps li { counter-increment: steps; padding: .7rem 0; }
+.simple-steps li::before { content: counter(steps) '. '; font-weight: 700; }
+.simple-steps span { display: block; margin-left: 1.2rem; color: var(--muted); }
+.question-toolbar { display: flex; align-items: center; gap: 1rem; margin: .6rem 0 1.4rem; font-weight: 650; }
+.question-toolbar progress { flex: 1; max-width: 200px; height: 10px; accent-color: var(--ink); }
+[data-question] .aufgabe { font-size: clamp(1.25rem, 3vw, 1.55rem); line-height: 1.5; }
+[data-question] input { font-size: 1.15rem; }
+[data-question] { border: 1px solid var(--border); border-radius: 18px; padding: 1.5rem; background: var(--surface); }
+.simple-footer { max-width: 1024px; width: calc(100% - 3rem); margin: 2rem auto; display: flex; justify-content: space-between; gap: 1rem; color: var(--muted); font-size: .88rem; }
+.simple-footer a { min-height: 44px; display: inline-flex; align-items: center; }
+.simple-footer span { padding-top: .6rem; }
+.skip-link { position: absolute; left: 1rem; top: -100px; padding: 1rem; background: var(--surface); z-index: 1000; }
+.skip-link:focus { top: 1rem; }
+.icon { vertical-align: middle; }
+.tablewrap { max-width: 100%; }
+code, dd { overflow-wrap: anywhere; }
+.setup-group { display: block; }
+.setup-group:not([open]) > :not(summary) { display: none; }
+.setup-group .card { margin: 0; }
+.hint, .klein { color: var(--muted); }
+.help-doc-label, .help-panel-intro { display: none; }
+@media (max-width: 680px) {
+  .simple-header { flex-wrap: wrap; padding: .65rem 1rem; gap: .4rem 1rem; }
+  .simple-header .brand { flex: 1; }
+  .simple-header .simple-nav { order: 3; flex-basis: 100%; justify-content: stretch; gap: .3rem; }
+  .simple-nav a { flex: 1; }
+  main.simple-main { width: calc(100% - 2rem); padding-top: 1.5rem; }
+  .choice-grid { grid-template-columns: 1fr; }
+  .next-step { padding: 1.3rem; gap: .85rem; }
+  .step-number { width: 40px; height: 40px; flex-basis: 40px; }
+  .next-step h2 { font-size: 1.35rem; }
+  .card { padding: 1.2rem; }
+  .actions { flex-wrap: wrap; }
+  .simple-footer { width: calc(100% - 2rem); flex-wrap: wrap; }
+  .simple-footer span { display: none; }
+  .lernmaterial-frame { min-height: 460px; height: 72vh; }
+  .exam-card .tablewrap { overflow: visible; }
+  .exam-card table, .exam-card tbody, .exam-card tr, .exam-card td { display: block; width: 100%; }
+  .exam-card thead { display: none; }
+  .exam-card tr { padding: 1rem 0; border-bottom: 1px solid var(--border); }
+  .exam-card td { border: 0; padding: .35rem 0; text-align: left; }
+  .exam-card td.num::after { content: ' Minuten'; }
+  .exam-card .plan-material-cell { min-width: 0; max-width: none; }
+  .exam-card select, .exam-card form button { max-width: 100%; }
+  .row > *, .field { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

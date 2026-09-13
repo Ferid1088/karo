@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Fragen – Karo{% endblock %}
+{% block mainclass %}{{ 'focus-view' if quiz.state == 'bereit' and quiz.modus == 'bildschirm' else '' }}{% endblock %}
 {% block content %}
+<a class="back-link" href="/lernen">← Später weiterlernen</a>
+<div data-quiz-state="{{ quiz.state }}" data-draft-key="karo-antworten-{{ quiz.id }}"></div>
 {% set thema = quiz.thema or {} %}
 <h1>{{ thema.label or 'Fragen' }}</h1>
 <p class="sub">
@@ -15,7 +18,7 @@
   <div class="card">
     <h3>Die Fragen werden erstellt</h3>
     <p>Karo schreibt gerade passende Fragen
-    aus Ihrem Schulmaterial. Das dauert etwa eine halbe Minute.</p>
+    aus deinen Schulblättern. Gleich geht es los.</p>
     <p class="hint">Diese Seite aktualisiert sich von selbst, sobald die Fragen fertig sind.
     {% if offen %}({{ offen }} Vorgang läuft){% endif %}</p>
     <script>karoAutoRefresh("/quiz/{{ quiz.id }}/status", "{{ signatur }}");</script>
@@ -49,15 +52,16 @@
 
 {% elif quiz.state == 'bereit' %}
   <div class="card">
-    <p class="hint">Das Kind beantwortet die Fragen hier. Kurze Antworten
-    genügen — eine Zahl, ein Bruch, ein Satz.</p>
+    <p class="hint">Nimm dir Zeit. Eine Zahl oder ein kurzer Satz reicht. Du musst noch nicht alles wissen.</p>
   </div>
-  <form method="post" action="/quiz/{{ quiz.id }}/antworten">
+  <form method="post" action="/quiz/{{ quiz.id }}/antworten" data-answer-form>
+    <div class="question-toolbar" data-question-toolbar hidden><span data-question-count aria-live="polite"></span><progress data-question-progress max="{{ quiz.fragen|length }}" value="1" aria-label="Fortschritt der Fragerunde"></progress></div>
+    <p class="hint" data-draft-status role="status"></p>
     {{ csrf_input() }}
     {% for f in quiz.fragen %}
-    <div class="item">
+    <div class="item" data-question>
       <div class="pos">Frage {{ f.position }}{% if f.stufe %} · {{ f.stufe }}{% endif %}</div>
-      <p class="aufgabe">{{ f.frage }}</p>
+      <p class="aufgabe" tabindex="-1">{{ f.frage }}</p>
       <div class="field" style="margin:0">
         <label for="a{{ f.id }}" class="sr">Antwort</label>
         <input type="text" id="a{{ f.id }}" name="antwort_{{ f.id }}"
@@ -67,7 +71,9 @@
     </div>
     {% endfor %}
     <div class="actions" style="margin-top:1rem">
-      <button type="submit">Fertig — auswerten</button>
+      <button type="button" class="ghost" data-question-prev hidden>← Zurück</button>
+      <button type="button" data-question-next hidden>Weiter →</button>
+      <button type="submit" data-answer-submit>Fertig – Antworten abgeben</button>
       <a class="btn quiet" href="/">später</a>
     </div>
   </form>
@@ -75,8 +81,7 @@
 {% elif quiz.state == 'beantwortet' %}
   <div class="card">
     <h3>Die Antworten werden ausgewertet</h3>
-    <p>Karo beurteilt jede Antwort und schlägt einen Fehlertyp vor. Danach
-    geben Sie frei.</p>
+    <p>Du hast deine Antworten abgegeben. Karo schaut sie an. Danach schaut ein Erwachsener mit dir zusammen nach.</p>
     <p class="hint">Diese Seite aktualisiert sich von selbst, sobald die Auswertung fertig ist.
     {% if offen %}({{ offen }} Vorgang läuft){% endif %}</p>
     <script>karoAutoRefresh("/quiz/{{ quiz.id }}/status", "{{ signatur }}");</script>
@@ -84,18 +89,15 @@
 
 {% else %}
   {% if quiz.finished_at %}
-  <div class="msg ok">Diese Fragerunde ist freigegeben. Bewertungen sind
-  unveränderlich — das ist Absicht: der Lernstand soll nicht rückwirkend
-  umgeschrieben werden können.</div>
+  <div class="msg ok">Geschafft! Deine Antworten sind gemeinsam geprüft und gespeichert.</div>
   {% else %}
   <div class="card">
-    <p class="hint">Vorschlag von Karo. Sie entscheiden — Ihre Korrekturen
-    werden gezählt und zeigen mit der Zeit, wie verlässlich die Vorschläge
-    sind.</p>
+    <p class="hint">Für Eltern: Bitte jede Antwort ansehen und die Bewertung bestätigen oder ändern.</p>
   </div>
   {% endif %}
 
-  <form method="post" action="/quiz/{{ quiz.id }}/freigabe">
+  {% if not quiz.finished_at %}<h2>Jetzt gemeinsam nachsehen</h2><p>Hol einen Erwachsenen dazu. Ihr schaut euch deine Antworten zusammen an.</p>{% endif %}
+  <form method="post" action="/quiz/{{ quiz.id }}/freigabe" data-review-form>
     {{ csrf_input() }}
     {% for f in quiz.fragen %}
     <div class="item {{ 'low' if f.vorschlag_konf is not none and f.vorschlag_konf < 0.6 }}">
@@ -124,25 +126,28 @@
 
       <div class="row">
         <div style="flex:0 0 auto">
-          <label>Bewertung</label>
+          {% if quiz.finished_at and not f.antwort_id %}<p class="klein">Übersprungen – ohne Bewertung.</p>{% else %}
+          <p class="klein">{{ ('Bestätigte Bewertung' if f.antwort_id else 'Vorschlag von Karo') }}: {{ 'richtig' if (f.bestaetigt_richtig if f.antwort_id else f.vorschlag_richtig) == 1 else ('falsch' if (f.bestaetigt_richtig if f.antwort_id else f.vorschlag_richtig) == 0 else 'bitte selbst prüfen') }}</p>{% endif %}
+          <label>Ihre Entscheidung</label>
           <div class="seg">
             <label><input type="radio" name="urteil_{{ f.id }}" value="ja"
-              {{ 'checked' if f.vorschlag_richtig == 1 }}
-              {{ 'disabled' if f.antwort_id }}><span>richtig</span></label>
+              {{ 'checked' if quiz.finished_at and f.bestaetigt_richtig == 1 }}
+              {{ 'disabled' if quiz.finished_at }}><span>richtig</span></label>
             <label><input type="radio" name="urteil_{{ f.id }}" value="nein"
-              {{ 'checked' if f.vorschlag_richtig == 0 }}
-              {{ 'disabled' if f.antwort_id }}><span>falsch</span></label>
+              {{ 'checked' if quiz.finished_at and f.bestaetigt_richtig == 0 }}
+              {{ 'disabled' if quiz.finished_at }}><span>falsch</span></label>
             <label><input type="radio" name="urteil_{{ f.id }}" value="skip"
-              {{ 'disabled' if f.antwort_id }}><span>überspringen</span></label>
+              {{ 'checked' if quiz.finished_at and not f.antwort_id }}
+              {{ 'disabled' if quiz.finished_at }}><span>überspringen</span></label>
           </div>
         </div>
         <div>
           <label for="fe{{ f.id }}">Fehlertyp</label>
           <select name="fehler_{{ f.id }}" id="fe{{ f.id }}"
-                  {{ 'disabled' if f.antwort_id }}>
+                  {{ 'disabled' if quiz.finished_at }}>
             <option value="">–</option>
             {% for key, label in error_labels.items() %}
-            <option value="{{ key }}" {{ 'selected' if f.vorschlag_fehler == key }}>{{ label }}</option>
+            <option value="{{ key }}" {{ 'selected' if (f.bestaetigt_fehler if quiz.finished_at else f.vorschlag_fehler) == key }}>{{ label }}</option>
             {% endfor %}
           </select>
         </div>
@@ -155,7 +160,7 @@
 
     {% if quiz.fragen and not quiz.finished_at %}
     <div class="actions" style="margin-top:1rem">
-      <button type="submit">Freigeben und Flagge setzen</button>
+      <button type="submit">Bewertungen speichern</button>
       <a class="btn quiet" href="/">Zurück</a>
     </div>
     <p class="hint" style="margin-top:.6rem">Jede Frage braucht eine
@@ -164,4 +169,5 @@
     {% endif %}
   </form>
 {% endif %}
+{% if quiz.finished_at %}<a class="btn section-space" href="/lernstand">Meine Erfolge ansehen</a>{% endif %}
 {% endblock %}

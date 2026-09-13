@@ -2,13 +2,13 @@
 {% block title %}{{ topic.label }} – Karo{% endblock %}
 {% block mainclass %}learning-main{% endblock %}
 {% block content %}
-<a class="back-link" href="/lernzyklus">← Alle Themen</a>
-<header class="page-heading"><p class="eyebrow">Lernrunde vorbereiten</p><h1>{{ topic.label }}</h1><p class="sub">{{ 'Wir schauen uns den Rechenweg gemeinsam an.' if topic.flag in ('rot','gelb') else 'Ein paar Fragen zeigen, was du schon kannst.' }}</p></header>
+<a class="back-link" href="/lernen">← Alle Themen</a>
+<header class="page-heading"><p class="eyebrow">Dein Thema</p><h1>{{ topic.label }}</h1><p class="sub">{{ 'Wir schauen uns den Rechenweg gemeinsam an.' if topic.flag in ('rot','gelb') else 'Ein paar Fragen zeigen, was du schon kannst.' }}</p></header>
 {% if topic.flag in ('rot','gelb') %}
 <form class="card" method="post" action="/lernzyklus/{{ topic.id }}/start">{{ csrf_input() }}
-<h2>Mit einer Erklärung beginnen</h2><p>Danach kannst du mit ein paar Fragen üben.</p>
+<h2>Erklärung anschauen</h2><p>Danach kannst du mit ein paar Fragen üben.</p>
 <details class="options"><summary>Format ändern</summary><label for="ausgabe">Lernmaterial</label><select name="ausgabe" id="ausgabe">{% for value, label in ausgabe_labels.items() %}<option value="{{ value }}" {{ 'selected' if cfg.default_ausgabe == value }}>{{ label }}</option>{% endfor %}</select></details>
-<button type="submit">Lernrunde vorbereiten {{ icon('arrow') }}</button></form>
+<button type="submit">Erklärung starten {{ icon('arrow') }}</button></form>
 {% endif %}
 <{% if topic.flag in ('rot','gelb') %}details{% else %}section{% endif %} class="card">
 {% if topic.flag in ('rot','gelb') %}<summary>Direkt Fragen beantworten</summary>{% else %}<h2>Los geht’s</h2>{% endif %}

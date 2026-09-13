@@ -25,7 +25,10 @@ BASE = Path(__file__).parent.parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 
 try:
-    ASSET_VERSION = str(int((BASE / "static" / "karo.css").stat().st_mtime))
+    ASSET_VERSION = str(max(
+        (BASE / "static" / name).stat().st_mtime_ns
+        for name in ("karo.css", "simple.css", "simple.js")
+    ))
 except OSError:
     ASSET_VERSION = "0"
 
@@ -56,6 +59,8 @@ def render(request: Request, name: str, status_code: int = 200,
         "today": db.today(),
         "path": request.url.path,
         "error": None,
+        "adult_page": request.url.path.startswith(("/eltern", "/wissen", "/themen", "/recherche", "/setup", "/protokoll")),
+        "child_flags": {"gruen": "Das kannst du gut", "gelb": "Du wirst sicherer", "rot": "Das üben wir zusammen", "weiss": "Noch nicht ausprobiert"},
         "offene_vorschlaege": topics.anzahl_vorschlaege(),
         "offene_funde": research.anzahl_vorschlaege(),
     }

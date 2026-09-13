@@ -2,21 +2,15 @@
 {% block title %}Klassenarbeit – Karo{% endblock %}
 {% block content %}
 {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
-<h1>Klassenarbeit</h1>
-<p class="sub">Beim Anlegen werden die aktuellen Flaggen eingefroren. Nach der
-Arbeit tragen Sie ein, was tatsächlich saß. Daraus entsteht die einzige echte
-Messung, ob dieses System funktioniert.</p>
+<a class="back-link" href="/lernen">← Lernen</a><h1>Dein Plan für die Klassenarbeit</h1>
+<p class="sub">Such dir einen Lerntag aus. Öffne dein Material und übe danach mit Fragen.</p>
 
-<div class="tabs" data-tabgroup="klassenarbeit" role="tablist" aria-label="Bereiche">
-  <button type="button" class="tab-btn" data-tab="neu">Neu anlegen</button>
-  <button type="button" class="tab-btn" data-tab="verlauf">Verlauf
-    {% if zeilen %}<b class="badge">{{ zeilen | length }}</b>{% endif %}</button>
-</div>
 
-<div class="tab-panel" data-tabgroup="klassenarbeit" data-tab="neu">
+
+<details class="card disclosure" id="klassenarbeit-neu" {{ 'open' if scan or not zeilen }}><summary>Für Eltern: Klassenarbeit hinzufügen</summary>
 
 <div class="card">
-  <h3><span class="klein">Schritt 1 (optional)</span><br>Themenblatt einlesen</h3>
+  <h3><span class="klein">Schritt 1</span><br>Themenblatt einlesen</h3>
   <p class="hint">Foto oder Scan des Ankündigungsblatts hochladen — Karo liest
   Themen und, falls lesbar, den Termin heraus und trägt beides unten ein.
   Geprüft und angelegt wird trotzdem erst von Hand.</p>
@@ -72,13 +66,13 @@ Messung, ob dieses System funktioniert.</p>
     </div>
   </div>
   <button type="submit" {{ 'disabled' if not (scan and scan.state == 'gelesen') }}>
-    Anlegen, Prognose einfrieren und Lernplan erstellen</button>
+    Klassenarbeit und Lernplan anlegen</button>
 </form>
-</div>
+</details>
 
-<div class="tab-panel" data-tabgroup="klassenarbeit" data-tab="verlauf">
+<section id="klassenarbeit-verlauf">
 {% for e in zeilen %}
-<details class="card">
+<details class="card exam-card" {{ 'open' if loop.first }}>
   <summary style="cursor:pointer; font-weight:700; font-size:1.08rem">{{ e.exam_date[8:10] }}.{{ e.exam_date[5:7] }}.{{ e.exam_date[0:4] }}
     {% if e.kalibrierung.quote is not none %}
       <span class="pill {{ 'gruen' if e.kalibrierung.quote >= 0.7 else 'gelb' }}">
@@ -106,7 +100,7 @@ Messung, ob dieses System funktioniert.</p>
     <button type="submit" class="ghost">Erneut versuchen</button>
   </form>
   {% elif e.plan and e.plan.state == 'bereit' %}
-  <details style="margin:.7rem 0">
+  <details style="margin:.7rem 0" open>
     <summary style="cursor:pointer"><strong>Lernplan</strong></summary>
     {% if e.plan.einschaetzung %}<p class="hint" style="margin-top:.5rem">{{ e.plan.einschaetzung }}</p>{% endif %}
     {% if e.plan.tagesplan_liste %}
@@ -172,6 +166,7 @@ Messung, ob dieses System funktioniert.</p>
   {% endif %}
 
   {% if e.kalibrierung.zeilen %}
+  <details class="disclosure"><summary>Für Eltern: Ergebnis der Klassenarbeit eintragen</summary>
   <form method="post" action="/klassenarbeit/{{ e.id }}/ergebnis">
     {{ csrf_input() }}
     <div class="tablewrap" style="margin:.7rem 0">
@@ -198,15 +193,15 @@ Messung, ob dieses System funktioniert.</p>
       </table>
     </div>
     <button type="submit" class="ghost">Ergebnisse speichern</button>
-  </form>
+  </form></details>
   {% else %}
   <p class="hint">Zum Zeitpunkt des Anlegens gab es keine bewerteten Themen —
   es gibt also nichts zu vergleichen.</p>
   {% endif %}
 </details>
 {% else %}
-<div class="empty">Noch keine Klassenarbeit angelegt.</div>
+<div class="empty">Noch kein Lernplan da. Ein Erwachsener kann oben eine Klassenarbeit hinzufügen.</div>
 {% endfor %}
-</div>
+</section>
 <script src="/static/exam-material.js?v={{ asset_version }}" defer></script>
 {% endblock %}

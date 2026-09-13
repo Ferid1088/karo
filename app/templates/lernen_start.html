@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Lernen – Karo{% endblock %}
+{% block content %}
+<p class="eyebrow">EIN THEMA NACH DEM ANDEREN</p><h1>Womit möchtest du loslegen?</h1>
+<p class="sub">Such dir ein Thema aus. Karo hilft dir weiter.</p>
+{% if schritte %}
+<section class="card"><h2>Hier warst du zuletzt</h2><div class="simple-list">
+{% for s in schritte %}<a class="simple-list-link" href="{{ s.url }}"><span><strong>{{ s.titel }}</strong><small>{{ s.text }}</small></span><span aria-hidden="true">→</span></a>{% endfor %}
+</div></section>{% endif %}
+{% if themen %}<div class="choice-grid">
+{% for t in themen %}<a class="choice-card" href="/lernzyklus/{{ t.id }}"><span class="child-status {{ t.flag }}">{{ child_flags[t.flag] }}</span><h2>{{ t.label }}</h2><span class="topic-link">Thema öffnen <span aria-hidden="true">→</span></span></a>{% endfor %}
+</div>{% else %}<section class="card"><h2>Deine Themen kommen hierhin</h2><p>Ein Erwachsener fügt ein Schulblatt hinzu. Dann könnt ihr loslegen.</p><a class="btn" href="/eltern">Gemeinsam vorbereiten</a></section>{% endif %}
+<a class="simple-list-link card" href="/klassenarbeit"><span><strong>Dein Plan für die Klassenarbeit</strong><small>Alle Lerntage an einem Ort.</small></span><span aria-hidden="true">→</span></a>
+{% if reviews %}<p class="quiet-note">Es gibt Antworten zum gemeinsamen Anschauen. <a href="/eltern">Für Eltern</a></p>{% endif %}
+{% endblock %}

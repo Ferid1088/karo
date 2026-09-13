@@ -144,6 +144,7 @@ const KERNIDEE = {json.dumps(kernidee or "", ensure_ascii=False)};
 
 let index = 0, laeuft = false, stimmen = [], aktuelleStimme = null;
 const $ = (id) => document.getElementById(id);
+const sprachHinweis = $("hinweis").textContent;
 
 function stimmenLaden() {{
   const alle = window.speechSynthesis ? speechSynthesis.getVoices() : [];
@@ -153,11 +154,15 @@ function stimmenLaden() {{
   if (!stimmen.length) {{
     wahl.innerHTML = '<option>keine deutsche Stimme gefunden</option>';
     wahl.disabled = true;
+    $("play").disabled = true;
     $("hinweis").textContent =
       "Dieser Browser hat keine deutsche Sprachausgabe. Die Folien lassen " +
       "sich trotzdem lesen — der Sprechtext steht unter jeder Folie.";
     return;
   }}
+  wahl.disabled = false;
+  $("play").disabled = false;
+  $("hinweis").textContent = sprachHinweis;
   stimmen.forEach((v, i) => {{
     const o = document.createElement("option");
     o.value = String(i); o.textContent = v.name;

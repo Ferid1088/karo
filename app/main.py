@@ -25,7 +25,7 @@ from starlette.status import HTTP_303_SEE_OTHER
 
 from . import config, db, jobs, security
 from .config import ConfigUnreadable
-from .routers import auth, eltern, kind, admin
+from .routers import auth, eltern, kind, admin, dashboard, lernzyklus
 
 security.configure_logging(os.environ.get("KARO_LOG_LEVEL", "INFO"))
 log = logging.getLogger("karo")
@@ -34,7 +34,10 @@ BASE = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 
 try:
-    ASSET_VERSION = str(int((BASE / "static" / "karo.css").stat().st_mtime))
+    ASSET_VERSION = str(max(
+        (BASE / "static" / name).stat().st_mtime_ns
+        for name in ("karo.css", "simple.css", "simple.js")
+    ))
 except OSError:
     ASSET_VERSION = "0"
 
@@ -65,6 +68,8 @@ app = FastAPI(title="Karo", lifespan=lifespan,
               docs_url=None, redoc_url=None, openapi_url=None)
 
 app.include_router(auth.router)
+app.include_router(dashboard.router)
+app.include_router(lernzyklus.router)
 app.include_router(eltern.router)
 app.include_router(kind.router)
 app.include_router(admin.router)

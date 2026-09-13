@@ -10,6 +10,26 @@ danach nach, bis das Thema sitzt.
 
 ---
 
+## Einfach durch den Alltag
+
+Die Hauptnavigation hat drei Ziele: **Heute** zeigt den nächsten Lernschritt,
+**Lernen** die Themen und angefangenen Runden, **Erfolge** den bestätigten
+Lernstand. Auf der Lernseite steht die Erklärung direkt über dem Knopf für die
+Fragen. Am Bildschirm erscheint jeweils eine Frage; Antworten werden auf dem
+Gerät zwischengespeichert, damit eine Pause möglich ist. Ohne JavaScript bleibt
+der vollständige Fragebogen als normales Formular nutzbar.
+
+Unter **Für Eltern** sind Schulblätter, Themenfreigabe, Quellen, Klassenarbeiten,
+ausführliche Berichte und Export, Einstellungen sowie Protokoll und erneute
+Versuche erreichbar. Selten benötigte Optionen lassen sich aufklappen. Der
+Elternbereich ordnet die Funktionen; er ist keine zusätzliche Passwortsperre.
+Bewertungen brauchen weiterhin eine ausdrückliche Entscheidung je Antwort.
+
+Der Klassenarbeitsplan ist auch direkt von **Heute** erreichbar. Lernmaterialien
+lassen sich weiterhin in jeder Themenzeile erstellen und in einem eigenen Tab
+öffnen. Materialarchiv, frühere Lernrunden, Papieraufgaben, Ausgabeformate und
+Speicherpfad bleiben verfügbar.
+
 ## Der Ablauf
 
 **1. Wissensbasis.** Erklärblätter und Aufgabenblätter werden fotografiert und
@@ -223,7 +243,7 @@ eingeben*.
 
 ## Drei Ausgabeformen für das Lernmaterial
 
-Im Bereich **Klassenarbeit → Verlauf → Lernplan** lässt sich neues Material
+Im Bereich **Klassenarbeit → Lernplan** lässt sich neues Material
 direkt in der Themenzeile erstellen. Der Fortschritt erscheint in dieser Zeile;
 der fertige Link öffnet das Material mit Lernkontrolle in einem eigenen Tab.
 Der Klassenarbeit-Tab bleibt dabei unverändert. Jede Erstellung gehört zu ihrer
@@ -397,7 +417,7 @@ ist kein Backup.
 make test
 ```
 
-58 Tests, ohne Netz und ohne Kosten: beide Zugangswege laufen gegen ein
+Die Tests laufen ohne Modellkosten: beide Zugangswege laufen gegen ein
 gefälschtes Modell, der Abo-Weg gegen eine nachgebildete Claude-CLI, die prüft,
 dass kein API-Schlüssel in der Umgebung steht und `--bare` nicht benutzt wird
 (es würde die Abo-Anmeldung übergehen).
