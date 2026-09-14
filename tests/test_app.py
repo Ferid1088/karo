@@ -1183,6 +1183,66 @@ def test_quiz_check_race_schuetzt_question_daten(
     assert nach["vorschlag_richtig"] is None
 
 
+def test_freigegeben_lehnt_ein_neues_antwortblatt_ab(
+        client, fake_llm, fake_cli, app_env):
+    """blatt_hochladen() ist in change.txt (Klassenarbeits-Cleanup) explizit
+    als Mutationspfad genannt, der FREIGEGEBEN nicht mehr verlassen darf."""
+    from app import quizzes as qz
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    quiz = _quiz_bereit_zum_freigeben(client, fake_llm, app_env, topic_id)
+    qz.freigeben(quiz["id"], _alle_entscheidungen(app_env, quiz["id"]))
+    blatt_pfad_vorher = app_env.db.q1(
+        "SELECT blatt_pfad FROM quiz WHERE id=?", quiz["id"])["blatt_pfad"]
+
+    with pytest.raises(qz.QuizError):
+        qz.blatt_hochladen(quiz["id"], b"irgendein-bild", ".jpg")
+
+    nach = app_env.db.q1("SELECT state, blatt_pfad FROM quiz WHERE id=?", quiz["id"])
+    assert nach["state"] == qz.STATE_FREIGEGEBEN
+    assert nach["blatt_pfad"] == blatt_pfad_vorher
+
+
+def test_freigegeben_ist_terminal_gegen_alle_mutationspfade(
+        client, fake_llm, fake_cli, app_env):
+    """Zusammenfassender Test (change.txt Abschnitt 1/15): nach der Freigabe
+    bleiben quiz.state, quiz.finished_at, die Antworten in `question` und
+    die bereits geschriebenen `answer_log`-Zeilen unter jedem der bekannten
+    Mutationspfade unveraendert."""
+    from app import quizzes as qz
+
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    quiz = _quiz_bereit_zum_freigeben(client, fake_llm, app_env, topic_id)
+    entscheidungen = _alle_entscheidungen(app_env, quiz["id"])
+    qz.freigeben(quiz["id"], entscheidungen)
+
+    vorher_quiz = dict(app_env.db.q1("SELECT * FROM quiz WHERE id=?", quiz["id"]))
+    vorher_fragen = [dict(r) for r in app_env.db.q(
+        "SELECT * FROM question WHERE quiz_id=? ORDER BY id", quiz["id"])]
+    vorher_log = [dict(r) for r in app_env.db.q(
+        "SELECT * FROM answer_log ORDER BY id")]
+
+    with pytest.raises(qz.QuizError):
+        qz.antworten_speichern(quiz["id"], {vorher_fragen[0]["id"]: "geaendert"})
+    with pytest.raises(qz.QuizError):
+        qz.blatt_hochladen(quiz["id"], b"irgendein-bild", ".jpg")
+    qz.job_quiz_check({"quiz_id": quiz["id"]})              # muss still no-open
+    qz.job_quiz_read_sheet({"quiz_id": quiz["id"], "document_id": 999999})
+
+    nach_quiz = dict(app_env.db.q1("SELECT * FROM quiz WHERE id=?", quiz["id"]))
+    nach_fragen = [dict(r) for r in app_env.db.q(
+        "SELECT * FROM question WHERE quiz_id=? ORDER BY id", quiz["id"])]
+    nach_log = [dict(r) for r in app_env.db.q("SELECT * FROM answer_log ORDER BY id")]
+
+    assert nach_quiz == vorher_quiz
+    assert nach_quiz["state"] == qz.STATE_FREIGEGEBEN
+    assert nach_fragen == vorher_fragen
+    assert nach_log == vorher_log
+
+
 # ==========================================================================
 # Prüfung auf Papier
 # ==========================================================================

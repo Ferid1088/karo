@@ -32,26 +32,42 @@ log = logging.getLogger("karo.quiz")
 BILDSCHIRM = "bildschirm"
 PAPIER = "papier"
 
-# --- Zustandsmaschine (KaroRefactoring_Plan.md, Abschnitt 13) --------------
-# offen -> bereit -> [beantwortet ->] ausgewertet.
+# --- Zustandsmaschine (KaroRefactoring_Plan.md Abschnitt 13; change.txt
+#     Abschnitt 1/9) -----------------------------------------------------
 #   offen:       Karo erstellt die Fragen noch (anfordern/job_quiz_build).
 #   bereit:      Fragen stehen. Beim Bildschirmweg antwortet jetzt das Kind;
 #                bei einer muendlichen Lernkontrolle (exam_learning) kann
 #                die Lernbegleitung auch direkt von hier aus freigeben, ohne
-#                dass das Kind digital tippt.
+#                dass das Kind digital tippt — daher bereit -> freigegeben.
 #   beantwortet: Antworten da (antworten_speichern); Karo schlaegt eine
-#                Bewertung vor (job_quiz_check).
+#                Bewertung vor (job_quiz_check). Auch von hier kann direkt
+#                freigegeben werden, ohne auf den Vorschlag zu warten.
 #   ausgewertet: der Vorschlag steht — heisst noch nicht "freigegeben".
-#   freigegeben: der Endzustand. `finished_at` bleibt der Zeitstempel dazu,
-#                ist aber nicht mehr die Quelle der Wahrheit — freigeben()
-#                setzt beide Felder in derselben atomaren Bedingung.
-# antworten_speichern()/freigeben() pruefen beide auf das jeweils Noetige
-# statt auf einen einzelnen erwarteten Vorzustand (siehe deren Docstrings).
+#   freigegeben: der Endzustand. Keine ausgehende Kante — nichts darf ihn
+#                verlassen. `finished_at` bleibt der Zeitstempel dazu, ist
+#                aber nicht mehr die Quelle der Wahrheit; state ist es.
 STATE_OFFEN = "offen"
 STATE_BEREIT = "bereit"
 STATE_BEANTWORTET = "beantwortet"
 STATE_AUSGEWERTET = "ausgewertet"
 STATE_FREIGEGEBEN = "freigegeben"
+
+#: Erlaubte Zielzustaende je Ausgangszustand — die einzige Quelle der
+#: Wahrheit fuer die Zustandsmaschine. FREIGEGEBEN hat keinen Eintrag mit
+#: Zielen: kein Code darf einen freigegebenen Quiz in einen anderen
+#: Zustand ueberfuehren (change.txt Abschnitt 1).
+ALLOWED_TRANSITIONS: dict[str, frozenset[str]] = {
+    STATE_OFFEN: frozenset({STATE_BEREIT}),
+    STATE_BEREIT: frozenset({STATE_BEANTWORTET, STATE_FREIGEGEBEN}),
+    STATE_BEANTWORTET: frozenset({STATE_AUSGEWERTET, STATE_FREIGEGEBEN}),
+    STATE_AUSGEWERTET: frozenset({STATE_FREIGEGEBEN}),
+    STATE_FREIGEGEBEN: frozenset(),
+}
+
+#: Aus welchen Zustaenden `freigeben()` ueberhaupt aufgerufen werden darf —
+#: aus ALLOWED_TRANSITIONS abgeleitet statt separat gepflegt.
+_VORZUSTAENDE_FUER_FREIGABE = tuple(
+    von for von, ziele in ALLOWED_TRANSITIONS.items() if STATE_FREIGEGEBEN in ziele)
 
 
 def client() -> ClaudeClient:
@@ -371,6 +387,11 @@ def blatt_hochladen(quiz_id: int, daten: bytes, endung: str) -> int:
 
     aufnahme = ingest.aufnehmen(daten, endung, rolle="bearbeitet")
     with db.tx() as c:
+        # Frische Pruefung: ingest.aufnehmen() oben ist der Moment, in dem
+        # eine Freigabe dazwischenkommen kann (change.txt P1/Aufgabe 1).
+        aktuell = c.execute("SELECT state FROM quiz WHERE id=?", (quiz_id,)).fetchone()
+        if aktuell is None or aktuell["state"] not in (STATE_BEREIT, STATE_BEANTWORTET):
+            raise QuizError("Zu dieser Fragerunde passt kein Antwortblatt mehr.")
         c.execute("UPDATE quiz SET blatt_pfad=COALESCE(blatt_pfad, ?) WHERE id=?",
                   (aufnahme["stored_path"], quiz_id))
     jobs.enqueue("quiz_read_sheet",
@@ -483,7 +504,7 @@ def freigeben(quiz_id: int, entscheidungen: list[dict]) -> dict:
     quiz = db.q1("SELECT * FROM quiz WHERE id = ?", quiz_id)
     if quiz is None:
         raise QuizError("Fragerunde nicht gefunden.")
-    if quiz["finished_at"]:
+    if quiz["state"] == STATE_FREIGEGEBEN:
         return {"geschrieben": 0, "uebersprungen": 0, "bereits": True}
 
     gueltig = {r["id"] for r in db.q(
@@ -502,13 +523,17 @@ def freigeben(quiz_id: int, entscheidungen: list[dict]) -> dict:
     tag = db.today()
     geschrieben = uebersprungen = 0
     with db.tx() as c:
-        # Atomare Beanspruchung: gewinnt nur, wer die Zeile von "noch nicht
-        # fertig" auf "freigegeben" dreht. BEGIN IMMEDIATE (siehe db.tx())
-        # serialisiert das gegen jeden anderen gleichzeitigen Aufruf — die
-        # zweite Freigabe sieht hier affected=0 und schreibt nichts mehr.
+        # Atomare Beanspruchung: gewinnt nur, wer die Zeile aus einem der
+        # in ALLOWED_TRANSITIONS erlaubten Vorzustaende nach FREIGEGEBEN
+        # dreht — nicht nur "finished_at fehlt noch". BEGIN IMMEDIATE
+        # (siehe db.tx()) serialisiert das gegen jeden anderen gleich-
+        # zeitigen Aufruf: die zweite Freigabe sieht hier affected=0 und
+        # schreibt nichts mehr.
+        platzhalter = ",".join("?" * len(_VORZUSTAENDE_FUER_FREIGABE))
         beansprucht = c.execute(
-            "UPDATE quiz SET state=?, finished_at=? WHERE id=? AND finished_at IS NULL",
-            (STATE_FREIGEGEBEN, db.now(), quiz_id)).rowcount == 1
+            f"UPDATE quiz SET state=?, finished_at=? WHERE id=? AND state IN ({platzhalter})",
+            (STATE_FREIGEGEBEN, db.now(), quiz_id, *_VORZUSTAENDE_FUER_FREIGABE)
+        ).rowcount == 1
         if not beansprucht:
             return {"geschrieben": 0, "uebersprungen": 0, "bereits": True}
 
