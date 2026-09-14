@@ -1107,6 +1107,83 @@ def test_erfolgreiche_nacharbeit_markiert_den_job_sofort_fertig(
 
 
 # ==========================================================================
+# P1: question-Daten bleiben nach FREIGEGEBEN vollstaendig unveraendert
+# ==========================================================================
+
+def test_antworten_speichern_race_schuetzt_question_daten(
+        client, fake_llm, fake_cli, app_env, monkeypatch):
+    """Die Vor-Pruefung in antworten_speichern() sieht den Zustand vor der
+    Transaktion — kommt eine Freigabe genau in diesem Fenster dazwischen,
+    darf die Transaktion die Antwort trotzdem nicht mehr schreiben. Der
+    Zustand wird hier ueber `db.q1` genau an der Vor-Pruefung eingeschleust:
+    die Pruefung sieht noch den alten Stand, die eigentliche Freigabe
+    passiert "waehrenddessen" echt."""
+    from app import quizzes as qz
+
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    quiz = _quiz_bereit_zum_freigeben(client, fake_llm, app_env, topic_id)
+    frage = app_env.db.q1(
+        "SELECT id, schueler_antwort FROM question WHERE quiz_id=? LIMIT 1", quiz["id"])
+    entscheidungen = _alle_entscheidungen(app_env, quiz["id"])
+
+    orig_q1 = qz.db.q1
+    zustand = {"n": 0}
+
+    def eingeschleust(sql, *params):
+        zustand["n"] += 1
+        ergebnis = orig_q1(sql, *params)
+        if zustand["n"] == 1 and sql.strip().startswith("SELECT * FROM quiz WHERE id = ?"):
+            veraltet = ergebnis
+            qz.freigeben(quiz["id"], entscheidungen)   # "waehrenddessen"
+            return veraltet
+        return ergebnis
+
+    monkeypatch.setattr(qz.db, "q1", eingeschleust)
+
+    with pytest.raises(qz.QuizError):
+        qz.antworten_speichern(quiz["id"], {frage["id"]: "nachtraeglich geaendert"})
+
+    nach = app_env.db.q1("SELECT schueler_antwort FROM question WHERE id=?", frage["id"])
+    assert nach["schueler_antwort"] == frage["schueler_antwort"]
+
+
+def test_quiz_check_race_schuetzt_question_daten(
+        client, fake_llm, fake_cli, app_env, monkeypatch):
+    """Derselbe Wettlauf fuer job_quiz_check(): der LLM-Aufruf ist wieder
+    der Moment, in dem eine dazwischenkommende Freigabe simuliert wird."""
+    from types import SimpleNamespace
+
+    from app import quizzes as qz
+
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    quiz = _quiz_bereit_zum_freigeben(client, fake_llm, app_env, topic_id)
+    quiz_beantworten(client, app_env, quiz["id"], {1: "3/4", 2: "5/9", 3: "2/9"})
+    entscheidungen = _alle_entscheidungen(app_env, quiz["id"])
+    frage = app_env.db.q1(
+        "SELECT id, vorschlag_richtig FROM question WHERE quiz_id=? LIMIT 1", quiz["id"])
+    assert frage["vorschlag_richtig"] is None
+
+    def freigabe_waehrenddessen(**kwargs):
+        qz.freigeben(quiz["id"], entscheidungen)
+        return SimpleNamespace(
+            data={"ergebnisse": [{"position": 1, "richtig": True, "fehlertyp": None,
+                                  "begruendung": "x", "rueckmeldung": "y",
+                                  "konfidenz": 0.9}]},
+            call_id=None)
+
+    monkeypatch.setattr(qz, "client",
+                        lambda: SimpleNamespace(complete=freigabe_waehrenddessen))
+    qz.job_quiz_check({"quiz_id": quiz["id"]})
+
+    nach = app_env.db.q1("SELECT vorschlag_richtig FROM question WHERE id=?", frage["id"])
+    assert nach["vorschlag_richtig"] is None
+
+
+# ==========================================================================
 # Prüfung auf Papier
 # ==========================================================================
 

@@ -210,16 +210,23 @@ def antworten_speichern(quiz_id: int, antworten: dict[int, str]) -> int:
         "SELECT id FROM question WHERE quiz_id = ?", quiz_id)}
     n = 0
     with db.tx() as c:
+        # Frische Pruefung INNERHALB der Transaktion (BEGIN IMMEDIATE, siehe
+        # db.tx()): die Pruefung oben vor der Transaktion schliesst nur den
+        # ueblichen Fall aus. Kommt eine Freigabe genau zwischen dieser
+        # Pruefung und dem Start der Transaktion dazwischen, sieht dieser
+        # Blick hier den frischen Stand und verhindert, dass `question`
+        # nach FREIGEGEBEN noch beschrieben wird (change.txt P1).
+        aktuell = c.execute("SELECT state FROM quiz WHERE id=?", (quiz_id,)).fetchone()
+        if aktuell is None or aktuell["state"] == STATE_FREIGEGEBEN:
+            raise QuizError(
+                "Diese Fragerunde ist bereits freigegeben und kann nicht "
+                "mehr geändert werden.")
         for frage_id, text in antworten.items():
             if int(frage_id) not in gueltig:
                 continue
             c.execute("UPDATE question SET schueler_antwort=? WHERE id=?",
                       ((text or "").strip()[:2000] or None, int(frage_id)))
             n += 1
-        # Bedingtes UPDATE statt eines blinden — schliesst das Fenster, in
-        # dem eine Freigabe genau zwischen der obigen Lese-Pruefung und
-        # diesem Schreibzugriff dazwischenkommt (siehe freigeben()'s
-        # atomarer Beanspruchung; BEGIN IMMEDIATE serialisiert beide).
         c.execute("UPDATE quiz SET state='beantwortet' WHERE id=? AND state != ?",
                   (quiz_id, STATE_FREIGEGEBEN))
 
@@ -261,6 +268,14 @@ def job_quiz_check(payload: dict) -> None:
     nach_position = {f["position"]: f["id"] for f in fragen}
     gesehen: set[int] = set()
     with db.tx() as c:
+        # Frische Pruefung: der LLM-Aufruf oben ist der Moment, in dem eine
+        # direkte Freigabe (z. B. muendliche Lernkontrolle) dazwischenkommen
+        # kann. Ohne diesen Blick wuerde die Schleife unten `question` noch
+        # mit einem laengst ueberholten Vorschlag beschreiben, obwohl die
+        # Fragerunde schon abschliessend freigegeben ist (change.txt P1).
+        aktuell = c.execute("SELECT state FROM quiz WHERE id=?", (quiz_id,)).fetchone()
+        if aktuell is None or aktuell["state"] != STATE_BEANTWORTET:
+            return
         for r in ergebnis.data.get("ergebnisse") or []:
             try:
                 frage_id = nach_position.get(int(r.get("position")))
@@ -403,29 +418,35 @@ müsstest. Einen Namen auf dem Blatt übernimm nicht."""
     gefunden = 0
     uebernommen = False
     with db.tx() as c:
-        for a in ergebnis.data.get("antworten") or []:
-            try:
-                frage_id = nach_position.get(int(a.get("position")))
-            except (TypeError, ValueError):
-                continue
-            if frage_id is None:
-                continue
-            text = (a.get("antwort") or "").strip()
-            c.execute("UPDATE question SET schueler_antwort=? WHERE id=?",
-                      (text[:2000] or None, frage_id))
-            if text:
-                gefunden += 1
+        # Frische Pruefung: der LLM-Aufruf oben ist wieder der Moment, in
+        # dem eine direkte Freigabe dazwischenkommen kann. Erst danach
+        # `question` beschreiben — sonst wuerden die abgelesenen Antworten
+        # dort noch landen, obwohl die Fragerunde schon freigegeben ist
+        # (change.txt P1). Das Dokument selbst gilt trotzdem als gelesen:
+        # das Foto wurde tatsaechlich ausgewertet, nur eben zu spaet.
+        aktuell = c.execute("SELECT state FROM quiz WHERE id=?", (quiz_id,)).fetchone()
+        quiz_aktiv = aktuell is not None and aktuell["state"] in (STATE_BEREIT, STATE_BEANTWORTET)
+        if quiz_aktiv:
+            for a in ergebnis.data.get("antworten") or []:
+                try:
+                    frage_id = nach_position.get(int(a.get("position")))
+                except (TypeError, ValueError):
+                    continue
+                if frage_id is None:
+                    continue
+                text = (a.get("antwort") or "").strip()
+                c.execute("UPDATE question SET schueler_antwort=? WHERE id=?",
+                          (text[:2000] or None, frage_id))
+                if text:
+                    gefunden += 1
         c.execute("UPDATE document SET state='gelesen' WHERE id=?", (doc_id,))
-        if gefunden:
-            # Bedingt: zwischen der Lese-Pruefung oben und hier kann eine
-            # Freigabe dazwischengekommen sein (z. B. eine muendliche
-            # Lernkontrolle, die direkt aus 'bereit' freigibt). Ohne die
-            # Bedingung wuerde dieser Job einen bereits freigegebenen
-            # Endzustand zurueck auf 'beantwortet' drehen.
+        if quiz_aktiv and gefunden:
             uebernommen = c.execute(
                 "UPDATE quiz SET state='beantwortet' WHERE id=? AND state IN (?, ?)",
                 (quiz_id, STATE_BEREIT, STATE_BEANTWORTET)).rowcount == 1
 
+    if not quiz_aktiv:
+        return  # anders abgeschlossen, waehrend das Foto gelesen wurde — kein Fehler.
     if not gefunden:
         raise QuizError(
             "Auf dem Foto war keine Antwort lesbar. Blatt flach hinlegen, von "
@@ -433,9 +454,6 @@ müsstest. Einen Namen auf dem Blatt übernimm nicht."""
     if uebernommen:
         jobs.enqueue("quiz_check", {"quiz_id": quiz_id},
                      dedup_key=f"quiz_check:{quiz_id}")
-    # uebernommen == False heisst: die Fragerunde wurde zwischenzeitlich
-    # anders abgeschlossen (siehe oben) — die abgelesenen Antworten sind
-    # dann nicht mehr relevant, das ist kein Fehler.
 
 
 # --------------------------------------------------------------------------
