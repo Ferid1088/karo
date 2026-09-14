@@ -18,7 +18,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from .. import config, db, teaching
+from .. import config, db, security, teaching
 from ..services import exam, measurement
 from ..services.exam import ExamError
 from .shared import render, flash, zurueck
@@ -58,7 +58,7 @@ async def klassenarbeit_themenblatt(request: Request,
     puffer = bytearray()
     while stueck := await datei.read(1 << 20):
         puffer.extend(stueck)
-        if len(puffer) > 25 * 1024 * 1024:
+        if len(puffer) > security.MAX_UPLOAD_BYTES:
             flash(request, "Die Datei ist zu groß.", "err")
             return zurueck("/klassenarbeit")
 

@@ -15,7 +15,7 @@ from pathlib import Path
 from fastapi import Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-from .. import config, db, ingest, jobs, kb, quizzes, research, topics
+from .. import config, db, ingest, jobs, kb, quizzes, research, security, topics
 from ..domain import FLAG_ORDER
 from ..routers.shared import flash, render, zurueck
 
@@ -66,7 +66,7 @@ async def handle_wissen_upload(request: Request, rolle: str,
     puffer = bytearray()
     while stueck := await datei.read(1 << 20):
         puffer.extend(stueck)
-        if len(puffer) > 25 * 1024 * 1024:
+        if len(puffer) > security.MAX_UPLOAD_BYTES:
             flash(request, "Datei zu groß.", "err")
             return zurueck("/wissen")
 

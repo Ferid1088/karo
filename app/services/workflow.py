@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
 from .. import (config, db, exam_learning, export, ingest, jobs, kb, materials,
-                quizzes, research, teaching, topics)
+                quizzes, research, security, teaching, topics)
 from ..domain import FLAG_ORDER, Flag
 from ..quizzes import QuizError
 from ..teaching import TeachingError
@@ -79,7 +79,7 @@ async def handle_quiz_blatt(request: Request, quiz_id: int,
     puffer = bytearray()
     while stueck := await datei.read(1 << 20):
         puffer.extend(stueck)
-        if len(puffer) > 25 * 1024 * 1024:
+        if len(puffer) > security.MAX_UPLOAD_BYTES:
             flash(request, "Die Datei ist zu groß.", "err")
             return zurueck(f"/quiz/{quiz_id}")
 

@@ -427,6 +427,26 @@ def test_post_ohne_csrf_wird_abgelehnt(client, fake_llm, fake_cli):
     assert client.post("/wissen/einlesen", data={}).status_code == 403
 
 
+def test_upload_groesser_als_das_limit_wird_abgelehnt(
+        client, fake_llm, fake_cli, app_env, monkeypatch):
+    """change.txt Abschnitt 12: Upload-Groessenbegrenzung bleibt in Kraft.
+    Das Limit selbst auf ein paar Bytes verkleinert statt wirklich 25 MB zu
+    senden — dieselbe security.MAX_UPLOAD_BYTES-Konstante steuert alle drei
+    Upload-Formulare (Wissen, Quiz-Blatt, Klassenarbeits-Themenblatt)."""
+    from app import security
+    einrichten(client, fake_llm)
+    monkeypatch.setattr(security, "MAX_UPLOAD_BYTES", 10)
+
+    seite = client.get("/wissen")
+    r = client.post("/wissen/upload", data={"_csrf": csrf_from(seite.text),
+                                            "themenname": "Test"},
+                    files={"datei": ("blatt.jpg", b"x" * 1000, "image/jpeg")},
+                    follow_redirects=True)
+    assert r.status_code == 200
+    assert "zu groß" in r.text
+    assert app_env.db.q("SELECT id FROM document") == []
+
+
 def test_post_von_fremder_seite_wird_abgelehnt(client, fake_llm, fake_cli):
     einrichten(client, fake_llm)
     token = csrf_from(client.get("/wissen").text)
@@ -464,6 +484,48 @@ def test_kind_modus_beschraenkt_auf_kindbereiche(client, fake_llm, fake_cli):
     r = client.post("/logout", data={"_csrf": csrf_from(seite.text)},
                     follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/login"
+
+
+def test_kind_kann_ein_quiz_nicht_selbst_freigeben(
+        client, fake_llm, fake_cli, app_env):
+    """change.txt Abschnitt 12: die Freigabe bleibt Elternsache, auch
+    innerhalb des sonst fuer Kinder erlaubten /quiz-Praefixes — sonst
+    koennte ein Kind seine eigene (ggf. falsche) Antwort selbst als
+    richtig bestaetigen, ohne dass je ein Erwachsener draufsieht."""
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    seite = client.get("/themen")
+    client.post(f"/themen/{topic_id}/pruefen",
+                data={"_csrf": csrf_from(seite.text), "modus": "bildschirm"})
+    run_jobs(app_env, fake_llm)
+    quiz = app_env.db.q1("SELECT * FROM quiz ORDER BY id DESC LIMIT 1")
+    fragen = app_env.db.q("SELECT id FROM question WHERE quiz_id=?", quiz["id"])
+
+    kind_modus_aktivieren(client)
+    seite = client.get(f"/quiz/{quiz['id']}", follow_redirects=False)
+    assert seite.status_code == 200          # die Quiz-Seite selbst bleibt erreichbar
+
+    daten = {"_csrf": csrf_from(seite.text),
+             "frage_id": [str(f["id"]) for f in fragen]}
+    for f in fragen:
+        daten[f"urteil_{f['id']}"] = "ja"
+    r = client.post(f"/quiz/{quiz['id']}/freigabe", data=daten, follow_redirects=False)
+    assert r.status_code == 403
+    assert app_env.db.q1("SELECT state FROM quiz WHERE id=?",
+                         quiz["id"])["state"] != "freigegeben"
+
+
+def test_eltern_koennen_alle_kind_routen_erreichen(
+        client, fake_llm, fake_cli, app_env):
+    """change.txt Abschnitt 12: "parent can access child routes" — die
+    Rollensperre in _kind_erlaubt() greift nur fuer role=='child', eine
+    Eltern-Session ist von ihr unberuehrt."""
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    for pfad in ("/", "/lernen", "/lernzyklus", f"/lernzyklus/{topic_id}"):
+        assert client.get(pfad, follow_redirects=False).status_code == 200, pfad
 
 
 def test_eigenes_kind_passwort_setzt_rolle_kind(client, fake_llm, fake_cli):

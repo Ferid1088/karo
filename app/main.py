@@ -57,15 +57,26 @@ CHILD_ALLOWED_EXACT = frozenset({"/", "/hilfe"})
 CHILD_ALLOWED_PREFIXES = ("/lernen", "/lernzyklus", "/quiz", "/material",
                           "/klassenarbeit/material")
 
+# Innerhalb sonst erlaubter Praefixe bleibt die Freigabe trotzdem
+# Elternsache: "die Lernbegleitung gibt jede Bewertung frei, bevor sie in
+# answer_log landet" (quizzes.py). Ohne diese Ausnahme koennte ein Kind
+# ueber /quiz/{id}/freigabe (oder den /lernzyklus-Alias derselben Route)
+# seine eigene Bewertung selbst bestaetigen (change.txt Abschnitt 12).
+CHILD_FORBIDDEN_SUFFIXES = ("/freigabe",)
+
 
 def _kind_erlaubt(path: str) -> bool:
+    if any(path.endswith(s) for s in CHILD_FORBIDDEN_SUFFIXES):
+        return False
     if path in CHILD_ALLOWED_EXACT:
         return True
     return any(path == p or path.startswith(p + "/")
               for p in CHILD_ALLOWED_PREFIXES)
 
+#: Obergrenze fuer den kompletten Request-Body (Gate, unten). Groesser als
+#: security.MAX_UPLOAD_BYTES: die Formular-Umhuellung eines Uploads braucht
+#: etwas mehr Platz als die reine Datei.
 MAX_BODY_BYTES = 30 * 1024 * 1024
-MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
 
 @asynccontextmanager
