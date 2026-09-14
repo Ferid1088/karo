@@ -6,7 +6,6 @@ import sqlite3
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from starlette.concurrency import run_in_threadpool
 
 from .. import config, connections, export, ingest, jobs, quizzes, security, materials, teaching
 from ..config import ConfigUnreadable
