@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import TypedDict
 
 from . import config, db, jobs, kb, pii, prompts, topics
 from .domain import (
@@ -481,7 +482,33 @@ müsstest. Einen Namen auf dem Blatt übernimm nicht."""
 # Freigabe → answer_log
 # --------------------------------------------------------------------------
 
-def freigeben(quiz_id: int, entscheidungen: list[dict]) -> dict:
+class QuizReleasedPayload(TypedDict):
+    """Payload des `quiz_released`-Jobs — die Schnittstelle zwischen dieser
+    Funktion (die ihn anlegt) und `services/workflow.py:job_quiz_released()`
+    (das ihn abarbeitet). Als JSON in `job.payload` gespeichert, siehe
+    freigeben()."""
+    quiz_id: int
+    topic_id: int
+    lesson_id: int | None
+    anlass: str
+
+
+class FreigabeErgebnis(TypedDict, total=False):
+    """Rueckgabeform von `freigeben()` — die wichtigste Schnittstelle
+    zwischen diesem Modul und `services/workflow.py` (change.txt
+    Abschnitt 10). `total=False`, weil der Kurzweg (bereits freigegeben)
+    nur `geschrieben`/`uebersprungen`/`bereits` befuellt; die uebrigen
+    Felder gibt es nur bei einer tatsaechlich neuen Freigabe."""
+    geschrieben: int
+    uebersprungen: int
+    bereits: bool
+    topic_id: int
+    lesson_id: int | None
+    anlass: str
+    job_id: int
+
+
+def freigeben(quiz_id: int, entscheidungen: list[dict]) -> FreigabeErgebnis:
     """Schreibt die freigegebenen Bewertungen. Append-only.
 
     Regeln, die hier durchgesetzt werden:

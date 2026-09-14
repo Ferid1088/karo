@@ -128,7 +128,7 @@ class NextAction:
     context: dict = dataclasses.field(default_factory=dict)
 
 
-def after_quiz_release(ergebnis: dict, quiz_id: int) -> NextAction:
+def after_quiz_release(ergebnis: quizzes.FreigabeErgebnis, quiz_id: int) -> NextAction:
     """Entscheidet, wohin eine Freigabe fuehrt — die groesste Kreuzung der
     App (siehe KaroRefactoring_Plan.md, Abschnitt 13). `ergebnis` kommt
     unveraendert aus `quizzes.freigeben()`.
@@ -157,7 +157,7 @@ def after_quiz_release(ergebnis: dict, quiz_id: int) -> NextAction:
 
 
 @jobs.handler("quiz_released")
-def job_quiz_released(payload: dict) -> dict:
+def job_quiz_released(payload: quizzes.QuizReleasedPayload) -> dict:
     """Die Nacharbeit einer Quiz-Freigabe: Flagge neu berechnen, bei einer
     Lernrunde die naechste Runde vorbereiten, den Lernstand exportieren.
 
