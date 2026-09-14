@@ -244,3 +244,10 @@ def retry(job_id: int) -> bool:
 def counts() -> dict[str, int]:
     return {r["state"]: r["n"]
             for r in db.q("SELECT state, COUNT(*) AS n FROM job GROUP BY state")}
+
+
+def fehlgeschlagen(limit: int = 20) -> list[dict]:
+    """Zuletzt endgueltig gescheiterte Jobs — fuer die Eltern-Uebersicht,
+    die daneben einen "Erneut versuchen"-Knopf anbietet (siehe retry())."""
+    return [dict(r) for r in db.q(
+        "SELECT * FROM job WHERE state='fehler' ORDER BY id DESC LIMIT ?", limit)]

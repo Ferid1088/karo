@@ -125,6 +125,13 @@ def request_exam_questions(material_id: int) -> int:
     return exam_learning.fragen_anfordern(material_id)
 
 
+def get_next_exam() -> dict | None:
+    """Die naechste bevorstehende Klassenarbeit — fuer die "Heute"-Anzeige."""
+    row = db.q1("SELECT * FROM exam WHERE exam_date >= ? ORDER BY exam_date LIMIT 1",
+               db.today())
+    return dict(row) if row else None
+
+
 def save_exam_results(exam_id: int, formular: FormData) -> int:
     """Schreibt die tatsaechlichen Ergebnisse — nur fuer Themen, die
     wirklich zu dieser Klassenarbeit gehoeren (siehe `prediction`), damit
