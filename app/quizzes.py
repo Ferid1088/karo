@@ -154,7 +154,8 @@ def job_quiz_build(payload: dict) -> None:
                  (f.get("erwartet") or "")[:1000] or None,
                  f.get("stufe") if f.get("stufe") in
                  ("leicht", "mittel", "schwer") else "mittel"))
-        c.execute("UPDATE quiz SET state='bereit' WHERE id=?", (quiz_id,))
+        c.execute("UPDATE quiz SET state='bereit' WHERE id=? AND state=?",
+                  (quiz_id, STATE_OFFEN))
 
     if quiz["modus"] == PAPIER:
         jobs.enqueue("quiz_print", {"quiz_id": quiz_id},
@@ -198,6 +199,10 @@ def antworten_speichern(quiz_id: int, antworten: dict[int, str]) -> int:
     quiz = db.q1("SELECT * FROM quiz WHERE id = ?", quiz_id)
     if quiz is None:
         raise QuizError("Fragerunde nicht gefunden.")
+    if quiz["state"] == STATE_FREIGEGEBEN:
+        raise QuizError(
+            "Diese Fragerunde ist bereits freigegeben und kann nicht mehr "
+            "geändert werden.")
     if quiz["state"] == STATE_AUSGEWERTET:
         raise QuizError("Diese Fragerunde ist bereits ausgewertet.")
 
@@ -211,7 +216,12 @@ def antworten_speichern(quiz_id: int, antworten: dict[int, str]) -> int:
             c.execute("UPDATE question SET schueler_antwort=? WHERE id=?",
                       ((text or "").strip()[:2000] or None, int(frage_id)))
             n += 1
-        c.execute("UPDATE quiz SET state='beantwortet' WHERE id=?", (quiz_id,))
+        # Bedingtes UPDATE statt eines blinden — schliesst das Fenster, in
+        # dem eine Freigabe genau zwischen der obigen Lese-Pruefung und
+        # diesem Schreibzugriff dazwischenkommt (siehe freigeben()'s
+        # atomarer Beanspruchung; BEGIN IMMEDIATE serialisiert beide).
+        c.execute("UPDATE quiz SET state='beantwortet' WHERE id=? AND state != ?",
+                  (quiz_id, STATE_FREIGEGEBEN))
 
     jobs.enqueue("quiz_check", {"quiz_id": quiz_id},
                  dedup_key=f"quiz_check:{quiz_id}")
@@ -391,6 +401,7 @@ müsstest. Einen Namen auf dem Blatt übernimm nicht."""
 
     nach_position = {f["position"]: f["id"] for f in fragen}
     gefunden = 0
+    uebernommen = False
     with db.tx() as c:
         for a in ergebnis.data.get("antworten") or []:
             try:
@@ -406,15 +417,25 @@ müsstest. Einen Namen auf dem Blatt übernimm nicht."""
                 gefunden += 1
         c.execute("UPDATE document SET state='gelesen' WHERE id=?", (doc_id,))
         if gefunden:
-            c.execute("UPDATE quiz SET state='beantwortet' WHERE id=?", (quiz_id,))
+            # Bedingt: zwischen der Lese-Pruefung oben und hier kann eine
+            # Freigabe dazwischengekommen sein (z. B. eine muendliche
+            # Lernkontrolle, die direkt aus 'bereit' freigibt). Ohne die
+            # Bedingung wuerde dieser Job einen bereits freigegebenen
+            # Endzustand zurueck auf 'beantwortet' drehen.
+            uebernommen = c.execute(
+                "UPDATE quiz SET state='beantwortet' WHERE id=? AND state IN (?, ?)",
+                (quiz_id, STATE_BEREIT, STATE_BEANTWORTET)).rowcount == 1
 
-    if gefunden:
-        jobs.enqueue("quiz_check", {"quiz_id": quiz_id},
-                     dedup_key=f"quiz_check:{quiz_id}")
-    else:
+    if not gefunden:
         raise QuizError(
             "Auf dem Foto war keine Antwort lesbar. Blatt flach hinlegen, von "
             "oben fotografieren, keine Schatten — dann erneut versuchen.")
+    if uebernommen:
+        jobs.enqueue("quiz_check", {"quiz_id": quiz_id},
+                     dedup_key=f"quiz_check:{quiz_id}")
+    # uebernommen == False heisst: die Fragerunde wurde zwischenzeitlich
+    # anders abgeschlossen (siehe oben) — die abgelesenen Antworten sind
+    # dann nicht mehr relevant, das ist kein Fehler.
 
 
 # --------------------------------------------------------------------------

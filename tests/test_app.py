@@ -914,6 +914,110 @@ def test_zweite_freigabe_ueber_http_loest_keine_neue_auswertung_aus(
     assert app_env.db.q1("SELECT COUNT(*) AS n FROM answer_log")["n"] == anzahl
 
 
+def _alle_entscheidungen(app_env, quiz_id):
+    fragen = app_env.db.q("SELECT id FROM question WHERE quiz_id=?", quiz_id)
+    return [{"frage_id": f["id"], "skip": False, "richtig": True,
+            "fehlertyp": None, "begruendung": "", "konfidenz": None,
+            "llm_call_id": None, "geaendert": False} for f in fragen]
+
+
+def test_freigegeben_ist_ein_endzustand_fuer_antworten_speichern(
+        client, fake_llm, fake_cli, app_env):
+    """P0: FREIGEGEBEN ist terminal — antworten_speichern() darf eine schon
+    freigegebene Fragerunde nicht zurueck auf 'beantwortet' drehen."""
+    from app import quizzes as qz
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    seite = client.get("/themen")
+    client.post(f"/themen/{topic_id}/pruefen",
+                data={"_csrf": csrf_from(seite.text), "modus": "bildschirm"})
+    run_jobs(app_env, fake_llm)
+    quiz = app_env.db.q1("SELECT * FROM quiz ORDER BY id DESC LIMIT 1")
+    entscheidungen = _alle_entscheidungen(app_env, quiz["id"])
+    qz.freigeben(quiz["id"], entscheidungen)
+
+    frage = app_env.db.q1("SELECT id FROM question WHERE quiz_id=? LIMIT 1", quiz["id"])
+    with pytest.raises(qz.QuizError):
+        qz.antworten_speichern(quiz["id"], {frage["id"]: "geaendert"})
+
+    nach = app_env.db.q1("SELECT state, finished_at FROM quiz WHERE id=?", quiz["id"])
+    assert nach["state"] == qz.STATE_FREIGEGEBEN
+    assert nach["finished_at"]
+    assert app_env.db.q1("SELECT schueler_antwort FROM question WHERE id=?",
+                         frage["id"])["schueler_antwort"] is None
+
+
+def test_freigegeben_bleibt_stabil_bei_erneutem_antwort_post_ueber_http(
+        client, fake_llm, fake_cli, app_env):
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    seite = client.get("/themen")
+    client.post(f"/themen/{topic_id}/pruefen",
+                data={"_csrf": csrf_from(seite.text), "modus": "bildschirm"})
+    run_jobs(app_env, fake_llm)
+    quiz = app_env.db.q1("SELECT * FROM quiz ORDER BY id DESC LIMIT 1")
+    quiz_freigeben(client, app_env, quiz["id"])
+    frage = app_env.db.q1("SELECT id FROM question WHERE quiz_id=? LIMIT 1", quiz["id"])
+
+    seite = client.get(f"/quiz/{quiz['id']}")
+    r = client.post(f"/quiz/{quiz['id']}/antworten",
+                    data={"_csrf": csrf_from(seite.text),
+                          f"antwort_{frage['id']}": "geaendert"},
+                    follow_redirects=True)
+    assert r.status_code == 200
+    nach = app_env.db.q1("SELECT state FROM quiz WHERE id=?", quiz["id"])
+    assert nach["state"] == "freigegeben"
+
+
+def test_quiz_read_sheet_ueberschreibt_keine_zwischenzeitliche_freigabe(
+        client, fake_llm, fake_cli, app_env, monkeypatch):
+    """P0: ein Wettlauf zwischen dem Foto-Ablesen (Papierweg) und einer
+    direkten Freigabe (z. B. muendliche Lernkontrolle) darf den Endzustand
+    nicht zurueckdrehen. Der LLM-Aufruf zum Ablesen ist der Moment, in dem
+    real Zeit vergeht — genau dort simulieren wir die dazwischenkommende
+    Freigabe."""
+    import io
+    from types import SimpleNamespace
+
+    from PIL import Image
+
+    from app import quizzes as qz
+
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    seite = client.get("/themen")
+    client.post(f"/themen/{topic_id}/pruefen",
+                data={"_csrf": csrf_from(seite.text), "modus": "papier"})
+    run_jobs(app_env, fake_llm)
+    quiz = app_env.db.q1("SELECT * FROM quiz ORDER BY id DESC LIMIT 1")
+    assert quiz["state"] == qz.STATE_BEREIT
+
+    puffer = io.BytesIO()
+    Image.new("RGB", (900, 1200), (250, 250, 250)).save(puffer, "JPEG")
+    doc_id = qz.blatt_hochladen(quiz["id"], puffer.getvalue(), ".jpg")
+
+    entscheidungen = _alle_entscheidungen(app_env, quiz["id"])
+    positionen = app_env.db.q("SELECT position FROM question WHERE quiz_id=?", quiz["id"])
+
+    def freigabe_waehrenddessen(**kwargs):
+        qz.freigeben(quiz["id"], entscheidungen)
+        return SimpleNamespace(
+            data={"lesbarkeit": "gut",
+                  "antworten": [{"position": p["position"], "antwort": "3/4",
+                                 "sicher_gelesen": True} for p in positionen]},
+            call_id=None)
+
+    monkeypatch.setattr(qz, "client",
+                        lambda: SimpleNamespace(complete=freigabe_waehrenddessen))
+    qz.job_quiz_read_sheet({"quiz_id": quiz["id"], "document_id": doc_id})
+
+    nach = app_env.db.q1("SELECT state FROM quiz WHERE id=?", quiz["id"])
+    assert nach["state"] == qz.STATE_FREIGEGEBEN
+
+
 # ==========================================================================
 # Prüfung auf Papier
 # ==========================================================================
