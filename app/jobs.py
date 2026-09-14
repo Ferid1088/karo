@@ -175,6 +175,62 @@ def recover_stuck() -> int:
         return cur.rowcount
 
 
+def run_now(job_id: int) -> tuple[str, object]:
+    """Verarbeitet einen bestimmten Job sofort, im aufrufenden Thread, mit
+    denselben Erfolgs-/Fehler-/Backoff-Regeln wie `run_once()`.
+
+    Fuer Faelle, in denen eine laufende Anfrage die Arbeit lieber gleich
+    selbst erledigt (bessere Rueckmeldung, kein Warten auf den naechsten
+    Umlauf) statt sie dem Hintergrund-Worker zu ueberlassen — siehe
+    quizzes.freigeben()/services/workflow.py, change.txt Aufgabe P2. Der
+    Job bleibt trotzdem die alleinige Quelle der Wahrheit: stuerzt der
+    Aufrufer ab, bevor er hier ankommt, findet der Hintergrund-Worker den
+    Job unveraendert in 'wartend' vor (oder 'laeuft', das `recover_stuck()`
+    beim naechsten Start zuruecksetzt) und erledigt ihn stattdessen.
+
+    Gibt (status, ergebnis) zurueck. status ist:
+      'done'    — erfolgreich verarbeitet; `ergebnis` ist der Rueckgabewert
+                  des Handlers.
+      'failed'  — der Handler hat eine Ausnahme geworfen (oder Payload/Typ
+                  waren ungueltig); der Job wurde wie ueblich fuer eine
+                  spaetere Wiederholung vorgemerkt. `ergebnis` ist None.
+      'skipped' — der Job stand nicht mehr auf 'wartend' (z. B. weil der
+                  Hintergrund-Worker ihn gerade in diesem Moment schon
+                  beansprucht hat). `ergebnis` ist None.
+    """
+    with db.tx() as c:
+        row = c.execute(
+            "SELECT * FROM job WHERE id=? AND state='wartend'", (job_id,)
+        ).fetchone()
+        if row is None:
+            return ("skipped", None)
+        c.execute(
+            "UPDATE job SET state='laeuft', attempts=attempts+1, started_at=? WHERE id=?",
+            (db.now(), job_id),
+        )
+        job = dict(row)
+
+    fn = HANDLERS.get(job["type"])
+    if fn is None:
+        _finish(job_id, f"Unbekannter Job-Typ: {job['type']}")
+        return ("failed", None)
+    try:
+        payload = json.loads(job["payload"] or "{}")
+    except json.JSONDecodeError:
+        _finish(job_id, "Payload ist kein gültiges JSON")
+        return ("failed", None)
+
+    try:
+        ergebnis = fn(payload)
+    except Exception as exc:
+        log.warning("Job %s (%s) fehlgeschlagen: %s", job_id, job["type"], exc)
+        log.debug("%s", traceback.format_exc())
+        _finish(job_id, f"{type(exc).__name__}: {exc}"[:500])
+        return ("failed", None)
+    _finish(job_id, None)
+    return ("done", ergebnis)
+
+
 def retry(job_id: int) -> bool:
     with db.tx() as c:
         cur = c.execute(

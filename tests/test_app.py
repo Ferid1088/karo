@@ -1019,6 +1019,94 @@ def test_quiz_read_sheet_ueberschreibt_keine_zwischenzeitliche_freigabe(
 
 
 # ==========================================================================
+# Nacharbeit nach der Freigabe (change.txt P2): persistiert statt verlassen
+# auf die laufende HTTP-Anfrage.
+# ==========================================================================
+
+def _quiz_bereit_zum_freigeben(client, fake_llm, app_env, topic_id):
+    seite = client.get("/themen")
+    client.post(f"/themen/{topic_id}/pruefen",
+                data={"_csrf": csrf_from(seite.text), "modus": "bildschirm"})
+    run_jobs(app_env, fake_llm)
+    return app_env.db.q1("SELECT * FROM quiz ORDER BY id DESC LIMIT 1")
+
+
+def test_freigabe_persistiert_einen_job_fuer_die_nacharbeit(
+        client, fake_llm, fake_cli, app_env):
+    from app import quizzes as qz
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    quiz = _quiz_bereit_zum_freigeben(client, fake_llm, app_env, topic_id)
+
+    ergebnis = qz.freigeben(quiz["id"], _alle_entscheidungen(app_env, quiz["id"]))
+    job = app_env.db.q1("SELECT * FROM job WHERE id=?", ergebnis["job_id"])
+    assert job is not None
+    assert job["type"] == "quiz_released"
+    assert job["state"] == "wartend"
+    assert json.loads(job["payload"])["quiz_id"] == quiz["id"]
+
+
+def test_abgesturzte_nacharbeit_wird_ueber_den_job_nachgeholt(
+        client, fake_llm, fake_cli, app_env, monkeypatch):
+    """P2: die Freigabe selbst gelingt; die Nacharbeit (hier: Flagge neu
+    berechnen) stuerzt ab. Die Freigabe bleibt trotzdem bestehen, der Job
+    bleibt offen (nicht 'fertig') und holt die Nacharbeit nach, sobald er
+    normal laeuft."""
+    from app import jobs as jobs_mod
+    from app.services import workflow
+
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    quiz = _quiz_bereit_zum_freigeben(client, fake_llm, app_env, topic_id)
+
+    def kaputt(topic_id):
+        raise RuntimeError("Absturz mitten in der Nacharbeit")
+    monkeypatch.setattr(workflow.quizzes, "flagge_neu", kaputt)
+
+    quiz_freigeben(client, app_env, quiz["id"])
+
+    assert app_env.db.q1("SELECT state FROM quiz WHERE id=?",
+                         quiz["id"])["state"] == "freigegeben"
+    job = app_env.db.q1(
+        "SELECT * FROM job WHERE type='quiz_released' ORDER BY id DESC LIMIT 1")
+    assert job["state"] != "fertig"
+    assert app_env.db.q1("SELECT 1 FROM topic_flag WHERE topic_id=?",
+                         topic_id) is None
+
+    monkeypatch.undo()
+    with app_env.db.tx() as c:
+        c.execute("UPDATE job SET not_before=NULL WHERE id=?", (job["id"],))
+    run_jobs(app_env, fake_llm)
+
+    assert app_env.db.q1("SELECT state FROM job WHERE id=?", job["id"])["state"] == "fertig"
+    assert app_env.db.q1("SELECT 1 FROM topic_flag WHERE topic_id=?",
+                         topic_id) is not None
+
+
+def test_erfolgreiche_nacharbeit_markiert_den_job_sofort_fertig(
+        client, fake_llm, fake_cli, app_env):
+    """Auf dem Erfolgsweg laeuft die Nacharbeit synchron im selben Request —
+    der Hintergrund-Worker findet danach nichts mehr zu tun (kein doppeltes
+    Verarbeiten)."""
+    from app import jobs as jobs_mod
+
+    einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    topic_id = themen_freigeben(client, app_env)[0]
+    quiz = _quiz_bereit_zum_freigeben(client, fake_llm, app_env, topic_id)
+    quiz_freigeben(client, app_env, quiz["id"])
+
+    job = app_env.db.q1(
+        "SELECT * FROM job WHERE type='quiz_released' ORDER BY id DESC LIMIT 1")
+    assert job["state"] == "fertig"
+    assert jobs_mod.run_once() is False
+    assert app_env.db.q1("SELECT 1 FROM topic_flag WHERE topic_id=?",
+                         topic_id) is not None
+
+
+# ==========================================================================
 # Prüfung auf Papier
 # ==========================================================================
 

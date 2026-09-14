@@ -131,10 +131,13 @@ class NextAction:
 def after_quiz_release(ergebnis: dict, quiz_id: int) -> NextAction:
     """Entscheidet, wohin eine Freigabe fuehrt — die groesste Kreuzung der
     App (siehe KaroRefactoring_Plan.md, Abschnitt 13). `ergebnis` kommt
-    unveraendert aus `quizzes.freigeben()`."""
+    unveraendert aus `quizzes.freigeben()`.
+
+    Rein lesend — die Nacharbeit (Lernrunden-Fortschritt, Flagge, Export)
+    steht nicht mehr hier drin, sondern in `job_quiz_released()` (change.txt
+    P2): eine Zielseite zu entscheiden darf nicht davon abhaengen, ob diese
+    Nacharbeit gerade erfolgreich lief oder noch aussteht."""
     if ergebnis.get("lesson_id") and ergebnis.get("anlass") == "lernrunde":
-        weiter = teaching.nach_freigabe(ergebnis["lesson_id"], ergebnis["topic_id"],
-                                        auto_weiter=False)
         material = db.q1("SELECT id FROM exam_material WHERE lesson_id=?",
                          ergebnis["lesson_id"])
         if material:
@@ -143,18 +146,38 @@ def after_quiz_release(ergebnis: dict, quiz_id: int) -> NextAction:
                 return NextAction(
                     kind="exam_material",
                     url=f"/klassenarbeit/material/{material['id']}",
-                    reason="Quiz gehörte zu Klassenarbeits-Lernmaterial",
-                    context={"weiter": weiter})
+                    reason="Quiz gehörte zu Klassenarbeits-Lernmaterial")
         return NextAction(
             kind="lesson", url=f"/lernen/{ergebnis['lesson_id']}",
-            reason="Quiz gehörte zu einer laufenden Lernrunde",
-            context={"weiter": weiter})
+            reason="Quiz gehörte zu einer laufenden Lernrunde")
 
-    thema = topics.get(ergebnis["topic_id"])
     return NextAction(
         kind="review_cycle", url=f"/lernzyklus/{ergebnis['topic_id']}",
-        reason="Themenprüfung außerhalb einer Lernrunde",
-        context={"flagge": (thema or {}).get("flag")})
+        reason="Themenprüfung außerhalb einer Lernrunde")
+
+
+@jobs.handler("quiz_released")
+def job_quiz_released(payload: dict) -> dict:
+    """Die Nacharbeit einer Quiz-Freigabe: Flagge neu berechnen, bei einer
+    Lernrunde die naechste Runde vorbereiten, den Lernstand exportieren.
+
+    quizzes.freigeben() legt diesen Job in DERSELBEN Transaktion an wie die
+    Freigabe selbst — er existiert also garantiert, sobald eine Freigabe
+    passiert ist, unabhaengig davon, ob die Anfrage danach noch zu Ende
+    laeuft. `handle_quiz_freigabe()` versucht ihn im gleichen Request ueber
+    `jobs.run_now()` sofort zu erledigen; stuerzt das ab, bleibt der Job auf
+    'wartend' und der Hintergrund-Worker (oder /vorgang/{id}/erneut) holt
+    ihn spaeter nach — mit denselben, hier stehenden, idempotenten Schritten.
+    """
+    topic_id = int(payload["topic_id"])
+    lesson_id = payload.get("lesson_id")
+    anlass = payload.get("anlass")
+    quizzes.flagge_neu(topic_id)
+    weiter = None
+    if lesson_id and anlass == "lernrunde":
+        weiter = teaching.nach_freigabe(int(lesson_id), topic_id, auto_weiter=False)
+    export.nach_freigabe()
+    return {"weiter": weiter}
 
 
 async def handle_quiz_freigabe(request: Request, quiz_id: int):
@@ -190,24 +213,33 @@ async def handle_quiz_freigabe(request: Request, quiz_id: int):
         flash(request, "Diese Fragerunde war bereits freigegeben.", "warn")
         return zurueck("/themen")
 
-    await run_in_threadpool(export.nach_freigabe)
-
     n = ergebnis["geschrieben"]
     meldung = f"{n} Antwort bewertet" if n == 1 else f"{n} Antworten bewertet"
     if ergebnis["uebersprungen"]:
         meldung += f", {ergebnis['uebersprungen']} übersprungen"
 
+    # Die Nacharbeit ist bereits als Job persistiert (siehe quizzes.
+    # freigeben()); hier versuchen wir nur, sie im selben Request gleich
+    # zu erledigen, statt auf den naechsten Worker-Umlauf zu warten. Klappt
+    # das nicht, bleibt der Job stehen und wird spaeter automatisch nach-
+    # geholt — die Freigabe selbst ist in jedem Fall bereits geschehen.
+    status, folge = await run_in_threadpool(jobs.run_now, ergebnis["job_id"])
     aktion = after_quiz_release(ergebnis, quiz_id)
-    if aktion.kind == "review_cycle":
-        flagge = aktion.context.get("flagge")
+
+    if status == "done" and folge and folge.get("weiter"):
+        weiter = folge["weiter"]
+        flash(request, f"{meldung}. {weiter['grund']}",
+              "ok" if weiter.get("erfolg") or weiter.get("weiter") else "warn")
+    elif status == "done":
+        zeile = db.q1("SELECT flag FROM topic_flag WHERE topic_id=?", ergebnis["topic_id"])
+        flagge = zeile["flag"] if zeile else None
         if flagge in (Flag.ROT.value, Flag.GELB.value):
             flash(request, f"{meldung}. Schau dir jetzt eine Erklärung an und übe weiter.", "ok")
         else:
             flash(request, f"{meldung}. Deine Ergebnisse sind gespeichert.")
     else:
-        weiter = aktion.context["weiter"]
-        flash(request, f"{meldung}. {weiter['grund']}",
-              "ok" if weiter.get("erfolg") or weiter.get("weiter") else "warn")
+        flash(request, f"{meldung}. Die Auswertung wird gleich automatisch nachgeholt.", "warn")
+
     return zurueck(aktion.url)
 
 

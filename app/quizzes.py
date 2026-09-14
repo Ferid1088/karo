@@ -455,6 +455,12 @@ def freigeben(quiz_id: int, entscheidungen: list[dict]) -> dict:
         Folgeschritte (Lernstand, Export, naechster Workflow-Schritt) nicht
         zweimal auslösen. Das erledigt die bedingte UPDATE unten — sie
         gewinnt genau einmal, unabhaengig von der fruehen Vorab-Pruefung.
+      * Die Nacharbeit (Flagge, Lernrunden-Fortschritt, Export) haengt nicht
+        davon ab, dass diese Anfrage zu Ende laeuft: der Job unten wird in
+        DERSELBEN Transaktion wie die Freigabe angelegt, also atomar mit
+        ihr — stuerzt der Prozess direkt danach ab, bleibt der Job stehen
+        und der Hintergrund-Worker holt ihn nach (change.txt P2). Siehe
+        services/workflow.py:job_quiz_released().
     """
     quiz = db.q1("SELECT * FROM quiz WHERE id = ?", quiz_id)
     if quiz is None:
@@ -514,10 +520,23 @@ def freigeben(quiz_id: int, entscheidungen: list[dict]) -> dict:
                  e.get("llm_call_id"), db.now()))
             geschrieben += 1
 
-    flagge_neu(quiz["topic_id"])
+        # Persistierter Auftrag fuer die Nacharbeit — siehe Docstring oben.
+        # Direktes INSERT statt jobs.enqueue(): das eroeffnet selbst eine
+        # Transaktion, was hier verschachtelt waere (db.tx() erlaubt das
+        # nicht und soll es auch nicht, siehe dessen eigene Absicherung).
+        job_payload = json.dumps(
+            {"quiz_id": quiz_id, "topic_id": quiz["topic_id"],
+             "lesson_id": quiz["lesson_id"], "anlass": quiz["anlass"]},
+            ensure_ascii=False)
+        job_id = c.execute(
+            """INSERT INTO job (type, payload, state, dedup_key, created_at)
+               VALUES ('quiz_released', ?, 'wartend', ?, ?)""",
+            (job_payload, f"quiz_released:{quiz_id}", db.now())).lastrowid
+
     return {"geschrieben": geschrieben, "uebersprungen": uebersprungen,
             "bereits": False, "topic_id": quiz["topic_id"],
-            "lesson_id": quiz["lesson_id"], "anlass": quiz["anlass"]}
+            "lesson_id": quiz["lesson_id"], "anlass": quiz["anlass"],
+            "job_id": job_id}
 
 
 # --------------------------------------------------------------------------
