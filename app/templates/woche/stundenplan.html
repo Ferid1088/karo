@@ -1,0 +1,50 @@
+{% extends "woche/base.html" %}
+{% block title %}Mein Stundenplan{% endblock %}
+
+{% block content %}
+<h1>Mein Stundenplan</h1>
+
+{% if bild %}
+  <img class="planbild" src="/woche/bild/{{ bild }}" alt="Mein Stundenplan">
+{% endif %}
+
+<form method="post" action="/woche/stundenplan/foto" enctype="multipart/form-data"
+      class="karte">
+  {{ csrf_input() }}
+  <label class="datei">{{ 'Neues Foto' if bild else '📷 Stundenplan fotografieren' }}
+    <input type="file" name="bild" accept="image/*" capture="environment">
+  </label>
+  <button type="submit" class="still">speichern</button>
+</form>
+
+<h2>An welchen Tagen?</h2>
+<form method="post" action="/woche/stundenplan/tage" class="karte">
+  {{ csrf_input() }}
+  <table class="plan">
+    <tr><th></th>{% for t in range(1, 6) %}<th>{{ tage[t][:2] }}</th>{% endfor %}</tr>
+    {% for f in faecher %}
+      <tr>
+        <td>{{ f.name }}</td>
+        {% for t in range(1, 6) %}
+          <td>
+            <label class="haken">
+              <input type="checkbox" name="tag_{{ f.id }}" value="{{ t }}"
+                     {{ 'checked' if plan[t] and f.id in plan[t]|map(attribute='id')|list }}>
+              <span></span>
+            </label>
+          </td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+  </table>
+  <button type="submit" class="still">speichern</button>
+</form>
+
+{% if termine %}
+  <h2>Außer Schule</h2>
+  <ul class="angebot">
+    {% for t in termine %}<li><b>{{ t.label }}</b>
+      <span class="leise">{{ tage[t.tag] }} {{ t.zeit or '' }}</span></li>{% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

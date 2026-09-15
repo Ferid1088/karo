@@ -1,0 +1,96 @@
+{% extends "woche/base.html" %}
+{% set nav = false %}
+{% block title %}Meine Woche — für Eltern{% endblock %}
+{% block mainclass %}eltern{% endblock %}
+
+{% block content %}
+{% set z = zusammenfassung %}
+
+{% if zusagen|length < 3 %}
+  <div class="karte zusage">
+    <h1>Bevor Sie hineinschauen</h1>
+    <p>Drei Sätze. Jeden einzeln bestätigen — ohne sie ist dieses Dashboard ein
+      Kontrollwerkzeug, egal wie freundlich es formuliert ist.</p>
+    {% for nr, satz in [
+        (1, 'Ich frage nicht nach, was erledigt wurde.'),
+        (2, 'Ich halte meinen festen Termin ein, auch wenn nichts anliegt.'),
+        (3, 'Wenn mein Kind eine Woche nichts macht, spreche ich es nicht auf die App an.')] %}
+      <form method="post" action="/woche/eltern/zusage" class="satz">
+        {{ csrf_input() }}
+        <input type="hidden" name="nr" value="{{ nr }}">
+        <button type="submit" class="{{ 'an' if nr in zusagen }}" {{ 'disabled' if nr in zusagen }}>
+          {{ '✓' if nr in zusagen else '○' }}</button>
+        <span>{{ satz }}</span>
+      </form>
+    {% endfor %}
+  </div>
+{% else %}
+
+  <h1>Diese Woche</h1>
+  {% if z.fokus %}<p class="fokus">🎯 {{ z.fokus }}</p>{% endif %}
+
+  {% if z.gemacht %}
+    <p class="gemacht">✓ {{ z.gemacht|join(', ') }}</p>
+  {% endif %}
+  {% if z.stimmung %}<p class="leise">🙂 {{ z.stimmung }}</p>{% endif %}
+
+  <div class="zustand">
+    <h2>{{ z.titel }}</h2>
+    <p>{{ z.impuls }}</p>
+  </div>
+
+  {% if termin %}
+    <p class="termin">👤 Ihr fester Termin: {{ tage[termin.fester_tag] }}
+      {{ termin.feste_zeit or '' }} — {{ termin.name }}</p>
+  {% endif %}
+
+  {% if freigaben %}
+    <div class="karte">
+      <h2>Kurz bestätigen</h2>
+      {% for d in freigaben %}
+        <form method="post" action="/woche/eltern/freigabe/{{ d.id }}" class="satz">
+          {{ csrf_input() }}
+          <span>Ihr Kind möchte <b>{{ d.wort }}</b> als sein Ding.</span>
+          <button type="submit" name="ja" value="1">ja</button>
+          <button type="submit">lieber nicht</button>
+        </form>
+      {% endfor %}
+      <p class="leise klein">Solange nichts bestätigt ist, läuft die App
+        weiter — sie sagt dann nur die Form statt des Wortes.</p>
+    </div>
+  {% endif %}
+
+  <div class="karte">
+    <h2>Karo mitlesen</h2>
+    <p class="leise">Der Begleiter kann Karos Themen und den Arbeitstermin
+      mitlesen{% if karo_fach %} — für {{ karo_fach }}{% endif %}. Dann steht im
+      Angebot der Name der Lücke statt einer allgemeinen Formulierung, und der
+      Wochenanker wird aus dem letzten eingelesenen Blatt vorgeschlagen.
+      Er schreibt dabei nichts in Karo zurück.</p>
+    <form method="post" action="/woche/eltern/bruecke">
+      {{ csrf_input() }}
+      {% if bruecke_an %}
+        <button type="submit" class="still">ausschalten</button>
+        <span class="leise klein">ist an</span>
+      {% else %}
+        <button type="submit" name="an" value="1" class="still">einschalten</button>
+        <span class="leise klein">ist aus</span>
+      {% endif %}
+    </form>
+  </div>
+
+  <details class="regeln">
+    <summary>Wie entsteht das?</summary>
+    <ul>
+      {% for key, text in regeln_liste %}
+        <li><b>{{ key }}</b> — {{ text }}</li>
+      {% endfor %}
+    </ul>
+    <p class="leise klein">Es gibt keine weitere Stufe, keine Farbe, keine
+      Quote und keine Liste des Liegengebliebenen. Sie sehen keine einzelnen
+      Tagesrückmeldungen, keine Gründe, keine Uhrzeiten und nicht, welche
+      Fächer Ihr Kind meidet. Eine Stimmung erscheint erst, wenn es
+        dafür mehr als eine Rückmeldung gibt.</p>
+  </details>
+{% endif %}
+{% endblock %}

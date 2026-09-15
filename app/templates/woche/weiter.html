@@ -1,0 +1,17 @@
+{% extends "woche/base.html" %}
+{% block title %}Weiter?{% endblock %}
+{% block mainclass %}heute{% endblock %}
+
+{% block content %}
+<div class="heute-karte">
+  {{ ding_bild('avatar gross') }}
+  <h1>Willst du weitermachen?</h1>
+  <p class="leise">{{ minuten }} Minuten. Oder auch nicht.</p>
+  <form method="post" action="/woche/schritt/{{ schritt.id }}/weiter">
+    {{ csrf_input() }}
+    <button type="submit" name="wert" value="ja" class="gross haupt">ja, {{ minuten }} Minuten</button>
+    <button type="submit" name="wert" value="nein" class="gross still">nein, das reicht</button>
+  </form>
+  <p class="leise klein">Beides ist okay. Angefangen hast du schon.</p>
+</div>
+{% endblock %}

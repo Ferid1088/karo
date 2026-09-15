@@ -1,0 +1,39 @@
+{% extends "woche/base.html" %}
+{% block title %}Hilfe{% endblock %}
+
+{% block content %}
+<h1>Ich brauche Hilfe</h1>
+
+{% if termin %}
+  <p class="termin">👤 {{ termin.name }} hat
+    {{ tage[termin.fester_tag]|lower }}s{% if termin.feste_zeit %} um
+    {{ termin.feste_zeit }}{% endif %} Zeit für dich.</p>
+  <p class="leise klein">Du musst nicht fragen. Der Termin ist schon da.</p>
+{% endif %}
+
+<form method="post" action="/woche/hilfe" class="karte">
+  {{ csrf_input() }}
+  <input type="text" name="frage" maxlength="400" autocomplete="off"
+         placeholder="Was ist die Frage? (kannst du auch leer lassen)">
+
+  <div class="liste">
+    {% for h in helfer %}
+      <button type="submit" name="helfer_id" value="{{ h.id }}" class="gross">
+        {{ h.name }} fragen{% if h.fach_name %} ({{ h.fach_name }}){% endif %}
+      </button>
+    {% endfor %}
+    <button type="submit" name="helfer_id" value="0" class="gross still">
+      Frage aufschreiben für später</button>
+  </div>
+</form>
+
+{% if nie_gefragt %}
+  <p class="leise">Du hast noch nie gefragt. Das Aufschreiben geht auch —
+    dann liest es jemand beim nächsten festen Termin.</p>
+{% endif %}
+
+{% if not helfer %}
+  <p class="leise">Noch niemand eingetragen.
+    <a href="/woche/einrichtung">Jemanden eintragen</a></p>
+{% endif %}
+{% endblock %}

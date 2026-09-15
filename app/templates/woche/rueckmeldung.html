@@ -1,0 +1,16 @@
+{% extends "woche/base.html" %}
+{% block title %}Wie war es?{% endblock %}
+{% block mainclass %}heute{% endblock %}
+
+{% block content %}
+<div class="heute-karte">
+  <h1>Wie war es?</h1>
+  <form method="post" action="/woche/schritt/{{ schritt.id }}/rueckmeldung"
+        class="smileys">
+    {{ csrf_input() }}
+    <button type="submit" name="wert" value="gut"><b>😊</b>gut</button>
+    <button type="submit" name="wert" value="okay"><b>😐</b>okay</button>
+    <button type="submit" name="wert" value="schwierig"><b>😣</b>schwierig</button>
+  </form>
+</div>
+{% endblock %}

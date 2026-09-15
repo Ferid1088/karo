@@ -1,0 +1,19 @@
+{% extends "woche/base.html" %}
+{% block title %}Was war los?{% endblock %}
+{% block mainclass %}heute{% endblock %}
+
+{% block content %}
+<div class="heute-karte">
+  <h1>Was war heute das Problem?</h1>
+  <form method="post" action="/woche/schritt/{{ schritt.id }}/grund"
+        class="liste">
+    {{ csrf_input() }}
+    {% for key, label in gruende.items() %}
+      <button type="submit" name="wert" value="{{ key }}" class="gross still">{{ label }}</button>
+    {% endfor %}
+    <button type="submit" name="wert" value="" class="linklike">etwas anderes</button>
+  </form>
+  <p class="leise klein">Ein Tap. Danach passen wir es an — es wird nichts
+    bewertet.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "woche/base.html" %}
+{% block title %}Pause{% endblock %}
+{% block mainclass %}heute{% endblock %}
+{% block content %}
+<div class="heute-karte ruhig">
+  {{ ding_bild('avatar gross') }}
+  <h1>Pause.</h1>
+  <p class="leise">Bis {{ datum_kurz(pause.bis) }} Ich melde mich nicht.</p>
+  <form method="post" action="/woche/pause/ende">
+    {{ csrf_input() }}
+    <button type="submit" class="gross still">doch wieder anfangen</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "woche/base.html" %}
+{% block title %}Heute{% endblock %}
+{% block mainclass %}heute{% endblock %}
+
+{% block content %}
+
+{% if anker_fach %}
+<form method="post" action="/woche/anker" class="karte anker">
+  {{ csrf_input() }}
+  <input type="hidden" name="fach_id" value="{{ anker_fach.id }}">
+  <h2>Du hattest heute {{ anker_fach.name }}.</h2>
+  <p class="leise">Was war dran?</p>
+  <input type="text" name="text" maxlength="120" autocomplete="off"
+         value="{{ anker_vorschlag|default('') }}"
+         placeholder="z. B. Brüche, S. 42">
+  {% if anker_vorschlag %}
+    <p class="leise klein">Das stand auf dem letzten Blatt. Ändern ist okay.</p>
+  {% endif %}
+  <div class="knopfreihe">
+    <button type="submit" class="gross">Passt</button>
+    <button type="submit" name="text" value="weiß nicht" class="still">weiß nicht</button>
+  </div>
+</form>
+{% endif %}
+
+{% if schritt %}
+  <div class="heute-karte">
+    {{ ding_bild('avatar gross') }}
+    <p class="fach">{{ schritt.fach_name or zyklus.fokus or 'Heute' }}</p>
+    <h1>{{ schritt.einstieg }}</h1>
+
+    <form method="post" action="/woche/schritt/{{ schritt.id }}/einstieg">
+      {{ csrf_input() }}
+      <button type="submit" name="wert" value="gemacht" class="gross haupt">gemacht</button>
+      <button type="submit" name="wert" value="nicht" class="still">geht gerade nicht</button>
+    </form>
+  </div>
+{% elif zyklus %}
+  <div class="heute-karte ruhig">
+    {{ ding_bild('avatar gross') }}
+    <h1>Heute nichts.</h1>
+    <p class="leise">Das ist kein Rückstand. Morgen wieder.</p>
+  </div>
+{% endif %}
+
+<div class="notruf">
+  <a href="/woche/notfall">Morgen ist was</a>
+  <form method="post" action="/woche/pause" class="inline">
+    {{ csrf_input() }}
+    <input type="hidden" name="wochen" value="1">
+    <button type="submit" class="linklike">Ich will gerade nicht</button>
+  </form>
+</div>
+
+{% endblock %}

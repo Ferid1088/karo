@@ -1,0 +1,57 @@
+{% extends "woche/base.html" %}
+{% block title %}Fertig{% endblock %}
+
+{% block content %}
+<h1>Das war deine Woche</h1>
+
+{% if saetze %}
+  <ul class="rueckblick">
+    {% for s in saetze %}<li>{{ s }}</li>{% endfor %}
+  </ul>
+{% else %}
+  <p class="gross-text">{{ leer_text }}</p>
+  {% if leer_optionen %}
+    <form method="post" action="/woche/abschluss" class="liste">
+      {{ csrf_input() }}
+      <input type="hidden" name="gefuehl" value="schwierig">
+      {% for key, label in leer_optionen %}
+        <button type="submit" name="wunsch" value="{{ key }}"
+                class="gross still">{{ label }}</button>
+      {% endfor %}
+    </form>
+  {% endif %}
+{% endif %}
+
+<form method="post" action="/woche/abschluss" class="karte">
+  {{ csrf_input() }}
+
+  {% if gemacht %}
+    <p class="leise">Was war am leichtesten?</p>
+    <div class="chips">
+      {% for s in gemacht %}
+        <label class="chip"><input type="radio" name="leicht" value="{{ s.id }}">
+          <span>{{ s.titel }}</span></label>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <p class="leise">Wie war deine Woche?</p>
+  <div class="chips">
+    {% for k, l in [('gut','😊 gut'), ('okay','😐 okay'), ('schwierig','😣 schwierig')] %}
+      <label class="chip"><input type="radio" name="gefuehl" value="{{ k }}"
+        {{ 'checked' if k == 'okay' }}><span>{{ l }}</span></label>
+    {% endfor %}
+  </div>
+
+  <p class="leise">Was möchtest du als Nächstes?</p>
+  <div class="chips">
+    {% for k, l in [('genauso','genauso'), ('mehr','etwas mehr'),
+                    ('leichter','etwas leichter'), ('anders','etwas anderes')] %}
+      <label class="chip"><input type="radio" name="wunsch" value="{{ k }}"
+        {{ 'checked' if k == 'genauso' }}><span>{{ l }}</span></label>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="gross haupt">fertig</button>
+</form>
+{% endblock %}

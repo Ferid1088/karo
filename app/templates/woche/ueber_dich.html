@@ -1,0 +1,41 @@
+{% extends "woche/base.html" %}
+{% block title %}Was ich über dich weiß{% endblock %}
+
+{% block content %}
+<h1>Was ich über dich weiß</h1>
+<p class="leise">Alles, was hier steht, hast du mir gesagt oder ich habe es
+  gemerkt. Stimmt was nicht? Tipp drauf.</p>
+
+{% if zeilen %}
+  <ul class="wissen">
+    {% for z in zeilen %}
+      <li>
+        <span class="sym">{{ z.symbol }}</span>
+        <span class="txt">{{ z.text }}</span>
+        <form method="post" action="/woche/wissen/{{ z.id }}/aus" class="inline">
+          {{ csrf_input() }}
+          <button type="submit" class="weg" title="stimmt nicht">✕</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="leise">Noch nichts. Das wird von Woche zu Woche mehr.</p>
+{% endif %}
+
+<h2>Anstupser</h2>
+<form method="post" action="/woche/anstupser" class="karte">
+  {{ csrf_input() }}
+  <p class="leise">Wann soll ich dich erinnern? Du kannst das jederzeit
+    ausschalten.</p>
+  <div class="chips">
+    {% for o in anker_optionen %}
+      <button type="submit" name="wert" value="{{ o }}"
+              class="chip-knopf {{ 'an' if kind and kind.anstupser_anker == o }}">{{ o }}</button>
+    {% endfor %}
+  </div>
+  <button type="submit" name="aus" value="1" class="linklike">gar nicht</button>
+</form>
+
+<p class="leise klein">Deine Eltern sehen diese Seite nicht.</p>
+{% endblock %}

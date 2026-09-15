@@ -1,0 +1,84 @@
+{% extends "woche/base.html" %}
+{% block title %}Einrichtung{% endblock %}
+{% block content %}
+
+<h1>Drei Minuten, dann geht's los</h1>
+
+<!-- 1 ------------------------------------------------------------------ -->
+<form method="post" action="/woche/einrichtung/faecher" class="karte {{ 'fertig' if schritt > 1 }}">
+  {{ csrf_input() }}
+  <h2>1 · Deine Fächer</h2>
+  <p class="leise">Hak an, was du hast.</p>
+  <div class="chips">
+    {% for name in standard %}
+      <label class="chip">
+        <input type="checkbox" name="fach" value="{{ name }}"
+               {{ 'checked' if name in faecher|map(attribute='name')|list }}>
+        <span>{{ name }}</span>
+      </label>
+    {% endfor %}
+  </div>
+  <label class="zeile">Klasse
+    <input type="number" name="klasse" min="1" max="13"
+           value="{{ kind.klasse if kind else 6 }}">
+  </label>
+  <button type="submit" class="still">speichern</button>
+  <p class="leise klein">Später kannst du auf „Plan" auch den Stundenplan
+    fotografieren.</p>
+</form>
+
+<!-- 2 ------------------------------------------------------------------ -->
+<form method="post" action="/woche/einrichtung/ding" enctype="multipart/form-data"
+      class="karte {{ 'fertig' if schritt > 2 }}">
+  {{ csrf_input() }}
+  <h2>2 · Mein Ding</h2>
+  <p class="leise">Was ist gerade dein Ding?</p>
+  <input type="text" name="wort" maxlength="40"
+         placeholder="z. B. Jellycats, Fußball, Minecraft">
+  <p class="leise">Und was machst du damit?</p>
+  <div class="chips">
+    {% for key, f in formen.items() %}
+      <label class="chip">
+        <input type="radio" name="form" value="{{ key }}"
+               {{ 'checked' if key == 'einfach' }}>
+        <span>{{ f.symbol }} {{ f.label }}</span>
+      </label>
+    {% endfor %}
+  </div>
+  <label class="datei">📷 Zeig's mir
+    <input type="file" name="bild" accept="image/*">
+  </label>
+  <button type="submit" class="still">speichern</button>
+  <p class="leise klein">Dein eigenes Foto — dein Kuscheltier, dein Trikot,
+    dein Poster. Es bleibt auf diesem Rechner.</p>
+</form>
+
+<!-- 3 ------------------------------------------------------------------ -->
+<form method="post" action="/woche/einrichtung/helfer" class="karte">
+  {{ csrf_input() }}
+  <h2>3 · Wer hilft dir?</h2>
+  {% if helfer %}
+    <ul class="angebot">
+      {% for h in helfer %}<li><b>{{ h.name }}</b>
+        {% if h.fester_tag %}<span class="leise">{{ tage[h.fester_tag] }}
+          {{ h.feste_zeit or '' }}</span>{% endif %}</li>{% endfor %}
+    </ul>
+  {% endif %}
+  <input type="text" name="name" maxlength="40"
+         placeholder="z. B. Mama, Lena, Tim">
+  <label class="zeile">Feste Zeit
+    <select name="fester_tag">
+      <option value="0">— keine —</option>
+      {% for t in range(1, 8) %}<option value="{{ t }}">{{ tage[t] }}</option>{% endfor %}
+    </select>
+    <input type="text" name="feste_zeit" maxlength="10" placeholder="18:00">
+  </label>
+  <div class="knopfreihe">
+    <button type="submit" class="still">noch jemand</button>
+    <button type="submit" name="fertig" value="1" class="gross haupt">fertig</button>
+  </div>
+  <p class="leise klein">Eine feste Zeit heißt: du musst nicht fragen. Der
+    Termin ist schon da.</p>
+</form>
+
+{% endblock %}

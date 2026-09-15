@@ -1,0 +1,124 @@
+{% extends "woche/base.html" %}
+{% block title %}Meine Woche{% endblock %}
+
+{% block content %}
+
+{% if karo_satz %}<p class="termin">📌 {{ karo_satz }}</p>{% endif %}
+
+{% if zyklus %}
+  <h1>Meine Woche</h1>
+  {% if zyklus.fokus %}<p class="fokus">🎯 {{ zyklus.fokus }}</p>{% endif %}
+  <p class="leise">Das steht dir zur Verfügung. Du musst nichts davon machen.</p>
+
+  <ul class="angebot">
+    {% for s in schritte %}
+      <li>
+        <b>{{ s.titel }}</b>
+        {% if s.fach_name %}<span class="leise">{{ s.fach_name }}</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+
+  <p class="leise klein">Bis {{ datum_kurz(zyklus.ende) }} Danach fängt alles
+    neu an — nichts wird übertragen.</p>
+{% else %}
+  <h1>Was ist gerade wichtig für dich?</h1>
+  <form method="post" action="/woche/start" class="karte">
+    {{ csrf_input() }}
+    <input type="text" name="fokus" maxlength="80" autocomplete="off"
+           placeholder="z. B. Mathearbeit, weniger aufschieben">
+
+    <p class="leise">Welche Fächer nimmst du mit?</p>
+    <div class="chips">
+      {% for f in faecher %}
+        <label class="chip">
+          <input type="checkbox" name="fach_id" value="{{ f.id }}">
+          <span>{{ f.name }}</span>
+        </label>
+      {% endfor %}
+    </div>
+
+    {% if frage %}
+      <div class="frage">
+        <p>{{ frage.symbol }} {{ frage.frage }}</p>
+        <input type="hidden" name="frage_schluessel" value="{{ frage.schluessel }}">
+        {% if frage.antworten %}
+          <div class="chips">
+            {% for a in frage.antworten %}
+              <label class="chip">
+                <input type="radio" name="frage_antwort" value="{{ a }}">
+                <span>{{ a }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        {% else %}
+          <input type="text" name="frage_antwort" maxlength="40"
+                 placeholder="kannst du auch überspringen">
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <button type="submit" class="gross haupt">Los</button>
+    <p class="leise klein">{{ horizont }} Tage. Wenn es zäh ist, macht die App
+      es von selbst kürzer.</p>
+  </form>
+{% endif %}
+
+{% if gemieden %}
+  <div class="karte ruhig">
+    {% set f = gemieden[0] %}
+    <p>{{ f.name }} war vier Wochen nicht dabei. Was passt für dich?</p>
+    <div class="knopfreihe">
+      <form method="post" action="/woche/start" class="inline">
+        {{ csrf_input() }}
+        <input type="hidden" name="fokus" value="{{ f.name }}">
+        <input type="hidden" name="fach_id" value="{{ f.id }}">
+        <button type="submit" class="still">kurz reinschauen</button>
+      </form>
+      <form method="post" action="/woche/weglassen" class="inline">
+        {{ csrf_input() }}
+        <input type="hidden" name="fach_id" value="{{ f.id }}">
+        <button type="submit" class="still">bewusst weglassen</button>
+      </form>
+    </div>
+  </div>
+{% endif %}
+
+<h2>Mein Ding</h2>
+<form method="post" action="/woche/ding" enctype="multipart/form-data" class="karte ding">
+  {{ csrf_input() }}
+  {{ ding_bild('avatar') }}
+  <input type="text" name="wort" maxlength="40" value="{{ ding.wort if ding }}"
+         placeholder="z. B. Jellycats, Fußball, Minecraft">
+  <div class="chips">
+    {% for key, f in formen.items() %}
+      <label class="chip">
+        <input type="radio" name="form" value="{{ key }}"
+               {{ 'checked' if ding and ding.form == key or (not ding and key == 'einfach') }}>
+        <span>{{ f.symbol }} {{ f.label }}</span>
+      </label>
+    {% endfor %}
+  </div>
+  <label class="datei">Zeig's mir
+    <input type="file" name="bild" accept="image/*">
+  </label>
+  <button type="submit" class="still">Ist jetzt mein Ding</button>
+  {% if ding and ding.freigabe == 'offen' %}
+    <p class="leise klein">Deine Eltern müssen das Wort noch kurz bestätigen.
+      Bis dahin sagt die App einfach „{{ ding_wort }}".</p>
+  {% endif %}
+</form>
+
+{% if karten %}
+  <h2>Meine Karten</h2>
+  <div class="karten">
+    {% for k in karten %}
+      <div class="sammelkarte">
+        {% if k.bild %}<img src="/woche/bild/{{ k.bild }}" alt="">{% else %}<span>🧸</span>{% endif %}
+        <b>{{ k.thema }}</b>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% endblock %}

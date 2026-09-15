@@ -1,0 +1,22 @@
+{% extends "woche/base.html" %}
+{% block title %}Neue Karte{% endblock %}
+{% block mainclass %}heute{% endblock %}
+
+{% block content %}
+<div class="heute-karte">
+  <h1>Willst du das als Karte?</h1>
+  <div class="sammelkarte gross">
+    {% if ding and ding.bild %}
+      <img src="/woche/bild/{{ ding.bild }}" alt="">
+    {% else %}<span>🧸</span>{% endif %}
+    <b>{{ thema }}</b>
+  </div>
+  <form method="post" action="/woche/schritt/{{ schritt.id }}/karte">
+    {{ csrf_input() }}
+    <input type="hidden" name="thema" value="{{ thema }}">
+    <button type="submit" class="gross haupt">ja</button>
+    <button type="submit" name="nein" value="1" class="still">nein</button>
+  </form>
+  <p class="leise klein">Karten laufen nicht ab und gehen nicht verloren.</p>
+</div>
+{% endblock %}

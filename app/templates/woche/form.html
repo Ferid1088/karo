@@ -1,0 +1,54 @@
+{% extends "woche/base.html" %}
+{% block title %}{{ formen.get(schritt.form, {}).get('label', 'Los') }}{% endblock %}
+{% block mainclass %}heute{% endblock %}
+
+{% block content %}
+<div class="heute-karte" id="formkarte"
+     data-form="{{ schritt.form }}" data-minuten="{{ minuten }}">
+  {{ ding_bild('avatar') }}
+  <p class="fach">{{ schritt.fach_name or '' }}</p>
+  <h1>{{ schritt.titel }}</h1>
+
+  {% if schritt.form == 'speedrun' %}
+    <p class="leise">{{ formen.speedrun.hinweis }}</p>
+    {% if bestzeit %}<p class="bestzeit">Deine Bestzeit: {{ bestzeit }} s</p>{% endif %}
+    <div class="uhr" id="uhr">0,0</div>
+    <button type="button" class="gross haupt" id="startknopf">Start</button>
+    <form method="post" action="/woche/schritt/{{ schritt.id }}/bestzeit" id="zeitform">
+      {{ csrf_input() }}
+      <input type="hidden" name="sekunden" id="sekunden" value="0">
+      <button type="submit" class="gross still" id="fertigknopf" hidden>fertig</button>
+    </form>
+
+  {% elif schritt.form == 'clip' %}
+    <p class="leise">{{ formen.clip.hinweis }}</p>
+    <div class="uhr" id="uhr">60</div>
+    <button type="button" class="gross haupt" id="clipknopf">Aufnehmen</button>
+    <video id="vorschau" playsinline controls hidden></video>
+    <p class="leise klein">Bleibt auf deinem Gerät. Nichts wird hochgeladen.</p>
+    <form method="post" action="/woche/schritt/{{ schritt.id }}/rueckmeldung" class="spaeter">
+      {{ csrf_input() }}
+      <input type="hidden" name="wert" value="okay">
+      <button type="submit" class="still">fertig</button>
+    </form>
+
+  {% else %}
+    <p class="leise">{{ formen.einfach.hinweis }}</p>
+    <div class="uhr" id="uhr">{{ minuten }}:00</div>
+    <button type="button" class="gross haupt" id="startknopf">Start</button>
+    <form method="post" action="/woche/schritt/{{ schritt.id }}/rueckmeldung" class="spaeter">
+      {{ csrf_input() }}
+      <input type="hidden" name="wert" value="okay">
+      <button type="submit" class="still">fertig</button>
+    </form>
+  {% endif %}
+</div>
+
+{% if lerneinheit %}
+  <p class="leise klein">Karo hat zu „{{ thema }}" schon eine Erklärung.
+    <a href="/lernen/{{ lerneinheit }}">anschauen</a> — dauert länger als
+    diese Minuten hier.</p>
+{% endif %}
+
+<script src="/static/woche.js?v={{ asset_version }}" defer></script>
+{% endblock %}

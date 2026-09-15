@@ -1,0 +1,50 @@
+{% extends "woche/base.html" %}
+{% block title %}Anpassen{% endblock %}
+{% block mainclass %}heute{% endblock %}
+
+{% block content %}
+<div class="heute-karte">
+  <h1>{{ vorschlag.text }}</h1>
+
+  {% if vorschlag.art == 'kleiner' %}
+    <p class="neuer-schritt">{{ vorschlag.neu.titel }}</p>
+    <form method="post" action="/woche/schritt/{{ schritt.id }}/anpassung">
+      {{ csrf_input() }}
+      <input type="hidden" name="art" value="kleiner">
+      <button type="submit" name="wert" value="annehmen" class="gross haupt">passt</button>
+      <button type="submit" name="wert" value="lassen" class="still">lass so</button>
+    </form>
+
+  {% elif vorschlag.art == 'zeitpunkt' %}
+    <form method="post" action="/woche/schritt/{{ schritt.id }}/anpassung"
+          class="liste">
+      {{ csrf_input() }}
+      <input type="hidden" name="art" value="zeitpunkt">
+      {% for o in vorschlag.optionen %}
+        <button type="submit" name="wert" value="{{ o }}" class="gross still">{{ o }}</button>
+      {% endfor %}
+    </form>
+
+  {% elif vorschlag.art == 'strategie' %}
+    <div class="liste">
+      <form method="post" action="/woche/schritt/{{ schritt.id }}/anpassung">
+        {{ csrf_input() }}
+        <input type="hidden" name="art" value="ruhen">
+        <button type="submit" class="gross still">diese Woche ruhen lassen</button>
+      </form>
+      <a href="/woche/hilfe" class="gross knopf">jemanden fragen</a>
+      <a href="/woche/plan" class="gross knopf still">anderen Schritt wählen</a>
+    </div>
+    <p class="leise klein">Deine Eltern bekommen den Hinweis, kurz mit dir zu
+      reden. Du siehst das hier — es passiert nichts hinter deinem Rücken.</p>
+
+  {% else %}
+    <form method="post" action="/woche/schritt/{{ schritt.id }}/anpassung">
+      {{ csrf_input() }}
+      <input type="hidden" name="art" value="kurz">
+      <button type="submit" name="wert" value="annehmen" class="gross haupt">okay</button>
+      <button type="submit" name="wert" value="lassen" class="still">lass so</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

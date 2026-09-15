@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="same-origin">
+  <title>{% block title %}Meine Woche{% endblock %}</title>
+  <link rel="stylesheet" href="/static/woche.css?v={{ asset_version|default('0') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🧸</text></svg>">
+</head>
+<body>
+
+{% macro csrf_input() -%}
+<input type="hidden" name="{{ csrf_field }}" value="{{ csrf }}">
+{%- endmacro %}
+
+{% macro ding_bild(klasse='avatar') -%}
+  {% if ding and ding.bild %}
+    <img class="{{ klasse }}" src="/woche/bild/{{ ding.bild }}" alt="">
+  {% else %}
+    <span class="{{ klasse }} platzhalter">{{ formen.get(ding.form if ding else 'einfach', {}).get('symbol', '🧸') }}</span>
+  {% endif %}
+{%- endmacro %}
+
+<main class="{% block mainclass %}{% endblock %}">
+  {% if sagt %}<p class="sagt">{{ sagt }}</p>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+{% if nav|default(true) %}
+<nav class="unten">
+  <a href="/woche" class="{{ 'on' if path == '/woche' or path == '/woche/' }}">
+    <b>☀️</b><span>Heute</span></a>
+  <a href="/woche/plan" class="{{ 'on' if path.startswith('/woche/plan') }}">
+    <b>🗒</b><span>Woche</span></a>
+  <a href="/woche/hilfe" class="{{ 'on' if path.startswith('/woche/hilfe') }}">
+    <b>🤝</b><span>Hilfe</span></a>
+  <a href="/woche/ueber-dich" class="{{ 'on' if path.startswith('/woche/ueber') }}">
+    <b>💭</b><span>Über dich</span></a>
+  <a href="/woche/stundenplan" class="{{ 'on' if path.startswith('/woche/stundenplan') }}">
+    <b>📅</b><span>Plan</span></a>
+</nav>
+{% endif %}
+
+</body>
+</html>

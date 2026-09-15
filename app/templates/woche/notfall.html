@@ -1,0 +1,64 @@
+{% extends "woche/base.html" %}
+{% block title %}Morgen ist was{% endblock %}
+{% block mainclass %}heute{% endblock %}
+
+{% block content %}
+{% if ergebnis %}
+  <div class="heute-karte">
+    {% if ergebnis.schlaf %}
+      <h1>🌙</h1>
+      <p class="gross-text">{{ ergebnis.text }}</p>
+    {% else %}
+      <p class="leise">{{ ergebnis.text }}</p>
+      <h1>{{ ergebnis.schritt.titel }}</h1>
+      <p class="leise">{{ ergebnis.schritt.einstieg }}</p>
+      {% if helfer %}
+        <form method="post" action="/woche/hilfe">
+          {{ csrf_input() }}
+          <input type="hidden" name="frage" value="Morgen ist {{ fach.name if fach }}.">
+          <button type="submit" name="helfer_id" value="{{ helfer[0].id }}"
+                  class="gross haupt">{{ helfer[0].name }} sofort fragen</button>
+        </form>
+      {% endif %}
+      {% if ergebnis.lerneinheit %}
+        <a href="/lernen/{{ ergebnis.lerneinheit }}" class="gross knopf">
+          Karos Erklärung dazu</a>
+      {% endif %}
+      <a href="/woche" class="gross knopf still">okay, ich fang an</a>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="heute-karte">
+    <h1>Morgen ist was</h1>
+    <form method="post" action="/woche/notfall" class="liste">
+      {{ csrf_input() }}
+      <p class="leise">Was ist morgen?</p>
+      <div class="chips">
+        {% for k, l in [('arbeit','Arbeit'), ('abgabe','Abgabe'),
+                        ('referat','Referat'), ('anderes','anderes')] %}
+          <label class="chip"><input type="radio" name="was" value="{{ k }}"
+            {{ 'checked' if k == 'arbeit' }}><span>{{ l }}</span></label>
+        {% endfor %}
+      </div>
+
+      <p class="leise">In welchem Fach?</p>
+      <div class="chips">
+        {% for f in faecher %}
+          <label class="chip"><input type="radio" name="fach_id" value="{{ f.id }}">
+            <span>{{ f.name }}</span></label>
+        {% endfor %}
+      </div>
+
+      <p class="leise">Wie viel Zeit hast du heute noch?</p>
+      <div class="chips">
+        {% for m, l in [(20,'20 Minuten'), (60,'1 Stunde'), (120,'mehr')] %}
+          <label class="chip"><input type="radio" name="minuten" value="{{ m }}"
+            {{ 'checked' if m == 20 }}><span>{{ l }}</span></label>
+        {% endfor %}
+      </div>
+
+      <button type="submit" class="gross haupt">zeig mir das Wichtigste</button>
+    </form>
+  </div>
+{% endif %}
+{% endblock %}
