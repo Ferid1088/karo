@@ -1,16 +1,19 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" data-ui-area="{{ ui_area|default('child') }}" data-theme-color="{{ 'schiefer' if ui_area == 'parent' else 'lila' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="same-origin">
   <title>{% block title %}Karo{% endblock %}</title>
+  <script src="/static/themes.js?v={{ asset_version|default('0') }}"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Comic+Neue:wght@400;700&display=swap">
   <link rel="stylesheet" href="/static/karo.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/simple.css?v={{ asset_version|default('0') }}">
+  <link rel="stylesheet" href="/static/areas.css?v={{ asset_version|default('0') }}">
   <script src="/static/simple.js?v={{ asset_version|default('0') }}" defer></script>
+  <script src="/static/drafts.js?v={{ asset_version|default('0') }}" defer></script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📐</text></svg>">
 <script>
   // Pollt eine kleine JSON-Statusroute und lädt die Seite automatisch neu,
@@ -47,13 +50,24 @@
 {% if show_nav|default(true) %}
 <a class="skip-link" href="#inhalt">Zum Inhalt</a>
 <header class="simple-header">
-  <a class="brand" href="/" aria-label="Karo – Startseite">Karo<span class="brand-dot" aria-hidden="true">.</span></a>
+  <div class="area-brand">
+    <a class="brand" href="{{ '/eltern' if adult_page else '/' }}" aria-label="Karo – {{ 'Elternübersicht' if adult_page else 'Startseite' }}">Karo<span class="brand-dot" aria-hidden="true">.</span></a>
+    <span class="area-label"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">{% if adult_page %}<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>{% else %}<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/>{% endif %}</svg>{{ 'Elternbereich' if adult_page else 'Kinderbereich' }}</span>
+  </div>
   <nav class="simple-nav" aria-label="Hauptnavigation">
+    {% if adult_page %}
+    <a href="/eltern" {{ 'aria-current=page' if path == '/eltern' }}>Übersicht</a>
+    <a href="/themen" {{ 'aria-current=page' if path.startswith(('/themen', '/wissen', '/vorbereitung', '/recherche')) }}>Vorbereitung</a>
+    <a href="/messung/fortschritt" {{ 'aria-current=page' if path.startswith(('/messung', '/klassenarbeit')) }}>Lernstand</a>
+    <a href="/setup" {{ 'aria-current=page' if path.startswith('/setup') }}>Einstellungen</a>
+    {% else %}
     <a href="/" {{ 'aria-current=page' if path == '/' }}>Heute</a>
     <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/klassenarbeit')) }}>Lernen</a>
-    {% if role != 'child' %}<a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>{% endif %}
+    <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>
+    {% endif %}
   </nav>
-  {% if role != 'child' %}<a class="parent-link" href="/eltern" {{ 'aria-current=page' if adult_page }}>Für Eltern</a>{% endif %}
+  {% if adult_page %}<a class="parent-link area-switch" href="/">Zum Kinderbereich <span aria-hidden="true">→</span></a>
+  {% elif role != 'child' %}<a class="parent-link area-switch" href="/eltern">Für Eltern <span aria-hidden="true">→</span></a>{% endif %}
 </header>
 {% endif %}
 
@@ -69,29 +83,8 @@
 </main>
 
 {% if show_nav|default(true) %}
-<footer class="simple-footer"><a href="/hilfe">Brauchst du Hilfe?</a><span>Ein Schritt nach dem anderen.</span>{% if request.session.get('auth') %}<form method="post" action="/logout" class="footer-logout">{{ csrf_input() }}<button type="submit" class="ghost">Abmelden</button></form>{% endif %}</footer>
+<footer class="simple-footer"><a href="/hilfe">{{ 'Hilfe & Anleitung' if adult_page else 'Brauchst du Hilfe?' }}</a><span>{{ 'Vorbereiten. Begleiten. Fortschritte sehen.' if adult_page else 'Ein Schritt nach dem anderen.' }}</span>{% if request.session.get('auth') %}<form method="post" action="/logout" class="footer-logout">{{ csrf_input() }}<button type="submit" class="ghost">Abmelden</button></form>{% endif %}</footer>
 <script>
-(function () {
-  var SCHLUESSEL = "karo-farbwelt";
-  var auswahl = document.getElementById("farbwelten-auswahl");
-
-  function anwenden(farbe) {
-    document.documentElement.setAttribute("data-theme-color", farbe);
-    if (auswahl) auswahl.value = farbe;
-  }
-
-  var gespeichert = null;
-  try { gespeichert = localStorage.getItem(SCHLUESSEL); } catch (e) {}
-  anwenden(gespeichert || "lila");
-
-  if (auswahl) {
-    auswahl.addEventListener("change", function () {
-      anwenden(auswahl.value);
-      try { localStorage.setItem(SCHLUESSEL, auswahl.value); } catch (e) {}
-    });
-  }
-})();
-
 // Reiter oben: bedient jede Seite, die das .tabs/.tab-panel-Muster benutzt
 // (Uebersicht, Themen, Recherche, ...) — ein Skript fuer alle, statt eines
 // je Seite.

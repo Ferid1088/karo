@@ -8,14 +8,17 @@
   <div><p class="eyebrow">DEIN NÄCHSTER SCHRITT</p><h2>{{ naechstes.titel }}</h2><p>{{ naechstes.text }}</p>
   <a class="btn gross" href="{{ naechstes.url }}">{{ naechstes.button }} <span aria-hidden="true">→</span></a></div>
 </section>
+{% elif hat_erfolge %}
+<section class="card"><h2>Für heute bist du fertig!</h2><p>Deine abgehakten Themen findest du unter „Erfolge“.</p><a class="btn" href="/lernstand">Meine Erfolge ansehen</a></section>
 {% else %}
 <section class="card next-step"><span class="step-number" aria-hidden="true">1</span><div><h2>Wir machen Karo startklar</h2>
-<p>Hol einen Erwachsenen dazu. Gemeinsam fügt ihr dein erstes Schulblatt hinzu.</p>
-<a class="btn" href="/wissen">Erstes Blatt hinzufügen</a></div></section>
+<p>{{ 'Füge dein erstes Schulblatt als Foto oder PDF hinzu.' if cfg.schulblaetter_kind else 'Hol einen Erwachsenen dazu. Gemeinsam fügt ihr dein erstes Schulblatt hinzu.' }}</p>
+{% if cfg.schulblaetter_kind or role == 'parent' %}<a class="btn" href="/wissen">Erstes Blatt hinzufügen</a>{% endif %}</div></section>
 {% endif %}
 <div class="choice-grid">
-<a class="choice-card" href="/lernen"><span class="choice-kicker">LERNEN</span><h2>Thema aussuchen</h2><p>Du entscheidest, was du übst.</p><span class="choice-arrow" aria-hidden="true">→</span></a>
-<a class="choice-card" href="/klassenarbeit"><span class="choice-kicker">DEIN LERNPLAN</span><h2>Für die Klassenarbeit üben</h2><p>{% if exam %}Deine nächste Arbeit: {{ exam.exam_date[8:10] }}.{{ exam.exam_date[5:7] }}.{{ exam.exam_date[:4] }}{% else %}Schau nach, was als Nächstes dran ist.{% endif %}</p><span class="choice-arrow" aria-hidden="true">→</span></a>
+{% include "schulblaetter_link.html" %}
+<a class="choice-card" href="/lernen?tab=bearbeitung"><span class="choice-kicker">LERNEN</span><h2>Thema aussuchen</h2><p>Du entscheidest, was du übst.</p><span class="choice-arrow" aria-hidden="true">→</span></a>
+{% if cfg.klassenarbeit_kind %}<a class="choice-card" href="/klassenarbeit"><span class="choice-kicker">DEIN LERNPLAN</span><h2>Für die Klassenarbeit üben</h2><p>{% if exam %}Deine nächste Arbeit: {{ exam.exam_date[8:10] }}.{{ exam.exam_date[5:7] }}.{{ exam.exam_date[:4] }}{% else %}Schau nach, was als Nächstes dran ist.{% endif %}</p><span class="choice-arrow" aria-hidden="true">→</span></a>{% endif %}
 </div>
-{% if reviews %}<p class="quiet-note">Ein Erwachsener schaut sich noch {{ reviews|length }} Fragerunde{{ 'n' if reviews|length != 1 }} an. <a href="/eltern">Gemeinsam ansehen</a></p>{% endif %}
+{% if reviews and not cfg.antworten_pruefen_kind %}<p class="quiet-note">Ein Erwachsener schaut sich noch {{ reviews|length }} Fragerunde{{ 'n' if reviews|length != 1 }} an. {% if role == 'parent' %}<a href="/eltern">Gemeinsam ansehen</a>{% endif %}</p>{% endif %}
 {% endblock %}

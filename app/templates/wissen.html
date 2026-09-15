@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Schulblätter – Karo{% endblock %}
 {% block content %}
-<h1>Schulblätter</h1><p class="sub">Fügen Sie Material aus dem Unterricht hinzu. Daraus entstehen passende Themen und Erklärungen.</p>
+{% if cfg.schulblaetter_kind %}<a class="back-link" href="/lernen">← Lernen</a>{% endif %}
+<h1>Schulblätter</h1><p class="sub">{{ 'Füge' if cfg.schulblaetter_kind else 'Fügen Sie' }} Material aus dem Unterricht hinzu. Daraus entstehen passende Themen und Erklärungen.</p>
 <section class="card"><h2>Ein Blatt hinzufügen</h2>
 <form method="post" action="/wissen/upload" enctype="multipart/form-data">
 {{ csrf_input() }}
@@ -15,8 +16,10 @@
 </details></section>
 {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
 {% if offen %}<p class="quiet-note" role="status">Karo liest das Material. <a href="/wissen">Stand aktualisieren</a></p>{% endif %}
-{% if offene_vorschlaege %}<a class="simple-list-link card" href="/themen#themen-vorschlaege"><span><strong>{{ offene_vorschlaege }} neue Themen prüfen</strong><small>Bestätigte Themen erscheinen sofort im Lernbereich.</small></span><span aria-hidden="true">→</span></a>{% endif %}
-<h2>Ihre Sammlung</h2>
+{% if offene_vorschlaege %}
+{% if role == 'child' %}<p class="quiet-note">Ein Erwachsener bestätigt noch die erkannten Themen. Danach erscheinen sie unter „Lernen“.</p>
+{% else %}<a class="simple-list-link card" href="/themen#themen-vorschlaege"><span><strong>{{ offene_vorschlaege }} neue Themen prüfen</strong><small>Bestätigte Themen erscheinen sofort im Lernbereich.</small></span><span aria-hidden="true">→</span></a>{% endif %}{% endif %}
+<h2>{{ 'Deine' if cfg.schulblaetter_kind else 'Ihre' }} Sammlung</h2>
 {% for d in blaetter %}
 <details class="card disclosure"><summary>{{ d.themenname or d.source_name }} <span class="klein">· {{ doc_labels.get(d.state, d.state) }}</span></summary>
 <p>{{ d.source_name }} · {{ d.captured_on or d.created_at[:10] }}</p>
@@ -24,6 +27,6 @@
 <a class="btn ghost" href="/wissen/{{ d.id }}">Blatt ansehen</a>
 <details class="disclosure"><summary>Angaben zur Datei</summary><dl><dt>Typ</dt><dd>{{ d.doc_type or 'Noch nicht erkannt' }}</dd><dt>Erkannte Abschnitte</dt><dd>{{ d.abschnitte or 0 }}</dd><dt>Speicherort</dt><dd><code>{{ d.stored_path }}</code></dd></dl></details>
 </details>
-{% else %}<p class="empty">Noch keine Blätter da. Beginnen Sie oben mit einem Foto oder PDF.</p>{% endfor %}
+{% else %}<p class="empty">Noch keine Blätter da. {{ 'Beginne' if cfg.schulblaetter_kind else 'Beginnen Sie' }} oben mit einem Foto oder PDF.</p>{% endfor %}
 <details class="card disclosure"><summary>Wie verwendet Karo die Blätter?</summary><p>Die Wissensbasis enthält {{ kb_stat.blaetter or 0 }} Blätter, {{ kb_stat.lehr or 0 }} Erklärungen und {{ kb_stat.aufgaben or 0 }} Aufgaben. Jede neue Erklärung wird gegen dieses Material geprüft.</p></details>
 {% endblock %}

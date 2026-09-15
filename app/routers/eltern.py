@@ -36,9 +36,10 @@ async def wissen_upload(request: Request, rolle: str = Form("wissen"),
 
 
 @router.get("/scan/{doc_id}.jpg")
-def scan(doc_id: int):
-    doc = db.q1("SELECT stored_path FROM document WHERE id=?", doc_id)
-    if not doc or not Path(doc["stored_path"]).is_file():
+def scan(request: Request, doc_id: int):
+    doc = db.q1("SELECT stored_path, rolle FROM document WHERE id=?", doc_id)
+    if (not doc or (request.session.get("role") == "child" and doc["rolle"] != "wissen")
+            or not Path(doc["stored_path"]).is_file()):
         return HTMLResponse("Blatt nicht gefunden.", status_code=404)
     return FileResponse(doc["stored_path"], media_type="image/jpeg")
 

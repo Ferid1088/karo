@@ -14,6 +14,7 @@ import hmac
 import logging
 import re
 import secrets
+from urllib.parse import urlsplit
 
 # --- Uploads ---------------------------------------------------------------
 
@@ -88,6 +89,19 @@ def same_origin(request_headers, host: str) -> bool:
     # Weder Sec-Fetch-Site noch Origin noch Referer: alter Browser oder curl.
     # Der Token entscheidet dann allein.
     return True
+
+
+def eigene_seite(referer: str | None, host: str) -> str | None:
+    """Pfad (inkl. Query) der aufrufenden Seite, wenn sie zur eigenen App
+    gehoert — damit ein Formular zur aktuellen Seite zurueckkehren kann
+    (Refresh), statt immer auf eine feste Uebersicht zu springen."""
+    if not referer:
+        return None
+    teile = urlsplit(referer)
+    if teile.netloc and teile.netloc != host:
+        return None
+    pfad = teile.path or "/"
+    return f"{pfad}?{teile.query}" if teile.query else pfad
 
 
 # --- Schwaerzung ----------------------------------------------------------

@@ -80,6 +80,9 @@ CREATE TABLE IF NOT EXISTS topic (
     code         TEXT NOT NULL UNIQUE,
     label        TEXT NOT NULL,
     beschreibung TEXT,
+    learning_started_at TEXT,
+    merged_into  INTEGER REFERENCES topic(id),
+    learned_at   TEXT,
     state        TEXT NOT NULL DEFAULT 'vorschlag',  -- vorschlag|aktiv|abgelehnt
     quelle_doc   INTEGER REFERENCES document(id),
     sort         INTEGER NOT NULL DEFAULT 0,
@@ -111,6 +114,11 @@ CREATE TABLE IF NOT EXISTS quiz (
     modus       TEXT NOT NULL DEFAULT 'bildschirm',  -- bildschirm | papier
     state       TEXT NOT NULL DEFAULT 'offen',  -- offen|beantwortet|ausgewertet
     blatt_pfad  TEXT,               -- gedrucktes Blatt, wenn modus=papier
+    superseded_by INTEGER REFERENCES quiz(id),
+    draft_revision INTEGER NOT NULL DEFAULT 0,
+    draft_position INTEGER NOT NULL DEFAULT 0,
+    draft_updated_at TEXT,
+    review_draft TEXT NOT NULL DEFAULT '{}',
     created_at  TEXT NOT NULL,
     finished_at TEXT
 );

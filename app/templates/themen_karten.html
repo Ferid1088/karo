@@ -1,0 +1,13 @@
+{% if liste %}<div class="choice-grid">
+{% for t in liste %}<section class="choice-card" data-topic-id="{{ t.id }}">
+<span class="child-status {{ t.flag }}">{{ child_flags[t.flag] }}</span><h2>{{ t.label }}</h2>
+{% set review = cfg.antworten_pruefen_kind and reviews_by_topic and reviews_by_topic.get(t.id) %}
+{% if review %}
+<a class="btn" href="/quiz/{{ review.id }}">Antworten prüfen →</a>
+{% elif t.learning_started_at or t.learning_status == 'bearbeitung' or t in gruppen.bearbeitung %}
+<a class="btn" href="/lernzyklus/{{ t.id }}">Weiterlernen →</a>
+{% else %}<form method="post" action="/lernzyklus/{{ t.id }}/beginnen">{{ csrf_input() }}<button type="submit">Thema anfangen →</button></form>{% endif %}
+{% with content_topic=t %}{% include "lerninhalte_form.html" %}{% endwith %}
+{% with progress_topic=t %}{% include "gelernt_form.html" %}{% endwith %}
+</section>{% endfor %}
+</div>{% endif %}

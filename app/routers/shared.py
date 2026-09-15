@@ -27,7 +27,7 @@ templates = Jinja2Templates(directory=str(BASE / "templates"))
 try:
     ASSET_VERSION = str(max(
         (BASE / "static" / name).stat().st_mtime_ns
-        for name in ("karo.css", "simple.css", "simple.js")
+        for name in ("karo.css", "simple.css", "simple.js", "drafts.js", "setup.js", "storage.js", "areas.css", "themes.js")
     ))
 except OSError:
     ASSET_VERSION = "0"
@@ -69,6 +69,15 @@ def render(request: Request, name: str, status_code: int = 200,
         "offene_funde": research.anzahl_vorschlaege(),
     }
     basis.update(ctx)
+    # The visible area follows the page, including shared pages enabled for children.
+    # This only selects presentation; authorization remains in Gate.
+    if request.session.get("role") == "child":
+        basis["adult_page"] = False
+    quiz = ctx.get("quiz") or {}
+    if (request.session.get("role") == "parent" and not cfg.antworten_pruefen_kind
+            and quiz.get("state") in ("beantwortet", "ausgewertet")):
+        basis["adult_page"] = True
+    basis["ui_area"] = "parent" if basis["adult_page"] else "child"
     return templates.TemplateResponse(request, name, basis,
                                       status_code=status_code)
 

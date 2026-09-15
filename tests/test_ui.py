@@ -38,7 +38,10 @@ def test_new_navigation_and_empty_pages(client, fake_llm, fake_cli):
         response = client.get(path)
         assert response.status_code == 200, path
         Forms(response.text)
-        for label in ("Heute", "Lernen", "Erfolge", "Für Eltern"):
+        labels = (("Übersicht", "Vorbereitung", "Lernstand", "Zum Kinderbereich")
+                  if 'data-ui-area="parent"' in response.text
+                  else ("Heute", "Lernen", "Erfolge", "Für Eltern"))
+        for label in labels:
             assert label in response.text
     assert "Erstes Blatt hinzufügen" in client.get("/").text
     client.cookies.clear()
@@ -174,7 +177,7 @@ def test_only_three_main_links_and_parent_features_remain(client, fake_llm, fake
     assert nav.count('<a ') == 3
     assert 'verbindung-popup-slot' not in page.text
     parent = client.get('/eltern').text
-    for path in ('/wissen', '/themen', '/klassenarbeit', '/lernstand#ausfuehrlich', '/recherche', '/setup', '/protokoll', '/hilfe'):
+    for path in ('/wissen', '/themen', '/klassenarbeit', '/messung/fortschritt#ausfuehrlich', '/recherche', '/setup', '/protokoll', '/hilfe'):
         assert f'href="{path}"' in parent
     for path in ('/', '/lernen', '/lernstand', '/klassenarbeit', '/themen', '/wissen', '/recherche', '/hilfe'):
         assert 'class="tab-btn"' not in client.get(path).text
@@ -182,9 +185,8 @@ def test_only_three_main_links_and_parent_features_remain(client, fake_llm, fake
 
 def test_topic_start_immediately_builds_existing_material(client, fake_llm, fake_cli, app_env):
     from app import teaching
-    einrichten(client, fake_llm)
-    blatt_einlesen(client, fake_llm, app_env)
-    topic_id = themen_freigeben(client, app_env)[0]
+    from .test_app import _bis_rot
+    topic_id = _bis_rot(client, fake_llm, app_env)
     page = client.get(f'/lernzyklus/{topic_id}')
     response = client.post(f'/lernzyklus/{topic_id}/start', data={'_csrf': csrf_from(page.text), 'ausgabe': 'html'}, follow_redirects=False)
     lesson_id = int(response.headers['location'].rsplit('/', 1)[-1])
@@ -203,7 +205,7 @@ def test_home_prefers_child_ready_work_to_parent_review(client, fake_llm, fake_c
     from app import quizzes
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
-    topic_id = themen_freigeben(client, app_env)[0]
+    topic_id, other_topic_id = themen_freigeben(client, app_env)
     first = quizzes.anfordern(topic_id)
     run_jobs(app_env, fake_llm)
     with app_env.db.tx() as c:
@@ -212,7 +214,7 @@ def test_home_prefers_child_ready_work_to_parent_review(client, fake_llm, fake_c
         # Lernbegleitung wartet (siehe quizzes.py, STATE_AUSGEWERTET).
         c.execute("UPDATE quiz SET state=? WHERE id=?",
                  (quizzes.STATE_AUSGEWERTET, first))
-    second = quizzes.anfordern(topic_id)
+    second = quizzes.anfordern(other_topic_id)
     run_jobs(app_env, fake_llm)
     page = client.get('/')
     assert f'href="/quiz/{second}"' in page.text

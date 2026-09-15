@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -37,7 +38,7 @@ templates = Jinja2Templates(directory=str(BASE / "templates"))
 try:
     ASSET_VERSION = str(max(
         (BASE / "static" / name).stat().st_mtime_ns
-        for name in ("karo.css", "simple.css", "simple.js")
+        for name in ("karo.css", "simple.css", "simple.js", "drafts.js", "setup.js")
     ))
 except OSError:
     ASSET_VERSION = "0"
@@ -53,20 +54,34 @@ VALID_ROLES = frozenset({"parent", "child"})
 
 # Kinder duerfen ausschliesslich ihren eigenen Lernbereich verwenden — das
 # wird hier zentral erzwungen, nicht nur durch ausgeblendete Menuepunkte.
-CHILD_ALLOWED_EXACT = frozenset({"/", "/hilfe"})
+CHILD_ALLOWED_EXACT = frozenset({"/", "/hilfe", "/lernstand"})
 CHILD_ALLOWED_PREFIXES = ("/lernen", "/lernzyklus", "/quiz", "/material",
                           "/klassenarbeit/material")
 
-# Innerhalb sonst erlaubter Praefixe bleibt die Freigabe trotzdem
-# Elternsache: "die Lernbegleitung gibt jede Bewertung frei, bevor sie in
-# answer_log landet" (quizzes.py). Ohne diese Ausnahme koennte ein Kind
-# ueber /quiz/{id}/freigabe (oder den /lernzyklus-Alias derselben Route)
-# seine eigene Bewertung selbst bestaetigen (change.txt Abschnitt 12).
+# Die Freigabe bleibt Elternsache, bis Eltern sie in den Einstellungen
+# ausdruecklich auch fuer das Kind aktivieren. Gilt fuer beide Routenfamilien.
 CHILD_FORBIDDEN_SUFFIXES = ("/freigabe",)
 
 
-def _kind_erlaubt(path: str) -> bool:
-    if any(path.endswith(s) for s in CHILD_FORBIDDEN_SUFFIXES):
+def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
+                  schulblaetter_kind: bool = False,
+                  klassenarbeit_kind: bool = False) -> bool:
+    if klassenarbeit_kind and (
+        path in {"/klassenarbeit", "/messung/examen",
+                 "/klassenarbeit/themenblatt", "/klassenarbeit/themenblatt/status"}
+        or re.fullmatch(r"/klassenarbeit/[0-9]+/(?:plan/(?:neu|status)|lerntag|ergebnis)", path)
+    ):
+        return True
+    if schulblaetter_kind and (
+        path in {"/wissen", "/wissen/upload", "/wissen/einlesen",
+                 "/vorbereitung", "/vorbereitung/",
+                 "/vorbereitung/schulmaterial/hochladen",
+                 "/vorbereitung/schulmaterial/einlesen"}
+        or re.fullmatch(r"/(?:wissen|vorbereitung/schulmaterial)/[0-9]+", path)
+        or re.fullmatch(r"/scan/[0-9]+\.jpg", path)
+    ):
+        return True
+    if not antworten_pruefen_kind and any(path.endswith(s) for s in CHILD_FORBIDDEN_SUFFIXES):
         return False
     if path in CHILD_ALLOWED_EXACT:
         return True
@@ -151,7 +166,9 @@ class Gate:
                     request.session.clear()
                     return await self._send(send, scope, RedirectResponse(
                         "/login", HTTP_303_SEE_OTHER))
-                if role == "child" and not _kind_erlaubt(path):
+                if role == "child" and not _kind_erlaubt(
+                        path, cfg.antworten_pruefen_kind, cfg.schulblaetter_kind,
+                        cfg.klassenarbeit_kind):
                     return await self._send(send, scope, self._kind_gesperrt())
 
         if request.method in security.SAFE_METHODS:

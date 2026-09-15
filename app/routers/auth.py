@@ -16,6 +16,27 @@ from .shared import render, flash, zurueck
 router = APIRouter()
 
 
+@router.get("/setup/speicher/ordner")
+def speicher_ordner(kind: str, root: str = "", relative: str = ""):
+    from ..services import storage
+    try:
+        return JSONResponse(storage.browse(kind, root, relative))
+    except (ValueError, OSError):
+        return JSONResponse({"error": "Dieser Ordner ist nicht verfügbar."}, status_code=400)
+
+
+@router.post("/setup/speicher/auswaehlen")
+def speicher_auswaehlen(kind: str = Form(...), root: str = Form(...),
+                       relative: str = Form(""), filename: str = Form("")):
+    from ..services import storage
+    try:
+        return JSONResponse({"value": storage.select(kind, root, relative, filename)})
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except OSError:
+        return JSONResponse({"error": "Dieser Ordner ist nicht verfügbar."}, status_code=400)
+
+
 @router.get("/health")
 def health() -> JSONResponse:
     try:
@@ -198,6 +219,9 @@ def setup_finish(request: Request, model_vision: str = Form(""),
                  default_ausgabe: str = Form("html"),
                  tts_stimme: str = Form(""),
                  max_lernrunden: str = Form("4"),
+                 antworten_pruefen_kind: str = Form(""),
+                 schulblaetter_kind: str = Form(""),
+                 klassenarbeit_kind: str = Form(""),
                  recherche: str = Form(""),
                  drive_unterordner: str = Form(""),
                  material_db_path: str | None = Form(None),
@@ -224,7 +248,7 @@ def setup_finish(request: Request, model_vision: str = Form(""),
     # zeichnis aus dem Drive-Ordner heraus zeigen (siehe config.drive_root()).
     unterordner = "/".join(
         teil for teil in drive_unterordner.strip().strip("/\\").split("/")
-        if teil not in ("", ".", ".."))[:100]
+        if teil not in ("", ".", ".."))
     entwurf = dataclasses.replace(
         cfg,
         model_vision=model_vision if model_vision in gueltige else cfg.model_vision,
@@ -235,6 +259,9 @@ def setup_finish(request: Request, model_vision: str = Form(""),
                         else cfg.default_ausgabe),
         tts_stimme=tts_stimme or cfg.tts_stimme,
         max_lernrunden=runden,
+        antworten_pruefen_kind=antworten_pruefen_kind == "ja",
+        schulblaetter_kind=schulblaetter_kind == "ja",
+        klassenarbeit_kind=klassenarbeit_kind == "ja",
         recherche_erlaubt=recherche == "ja",
         drive_subdir=unterordner,
         material_db_path=(material_db_path.strip() if material_db_path is not None
@@ -271,6 +298,9 @@ def setup_finish(request: Request, model_vision: str = Form(""),
         "default_ausgabe": entwurf.default_ausgabe,
         "tts_stimme": entwurf.tts_stimme,
         "max_lernrunden": entwurf.max_lernrunden,
+        "antworten_pruefen_kind": entwurf.antworten_pruefen_kind,
+        "schulblaetter_kind": entwurf.schulblaetter_kind,
+        "klassenarbeit_kind": entwurf.klassenarbeit_kind,
         "recherche_erlaubt": entwurf.recherche_erlaubt,
         "drive_subdir": entwurf.drive_subdir,
         "material_db_path": entwurf.material_db_path,

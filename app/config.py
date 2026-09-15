@@ -74,6 +74,9 @@ class Config:
     default_ausgabe: str = "html"   # html | mp4 | notebooklm
     tts_stimme: str = "de_DE-thorsten-medium"
     max_lernrunden: int = 4
+    antworten_pruefen_kind: bool = False
+    schulblaetter_kind: bool = False
+    klassenarbeit_kind: bool = False
 
     # --- Recherche ---------------------------------------------------------
     recherche_erlaubt: bool = True

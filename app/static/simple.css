@@ -34,6 +34,14 @@ label { font-weight: 600; }
 .next-step .btn { margin-top: .5rem; }
 .step-number { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; flex: 0 0 52px; background: var(--ink-soft); color: var(--text); font-size: 1.5rem; font-weight: 750; }
 .choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1.3rem 0; }
+.learning-tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.2rem 0 1.6rem; padding-bottom: .6rem; border-bottom: 1px solid var(--border); }
+.learning-tabs a { display: inline-flex; align-items: center; gap: .6rem; min-height: 48px; padding: .6rem 1rem; border-radius: 12px; text-decoration: none; font-weight: 650; }
+.learning-tabs a[aria-current] { background: var(--ink-soft); color: var(--text); box-shadow: inset 0 -3px var(--ink); }
+.learning-tabs span { font-size: .8rem; padding: .05rem .5rem; border-radius: 20px; background: var(--surface); }
+.learning-tabs.secondary { font-size: .95rem; }
+.learned-form { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; margin-top: 1.2rem; padding-top: .8rem; border-top: 1px solid var(--border); }
+.learned-form label { display: flex; align-items: center; gap: .6rem; font-size: .95rem; }
+.content-creation-form { display: grid; gap: .6rem; margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 .choice-card { display: block; position: relative; padding: 1.5rem; border: 1px solid var(--border); background: var(--surface); border-radius: 20px; text-decoration: none; color: var(--text); transition: border-color .15s, background .15s; overflow-wrap: anywhere; }
 a.choice-card:hover { border-color: var(--ink); background: var(--surface-2); }
 .choice-card h2 { margin: .55rem 0; }
@@ -108,4 +116,66 @@ code, dd { overflow-wrap: anywhere; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+
+/* Parent settings: everyday choices first, technical details on demand. */
+main.settings-page { max-width: 880px; }
+.settings-shortcuts { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 1.5rem; }
+.settings-shortcuts a { padding: .55rem .85rem; min-height: 44px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); text-decoration: none; font-size: .9rem; font-weight: 600; }
+.settings-shortcuts a:hover { background: var(--ink-soft); border-color: var(--ink); }
+.settings-category { scroll-margin-top: 1rem; padding: 0; }
+.settings-category > summary { display: flex; align-items: center; gap: 1rem; padding: 1.25rem 1.5rem; list-style: none; }
+.settings-category > summary::-webkit-details-marker { display: none; }
+.settings-category > summary::after { content: '+'; font-size: 1.5rem; margin-left: auto; font-weight: 400; }
+.settings-category[open] > summary::after { content: '−'; }
+.settings-category > summary strong { display: block; font-size: 1.15rem; }
+.settings-category > summary small { display: block; font-weight: 400; font-size: .9rem; color: var(--muted); margin-top: .15rem; }
+.settings-category[open] { padding-bottom: 1.5rem; }
+.settings-category[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
+.settings-category > :not(summary) { margin-left: 1.5rem; margin-right: 1.5rem; }
+.settings-explainer { font-size: .95rem; color: var(--muted); margin-bottom: .75rem; }
+.settings-choice { display: flex; align-items: center; gap: .85rem; padding: 1rem 0; cursor: pointer; margin-bottom: 0; }
+.settings-choice + .settings-choice { border-top: 1px solid var(--border); }
+.settings-choice input { accent-color: var(--ink); flex: 0 0 22px; width: 22px; height: 22px; margin: 0; }
+.settings-choice > span:first-of-type { flex: 1; min-width: 0; }
+.settings-choice strong { display: block; font-size: 1rem; }
+.settings-choice small { display: block; font-size: .88rem; font-weight: 400; color: var(--muted); margin-top: .15rem; }
+.settings-destination { flex-shrink: 0; font-size: .78rem; font-weight: 600; padding: .25rem .65rem; border-radius: 20px; background: var(--surface-2); }
+.settings-choice:has(input:checked) .settings-destination { background: var(--ink-soft); color: var(--text); }
+.settings-subsection { padding: .5rem 0; }
+.settings-subsection + .settings-subsection { margin-top: 1.2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); }
+.settings-page .field { flex: 1 1 240px !important; }
+.settings-page input:not([type=checkbox]):not([type=radio]), .settings-page select { width: 100%; }
+.settings-page input[type=number] { max-width: 9rem; }
+.settings-page .hint { font-size: .88rem; }
+.storage-field + .storage-field { margin-top: 1.1rem; }
+.storage-control { display: flex; align-items: center; gap: .65rem; }
+.storage-control input { flex: 1; min-width: 0; }
+.storage-control button { flex-shrink: 0; white-space: nowrap; }
+.storage-dialog { width: min(560px, calc(100% - 2rem)); max-height: 85vh; overflow: auto; padding: 1.5rem; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 20px; }
+.storage-dialog::backdrop { background: rgba(20, 20, 60, .35); }
+.storage-dialog h2 { margin: 0 0 1rem; }
+.storage-toolbar { display: flex; gap: .65rem; }
+.storage-toolbar select { flex: 1; min-width: 0; }
+.storage-path { overflow-wrap: anywhere; font-size: .85rem; color: var(--muted); margin: .8rem 0; }
+.storage-folders { min-height: 8rem; max-height: 35vh; overflow: auto; border-block: 1px solid var(--border); margin-bottom: 1rem; }
+.storage-folders button { display: block; width: 100%; text-align: left; margin: .25rem 0; }
+.storage-dialog .actions { justify-content: flex-end; margin-top: 1.25rem; }
+@media (max-width: 480px) {
+  .storage-control { flex-wrap: wrap; }
+  .storage-control input { flex-basis: 100%; }
+  .storage-control button { width: 100%; }
+}
+.settings-inline-status { float: right; font-size: .82rem; font-weight: 400; margin-left: .5rem; }
+.settings-savebar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; position: sticky; bottom: 1rem; z-index: 11; padding: .8rem 1rem; background: var(--surface); border: 1px solid var(--border-firm); border-radius: 16px; box-shadow: 0 5px 24px rgba(20,20,60,.1); margin: 1.5rem 0 1rem; }
+.settings-savebar p { font-size: .88rem; margin: 0; color: var(--muted); }
+.settings-savebar button { flex-shrink: 0; }
+@media (max-width: 680px) {
+  .settings-category { padding: 0; }
+  .settings-category > summary { padding: 1rem; }
+  .settings-category > :not(summary) { margin-left: 1rem; margin-right: 1rem; }
+  .settings-choice { display: grid; grid-template-columns: 22px minmax(0,1fr); gap: .25rem .75rem; }
+  .settings-choice input { grid-row: 1 / 3; align-self: start; margin-top: .25rem; }
+  .settings-destination { grid-column: 2; justify-self: start; margin-top: .25rem; }
+  .settings-savebar { bottom: .5rem; gap: .5rem; }
 }

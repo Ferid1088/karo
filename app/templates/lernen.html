@@ -34,13 +34,17 @@
 
 
 {% if lesson.state == 'abgebrochen' %}
-<section class="card"><h2>Diese Runde ist zu Ende</h2><p>Du kannst ein anderes Thema wählen oder dir gemeinsam helfen lassen.</p><a class="btn" href="/lernen">Thema aussuchen</a><details class="disclosure"><summary>Für Eltern: Grund ansehen</summary><p>{{ lesson.abbruch_grund or 'Diese Lerneinheit ist beendet.' }}</p></details></section>
+<section class="card"><h2>Diese Runde ist zu Ende</h2><p>Du kannst ein anderes Thema wählen oder dir gemeinsam helfen lassen.</p><a class="btn" href="/lernen?tab=bearbeitung">Thema aussuchen</a><details class="disclosure"><summary>Für Eltern: Grund ansehen</summary><p>{{ lesson.abbruch_grund or 'Diese Lerneinheit ist beendet.' }}</p></details></section>
 {% elif lesson.state == 'gelernt' %}
-<section class="card"><h2>Das kannst du gut!</h2><p>Diese Lernrunde ist geschafft.</p><div class="actions"><a class="btn" href="/lernstand">Meine Erfolge ansehen</a><form method="post" action="/themen/{{ lesson.topic_id }}/pruefen">{{ csrf_input() }}<button class="ghost" type="submit">Mit Fragen wiederholen</button></form></div></section>
+<section class="card"><h2>Das kannst du gut!</h2><p>Diese Lernrunde ist geschafft.</p><div class="actions"><a class="btn" href="/lernstand">Meine Erfolge ansehen</a><form method="post" action="/lernzyklus/{{ lesson.topic_id }}/quiz/starten">{{ csrf_input() }}<input type="hidden" name="erneut" value="ja"><button class="ghost" type="submit">Mit Fragen wiederholen</button></form></div></section>
 {% elif lesson.state == 'wartet' %}
 <section class="card"><h2>{{ 'Bereit für deine Erklärung?' if lesson.runden == 0 else 'Noch einmal zusammen üben' }}</h2>
 {% if hat_material %}<p>Karo zeigt dir den Rechenweg Schritt für Schritt.</p>
+{% if lesson.runden == 0 and progress_topic.can_create_content %}
+{% with content_topic=progress_topic %}{% include "lerninhalte_form.html" %}{% endwith %}
+{% else %}
 <form method="post" action="/lernen/{{ lesson.id }}/runde/weiter">{{ csrf_input() }}<button type="submit">{{ 'Erklärung starten' if lesson.runden == 0 else 'Nächste Runde starten' }}</button></form>
+{% endif %}
 {% else %}<p>Hier fehlt noch ein Schulblatt. Hol einen Erwachsenen dazu.</p><a class="btn" href="/wissen">Schulblatt hinzufügen</a>{% endif %}
 <details class="disclosure" {{ 'open' if not hat_material }}><summary>Für Eltern: Lernquellen auswählen</summary>
   {% if vorschlaege %}
@@ -84,6 +88,9 @@
 
 {% if not hat_material %}<form method="post" action="/lernen/{{ lesson.id }}/runde/weiter">{{ csrf_input() }}<button type="submit" disabled>Erklärung starten, sobald Material da ist</button></form>{% endif %}
 </details></section>
+{% endif %}
+{% if lesson.state in ('gelernt', 'abgebrochen') and progress_topic.can_create_content %}
+<section class="card"><h2>Weiter mit neuen Lerninhalten</h2>{% with content_topic=progress_topic %}{% include "lerninhalte_form.html" %}{% endwith %}</section>
 {% endif %}
 {% if r and r.state in ('offen', 'geprueft') %}
 <section class="card" role="status">
@@ -259,4 +266,5 @@
 </form>{% endif %}
 </details>
 {% if lesson.state == 'wartet' and offen %}<script>karoAutoRefresh("/lernen/{{ lesson.id }}/status", "{{ signatur }}");</script>{% endif %}
+{% if progress_topic %}{% include "gelernt_form.html" %}{% endif %}
 {% endblock %}

@@ -1,0 +1,12 @@
+{% if content_topic.can_create_content %}
+<form method="post" action="/lernzyklus/{{ content_topic.id }}/start" class="content-creation-form">
+  {{ csrf_input() }}
+  <label>Format der Lerninhalte
+  <select name="ausgabe">
+  {% for wert, label in ausgabe_labels.items() %}<option value="{{ wert }}" {{ 'selected' if cfg.default_ausgabe == wert }}>{{ label }}</option>{% endfor %}
+  </select></label>
+  <button type="submit">Lerninhalte erstellen</button>
+</form>
+{% else %}
+<p class="hint">Nach deiner ersten Prüfung und der Bestätigung der Bewertungen kannst du hier Lerninhalte erstellen.</p>
+{% endif %}

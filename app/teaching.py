@@ -77,26 +77,19 @@ def starten(topic_id: int, ausgabe: str | None = None,
     if ausgabe not in {a.value for a in Ausgabe}:
         raise TeachingError("Unbekannte Ausgabeart.")
 
-    offen = db.q1(
-        """SELECT id, ausgabe FROM lesson WHERE topic_id=?
-             AND state NOT IN ('gelernt','abgebrochen') ORDER BY id DESC LIMIT 1""",
-        topic_id)
-    if offen is not None and not neue_einheit:
-        # Eine schon laufende Lerneinheit wird nicht doppelt angelegt — aber
-        # das Ausgabeformat soll trotzdem immer dem aktuellen Stand folgen
-        # (Einstellungen oder die bewusste Wahl gerade eben), statt für immer
-        # am Format der allerersten Runde festzuhaengen. Schon fertiges
-        # Material bleibt unberuehrt; erst die naechste Runde benutzt das
-        # neue Format — job_lesson_render liest lesson.ausgabe ohnehin frisch
-        # aus der Datenbank, nicht aus einem beim Einreihen eingefrorenen Wert.
-        if offen["ausgabe"] != ausgabe:
-            with db.tx() as c:
-                c.execute("UPDATE lesson SET ausgabe=? WHERE id=?",
-                          (ausgabe, offen["id"]))
-        return offen["id"]
-
     prompt_wunsch = (prompt_wunsch or "").strip()[:500] or None
     with db.tx() as c:
+        offen = c.execute(
+            """SELECT id, ausgabe FROM lesson WHERE topic_id=?
+                 AND state NOT IN ('gelernt','abgebrochen') ORDER BY id DESC LIMIT 1""",
+            (topic_id,)).fetchone()
+        if offen is not None and not neue_einheit:
+            # Suche und Anlage sind atomar, auch bei zwei Browserfenstern.
+            # Fertiges Material bleibt erhalten; das Format gilt ab der nächsten Runde.
+            if offen["ausgabe"] != ausgabe:
+                c.execute("UPDATE lesson SET ausgabe=? WHERE id=?",
+                          (ausgabe, offen["id"]))
+            return offen["id"]
         cur = c.execute(
             """INSERT INTO lesson
                    (topic_id, ausgabe, state, max_runden, prompt_wunsch, created_at)
@@ -119,6 +112,8 @@ def runde_starten(lesson_id: int, stufe: str | None = None) -> int | None:
     letzte = db.q1(
         "SELECT * FROM lesson_round WHERE lesson_id=? ORDER BY nr DESC LIMIT 1",
         lesson_id)
+    if letzte and lesson['state'] == 'material':
+        return letzte['id']
     nr = (letzte["nr"] + 1) if letzte else 1
 
     if nr > lesson["max_runden"]:
@@ -149,6 +144,14 @@ def runde_starten(lesson_id: int, stufe: str | None = None) -> int | None:
             if letzte else Stufe.NORMAL.value
 
     with db.tx() as c:
+        current = c.execute('SELECT state FROM lesson WHERE id=?', (lesson_id,)).fetchone()
+        latest = c.execute('SELECT id, nr FROM lesson_round WHERE lesson_id=? ORDER BY nr DESC LIMIT 1',
+                           (lesson_id,)).fetchone()
+        if current['state'] in ('gelernt', 'abgebrochen'):
+            return None
+        # Ein zweiter Start darf keine laufende oder gerade angelegte Runde ersetzen.
+        if latest and (latest['nr'] >= nr or current['state'] == 'material'):
+            return latest['id']
         cur = c.execute(
             """INSERT INTO lesson_round (lesson_id, nr, stufe, state, created_at)
                VALUES (?, ?, ?, 'offen', ?)""",
@@ -156,9 +159,8 @@ def runde_starten(lesson_id: int, stufe: str | None = None) -> int | None:
         round_id = cur.lastrowid
         c.execute("UPDATE lesson SET state='material', runden=? WHERE id=?",
                   (nr, lesson_id))
-
-    jobs.enqueue("lesson_build", {"round_id": round_id},
-                 dedup_key=f"lesson_build:{round_id}")
+        jobs.enqueue_in_transaction(c, "lesson_build", {"round_id": round_id},
+                                    dedup_key=f"lesson_build:{round_id}")
     return round_id
 
 
@@ -272,6 +274,9 @@ def job_lesson_build(payload: dict) -> None:
                         ensure_ascii=False),
              "geprueft" if not blockierend else "verworfen",
              round_id))
+        if not blockierend:
+            jobs.enqueue_in_transaction(c, "lesson_render", {"round_id": round_id},
+                                        dedup_key=f"lesson_render:{round_id}")
 
     if blockierend:
         # Verworfen heisst: neu schreiben, eine Stufe einfacher — nicht
@@ -283,10 +288,6 @@ def job_lesson_build(payload: dict) -> None:
                       (lesson["id"],))
         runde_starten(lesson["id"])
         return
-
-    # --- 4. Rendern ------------------------------------------------------
-    jobs.enqueue("lesson_render", {"round_id": round_id},
-                 dedup_key=f"lesson_render:{round_id}")
 
 
 def _render_material(ausgabe: str, titel: str, folien: list[dict], thema: dict,
@@ -596,8 +597,7 @@ def variante_anfordern(round_id: int, wunsch: str, ausgabe: str | None = None) -
                VALUES (?, ?, ?, 'offen', ?)""",
             (round_id, wunsch, ausgabe, db.now()))
         variant_id = cur.lastrowid
-
-    jobs.enqueue("lesson_variant", {"variant_id": variant_id})
+        jobs.enqueue_in_transaction(c, "lesson_variant", {"variant_id": variant_id})
     return variant_id
 
 
@@ -725,7 +725,8 @@ def holen(lesson_id: int) -> dict | None:
         runde["quellen"] = _json(runde.get("quellen"))
         runde["quiz"] = db.q1(
             """SELECT id, state, modus, finished_at FROM quiz
-                WHERE lesson_id=? AND round_nr=? ORDER BY id DESC LIMIT 1""",
+                WHERE lesson_id=? AND round_nr=? AND superseded_by IS NULL
+                ORDER BY id DESC LIMIT 1""",
             lesson_id, runde["nr"])
         runde["quiz"] = dict(runde["quiz"]) if runde["quiz"] else None
         runde["varianten"] = [dict(v) for v in db.q(
@@ -821,7 +822,7 @@ def offene() -> list[dict]:
              JOIN topic t ON t.id = l.topic_id
              LEFT JOIN topic_flag f ON f.topic_id = l.topic_id
             WHERE l.state NOT IN ('gelernt','abgebrochen')
-            ORDER BY l.id DESC LIMIT 20""")]
+            ORDER BY l.id DESC""")]
 
 
 def verlauf(limit: int = 30) -> list[dict]:

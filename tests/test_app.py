@@ -463,13 +463,13 @@ def test_kind_modus_beschraenkt_auf_kindbereiche(client, fake_llm, fake_cli):
     einrichten(client, fake_llm)
     kind_modus_aktivieren(client)
 
-    for pfad in ("/eltern", "/wissen", "/themen", "/recherche", "/lernstand",
+    for pfad in ("/eltern", "/wissen", "/themen", "/recherche",
                  "/protokoll", "/vorbereitung", "/messung", "/klassenarbeit",
                  "/setup"):
         r = client.get(pfad, follow_redirects=False)
         assert r.status_code == 403, pfad
 
-    for pfad in ("/", "/lernen", "/lernzyklus"):
+    for pfad in ("/", "/lernen", "/lernzyklus", "/lernstand"):
         r = client.get(pfad, follow_redirects=False)
         assert r.status_code == 200, pfad
 
@@ -614,8 +614,8 @@ def test_messung_zeigt_dieselben_inhalte_wie_die_alten_seiten(
         client, fake_llm, fake_cli):
     einrichten(client, fake_llm)
     client.get("/")  # verbraucht die Flash-Meldung aus der Einrichtung
-    assert (_hauptinhalt(client.get("/messung/fortschritt").text)
-            == _hauptinhalt(client.get("/lernstand").text))
+    assert "Ausführlicher Lernstand" in client.get("/messung/fortschritt").text
+    assert "Alle bewerteten Antworten" not in client.get("/lernstand").text
     assert (_hauptinhalt(client.get("/messung/examen").text)
             == _hauptinhalt(client.get("/klassenarbeit").text))
 
@@ -2047,8 +2047,9 @@ def test_thema_mit_nur_aufgaben_weist_auf_fehlendes_material_hin(
     assert thema["lehr_quellen"] == 0
 
     seite = client.get("/themen")
-    assert "Kein eigenes Material" in seite.text
-    assert f'/themen/{topic_id}/lernen' in seite.text
+    assert "noch keine Erklärung" in seite.text
+    assert f'/themen/{topic_id}/lernen' not in seite.text
+    assert f'/lernzyklus/{topic_id}' in seite.text
 
 
 def test_quelle_erlaubt_prueft_wirklich():

@@ -18,8 +18,8 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from .. import config, db, security, teaching
-from ..services import exam, measurement
+from .. import config, db, security, teaching, topics
+from ..services import exam, learning_progress, measurement
 from ..services.exam import ExamError
 from .shared import render, flash, zurueck
 
@@ -98,8 +98,11 @@ def klassenarbeit_lerntag(request: Request, exam_id: int,
         if as_json:
             return JSONResponse({"fehler": str(exc)}, status_code=400)
         return render(request, "material_fehler.html", error=str(exc), status_code=400)
+    material = exam.get_exam_material(material_id)
+    if request.session.get('role') == 'child':
+        learning_progress.start(teaching.holen(material['lesson_id'])['topic_id'])
     if as_json:
-        return exam.get_exam_material(material_id)
+        return material
     return zurueck(f"/klassenarbeit/material/{material_id}")
 
 
@@ -108,7 +111,12 @@ def klassenarbeit_material(request: Request, material_id: int):
     material = exam.get_exam_material(material_id)
     if material is None:
         raise HTTPException(404, "Lernmaterial nicht gefunden.")
+    topic_id = teaching.holen(material['lesson_id'])['topic_id']
+    if request.session.get('role') == 'child':
+        learning_progress.start(topic_id)
     return render(request, "klassenarbeit_material.html", material=material,
+                  progress_topic=topics.get(topic_id),
+                  adult_page=request.session.get("role") == "parent" and not config.load().klassenarbeit_kind,
                   auswertung=exam.get_exam_material_evaluation(material))
 
 

@@ -1,0 +1,5 @@
+<form method="post" action="/lernzyklus/{{ progress_topic.id }}/gelernt" class="learned-form">
+  {{ csrf_input() }}
+  <label><input type="checkbox" name="gelernt" value="ja" {{ 'checked' if progress_topic.learned_at }}> Als gelernt abhaken</label>
+  <button type="submit" class="ghost">Speichern</button>
+</form>

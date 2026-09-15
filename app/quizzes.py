@@ -94,11 +94,15 @@ def anfordern(topic_id: int, anlass: str = "evaluation", modus: str = BILDSCHIRM
 
     with db.tx() as c:
         offen = c.execute(
-            """SELECT id FROM quiz WHERE topic_id=? AND anlass=? AND state='offen'
+            """SELECT id FROM quiz WHERE topic_id=? AND anlass=?
+                 AND ((state!='freigegeben' AND finished_at IS NULL) OR ?)
+                 AND superseded_by IS NULL
                  AND COALESCE(lesson_id, -1) = COALESCE(?, -1)
                  AND COALESCE(round_nr, -1) = COALESCE(?, -1)
-                ORDER BY id DESC LIMIT 1""",
-            (topic_id, anlass, lesson_id, round_nr)).fetchone()
+                ORDER BY CASE state WHEN 'freigegeben' THEN -1 WHEN 'ausgewertet' THEN 0 WHEN 'beantwortet' THEN 1
+                         WHEN 'bereit' THEN 2 ELSE 3 END, id LIMIT 1""",
+            (topic_id, anlass, anlass == 'lernrunde' and lesson_id is not None,
+             lesson_id, round_nr)).fetchone()
         if offen is not None:
             return offen["id"]
         cur = c.execute(
@@ -107,9 +111,8 @@ def anfordern(topic_id: int, anlass: str = "evaluation", modus: str = BILDSCHIRM
                VALUES (?, ?, ?, ?, ?, 'offen', ?)""",
             (topic_id, anlass, lesson_id, round_nr, modus, db.now()))
         quiz_id = cur.lastrowid
-
-    jobs.enqueue("quiz_build", {"quiz_id": quiz_id, "anzahl": anzahl},
-                 dedup_key=f"quiz_build:{quiz_id}")
+        jobs.enqueue_in_transaction(c, "quiz_build", {"quiz_id": quiz_id, "anzahl": anzahl},
+                                    dedup_key=f"quiz_build:{quiz_id}")
     return quiz_id
 
 
@@ -118,7 +121,7 @@ def job_quiz_build(payload: dict) -> None:
     quiz_id = int(payload["quiz_id"])
     anzahl = int(payload.get("anzahl") or 5)
     quiz = db.q1("SELECT * FROM quiz WHERE id = ?", quiz_id)
-    if quiz is None or quiz["state"] != STATE_OFFEN:
+    if quiz is None or quiz["state"] != STATE_OFFEN or quiz['superseded_by']:
         return
     if db.q1("SELECT 1 FROM question WHERE quiz_id = ?", quiz_id):
         return                                  # schon gebaut
@@ -160,6 +163,11 @@ def job_quiz_build(payload: dict) -> None:
         raise QuizError("Das Modell hat keine Fragen geliefert.")
 
     with db.tx() as c:
+        current = c.execute('SELECT state, superseded_by FROM quiz WHERE id=?', (quiz_id,)).fetchone()
+        if not current or current['state'] != STATE_OFFEN or current['superseded_by']:
+            return
+        if c.execute('SELECT 1 FROM question WHERE quiz_id=?', (quiz_id,)).fetchone():
+            return
         for i, f in enumerate(fragen, start=1):
             frage = (f.get("frage") or "").strip()
             if not frage:
@@ -207,7 +215,7 @@ def job_quiz_print(payload: dict) -> None:
 # Antworten aufnehmen
 # --------------------------------------------------------------------------
 
-def antworten_speichern(quiz_id: int, antworten: dict[int, str]) -> int:
+def antworten_speichern(quiz_id: int, antworten: dict[int, str], revision: int | None = None) -> int:
     """Nimmt die Antworten des Kindes auf und reiht die Auswertung ein.
 
     Die Antworten sind noch keine Bewertung — sie stehen in `question`, nicht
@@ -233,22 +241,27 @@ def antworten_speichern(quiz_id: int, antworten: dict[int, str]) -> int:
         # Pruefung und dem Start der Transaktion dazwischen, sieht dieser
         # Blick hier den frischen Stand und verhindert, dass `question`
         # nach FREIGEGEBEN noch beschrieben wird (change.txt P1).
-        aktuell = c.execute("SELECT state FROM quiz WHERE id=?", (quiz_id,)).fetchone()
+        aktuell = c.execute("SELECT state, superseded_by, draft_revision FROM quiz WHERE id=?", (quiz_id,)).fetchone()
         if aktuell is None or aktuell["state"] == STATE_FREIGEGEBEN:
             raise QuizError(
                 "Diese Fragerunde ist bereits freigegeben und kann nicht "
                 "mehr geändert werden.")
+        if aktuell['state'] == STATE_BEANTWORTET:
+            return len(gueltig)
+        if aktuell['state'] != STATE_BEREIT or aktuell['superseded_by']:
+            raise QuizError('Diese Prüfung nimmt keine neuen Antworten mehr an.')
+        if revision is not None and revision != aktuell['draft_revision']:
+            raise QuizError('Die Antworten wurden in einem anderen Fenster geändert. Bitte lade die Seite neu.')
         for frage_id, text in antworten.items():
             if int(frage_id) not in gueltig:
                 continue
             c.execute("UPDATE question SET schueler_antwort=? WHERE id=?",
                       ((text or "").strip()[:2000] or None, int(frage_id)))
             n += 1
-        c.execute("UPDATE quiz SET state='beantwortet' WHERE id=? AND state != ?",
+        c.execute("UPDATE quiz SET state='beantwortet', draft_revision=draft_revision+1 WHERE id=? AND state != ?",
                   (quiz_id, STATE_FREIGEGEBEN))
-
-    jobs.enqueue("quiz_check", {"quiz_id": quiz_id},
-                 dedup_key=f"quiz_check:{quiz_id}")
+        jobs.enqueue_in_transaction(c, "quiz_check", {"quiz_id": quiz_id},
+                                    dedup_key=f"quiz_check:{quiz_id}")
     return n
 
 
@@ -508,7 +521,7 @@ class FreigabeErgebnis(TypedDict, total=False):
     job_id: int
 
 
-def freigeben(quiz_id: int, entscheidungen: list[dict]) -> FreigabeErgebnis:
+def freigeben(quiz_id: int, entscheidungen: list[dict], revision: int | None = None) -> FreigabeErgebnis:
     """Schreibt die freigegebenen Bewertungen. Append-only.
 
     Regeln, die hier durchgesetzt werden:
@@ -550,6 +563,11 @@ def freigeben(quiz_id: int, entscheidungen: list[dict]) -> FreigabeErgebnis:
     tag = db.today()
     geschrieben = uebersprungen = 0
     with db.tx() as c:
+        current = c.execute('SELECT state, superseded_by, draft_revision FROM quiz WHERE id=?', (quiz_id,)).fetchone()
+        if current and current['superseded_by']:
+            raise QuizError('Diese Prüfung wurde durch einen gespeicherten Stand ersetzt. Bitte neu öffnen.')
+        if current and current['state'] != STATE_FREIGEGEBEN and revision is not None and revision != current['draft_revision']:
+            raise QuizError('Ein anderes Fenster hat neuere Bewertungen gespeichert. Bitte neu laden.')
         # Atomare Beanspruchung: gewinnt nur, wer die Zeile aus einem der
         # in ALLOWED_TRANSITIONS erlaubten Vorzustaende nach FREIGEGEBEN
         # dreht — nicht nur "finished_at fehlt noch". BEGIN IMMEDIATE
@@ -663,6 +681,7 @@ def holen(quiz_id: int) -> dict | None:
     if quiz is None:
         return None
     d = dict(quiz)
+    d['review_draft'] = json.loads(d.get('review_draft') or '{}')
     d["thema"] = topics.get(quiz["topic_id"])
     d["fragen"] = [dict(r) for r in db.q(
         """SELECT q.*, (SELECT MAX(id) FROM answer_log a
@@ -681,8 +700,10 @@ def offene() -> list[dict]:
         """SELECT q.*, t.label AS thema_label, t.code AS thema_code,
                   (SELECT COUNT(*) FROM question x WHERE x.quiz_id = q.id) AS n
              FROM quiz q JOIN topic t ON t.id = q.topic_id
-            WHERE q.state != ?
-            ORDER BY q.id DESC LIMIT 30""", STATE_FREIGEGEBEN)]
+            WHERE q.state != ? AND q.superseded_by IS NULL AND q.finished_at IS NULL
+              AND (q.lesson_id IS NULL OR EXISTS (SELECT 1 FROM lesson l WHERE l.id=q.lesson_id
+                   AND l.state NOT IN ('gelernt','abgebrochen')))
+            ORDER BY q.id DESC""", STATE_FREIGEGEBEN)]
 
 
 def verlauf(topic_id: int, limit: int = 14) -> list[dict]:

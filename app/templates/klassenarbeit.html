@@ -2,12 +2,12 @@
 {% block title %}Klassenarbeit – Karo{% endblock %}
 {% block content %}
 {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
-<a class="back-link" href="/lernen">← Lernen</a><h1>Dein Plan für die Klassenarbeit</h1>
+{% if cfg.klassenarbeit_kind %}<a class="back-link" href="/lernen">← Lernen</a>{% endif %}<h1>Dein Plan für die Klassenarbeit</h1>
 <p class="sub">Such dir einen Lerntag aus. Öffne dein Material und übe danach mit Fragen.</p>
 
 
 
-<details class="card disclosure" id="klassenarbeit-neu" {{ 'open' if scan or not zeilen }}><summary>Für Eltern: Klassenarbeit hinzufügen</summary>
+<details class="card disclosure" id="klassenarbeit-neu" {{ 'open' if scan or not zeilen }}><summary>{{ '' if cfg.klassenarbeit_kind else 'Für Eltern: ' }}Klassenarbeit hinzufügen</summary>
 
 <div class="card">
   <h3><span class="klein">Schritt 1</span><br>Themenblatt einlesen</h3>
@@ -72,7 +72,7 @@
 
 <section id="klassenarbeit-verlauf">
 {% for e in zeilen %}
-<details class="card exam-card" {{ 'open' if loop.first }}>
+<details class="card exam-card" id="exam-{{ e.id }}" {{ 'open' if loop.first }}>
   <summary style="cursor:pointer; font-weight:700; font-size:1.08rem">{{ e.exam_date[8:10] }}.{{ e.exam_date[5:7] }}.{{ e.exam_date[0:4] }}
     {% if e.kalibrierung.quote is not none %}
       <span class="pill {{ 'gruen' if e.kalibrierung.quote >= 0.7 else 'gelb' }}">
@@ -166,7 +166,7 @@
   {% endif %}
 
   {% if e.kalibrierung.zeilen %}
-  <details class="disclosure"><summary>Für Eltern: Ergebnis der Klassenarbeit eintragen</summary>
+  <details class="disclosure"><summary>{{ '' if cfg.klassenarbeit_kind else 'Für Eltern: ' }}Ergebnis der Klassenarbeit eintragen</summary>
   <form method="post" action="/klassenarbeit/{{ e.id }}/ergebnis">
     {{ csrf_input() }}
     <div class="tablewrap" style="margin:.7rem 0">
@@ -200,7 +200,7 @@
   {% endif %}
 </details>
 {% else %}
-<div class="empty">Noch kein Lernplan da. Ein Erwachsener kann oben eine Klassenarbeit hinzufügen.</div>
+<div class="empty">Noch kein Lernplan da. {{ 'Du kannst' if cfg.klassenarbeit_kind else 'Ein Erwachsener kann' }} oben eine Klassenarbeit hinzufügen.</div>
 {% endfor %}
 </section>
 <script src="/static/exam-material.js?v={{ asset_version }}" defer></script>

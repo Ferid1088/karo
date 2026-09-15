@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ doc.source_name }} – Karo{% endblock %}
 {% block content %}
+{% if cfg.schulblaetter_kind %}<a class="back-link" href="/wissen">← Schulblätter</a>{% endif %}
 <h1>{{ doc.source_name }}</h1>
 <p class="sub">{{ doc.captured_on or '' }} · {{ doc.doc_type or 'Typ unbekannt' }}
 {% if doc.note %} · {{ doc.note }}{% endif %}

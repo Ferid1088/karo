@@ -30,6 +30,7 @@ def render_wissen(request: Request):
            ORDER BY d.created_at DESC LIMIT 50""")]
     return render(request, "wissen.html", blaetter=docu, counts=jobs.counts(),
                   kb_stat=kb.statistik(), drive_ok=ingest.drive_available(),
+                  adult_page=not config.load().schulblaetter_kind,
                   inbox_path=ingest.inbox_path())
 
 
@@ -52,6 +53,8 @@ async def handle_wissen_einlesen(request: Request, quelle: str):
 
 async def handle_wissen_upload(request: Request, rolle: str,
                                datei: UploadFile | None):
+    if request.session.get("role") == "child":
+        rolle = "wissen"
     formular = await request.form()
     datei = datei or formular.get("datei")
     themenname = str(formular.get("themenname") or "").strip()[:200]
@@ -79,7 +82,7 @@ async def handle_wissen_upload(request: Request, rolle: str,
     except ingest.IngestError as exc:
         flash(request, str(exc), "err")
     else:
-        flash(request, "Dieses Blatt ist bereits in Ihrer Sammlung." if
+        flash(request, "Dieses Blatt ist bereits in der Sammlung." if
               ergebnis["status"] == "doppelt" else
               f"Datei eingereicht — sie wird jetzt für „{themenname}“ gelesen.")
     return zurueck("/wissen")
@@ -87,14 +90,15 @@ async def handle_wissen_upload(request: Request, rolle: str,
 
 def render_wissen_detail(request: Request, doc_id: int):
     doc = db.q1("SELECT * FROM document WHERE id = ?", doc_id)
-    if doc is None:
+    if doc is None or (request.session.get("role") == "child" and doc["rolle"] != "wissen"):
         flash(request, "Blatt nicht gefunden.", "err")
         return zurueck("/wissen")
     abschnitte = [dict(r) for r in db.q(
         """SELECT k.*, t.label AS thema_label FROM kb_chunk k
              LEFT JOIN topic t ON t.id = k.topic_id
             WHERE k.document_id=? ORDER BY k.position""", doc_id)]
-    return render(request, "wissen_blatt.html", doc=dict(doc), abschnitte=abschnitte)
+    return render(request, "wissen_blatt.html", doc=dict(doc), abschnitte=abschnitte,
+                  adult_page=not config.load().schulblaetter_kind)
 
 
 # --- Themen genehmigen ---------------------------------------------------------

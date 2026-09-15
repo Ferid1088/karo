@@ -22,37 +22,19 @@
 
   const quiz = document.querySelector('[data-draft-key]');
   const form = document.querySelector('[data-answer-form]');
-  if (quiz && quiz.dataset.quizState !== 'bereit') {
-    try { localStorage.removeItem(quiz.dataset.draftKey); } catch (_) {}
-  }
   if (form && quiz) {
-    const inputs = [...form.querySelectorAll('input[name^="antwort_"]')];
     const questions = [...form.querySelectorAll('[data-question]')];
     const previous = form.querySelector('[data-question-prev]');
     const next = form.querySelector('[data-question-next]');
     const submit = form.querySelector('[data-answer-submit]');
     const count = form.querySelector('[data-question-count]');
     const progress = form.querySelector('[data-question-progress]');
-    const status = form.querySelector('[data-draft-status]');
-    const key = quiz.dataset.draftKey;
-    let index = 0;
-    try {
-      const draft = JSON.parse(localStorage.getItem(key) || '{}');
-      if (Date.now() - draft.savedAt < 14 * 86400000 && draft.answers) {
-        inputs.forEach(input => {
-          if (!input.value && typeof draft.answers[input.name] === 'string') input.value = draft.answers[input.name].slice(0, 2000);
-        });
-        index = Math.max(0, inputs.findIndex(input => !input.value.trim()));
-        status.textContent = 'Deine Antworten sind noch da.';
-      }
-    } catch (_) {}
+    let index = Math.max(0, Math.min(Number(quiz.dataset.draftPosition || 0), questions.length - 1));
     function save() {
-      try {
-        localStorage.setItem(key, JSON.stringify({savedAt: Date.now(), answers: Object.fromEntries(inputs.map(i => [i.name, i.value]))}));
-        status.textContent = 'Deine Antworten sind auf diesem Gerät zwischengespeichert.';
-      } catch (_) { status.textContent = 'Lass die Seite bis zur Abgabe geöffnet.'; }
+      if (form.karoDraft) form.karoDraft.schedule();
     }
     function show(focus) {
+      form.dataset.position = index;
       questions.forEach((q, i) => { q.hidden = i !== index; });
       previous.hidden = index === 0;
       next.hidden = index === questions.length - 1;
@@ -64,9 +46,12 @@
     if (questions.length) {
       form.querySelector('[data-question-toolbar]').hidden = false;
       show(false);
-      previous.addEventListener('click', () => { index--; show(true); });
-      next.addEventListener('click', () => { save(); index++; show(true); });
-      form.addEventListener('input', save);
+      previous.addEventListener('click', () => { index--; show(true); save(); });
+      next.addEventListener('click', () => { index++; show(true); save(); });
+      form.addEventListener('draft-restored', () => {
+        index = Math.max(0, Math.min(Number(form.dataset.position || 0), questions.length - 1));
+        show(false);
+      });
       form.addEventListener('submit', event => {
         save();
         if (index < questions.length - 1) { event.preventDefault(); index++; show(true); }

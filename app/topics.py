@@ -8,6 +8,7 @@ hat.
 
 from __future__ import annotations
 
+import difflib
 import logging
 import re
 import unicodedata
@@ -55,14 +56,19 @@ def job_topic_propose(payload: dict) -> None:
         system=prompts.SYSTEM,
     )
 
-    bekannt = {r["code"] for r in db.q("SELECT code FROM topic")}
     with db.tx() as c:
+        bekannt_rows = [dict(r) for r in c.execute("SELECT code, label FROM topic")]
+        bekannt = {r["code"] for r in bekannt_rows}
+        bekannte_labels = [r["label"] for r in bekannt_rows]
         for roh in ergebnis.data.get("themen") or []:
             code = normalize_code(roh.get("code") or roh.get("label") or "")
             label = (roh.get("label") or "").strip()
             if not code or not label or code in bekannt:
                 continue
+            if ist_duplikat(label, bekannte_labels):
+                continue
             bekannt.add(code)
+            bekannte_labels.append(label)
             c.execute(
                 """INSERT INTO topic (subject, code, label, beschreibung, state,
                                       quelle_doc, sort, created_at)
@@ -89,6 +95,33 @@ def normalize_code(text: str) -> str:
     text = re.sub(r"[^A-Z0-9.]+", ".", text).strip(".")
     text = re.sub(r"\.{2,}", ".", text)
     return text[:60]
+
+
+DUPLIKAT_SCHWELLE = 0.88
+
+
+def _vergleichstext(label: str) -> str:
+    text = unicodedata.normalize("NFKD", label).lower()
+    text = (text.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
+                .replace("ß", "ss"))
+    return re.sub(r"[^a-z0-9]+", "", text)
+
+
+def ist_duplikat(label: str, vorhandene_labels: list[str]) -> bool:
+    """True, wenn `label` einem der `vorhandene_labels` zum Verwechseln
+    aehnlich ist — auch wenn der Themencode (der 1:1 aus der Schreibweise
+    kommt) sich unterscheidet. Ohne diesen Abgleich landet dasselbe Thema
+    manchmal doppelt in der Datenbank, einmal z. B. als 'Multiplikation',
+    einmal als 'multiplication' aus einer anderssprachigen Quelle — beide
+    aktiv, aber mit unabhaengigem Gelernt-Status, sodass dasselbe Thema
+    gleichzeitig unter 'Lernen' und 'Erfolge' auftaucht."""
+    ziel = _vergleichstext(label)
+    if not ziel:
+        return False
+    return any(
+        difflib.SequenceMatcher(None, ziel, _vergleichstext(vorhanden)).ratio()
+        >= DUPLIKAT_SCHWELLE
+        for vorhanden in vorhandene_labels)
 
 
 # --------------------------------------------------------------------------
@@ -234,6 +267,9 @@ def anlegen(label: str, beschreibung: str = "") -> int | None:
         return None
     with db.tx() as c:
         if c.execute("SELECT 1 FROM topic WHERE code=?", (code,)).fetchone():
+            return None
+        vorhandene_labels = [r["label"] for r in c.execute("SELECT label FROM topic").fetchall()]
+        if ist_duplikat(label, vorhandene_labels):
             return None
         cur = c.execute(
             """INSERT INTO topic (subject, code, label, beschreibung, state,

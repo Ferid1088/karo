@@ -1,15 +1,38 @@
 {% extends "base.html" %}
 {% block title %}Lernen – Karo{% endblock %}
 {% block content %}
-<p class="eyebrow">EIN THEMA NACH DEM ANDEREN</p><h1>Womit möchtest du loslegen?</h1>
-<p class="sub">Such dir ein Thema aus. Karo hilft dir weiter.</p>
-{% if schritte %}
+<p class="eyebrow">DEIN LERNBEREICH</p><h1>Was möchtest du heute lernen?</h1>
+<p class="sub">Starte ein neues Thema oder mach dort weiter, wo du aufgehört hast.</p>
+<nav class="learning-tabs" aria-label="Lernbereiche">
+{% if cfg.klassenarbeit_kind %}<a href="/lernen?tab=klassenarbeit" {{ 'aria-current=page' if tab == 'klassenarbeit' }}>Klassenarbeit</a>{% endif %}
+<a href="/lernen?tab=bearbeitung" {{ 'aria-current=page' if tab == 'bearbeitung' }}>In Bearbeitung <span>{{ gruppen.bearbeitung|length }}</span></a>
+<a href="/lernen?tab=neu" {{ 'aria-current=page' if tab == 'neu' }}>Neue Themen <span>{{ gruppen.neu|length }}</span></a>
+</nav>
+{% if tab == 'klassenarbeit' %}
+<section aria-labelledby="klassenarbeit-heading">
+<h2 id="klassenarbeit-heading">Dein Plan für die Klassenarbeit</h2>
+<nav class="learning-tabs secondary" aria-label="Themen für die Klassenarbeit">
+<a href="/lernen?tab=klassenarbeit&amp;status=neu" {{ 'aria-current=page' if subtab == 'neu' }}>Neue Themen</a>
+<a href="/lernen?tab=klassenarbeit&amp;status=bearbeitung" {{ 'aria-current=page' if subtab == 'bearbeitung' }}>In Bearbeitung</a>
+</nav>
+{% for exam in exam_gruppen[subtab] %}
+<section class="card"><p class="eyebrow">KLASSENARBEIT AM {{ exam.exam_date[8:10] }}.{{ exam.exam_date[5:7] }}.{{ exam.exam_date[:4] }}</p>
+{% with liste=exam.themen %}{% include "themen_karten.html" %}{% endwith %}
+{% if not exam.themen %}<p>Die Themen für diese Klassenarbeit werden noch vorbereitet.</p>{% endif %}
+<a href="/klassenarbeit#exam-{{ exam.id }}">Lernplan und Lerntage öffnen →</a>
+</section>
+{% else %}<section class="card"><h3>{{ 'Noch keine neuen Themen' if subtab == 'neu' else 'Noch nichts in Bearbeitung' }}</h3><p>{{ 'Sobald eine Klassenarbeit vorbereitet ist, findest du ihre Themen hier.' if subtab == 'neu' else 'Starte ein Thema für die Klassenarbeit. Dann kannst du hier weiterlernen.' }}</p></section>{% endfor %}
+<a class="btn ghost" href="/klassenarbeit">Klassenarbeiten und Lernpläne verwalten</a>
+</section>
+{% else %}
+{% if tab == 'bearbeitung' and schritte %}
 <section class="card"><h2>Hier warst du zuletzt</h2><div class="simple-list">
 {% for s in schritte %}<a class="simple-list-link" href="{{ s.url }}"><span><strong>{{ s.titel }}</strong><small>{{ s.text }}</small></span><span aria-hidden="true">→</span></a>{% endfor %}
 </div></section>{% endif %}
-{% if themen %}<div class="choice-grid">
-{% for t in themen %}<a class="choice-card" href="/lernzyklus/{{ t.id }}"><span class="child-status {{ t.flag }}">{{ child_flags[t.flag] }}</span><h2>{{ t.label }}</h2><span class="topic-link">Thema öffnen <span aria-hidden="true">→</span></span></a>{% endfor %}
-</div>{% else %}<section class="card"><h2>Deine Themen kommen hierhin</h2><p>Ein Erwachsener fügt ein Schulblatt hinzu. Dann könnt ihr loslegen.</p><a class="btn" href="/eltern">Gemeinsam vorbereiten</a></section>{% endif %}
-<a class="simple-list-link card" href="/klassenarbeit"><span><strong>Dein Plan für die Klassenarbeit</strong><small>Alle Lerntage an einem Ort.</small></span><span aria-hidden="true">→</span></a>
-{% if reviews %}<p class="quiet-note">Es gibt Antworten zum gemeinsamen Anschauen. <a href="/eltern">Für Eltern</a></p>{% endif %}
+{% with liste=gruppen[tab] %}{% include "themen_karten.html" %}{% endwith %}
+{% if not gruppen[tab] %}<section class="card"><h2>{{ 'Keine neuen Themen' if tab == 'neu' else 'Noch nichts in Bearbeitung' }}</h2><p>{{ 'Hier erscheinen bestätigte Themen, die du noch nicht begonnen hast.' if tab == 'neu' else 'Starte unter „Neue Themen“ ein Thema. Danach findest du es hier.' }}</p></section>{% endif %}
+{% endif %}
+{% if cfg.schulblaetter_kind and tab == 'neu' %}<div class="choice-grid">{% include "schulblaetter_link.html" %}</div>{% endif %}
+{% if cfg.klassenarbeit_kind and tab != 'klassenarbeit' %}<a class="simple-list-link" href="/klassenarbeit">Dein Plan für die Klassenarbeit →</a>{% endif %}
+{% if reviews and not cfg.antworten_pruefen_kind %}<p class="quiet-note">Es gibt Antworten zum gemeinsamen Anschauen. {% if role == 'parent' %}<a href="/eltern">Für Eltern</a>{% endif %}</p>{% endif %}
 {% endblock %}

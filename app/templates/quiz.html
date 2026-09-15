@@ -3,7 +3,7 @@
 {% block mainclass %}{{ 'focus-view' if quiz.state == 'bereit' and quiz.modus == 'bildschirm' else '' }}{% endblock %}
 {% block content %}
 <a class="back-link" href="/lernen">← Später weiterlernen</a>
-<div data-quiz-state="{{ quiz.state }}" data-draft-key="karo-antworten-{{ quiz.id }}"></div>
+<div data-quiz-state="{{ quiz.state }}" data-draft-revision="{{ quiz.draft_revision }}" data-draft-position="{{ quiz.draft_position }}" data-draft-key="karo-antworten-{{ quiz.id }}"></div>
 {% set thema = quiz.thema or {} %}
 <h1>{{ thema.label or 'Fragen' }}</h1>
 <p class="sub">
@@ -58,6 +58,7 @@
     <div class="question-toolbar" data-question-toolbar hidden><span data-question-count aria-live="polite"></span><progress data-question-progress max="{{ quiz.fragen|length }}" value="1" aria-label="Fortschritt der Fragerunde"></progress></div>
     <p class="hint" data-draft-status role="status"></p>
     {{ csrf_input() }}
+    <input type="hidden" name="draft_revision" value="{{ quiz.draft_revision }}">
     {% for f in quiz.fragen %}
     <div class="item" data-question>
       <div class="pos">Frage {{ f.position }}{% if f.stufe %} · {{ f.stufe }}{% endif %}</div>
@@ -81,24 +82,40 @@
 {% elif quiz.state == 'beantwortet' %}
   <div class="card">
     <h3>Die Antworten werden ausgewertet</h3>
-    <p>Du hast deine Antworten abgegeben. Karo schaut sie an. Danach schaut ein Erwachsener mit dir zusammen nach.</p>
+    <p>Du hast deine Antworten abgegeben. Karo schaut sie an. {{ 'Danach kannst du deine Antworten prüfen.' if cfg.antworten_pruefen_kind else 'Danach schaut ein Erwachsener mit dir zusammen nach.' }}</p>
     <p class="hint">Diese Seite aktualisiert sich von selbst, sobald die Auswertung fertig ist.
     {% if offen %}({{ offen }} Vorgang läuft){% endif %}</p>
     <script>karoAutoRefresh("/quiz/{{ quiz.id }}/status", "{{ signatur }}");</script>
   </div>
 
+{% elif role == 'child' and not cfg.antworten_pruefen_kind and not quiz.finished_at %}
+  <div class="card">
+    <h2>Deine Antworten warten auf die Prüfung</h2>
+    <p>Ein Erwachsener schaut sich deine Antworten an und bestätigt die Bewertungen im Elternbereich.</p>
+    <a class="btn" href="/">Zurück zu Heute</a>
+    <script>karoAutoRefresh("/quiz/{{ quiz.id }}/status", "{{ signatur }}");</script>
+  </div>
 {% else %}
   {% if quiz.finished_at %}
-  <div class="msg ok">Geschafft! Deine Antworten sind gemeinsam geprüft und gespeichert.</div>
+  <div class="msg ok">Geschafft! Deine Antworten sind geprüft und gespeichert.</div>
+  {% if quiz.anlass == 'evaluation' and progress_topic.can_create_content %}
+  <section class="card"><h2>Jetzt mit Lerninhalten weiterlernen</h2>
+  {% with content_topic=progress_topic %}{% include "lerninhalte_form.html" %}{% endwith %}</section>
+  {% endif %}
   {% else %}
   <div class="card">
-    <p class="hint">Für Eltern: Bitte jede Antwort ansehen und die Bewertung bestätigen oder ändern.</p>
+    <p class="hint">{{ 'Schau dir jede Antwort an und bestätige oder ändere die Bewertung.' if cfg.antworten_pruefen_kind else 'Für Eltern: Bitte jede Antwort ansehen und die Bewertung bestätigen oder ändern.' }}</p>
   </div>
   {% endif %}
 
-  {% if not quiz.finished_at %}<h2>Jetzt gemeinsam nachsehen</h2><p>Hol einen Erwachsenen dazu. Ihr schaut euch deine Antworten zusammen an.</p>{% endif %}
+  {% if not quiz.finished_at %}
+    {% if cfg.antworten_pruefen_kind %}<h2>Antworten prüfen</h2><p>Vergleiche deine Antworten mit den Vorschlägen. Wenn du unsicher bist, hol einen Erwachsenen dazu.</p>
+    {% else %}<h2>Jetzt gemeinsam nachsehen</h2><p>Hol einen Erwachsenen dazu. Ihr schaut euch deine Antworten zusammen an.</p>{% endif %}
+  {% endif %}
   <form method="post" action="/quiz/{{ quiz.id }}/freigabe" data-review-form>
+    {% if not quiz.finished_at %}<p class="hint" data-draft-status role="status"></p>{% endif %}
     {{ csrf_input() }}
+    <input type="hidden" name="draft_revision" value="{{ quiz.draft_revision }}">
     {% for f in quiz.fragen %}
     <div class="item {{ 'low' if f.vorschlag_konf is not none and f.vorschlag_konf < 0.6 }}">
       <div class="pos">Frage {{ f.position }}
@@ -128,16 +145,16 @@
         <div style="flex:0 0 auto">
           {% if quiz.finished_at and not f.antwort_id %}<p class="klein">Übersprungen – ohne Bewertung.</p>{% else %}
           <p class="klein">{{ ('Bestätigte Bewertung' if f.antwort_id else 'Vorschlag von Karo') }}: {{ 'richtig' if (f.bestaetigt_richtig if f.antwort_id else f.vorschlag_richtig) == 1 else ('falsch' if (f.bestaetigt_richtig if f.antwort_id else f.vorschlag_richtig) == 0 else 'bitte selbst prüfen') }}</p>{% endif %}
-          <label>Ihre Entscheidung</label>
+          <label>{{ 'Deine Entscheidung' if cfg.antworten_pruefen_kind else 'Ihre Entscheidung' }}</label>
           <div class="seg">
             <label><input type="radio" name="urteil_{{ f.id }}" value="ja"
-              {{ 'checked' if quiz.finished_at and f.bestaetigt_richtig == 1 }}
+              {{ 'checked' if (quiz.finished_at and f.bestaetigt_richtig == 1) or (not quiz.finished_at and quiz.review_draft.get('urteil_' ~ f.id) == 'ja') }}
               {{ 'disabled' if quiz.finished_at }}><span>richtig</span></label>
             <label><input type="radio" name="urteil_{{ f.id }}" value="nein"
-              {{ 'checked' if quiz.finished_at and f.bestaetigt_richtig == 0 }}
+              {{ 'checked' if (quiz.finished_at and f.bestaetigt_richtig == 0) or (not quiz.finished_at and quiz.review_draft.get('urteil_' ~ f.id) == 'nein') }}
               {{ 'disabled' if quiz.finished_at }}><span>falsch</span></label>
             <label><input type="radio" name="urteil_{{ f.id }}" value="skip"
-              {{ 'checked' if quiz.finished_at and not f.antwort_id }}
+              {{ 'checked' if (quiz.finished_at and not f.antwort_id) or (not quiz.finished_at and quiz.review_draft.get('urteil_' ~ f.id) == 'skip') }}
               {{ 'disabled' if quiz.finished_at }}><span>überspringen</span></label>
           </div>
         </div>
@@ -147,7 +164,7 @@
                   {{ 'disabled' if quiz.finished_at }}>
             <option value="">–</option>
             {% for key, label in error_labels.items() %}
-            <option value="{{ key }}" {{ 'selected' if (f.bestaetigt_fehler if quiz.finished_at else f.vorschlag_fehler) == key }}>{{ label }}</option>
+            <option value="{{ key }}" {{ 'selected' if (f.bestaetigt_fehler if quiz.finished_at else quiz.review_draft.get('fehler_' ~ f.id, f.vorschlag_fehler)) == key }}>{{ label }}</option>
             {% endfor %}
           </select>
         </div>
@@ -170,4 +187,5 @@
   </form>
 {% endif %}
 {% if quiz.finished_at %}<a class="btn section-space" href="/lernstand">Meine Erfolge ansehen</a>{% endif %}
+{% if progress_topic %}{% include "gelernt_form.html" %}{% endif %}
 {% endblock %}

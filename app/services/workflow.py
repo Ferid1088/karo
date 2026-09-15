@@ -20,6 +20,7 @@ from ..domain import FLAG_ORDER, Flag
 from ..quizzes import QuizError
 from ..teaching import TeachingError
 from ..routers.shared import flash, render, zurueck
+from . import learning_content, learning_progress, topic_workflow
 
 
 # --- Quiz-Seite -------------------------------------------------------------
@@ -45,7 +46,15 @@ def render_quiz_page(request: Request, quiz_id: int):
     if quiz is None:
         flash(request, "Fragerunde nicht gefunden.", "err")
         return zurueck("/")
+    if quiz['superseded_by']:
+        return zurueck(f"/quiz/{quiz['superseded_by']}")
+    if request.session.get('role') == 'child':
+        learning_progress.start(quiz['topic_id'])
+    topic = topics.get(quiz['topic_id'])
+    if topic:
+        learning_content.add_creation_options([topic])
     return render(request, "quiz.html", quiz=quiz, counts=jobs.counts(),
+                  progress_topic=topic,
                   signatur=_quiz_signatur(quiz_id))
 
 
@@ -59,7 +68,9 @@ async def handle_quiz_antworten(request: Request, quiz_id: int):
         if roh.isdigit():
             antworten[int(roh)] = str(formular.get(schluessel) or "")
     try:
-        n = quizzes.antworten_speichern(quiz_id, antworten)
+        raw_revision = str(formular.get('draft_revision') or '')
+        n = quizzes.antworten_speichern(quiz_id, antworten,
+                                      int(raw_revision) if raw_revision.isdigit() else None)
     except QuizError as exc:
         flash(request, str(exc), "err")
         return zurueck(f"/quiz/{quiz_id}")
@@ -103,12 +114,20 @@ def handle_quiz_starten(request: Request, topic_id: int, modus: str):
     return zurueck(f"/quiz/{quiz_id}")
 
 
-def handle_quiz_or_lernen_start(request: Request, topic_id: int, modus: str):
+def handle_quiz_or_lernen_start(request: Request, topic_id: int, modus: str, erneut: bool = False):
     """Der Themenzyklus kennt nur EIN „Fragen starten" — je nachdem, ob
     schon eine Lernrunde laeuft, ist das entweder eine Verstaendnisfrage zur
     Lernrunde oder eine eigenstaendige Themenpruefung. Frueher entschied
     lernzyklus.py das und rief dafuer zwei kind.py-Router-Funktionen auf;
     die Entscheidung gehoert hierher, nicht in einen Router."""
+    topic_id = topic_workflow.canonical_topic_id(topic_id)
+    learning_progress.start(topic_id)
+    pending = topic_workflow.pending_quiz(topic_id)
+    if pending:
+        return zurueck(f"/quiz/{pending['id']}")
+    result = topic_workflow.latest_result(topic_id)
+    if result and not erneut:
+        return zurueck(f'/lernzyklus/{topic_id}')
     row = db.q1("SELECT id FROM lesson WHERE topic_id=? ORDER BY id DESC LIMIT 1",
                topic_id)
     lesson_id = row["id"] if row else None
@@ -204,14 +223,16 @@ async def handle_quiz_freigabe(request: Request, quiz_id: int):
         })
 
     try:
-        ergebnis = quizzes.freigeben(quiz_id, entscheidungen)
+        raw_revision = str(formular.get('draft_revision') or '')
+        ergebnis = quizzes.freigeben(quiz_id, entscheidungen,
+                                    int(raw_revision) if raw_revision.isdigit() else None)
     except QuizError as exc:
         flash(request, str(exc), "err")
         return zurueck(f"/quiz/{quiz_id}")
 
     if ergebnis["bereits"]:
         flash(request, "Diese Fragerunde war bereits freigegeben.", "warn")
-        return zurueck("/themen")
+        return zurueck("/" if request.session.get("role") == "child" else "/themen")
 
     n = ergebnis["geschrieben"]
     meldung = f"{n} Antwort bewertet" if n == 1 else f"{n} Antworten bewertet"
@@ -410,20 +431,23 @@ def render_material_variante_notebooklm_quelle(variant_id: int):
 def offene_schritte():
     """Alle offenen Lernschritte, dringlichste zuerst — fuer die Uebersichten
     unter /lernen und /eltern sowie als Basis fuer `get_next_action()`."""
-    themen = topics.liste(topics.AKTIV)
+    themen = [t for t in topics.liste(topics.AKTIV) if not t.get('learned_at')]
     themen.sort(key=lambda t: (FLAG_ORDER.index(t['flag']), t['sort']))
     quizze = quizzes.offene()
+    # Auch bei älteren Mehrfacheinträgen zeigt jedes Thema nur einen Einstieg.
+    by_topic = {q['topic_id']: topic_workflow.pending_quiz(q['topic_id']) for q in quizze}
+    selected_ids = {q['id'] for q in by_topic.values() if q}
+    quizze = [q for q in quizze if q['id'] in selected_ids]
     lessons = teaching.offene()
     schritte = []
+    offene_ids = {t['id'] for t in themen}
     # Ein Material aus dem Lernplan führt immer zurück zu seinem Materialtab.
     material = {r['lesson_id']: r['id'] for r in db.q('SELECT id, lesson_id FROM exam_material')}
     for q in quizze:
-        # Ausgewertet heisst: der LLM-Vorschlag steht, ein Erwachsener muss
-        # freigeben — das Kind kann hier nichts mehr tun (siehe `reviews`
-        # unten, das genau diese Faelle sammelt). Frueher stand hier
-        # faelschlich 'geprueft', ein Zustand, den ein Quiz nie annimmt —
-        # ausgewertete Fragerunden erschienen dadurch weiterhin als
-        # Kind-Schritt, obwohl schon die Lernbegleitung am Zug war.
+        if q['topic_id'] not in offene_ids:
+            continue
+        # Auswertungen werden separat gesammelt und je nach Einstellung
+        # im Eltern- oder Kind-Bereich angezeigt.
         if q['state'] == quizzes.STATE_AUSGEWERTET:
             continue
         text = {'bereit': 'Deine Fragen sind da', 'offen': 'Deine Fragen werden vorbereitet',
@@ -432,13 +456,21 @@ def offene_schritte():
                          'topic_id': q['topic_id'], 'bereit': q['state'] == 'bereit'})
     quiz_themen = {q['topic_id'] for q in quizze}
     for l in lessons:
+        if l['topic_id'] not in offene_ids:
+            continue
         if l['topic_id'] in quiz_themen:
             continue
+        quiz_themen.add(l['topic_id'])
         url = f"/klassenarbeit/material/{material[l['id']]}" if l['id'] in material else f"/lernen/{l['id']}"
         schritte.append({'titel': l['thema_label'], 'text': 'Hier geht deine Lernrunde weiter',
                          'url': url, 'topic_id': l['topic_id'], 'bereit': l['state'] == 'bereit'})
     schritte.sort(key=lambda s: not s['bereit'])
-    reviews = [q for q in quizze if q['state'] == quizzes.STATE_AUSGEWERTET]
+    # Eine Auswertung gehoert immer zu einem Thema, das gerade gelernt wird —
+    # ohne diese Eingrenzung wuerde eine Bewertung fuer ein laengst gelerntes
+    # oder nicht mehr aktives Thema als verwaiste "Antworten pruefen"-Karte
+    # auftauchen, statt zum Lernprozess ihres Themas zu gehoeren.
+    reviews = [q for q in quizze
+              if q['state'] == quizzes.STATE_AUSGEWERTET and q['topic_id'] in offene_ids]
     return themen, schritte, reviews
 
 
@@ -447,8 +479,19 @@ def render_lernen_uebersicht(request: Request):
     /lernzyklus (Index), damit der Lernzyklus-Router nicht dashboard.py's
     Routen-Funktion direkt aufrufen muss."""
     themen, schritte, reviews = offene_schritte()
+    learning_content.add_creation_options(themen)
+    grouped = learning_progress.groups(themen)
+    cfg = config.load()
+    tab = request.query_params.get('tab', 'bearbeitung')
+    if tab not in ('neu', 'bearbeitung', 'klassenarbeit') or (tab == 'klassenarbeit' and not cfg.klassenarbeit_kind):
+        tab = 'bearbeitung'
+    subtab = request.query_params.get('status', 'neu')
+    if subtab not in ('neu', 'bearbeitung'):
+        subtab = 'neu'
     return render(request, 'lernen_start.html', themen=themen, schritte=schritte,
-                  reviews=reviews)
+                  gruppen=grouped, tab=tab, subtab=subtab,
+                  exam_gruppen=learning_progress.exam_groups(topics.liste(topics.AKTIV)) if cfg.klassenarbeit_kind else {},
+                  reviews=reviews, reviews_by_topic={q['topic_id']: q for q in reviews})
 
 
 def _schritt_kategorie(schritt: dict) -> str:
@@ -466,24 +509,26 @@ _SCHRITT_RANG = {'quiz': 0, 'lesson': 1, 'exam_material': 2}
 
 
 def get_next_action(role: str, themen: list[dict], schritte: list[dict],
-                    reviews: list[dict] | None = None) -> NextAction:
+                    reviews: list[dict] | None = None, *,
+                    antworten_pruefen_kind: bool = False) -> NextAction:
     """Die eine deterministische Prioritaet fuer „Heute" — dieselbe Funktion
     fuer jedes Dashboard, damit es nur einen Ort gibt, an dem diese
     Entscheidung getroffen wird (KaroRefactoring_Plan.md Abschnitt 15;
     change.txt Aufgabe 5):
 
-      1. eine ausstehende Freigabe — nur relevant fuer die Eltern-Rolle
+      1. eine ausstehende Freigabe — fuer die eingestellte Rolle
       2. ein bereites/offenes Quiz
       3. eine laufende Lernrunde
       4. aktives Klassenarbeits-Material
       5. ein neues, bestaetigtes Thema
       6. nichts zu tun
     """
-    if role != 'child' and reviews:
+    review_role = 'child' if antworten_pruefen_kind else 'parent'
+    if role == review_role and reviews:
         q = reviews[0]
         return NextAction(
             kind='review', url=f"/quiz/{q['id']}",
-            reason='Eine Fragerunde wartet auf die Freigabe der Lernbegleitung',
+            reason='Eine Fragerunde wartet auf deine Prüfung',
             context={'quiz': q})
 
     if schritte:
@@ -532,11 +577,16 @@ def render_lernen_page(request: Request, lesson_id: int):
     if lesson is None:
         flash(request, "Lerneinheit nicht gefunden.", "err")
         return zurueck("/themen")
+    if request.session.get('role') == 'child':
+        learning_progress.start(lesson['topic_id'])
     thema = lesson.get("thema") or {}
+    if thema:
+        learning_content.add_creation_options([thema])
     hat_material = bool(
         kb.lehrmaterial(lesson["topic_id"], thema.get("label", ""), limit=1)
         or research.material_fuer(lesson["topic_id"]))
     return render(request, "lernen.html", lesson=lesson, counts=jobs.counts(),
+                  progress_topic=thema,
                   funde=research.freigegebene(lesson["topic_id"]),
                   vorschlaege=research.vorschlaege(lesson["topic_id"]),
                   recherche_erlaubt=config.load_safe().recherche_erlaubt,

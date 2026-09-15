@@ -26,8 +26,11 @@ from ..routers.shared import flash, render, zurueck
 
 def render_lernstand(request: Request):
     cfg = config.load_safe()
+    zeilen = export.lernstand_zeilen()
     return render(request, "lernstand.html",
-                  zeilen=export.lernstand_zeilen(),
+                  zeilen=zeilen, erfolge=[t for t in zeilen if t.get('learned_at')],
+                  full_progress=request.url.path.startswith('/messung'),
+                  adult_page=request.url.path.startswith('/messung'),
                   verlauf=export.verlauf_zeilen(limit=200),
                   xlsx_ok=export.verfuegbar(),
                   drive_ok=ingest.drive_available(),
@@ -73,4 +76,5 @@ def render_klassenarbeit(request: Request):
         e["kalibrierung"] = _kalibrierung(e["id"])
         e["plan"] = exam_plan.holen_plan(e["id"])
     return render(request, "klassenarbeit.html", zeilen=zeilen,
+                  adult_page=not config.load().klassenarbeit_kind,
                   scan=exam_plan.offene_scan(), counts=jobs.counts())

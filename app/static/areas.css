@@ -1,0 +1,98 @@
+/* Area identity is independent of the signed-in role and the other area's palette. */
+:root[data-ui-area="parent"] {
+  --ground: #f2f5f5; --surface: #fff; --surface-2: #edf2f2;
+  --text: #24373c; --muted: #53686d; --faint: #63777c;
+  --border: #d3dfe0; --border-firm: #9aafb3;
+  --ink: #176b69; --ink-soft: #e0efec;
+  --ok: #237045; --ok-bg: #e2f3e7;
+  --warn: #956000; --warn-bg: #fff2d4;
+  --bad: #b32e49; --bad-bg: #fbe6ea;
+  --radius: 12px; --radius-sm: 8px; --shadow-clay: none;
+  --header: #20383e; --header-text: #f4faf9; --header-muted: #c2d7d8;
+  --header-active: #36565b; --button-text: #fff;
+  color-scheme: light;
+}
+:root[data-ui-area="parent"][data-theme-color="sand"] {
+  --ground: #f6f3ed; --surface: #fffefb; --surface-2: #f2ece1;
+  --text: #40392f; --muted: #71634f; --faint: #776953;
+  --border: #e0d6c5; --border-firm: #b4a58c;
+  --ink: #85552c; --ink-soft: #f0e3cf;
+  --header: #443b30; --header-text: #fffaf0; --header-muted: #dfd1bd;
+  --header-active: #655541;
+}
+:root[data-ui-area="parent"][data-theme-color="nacht"] {
+  --ground: #151f2a; --surface: #202e3c; --surface-2: #283948;
+  --text: #edf3f7; --muted: #b7c7d4; --faint: #a4bacb;
+  --border: #3b5063; --border-firm: #647f95;
+  --ink: #92d7d0; --ink-soft: #28464a; --button-text: #142e32;
+  --ok: #85d7a2; --ok-bg: #253e32;
+  --warn: #f2cd80; --warn-bg: #403724;
+  --bad: #ffa5b8; --bad-bg: #442e3a;
+  --header: #101923; --header-text: #edf3f7; --header-muted: #b7c7d4;
+  --header-active: #2c4254;
+  color-scheme: dark;
+}
+.area-brand { display: flex; flex-direction: column; flex-shrink: 0; gap: .1rem; }
+.area-brand .brand { line-height: 1.1; }
+.area-label { display: inline-flex; align-items: center; gap: .35rem; font-size: .73rem; font-weight: 700; white-space: nowrap; }
+.area-switch { gap: .5rem; }
+.area-preferences { margin-top: .8rem; }
+[data-ui-area="parent"] body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 16px; }
+[data-ui-area="parent"] :is(h1,h2,h3,.brand) { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: -.025em; }
+[data-ui-area="parent"] h1 { color: var(--text); font-weight: 720; font-size: clamp(1.9rem, 3.5vw, 2.4rem); }
+[data-ui-area="parent"] .simple-header { background: var(--header); border: 0; padding-block: 1.2rem; gap: 1.5rem; }
+[data-ui-area="parent"] .area-label { color: var(--header-muted); letter-spacing: .035em; }
+[data-ui-area="parent"] .simple-header :is(.brand,.brand-dot,.parent-link,.simple-nav a) { color: var(--header-text); }
+[data-ui-area="parent"] .simple-nav a { border-radius: 7px; font-size: .9rem; padding-inline: .8rem; }
+[data-ui-area="parent"] .simple-nav a:is([aria-current],:hover) { background: var(--header-active); }
+[data-ui-area="parent"] .parent-link { border-color: var(--header-muted); border-radius: 7px; font-size: .82rem; }
+[data-ui-area="parent"] .parent-link:hover { background: var(--header-active); }
+[data-ui-area="parent"] .simple-header :is(a,button):focus-visible { outline-color: var(--header-text); }
+[data-ui-area="parent"] :is(.card,.choice-card,.tablewrap,.settings-savebar,.storage-dialog) { border-radius: 12px; box-shadow: none; }
+[data-ui-area="parent"] .parent-choices .choice-card { border-left: 3px solid var(--border-firm); padding: 1.2rem 1.4rem; }
+[data-ui-area="parent"] .parent-choices .choice-card:hover { border-left-color: var(--ink); }
+[data-ui-area="parent"] .choice-card h2 { font-size: 1.15rem; }
+[data-ui-area="parent"] .choice-card p { margin-bottom: .4rem; font-size: .92rem; }
+[data-ui-area="parent"] :is(button,.btn,input,select) { border-radius: 8px; box-shadow: none; }
+[data-ui-area="parent"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn) { color: var(--button-text); }
+[data-ui-area="parent"] .eyebrow { color: var(--ink); font-size: .7rem; letter-spacing: .12em; }
+[data-ui-area="parent"] th { background: var(--surface-2); }
+[data-ui-area="parent"] .simple-footer { font-size: .8rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+
+[data-ui-area="child"] body { font-family: "Comic Neue", "Trebuchet MS", sans-serif; font-size: 18px; }
+[data-ui-area="child"] :is(h1,h2,h3,.brand) { font-family: "Baloo 2", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif; }
+[data-ui-area="child"] .simple-header { border-bottom: 4px solid var(--border-firm); }
+[data-ui-area="child"] .area-brand { padding: .5rem .85rem; border-radius: 18px; background: var(--ink-soft); }
+[data-ui-area="child"] .area-label { color: var(--text); }
+[data-ui-area="child"] .simple-nav a { border-radius: 999px; font-weight: 700; }
+[data-ui-area="child"] .simple-nav a[aria-current] { background: var(--ink); color: #fff; }
+[data-ui-area="child"] :is(.card,.choice-card) { border-radius: 24px; border-width: 2px; box-shadow: 0 4px 0 var(--border); }
+[data-ui-area="child"] .next-step { border-color: var(--border-firm); background: var(--surface); box-shadow: 0 5px 0 var(--border-firm); }
+[data-ui-area="child"] .step-number { border-radius: 18px; background: var(--ink); color: #fff; font-family: "Baloo 2", "Trebuchet MS", sans-serif; font-size: 1.8rem; }
+[data-ui-area="child"] .choice-card .choice-arrow { display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: var(--ink-soft); }
+[data-ui-area="child"] .welcome { padding-bottom: .4rem; }
+[data-ui-area="child"] .welcome h1 { font-size: clamp(2.5rem, 5vw, 3.4rem); }
+[data-ui-area="child"] .eyebrow { letter-spacing: .07em; }
+[data-ui-area="child"] :is(button,.btn) { font-weight: 700; }
+[data-ui-area="child"] .card .card { box-shadow: none; }
+/* White button labels must remain readable in every existing children's palette. */
+:root[data-ui-area="child"][data-theme-color="ozean"] { --ink: #036d9f; }
+:root[data-ui-area="child"][data-theme-color="wiese"] { --ink: #187a3b; }
+:root[data-ui-area="child"][data-theme-color="sonne"] { --ink: #ba4310; }
+[data-ui-area="child"][data-theme-color="dunkel"] :is(.simple-nav a[aria-current],.step-number) { color: #1c1a3a; }
+[data-ui-area="child"][data-theme-color="dunkel"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn) { color: #1c1a3a; }
+@media (max-width: 1000px) {
+  [data-ui-area="parent"] .simple-header { flex-wrap: wrap; gap: 1rem; padding-inline: 1.2rem; }
+  [data-ui-area="parent"] .area-brand { flex: 1; }
+  [data-ui-area="parent"] .simple-nav { flex-basis: 100%; order: 3; }
+  [data-ui-area="parent"] .simple-nav a { flex: 1; }
+}
+@media (max-width: 680px) {
+  .area-brand { flex: 1; }
+  [data-ui-area="child"] .area-brand { flex: 0 1 auto; margin-right: auto; }
+  [data-ui-area="child"] .simple-header { gap: .65rem; }
+  [data-ui-area="parent"] .simple-nav { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .35rem; }
+  [data-ui-area="parent"] .simple-nav a { justify-content: flex-start; }
+  [data-ui-area="parent"] .parent-link { padding-inline: .7rem; }
+  [data-ui-area="child"] .card { padding: 1.2rem; }
+}

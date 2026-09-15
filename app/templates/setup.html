@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% set show_nav = cfg.setup_complete %}
-{% block title %}Einrichtung – Karo{% endblock %}
-{% block mainclass %}{{ '' if cfg.setup_complete else 'narrow' }}{% endblock %}
+{% block title %}{{ 'Einstellungen' if cfg.setup_complete else 'Einrichtung' }} – Karo{% endblock %}
+{% block mainclass %}{{ 'settings-page' if schritt != 'start' else 'narrow' }}{% endblock %}
 
 {% block content %}
 <h1>{{ 'Einstellungen' if cfg.setup_complete else 'Karo einrichten' }}</h1>
-<p class="sub">Öffnen Sie nur den Bereich, den Sie ändern möchten. Speichern Sie Ihre Änderungen unten.</p>
+<p class="sub">Passen Sie Karo an Ihr Kind an. Die wichtigsten Optionen stehen gleich am Anfang.</p>
 
 {% if not cfg.setup_complete %}
 <div class="steps">
@@ -125,12 +125,202 @@ claude setup-token                         <span class="c-com"># Token wird ange
 {% else %}
 {% macro hilfe(text) %}<span class="hilfe" tabindex="0"><span class="hilfe-btn" aria-hidden="true">?</span><span class="hilfe-text" role="tooltip">{{ text }}</span></span>{% endmacro %}
 
+<nav class="settings-shortcuts" aria-label="Einstellungsbereiche">
+  <a href="#kind-bereich">Kind-Bereich</a><a href="#lernmaterial">Lernmaterial</a>
+  <a href="#zugang">Passwörter</a><a href="#erweitert">Erweitert</a><a href="#verbindungen">Verbindungen</a>
+</nav>
+<form id="settings-form" data-settings-form data-configured="{{ 'true' if cfg.setup_complete else 'false' }}"{% if invalid %} data-invalid="true"{% endif %}
+      method="post" action="/setup/finish">
+  {{ csrf_input() }}
+<details class="card setup-group settings-category" id="kind-bereich" open>
+  <summary><span><strong>Was darf mein Kind?</strong><small>Sie entscheiden, welche Aufgaben Ihr Kind selbst übernimmt.</small></span></summary>
+  <p class="settings-explainer">Häkchen gesetzt: im Kinderbereich. Ohne Häkchen: nur bei den Eltern. Jeder Bereich erscheint an einem Ort.</p>
+  {% for name, title, description in [
+    ('antworten_pruefen_kind', 'Antworten prüfen', 'Antworten ansehen und Bewertungen bestätigen.'),
+    ('schulblaetter_kind', 'Schulblätter verwalten', 'Fotos und PDFs hinzufügen und ansehen.'),
+    ('klassenarbeit_kind', 'Klassenarbeiten planen', 'Klassenarbeiten hinzufügen, Lernpläne erstellen und Ergebnisse eintragen.')
+  ] %}
+  <label class="settings-choice" for="{{ name }}">
+    <input type="checkbox" id="{{ name }}" name="{{ name }}" value="ja" {{ 'checked' if cfg[name] }}>
+    <span><strong>{{ title }}</strong><small>{{ description }}</small></span>
+    <span class="settings-destination" data-child-destination>{{ 'Beim Kind' if cfg[name] else 'Nur Eltern' }}</span>
+  </label>
+  {% endfor %}
+</details>
+<details class="card setup-group settings-category" id="lernmaterial">
+  <summary><span><strong>Lernmaterial und Lernen</strong><small>Format, Lernrunden und Internetquellen</small></span></summary>
+<div id="ausgabe" class="settings-subsection">
+    <h3>Lernmaterial</h3>
+    {% set nlm_zusatz = ' Die Anmeldung finden Sie unter „Verbindungen“.' %}
+    <div class="field">
+      <label for="default_ausgabe">Bevorzugtes Format</label>
+      <select id="default_ausgabe" name="default_ausgabe" form="settings-form">
+        {% for wert, label in ausgabe_labels.items() %}
+        <option value="{{ wert }}" {{ 'selected' if cfg.default_ausgabe == wert }}
+                data-hinweis="{{ ausgabe_hints[wert] }}{{ nlm_zusatz if wert == 'notebooklm' else '' }}">
+          {{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="hint" id="default-ausgabe-hinweis">{{ ausgabe_hints.get(cfg.default_ausgabe, '') }}{{
+        nlm_zusatz if cfg.default_ausgabe == 'notebooklm' else '' }}</p>
+    </div>
+    <div class="field" id="feld-tts-stimme" style="margin-top:.4rem"
+         {{ 'hidden' if cfg.default_ausgabe != 'mp4' }}>
+      <label for="tts_stimme">Stimme für die MP4-Ausgabe</label>
+      <select id="tts_stimme" name="tts_stimme" form="settings-form">
+        {% for sw, slabel in stimmen.items() %}
+        <option value="{{ sw }}" {{ 'selected' if cfg.tts_stimme == sw }}>{{ slabel }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var auswahl = document.getElementById("default_ausgabe");
+      var hinweis = document.getElementById("default-ausgabe-hinweis");
+      var stimmeFeld = document.getElementById("feld-tts-stimme");
+      if (!auswahl) return;
+      auswahl.addEventListener("change", function () {
+        var option = auswahl.options[auswahl.selectedIndex];
+        hinweis.textContent = option.dataset.hinweis || "";
+        if (stimmeFeld) stimmeFeld.hidden = auswahl.value !== "mp4";
+      });
+    })();
+  </script>
+<div id="lernverhalten" class="settings-subsection"><h3>Lerntempo und Quellen</h3><p class="hint">Nach der letzten Lernrunde bittet Karo um Unterstützung. Internetquellen bestätigen Sie vor der Verwendung.</p>    <div class="row">
+      <div class="field" style="flex:0 0 190px">
+        <label for="max_lernrunden">Lernrunden pro Thema </label>
+        <input type="number" id="max_lernrunden" name="max_lernrunden" form="settings-form"
+               min="1" max="8" value="{{ cfg.max_lernrunden }}">
+      </div>
+      <div class="field">
+        <label for="recherche">Zusätzliche Internetquellen {{ hilfe('Funde: Vorschlag, der bestätigt wird.') }}</label>
+        <select id="recherche" name="recherche" form="settings-form">
+          <option value="ja" {{ 'selected' if cfg.recherche_erlaubt }}>Ja</option>
+          <option value="nein" {{ 'selected' if not cfg.recherche_erlaubt }}>Nein, nur eigenes Material</option>
+        </select>
+      </div>
+    </div>
+</div>
+<div class="settings-subsection">
+      <label for="header_crop">Oberen Blattrand abschneiden (%)
+        {{ hilfe('Auf deutschen Arbeitsblättern steht oben der Name. Was hier abgeschnitten wird, verlässt den Rechner nicht. Antwortblätter werden nie beschnitten. Richtwerte: 0 = nicht abschneiden, 8 % üblicher Namensbereich, 12 % breiter Kopf, 18 % sehr breiter Kopf.') }}
+      </label>
+      <input type="number" id="header_crop" name="header_crop" form="settings-form"
+             min="0" max="25" value="{{ cfg.header_crop_percent }}">
+    </div>
 
+</details>
+<details class="card setup-group settings-category" id="zugang" {{ 'open' if not cfg.setup_complete or invalid|default(false) }}>
+  <summary><span><strong>Passwörter</strong><small>Elternzugang schützen und einen eigenen Kinderzugang einrichten</small></span></summary>
+<div id="passwort" class="settings-subsection">
+    <h3>Eltern-Passwort</h3>
+    <div class="row">
+      <div class="field">
+        <label for="password">{{ 'Neues Passwort' if cfg.has_password else 'Passwort' }} (min. {{ min_password }} Zeichen)</label>
+        <input type="password" id="password" name="password" form="settings-form"
+               autocomplete="new-password" {{ '' if cfg.has_password else 'required' }}>
+      </div>
+      <div class="field">
+        <label for="password2">Wiederholen</label>
+        <input type="password" id="password2" name="password2" form="settings-form"
+               autocomplete="new-password">
+      </div>
+    </div>
+    <p class="hint">
+      {% if cfg.has_password %}Leer lassen zum Behalten.{% else %}Erforderlich.{% endif %}
+    </p>
+  </div>
+<div id="kind-passwort" class="settings-subsection">
+    <h3>Kind-Passwort {{ hilfe('Optional: eigenes Login fürs Kind, direkt im Kind-Bereich.') }}</h3>
+    <div class="row">
+      <div class="field">
+        <label for="child_password">{{ 'Neues Kind-Passwort' if cfg.has_child_password else 'Kind-Passwort' }} (min. {{ min_password }} Zeichen)</label>
+        <input type="password" id="child_password" name="child_password" form="settings-form"
+               autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label for="child_password2">Wiederholen</label>
+        <input type="password" id="child_password2" name="child_password2" form="settings-form"
+               autocomplete="new-password">
+      </div>
+    </div>
+    <p class="hint">
+      {% if cfg.has_child_password %}Leer lassen zum Behalten.{% else %}Optional — ohne eigenes Kind-Passwort schaltet ein Klick auf „Kind-Modus starten“ im Eltern-Bereich in den Kinderbereich um.{% endif %}
+    </p>
+  </div>
+</details>
+<details class="card setup-group settings-category" id="erweitert">
+  <summary><span><strong>Erweiterte Einstellungen</strong><small>KI-Modelle und Speicherorte · nur bei Bedarf ändern</small></span></summary>
+<div id="ki-modelle" class="settings-subsection">
+    <h3>KI-Modelle {{ hilfe('Stärker für Handschrift, billiger für Texte.') }}</h3>
+    {% if modelle %}
+    <div class="row">
+      <div class="field">
+        <label for="model_vision">Handschrift lesen</label>
+        <select id="model_vision" name="model_vision">
+          {% for m in modelle %}
+          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_vision }}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="model_text">Texte erzeugen</label>
+        <select id="model_text" name="model_text">
+          {% for m in modelle %}
+          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_text }}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+<div id="blaetter" class="settings-subsection">
+    <h3>Speicherorte</h3>
+    <div class="field storage-field">
+      <label for="material_db_path">Datenbank für Lernmaterialien</label>
+      <div class="storage-control">
+        <input type="text" id="material_db_path" name="material_db_path" form="settings-form"
+               value="{{ cfg.material_db_path }}" placeholder="Standardordner">
+        <button type="button" class="quiet" data-storage-picker="database"
+                aria-label="Speicherort der Datenbank auswählen">Auswählen…</button>
+      </div>
+    </div>
+    <div class="field storage-field">
+      <label for="drive_unterordner">Ordner für Lernmaterial</label>
+      <div class="storage-control">
+        <input type="text" id="drive_unterordner" name="drive_unterordner" form="settings-form"
+               placeholder="Drive-Ordner" value="{{ cfg.drive_subdir }}">
+        <button type="button" class="quiet" data-storage-picker="material"
+                aria-label="Ordner für Lernmaterial auswählen">Auswählen…</button>
+      </div>
+    </div>
+  </div>
 
-{# Verbindungen haben eigene Formulare; die Einstellungen darunter werden gemeinsam gespeichert. #}
-
-
-<details class="card disclosure setup-group" id="claude" {{ 'open' if not cfg.has_credentials }}><summary>Claude verbinden</summary>
+</details>
+</form>
+<dialog class="storage-dialog" data-storage-dialog aria-labelledby="storage-dialog-title">
+  <h2 id="storage-dialog-title">Speicherort auswählen</h2>
+  <div class="storage-toolbar">
+    <select data-storage-root aria-label="Speicherort"></select>
+    <button type="button" class="quiet" data-storage-up aria-label="Übergeordneter Ordner">↑</button>
+  </div>
+  <p class="storage-path" data-storage-path></p>
+  <div class="storage-folders" data-storage-folders aria-label="Ordner" aria-busy="false"></div>
+  <div class="field" data-storage-filename-field>
+    <label for="storage-filename">Dateiname</label>
+    <input id="storage-filename" data-storage-filename value="lernmaterialien.sqlite3">
+  </div>
+  <p class="text-warn" data-storage-dialog-error role="alert" hidden></p>
+  <div class="actions">
+    <button type="button" class="quiet" data-storage-cancel>Abbrechen</button>
+    <button type="button" data-storage-select>Auswählen</button>
+  </div>
+</dialog>
+<details class="card setup-group settings-category" id="verbindungen" {{ 'open' if not claude_ok }}>
+  <summary><span><strong>Verbindungen</strong><small>Claude: {{ 'verbunden' if claude_ok else 'nicht verbunden' }} · NotebookLM: {{ 'verbunden' if nlm_ok else 'nicht verbunden' }}</small></span></summary>
+  <p class="hint">Claude erstellt die Lerninhalte. NotebookLM wird für das Format „NotebookLM“ benötigt. Verbindungen werden direkt gespeichert.</p>
+<details class="disclosure settings-subsection" id="claude" {{ 'open' if not cfg.has_credentials }}><summary>Claude <span class="settings-inline-status">{{ 'Verbunden' if claude_ok else 'Nicht verbunden' }}</span></summary>
 <div class="card" id="claude-verbindung">
   <h3>Claude-Verbindung
     <span class="pill {{ 'gruen' if claude_ok else 'rot' }}">{{ 'verbunden' if claude_ok else 'getrennt' }}</span>
@@ -214,7 +404,7 @@ claude setup-token                         <span class="c-com"># Token wird ange
 </div>
 {% endmacro %}
 
-<details class="card disclosure setup-group" id="notebooklm"><summary>Videos mit NotebookLM</summary>
+<details class="disclosure settings-subsection" id="notebooklm"><summary>NotebookLM <span class="settings-inline-status">{{ 'Verbunden' if nlm_ok else 'Nicht verbunden' }}</span></summary>
 <div class="card" id="notebooklm-verbindung">
   <h3>NotebookLM-Verbindung {{ hilfe(nlm_warnung) }}
     <span class="pill {{ 'gruen' if nlm_ok else 'rot' }}">{{ 'verbunden' if nlm_ok else 'getrennt' }}</span>
@@ -315,221 +505,19 @@ claude setup-token                         <span class="c-com"># Token wird ange
 </script>
 </details>
 
-{#- Ab hier ist wieder ein ganz normales, durchgehendes <form> moeglich:
-   Claude und NotebookLM mit ihren eigenen <form>s liegen jetzt komplett
-   VOR dieser Stelle (siehe Kommentar oben), also verschachtelt sich hier
-   nichts mehr. -#}
-<form id="settings-form" data-settings-form{% if invalid %} data-invalid="true"{% endif %}
-      method="post" action="/setup/finish">
-  {{ csrf_input() }}
-
-<details class="card disclosure setup-group" id="ki-modelle"><summary>Weitere Modell-Einstellungen</summary>
-  <div class="card">
-    <h3>KI-Modelle {{ hilfe('Stärker für Handschrift, billiger für Texte.') }}</h3>
-    {% if modelle %}
-    <div class="row">
-      <div class="field">
-        <label for="model_vision">Handschrift lesen</label>
-        <select id="model_vision" name="model_vision">
-          {% for m in modelle %}
-          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_vision }}>{{ m.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field">
-        <label for="model_text">Texte erzeugen</label>
-        <select id="model_text" name="model_text">
-          {% for m in modelle %}
-          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_text }}>{{ m.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-    {% endif %}
-  </div>
-</details>
-
-<details class="card disclosure setup-group" id="ausgabe"><summary>So sieht das Lernmaterial aus</summary>
-  <div class="card">
-    <h3>Ausgabeformat {{ hilfe('Kann bei jeder Runde neu gewählt werden.') }}</h3>
-    {% set nlm_zusatz = ' Verbinden/Trennen: oben bei „NotebookLM-Verbindung“.' %}
-    <div class="field">
-      <label for="default_ausgabe">Voreinstellung</label>
-      <select id="default_ausgabe" name="default_ausgabe" form="settings-form">
-        {% for wert, label in ausgabe_labels.items() %}
-        <option value="{{ wert }}" {{ 'selected' if cfg.default_ausgabe == wert }}
-                data-hinweis="{{ ausgabe_hints[wert] }}{{ nlm_zusatz if wert == 'notebooklm' else '' }}">
-          {{ label }}</option>
-        {% endfor %}
-      </select>
-      <p class="hint" id="default-ausgabe-hinweis">{{ ausgabe_hints.get(cfg.default_ausgabe, '') }}{{
-        nlm_zusatz if cfg.default_ausgabe == 'notebooklm' else '' }}</p>
-    </div>
-    <div class="field" id="feld-tts-stimme" style="margin-top:.4rem"
-         {{ 'hidden' if cfg.default_ausgabe != 'mp4' }}>
-      <label for="tts_stimme">Stimme für die MP4-Ausgabe</label>
-      <select id="tts_stimme" name="tts_stimme" form="settings-form">
-        {% for sw, slabel in stimmen.items() %}
-        <option value="{{ sw }}" {{ 'selected' if cfg.tts_stimme == sw }}>{{ slabel }}</option>
-        {% endfor %}
-      </select>
-    </div>
-  </div>
-  <script>
-    (function () {
-      var auswahl = document.getElementById("default_ausgabe");
-      var hinweis = document.getElementById("default-ausgabe-hinweis");
-      var stimmeFeld = document.getElementById("feld-tts-stimme");
-      if (!auswahl) return;
-      auswahl.addEventListener("change", function () {
-        var option = auswahl.options[auswahl.selectedIndex];
-        hinweis.textContent = option.dataset.hinweis || "";
-        if (stimmeFeld) stimmeFeld.hidden = auswahl.value !== "mp4";
-      });
-    })();
-  </script>
-</details>
-
-<details class="card disclosure setup-group" id="lernverhalten"><summary>Lernen und Internetquellen</summary>
-  <div class="card">
-    <h3>Lernverhalten</h3>
-    <div class="row">
-      <div class="field" style="flex:0 0 190px">
-        <label for="max_lernrunden">Max. Runden pro Thema {{ hilfe('Dann: Mensch statt Maschine.') }}</label>
-        <input type="number" id="max_lernrunden" name="max_lernrunden" form="settings-form"
-               min="1" max="8" value="{{ cfg.max_lernrunden }}">
-      </div>
-      <div class="field">
-        <label for="recherche">Im Netz suchen {{ hilfe('Funde: Vorschlag, der bestätigt wird.') }}</label>
-        <select id="recherche" name="recherche" form="settings-form">
-          <option value="ja" {{ 'selected' if cfg.recherche_erlaubt }}>Ja</option>
-          <option value="nein" {{ 'selected' if not cfg.recherche_erlaubt }}>Nein, nur eigenes Material</option>
-        </select>
-      </div>
-    </div>
-  </div>
-</details>
-
-<details class="card disclosure setup-group" id="blaetter"><summary>Schulblätter und Speicherort</summary>
-  <div class="card">
-    <h3>Schulblätter & Speicher</h3>
-    <div class="field">
-      <label for="material_db_path">Datenbank für Lernmaterialien</label>
-      <input type="text" id="material_db_path" name="material_db_path" form="settings-form"
-             value="{{ cfg.material_db_path }}" placeholder="Standard: lernmaterialien.sqlite3 im Karo-Datenordner">
-      <p class="hint">Absoluter Dateipfad auf dem Rechner, auf dem Karo läuft, z. B.
-        <code>/data/lernmaterialien.sqlite3</code>. Leer lassen für den Standardpfad.
-        Bei einem Pfadwechsel werden vorhandene Materialien samt Inhalt übernommen;
-        die bisherige Datenbank bleibt als Sicherung erhalten. In Docker muss der
-        Zielordner als dauerhaftes Volume eingebunden sein.</p>
-    </div>
-    {% if drive_ok and drive_writable %}
-      <p class="hint">✓ Drive-Ordner: <code>{{ drive_path }}</code></p>
-    {% elif drive_ok %}
-      <p class="hint">⚠ Ordner existiert, aber nicht beschreibbar: <code>{{ drive_path }}</code></p>
-    {% else %}
-      <p class="hint">Kein Google Drive gefunden. Blätter können direkt hochgeladen werden.</p>
-    {% endif %}
-    {% if not heif_ok %}<p class="hint klein">HEIC (iPhone): Kamera › Formate › Maximale Kompatibilität</p>{% endif %}
-
-    <div class="actions" style="margin-top:.7rem">
-      <button type="button" class="quiet" id="drive-ordner-waehlen">Ordner wählen…</button>
-      {{ hilfe('Zeigt nur den gewählten Ordnernamen — Browser können aus Sicherheitsgründen keinen vollen Pfad herausgeben. Der tatsächlich genutzte Ordner wird über KARO_DRIVE_PATH in der .env gesetzt (danach neu starten).') }}
-      <span class="hint" id="drive-ordner-gewaehlt" style="margin:0"></span>
-    </div>
-    <input type="file" id="drive-ordner-input" webkitdirectory directory multiple hidden>
-
-    <div class="field" style="margin-top:1rem">
-      <label for="header_crop">Oberen Blattrand abschneiden (%)
-        {{ hilfe('Auf deutschen Arbeitsblättern steht oben der Name. Was hier abgeschnitten wird, verlässt den Rechner nicht. Antwortblätter werden nie beschnitten. Richtwerte: 0 = nicht abschneiden, 8 % üblicher Namensbereich, 12 % breiter Kopf, 18 % sehr breiter Kopf.') }}
-      </label>
-      <input type="number" id="header_crop" name="header_crop" form="settings-form"
-             min="0" max="25" value="{{ cfg.header_crop_percent }}">
-    </div>
-
-    <div class="field" style="margin-top:1rem">
-      <label for="drive_unterordner">Unterordner für Lernmaterial
-        {{ hilfe('Videos, Folien und Sprachaufnahmen landen in diesem Unterordner des Drive-Ordners (siehe oben) — leer lassen für den Drive-Ordner selbst. Nur der Unterordner, nicht der ganze Pfad — der wird weiterhin über KARO_DRIVE_PATH gesetzt.') }}
-      </label>
-      <input type="text" id="drive_unterordner" name="drive_unterordner" form="settings-form"
-             placeholder="z. B. Karo-Material" maxlength="100"
-             value="{{ cfg.drive_subdir }}">
-    </div>
-  </div>
-  <script>
-    (function () {
-      var btn = document.getElementById("drive-ordner-waehlen");
-      var input = document.getElementById("drive-ordner-input");
-      var out = document.getElementById("drive-ordner-gewaehlt");
-      if (!btn || !input) return;
-      btn.addEventListener("click", function () { input.click(); });
-      input.addEventListener("change", function () {
-        if (input.files && input.files.length) {
-          var ordner = input.files[0].webkitRelativePath.split("/")[0];
-          out.textContent = "Gewählt: " + ordner;
-        }
-      });
-    })();
-  </script>
-</details>
-
-<details class="card disclosure setup-group" id="passwort" {{ 'open' if not cfg.setup_complete or invalid|default(false) }}><summary>Passwort ändern</summary>
-  <div class="card">
-    <h3>Passwort {{ hilfe('Schützt Karo auf diesem Rechner.') }}</h3>
-    <div class="row">
-      <div class="field">
-        <label for="password">{{ 'Neues Passwort' if cfg.has_password else 'Passwort' }} (min. {{ min_password }} Zeichen)</label>
-        <input type="password" id="password" name="password" form="settings-form"
-               autocomplete="new-password" {{ '' if cfg.has_password else 'required' }}>
-      </div>
-      <div class="field">
-        <label for="password2">Wiederholen</label>
-        <input type="password" id="password2" name="password2" form="settings-form"
-               autocomplete="new-password">
-      </div>
-    </div>
-    <p class="hint">
-      {% if cfg.has_password %}Leer lassen zum Behalten.{% else %}Erforderlich.{% endif %}
-    </p>
-  </div>
-</details>
-
-<details class="card disclosure setup-group" id="kind-passwort"><summary>Kind-Passwort {% if cfg.has_child_password %}(eingerichtet){% endif %}</summary>
-  <div class="card">
-    <h3>Kind-Passwort {{ hilfe('Optional: eigenes Login fürs Kind, direkt im Kind-Bereich.') }}</h3>
-    <div class="row">
-      <div class="field">
-        <label for="child_password">{{ 'Neues Kind-Passwort' if cfg.has_child_password else 'Kind-Passwort' }} (min. {{ min_password }} Zeichen)</label>
-        <input type="password" id="child_password" name="child_password" form="settings-form"
-               autocomplete="new-password">
-      </div>
-      <div class="field">
-        <label for="child_password2">Wiederholen</label>
-        <input type="password" id="child_password2" name="child_password2" form="settings-form"
-               autocomplete="new-password">
-      </div>
-    </div>
-    <p class="hint">
-      {% if cfg.has_child_password %}Leer lassen zum Behalten.{% else %}Optional — ohne eigenes Kind-Passwort schaltet ein Klick auf „Kind-Modus starten“ im Eltern-Bereich die gleiche Session um.{% endif %}
-    </p>
-  </div>
-</details>
-
-
-
-
-  <div class="actions">
-    <button type="submit">{{ 'Speichern' if cfg.setup_complete else 'Einrichtung abschließen' }}</button>
-  </div>
-</form>
-
-
-
 <details class="disclosure"><summary>Verbindung zurücksetzen</summary>
 <form method="post" action="/setup/reset" style="margin-top:1rem"
       onsubmit="return confirm('Zugangsdaten wirklich löschen? Die Lerndaten bleiben erhalten.')">
   {{ csrf_input() }}
   <button type="submit" class="quiet">Zugangsdaten löschen und neu eingeben</button>
 </form></details>
+
+</details>
+<div class="settings-savebar">
+  <p data-settings-status role="status">{{ 'Bitte prüfen Sie Ihre Angaben.' if invalid|default(false) else 'Änderungen mit „Speichern“ übernehmen.' }}</p>
+  <button type="submit" form="settings-form" data-settings-save>{{ 'Speichern' if cfg.setup_complete else 'Einrichtung abschließen' }}</button>
+</div>
+<script src="/static/setup.js?v={{ asset_version }}" defer></script>
+<script src="/static/storage.js?v={{ asset_version }}" defer></script>
 {% endif %}
 {% endblock %}

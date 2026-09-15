@@ -6,8 +6,8 @@
 
 
 
-<details class="card disclosure" id="themen-vorschlaege" open><summary>Neue Themen bestätigen</summary>
 {% if vorschlaege %}
+<details class="card disclosure" id="themen-vorschlaege" open><summary>Neue Themen bestätigen</summary>
 <p class="hint">Karo hat diese Themen im eingelesenen Material gefunden. Namen
 lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
 <form method="post" action="/themen/entscheiden">
@@ -32,10 +32,8 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
     <button type="submit">Entscheidungen speichern</button>
   </div>
 </form>
-{% else %}
-<div class="empty">Keine offenen Vorschläge.</div>
-{% endif %}
 </details>
+{% endif %}
 
 <section id="themen-freigegeben">
 {% if aktive %}
@@ -69,30 +67,10 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
             <a class="btn" href="/lernen/{{ t.offene_lesson }}">Lerneinheit öffnen</a>
           {% else %}
           <div class="actions" style="gap:.4rem">
-            <form method="post" action="/themen/{{ t.id }}/pruefen" class="actions"
-                  style="gap:.3rem">
-              {{ csrf_input() }}
-              <select name="modus" class="mini" aria-label="Antwortweg">
-                <option value="bildschirm">am Bildschirm</option>
-                <option value="papier">auf Papier</option>
-              </select>
-              <button type="submit" class="quiet">prüfen</button>
-            </form>
-            {% if t.flag in ('rot', 'gelb') %}
-              <form method="post" action="/themen/{{ t.id }}/lernen" class="actions"
-                    style="gap:.3rem">
-                {{ csrf_input() }}
-                <select name="ausgabe" class="mini" aria-label="Format der Erklärung">
-                  {% for wert, label in ausgabe_labels.items() %}
-                  <option value="{{ wert }}" {{ 'selected' if cfg.default_ausgabe == wert }}>{{ label }}</option>
-                  {% endfor %}
-                </select>
-                <button type="submit">erklären</button>
-              </form>
-              {% if not t.lehr_quellen %}
-              <span class="klein" style="color:var(--warn)">Kein eigenes Material — auf der nächsten Seite im Netz suchen oder erst ein Erklärblatt einlesen.</span>
-              {% endif %}
+            {% if t.neues_material %}
+            <a class="btn" href="/material/{{ t.neues_material }}" target="_blank" rel="noopener">Material ansehen</a>
             {% endif %}
+            <a class="btn ghost" href="/lernzyklus/{{ t.id }}">Thema im Kindbereich öffnen</a>
           </div>
           {% endif %}
         </td>

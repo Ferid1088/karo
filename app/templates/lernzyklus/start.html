@@ -3,16 +3,20 @@
 {% block mainclass %}learning-main{% endblock %}
 {% block content %}
 <a class="back-link" href="/lernen">← Alle Themen</a>
-<header class="page-heading"><p class="eyebrow">Dein Thema</p><h1>{{ topic.label }}</h1><p class="sub">{{ 'Wir schauen uns den Rechenweg gemeinsam an.' if topic.flag in ('rot','gelb') else 'Ein paar Fragen zeigen, was du schon kannst.' }}</p></header>
-{% if topic.flag in ('rot','gelb') %}
-<form class="card" method="post" action="/lernzyklus/{{ topic.id }}/start">{{ csrf_input() }}
-<h2>Erklärung anschauen</h2><p>Danach kannst du mit ein paar Fragen üben.</p>
-<details class="options"><summary>Format ändern</summary><label for="ausgabe">Lernmaterial</label><select name="ausgabe" id="ausgabe">{% for value, label in ausgabe_labels.items() %}<option value="{{ value }}" {{ 'selected' if cfg.default_ausgabe == value }}>{{ label }}</option>{% endfor %}</select></details>
-<button type="submit">Erklärung starten {{ icon('arrow') }}</button></form>
+<header class="page-heading"><p class="eyebrow">Dein Thema</p><h1>{{ topic.label }}</h1><p class="sub">{{ 'Nach der ersten Prüfung kannst du passende Lerninhalte erstellen.' if not topic.can_create_content else 'Erstelle passende Lerninhalte und übe danach mit Fragen.' }}</p></header>
+{% if topic.can_create_content %}
+<section class="card"><h2>Deine Lerninhalte</h2>{% with content_topic=topic %}{% include "lerninhalte_form.html" %}{% endwith %}</section>
 {% endif %}
-<{% if topic.flag in ('rot','gelb') %}details{% else %}section{% endif %} class="card">
-{% if topic.flag in ('rot','gelb') %}<summary>Direkt Fragen beantworten</summary>{% else %}<h2>Los geht’s</h2>{% endif %}
-<form method="post" action="/themen/{{ topic.id }}/pruefen">{{ csrf_input() }}<p>Nimm dir Zeit. Du musst noch nicht alles wissen.</p><details class="options"><summary>Lieber auf Papier?</summary><label for="modus">Antworten</label><select id="modus" name="modus"><option value="bildschirm">Am Bildschirm</option><option value="papier">Auf Papier zum Ausdrucken</option></select></details><button type="submit" {{ 'class=ghost' if topic.flag in ('rot','gelb') }}>Fragen starten {{ icon('arrow') }}</button></form>
-</{% if topic.flag in ('rot','gelb') %}details{% else %}section{% endif %}>
-{% if topic.flag not in ('rot','gelb') %}<details class="card"><summary>Zuerst eine Erklärung ansehen</summary><form method="post" action="/lernzyklus/{{ topic.id }}/start">{{ csrf_input() }}<label for="ausgabe">Format</label><select id="ausgabe" name="ausgabe">{% for value, label in ausgabe_labels.items() %}<option value="{{ value }}" {{ 'selected' if cfg.default_ausgabe == value }}>{{ label }}</option>{% endfor %}</select><button type="submit" class="ghost">Erklärung vorbereiten</button></form></details>{% endif %}
+<section class="card">
+{% if last_result %}<p>Deine erste Prüfung ist gespeichert.</p><a href="/quiz/{{ last_result.id }}">Gespeicherte Prüfung ansehen</a>{% endif %}
+<h2>{{ 'Deine erste Prüfung' if not topic.can_create_content else 'Mit Fragen üben' }}</h2>
+<form method="post" action="/lernzyklus/{{ topic.id }}/quiz/starten">
+{{ csrf_input() }}<p>Nimm dir Zeit. Du musst noch nicht alles wissen.</p>
+{% if topic.can_create_content %}<input type="hidden" name="erneut" value="ja">{% endif %}
+<details class="options"><summary>Lieber auf Papier?</summary><label for="modus">Antworten</label><select id="modus" name="modus"><option value="bildschirm">Am Bildschirm</option><option value="papier">Auf Papier zum Ausdrucken</option></select></details>
+<button type="submit">{{ 'Erste Prüfung starten' if not topic.can_create_content else 'Noch einmal prüfen' }}</button>
+</form>
+</section>
+{% if not topic.can_create_content %}<section class="card">{% with content_topic=topic %}{% include "lerninhalte_form.html" %}{% endwith %}</section>{% endif %}
+{% with progress_topic=topic %}{% include "gelernt_form.html" %}{% endwith %}
 {% endblock %}

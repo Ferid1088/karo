@@ -15,22 +15,31 @@
   const form = document.querySelector('[data-settings-form]');
   if (form) {
     const format = form.querySelector('[name="default_ausgabe"]');
-    const button = form.querySelector('[data-settings-save]');
-    const status = form.querySelector('[data-settings-status]');
+    const button = document.querySelector('[data-settings-save]');
+    const status = document.querySelector('[data-settings-status]');
     const initial = new URLSearchParams(new FormData(form)).toString();
+    let dirty = form.dataset.invalid === 'true';
     function update() {
       form.querySelectorAll('[data-format-options]').forEach(panel => {
         panel.hidden = panel.dataset.formatOptions !== format.value;
       });
       if (form.dataset.configured === 'true') {
-        const dirty = new URLSearchParams(new FormData(form)).toString() !== initial;
+        dirty = new URLSearchParams(new FormData(form)).toString() !== initial;
         button.disabled = !dirty && form.dataset.invalid !== 'true';
         status.textContent = dirty ? 'Noch nicht gespeicherte Änderungen.' :
           (form.dataset.invalid === 'true' ? 'Bitte prüfen Sie die markierten Angaben.' : 'Alles gespeichert.');
       }
+      form.querySelectorAll('.settings-choice').forEach(choice => {
+        choice.querySelector('[data-child-destination]').textContent =
+          choice.querySelector('input').checked ? 'Beim Kind' : 'Nur Eltern';
+      });
     }
     form.addEventListener('input', update);
     form.addEventListener('change', update);
+    form.addEventListener('submit', () => { dirty = false; });
+    window.addEventListener('beforeunload', event => {
+      if (dirty) { event.preventDefault(); event.returnValue = ''; }
+    });
     form.addEventListener('invalid', event => {
       let parent = event.target.parentElement;
       while (parent && parent !== form) {

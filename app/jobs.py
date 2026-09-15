@@ -44,26 +44,30 @@ def _in(seconds: int) -> str:
 
 def enqueue(job_type: str, payload: dict | None = None,
             dedup_key: str | None = None) -> int | None:
-    """Legt einen Job an. None, wenn unter diesem Schluessel schon einer offen ist."""
+    with db.tx() as c:
+        return enqueue_in_transaction(c, job_type, payload, dedup_key)
+
+
+def enqueue_in_transaction(c, job_type: str, payload: dict | None = None,
+                           dedup_key: str | None = None) -> int | None:
+    """Job und zugehörige Zustandsänderung gemeinsam dauerhaft speichern."""
     if job_type not in HANDLERS:
         raise ValueError(f"Unbekannter Job-Typ: {job_type}")
     payload = payload or {}
-    with db.tx() as c:
-        if dedup_key:
-            row = c.execute(
-                "SELECT id, state FROM job WHERE dedup_key = ?", (dedup_key,)
-            ).fetchone()
-            if row is not None:
-                if row["state"] in ("wartend", "laeuft"):
-                    return None
-                c.execute("UPDATE job SET dedup_key = NULL WHERE id = ?", (row["id"],))
-        cur = c.execute(
-            """INSERT INTO job (type, payload, state, dedup_key, created_at)
-               VALUES (?, ?, 'wartend', ?, ?)""",
-            (job_type, json.dumps(payload, ensure_ascii=False), dedup_key, db.now()),
-        )
-        return cur.lastrowid
-
+    if dedup_key:
+        row = c.execute(
+            "SELECT id, state FROM job WHERE dedup_key = ?", (dedup_key,)
+        ).fetchone()
+        if row is not None:
+            if row["state"] in ("wartend", "laeuft"):
+                return None
+            c.execute("UPDATE job SET dedup_key = NULL WHERE id = ?", (row["id"],))
+    cur = c.execute(
+        """INSERT INTO job (type, payload, state, dedup_key, created_at)
+           VALUES (?, ?, 'wartend', ?, ?)""",
+        (job_type, json.dumps(payload, ensure_ascii=False), dedup_key, db.now()),
+    )
+    return cur.lastrowid
 
 def _claim() -> dict | None:
     with db.tx() as c:

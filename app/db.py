@@ -19,7 +19,7 @@ from . import config
 log = logging.getLogger("karo.db")
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 6
 
 _local = threading.local()
 
@@ -108,15 +108,25 @@ def init() -> None:
     _migrate(c)
     row = c.execute("SELECT MAX(version) AS v FROM schema_version").fetchone()
     if row is None or row["v"] is None or row["v"] < SCHEMA_VERSION:
-        c.execute(
-            "INSERT OR REPLACE INTO schema_version (version, applied_at) VALUES (?, ?)",
-            (SCHEMA_VERSION, now()),
-        )
+        with tx() as migration:
+            from .services.workflow_repair import repair
+            repair(migration)
+            migration.execute(
+                "INSERT OR REPLACE INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (SCHEMA_VERSION, now()))
 
 
 # Spalten, die spaeter dazugekommen sind. CREATE TABLE IF NOT EXISTS legt sie
 # in einer bestehenden Datenbank nicht an, deshalb hier einzeln nachziehen.
 _ADDED_COLUMNS = [
+    ("topic", "merged_into", "INTEGER REFERENCES topic(id)"),
+    ("quiz", "superseded_by", "INTEGER REFERENCES quiz(id)"),
+    ("quiz", "draft_revision", "INTEGER NOT NULL DEFAULT 0"),
+    ("quiz", "draft_position", "INTEGER NOT NULL DEFAULT 0"),
+    ("quiz", "draft_updated_at", "TEXT"),
+    ("quiz", "review_draft", "TEXT NOT NULL DEFAULT '{}'"),
+    ("topic", "learning_started_at", "TEXT"),
+    ("topic", "learned_at", "TEXT"),
     ("document", "rolle", "TEXT NOT NULL DEFAULT 'wissen'"),
     ("llm_call", "backend", "TEXT"),
     ("job", "not_before", "TEXT"),

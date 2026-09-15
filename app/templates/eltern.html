@@ -2,7 +2,7 @@
 {% block title %}Für Eltern – Karo{% endblock %}
 {% block content %}
 <p class="eyebrow">GEMEINSAM VORBEREITEN</p><h1>Für Eltern</h1>
-<p class="sub">Material vorbereiten, Antworten prüfen und Karo einstellen.</p>
+<p class="sub">{{ 'Material vorbereiten und Karo einstellen.' if cfg.antworten_pruefen_kind else 'Material vorbereiten, Antworten prüfen und Karo einstellen.' }}</p>
 {% if reviews or offene_vorschlaege or offene_funde %}
 <section class="card"><h2>Das braucht Ihre Hilfe</h2><div class="simple-list">
 {% for q in reviews %}<a class="simple-list-link" href="/quiz/{{ q.id }}"><span><strong>Antworten prüfen</strong><small>{{ q.thema_label }}</small></span><span aria-hidden="true">→</span></a>{% endfor %}
@@ -10,12 +10,12 @@
 {% if offene_funde %}<a class="simple-list-link" href="/recherche"><span><strong>{{ offene_funde }} Internetquellen prüfen</strong><small>Sie entscheiden, was verwendet wird.</small></span><span aria-hidden="true">→</span></a>{% endif %}
 </div></section>{% endif %}
 <div class="choice-grid parent-choices">
-<a class="choice-card" href="/wissen"><h2>Schulblätter</h2><p>Fotos und PDFs hinzufügen und ansehen.</p></a>
+{% if not cfg.schulblaetter_kind %}<a class="choice-card" href="/wissen"><h2>Schulblätter</h2><p>Fotos und PDFs hinzufügen und ansehen.</p></a>{% endif %}
 <a class="choice-card" href="/themen"><h2>Themen</h2><p>Themen bestätigen, benennen oder selbst anlegen.</p></a>
-<a class="choice-card" href="/klassenarbeit"><h2>Klassenarbeit</h2><p>Themenblatt einlesen, Lernplan und Ergebnisse.</p></a>
-<a class="choice-card" href="/lernstand#ausfuehrlich"><h2>Lernstand &amp; Export</h2><p>Entwicklung, Antworten und die Tabelle für Drive.</p></a>
+{% if not cfg.klassenarbeit_kind %}<a class="choice-card" href="/klassenarbeit"><h2>Klassenarbeit</h2><p>Themenblatt einlesen, Lernplan und Ergebnisse.</p></a>{% endif %}
+<a class="choice-card" href="/messung/fortschritt#ausfuehrlich"><h2>Lernstand &amp; Export</h2><p>Entwicklung, Antworten und die Tabelle für Drive.</p></a>
 <a class="choice-card" href="/recherche"><h2>Internetquellen</h2><p>Fundstellen prüfen und erlaubte Seiten verwalten.</p></a>
-<a class="choice-card" href="/setup"><h2>Einstellungen</h2><p>Verbindungen, Lernmaterial, Speicherort und Passwort.</p></a>
+<a class="choice-card" href="/setup"><h2>Einstellungen</h2><p>Was darf Ihr Kind? Lernmaterial, Passwörter und Verbindungen.</p></a>
 </div>
 <details class="card disclosure" id="betrieb"><summary>Betrieb und Protokoll{% if fehler %} · {{ fehler|length }} Problem{{ 'e' if fehler|length != 1 }}{% endif %}</summary>
 <p>{{ counts.get('wartend', 0) + counts.get('laeuft', 0) }} Vorgänge werden gerade bearbeitet.</p>
@@ -25,8 +25,13 @@
 {% if einig.gesamt %}<p class="hint">Karo und Lernbegleitung waren sich bei {{ (einig.quote * 100)|round|int }} % der letzten {{ einig.gesamt }} Antworten einig.</p>{% endif %}
 </details>
 <details class="card disclosure"><summary>Aussehen und Anmeldung</summary>
-<label for="farbwelten-auswahl">Farbe der App</label><select id="farbwelten-auswahl">
+<div class="row area-preferences"><div class="field">
+<label for="eltern-farbwelt">Elternbereich</label><select id="eltern-farbwelt" data-theme-picker="parent">
+{% for wert, name in [('schiefer','Schiefer & Petrol'),('sand','Sand & Braun'),('nacht','Nachtblau')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
+</div><div class="field">
+<label for="farbwelten-auswahl">Kinderbereich</label><select id="farbwelten-auswahl" data-theme-picker="child">
 {% for wert, name in [('lila','Lila'),('ozean','Blau'),('wiese','Grün'),('sonne','Orange'),('zuckerwatte','Rosa'),('lava','Rot'),('dunkel','Dunkel')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
+</div></div>
 <form method="post" action="/eltern/kind-modus" class="section-space"><p class="hint">Gerät ans Kind übergeben? Zurück geht es nur mit dem Eltern-Passwort.</p>{{ csrf_input() }}<button type="submit" class="ghost">Kind-Modus starten</button></form>
 <form method="post" action="/logout" class="section-space" data-logout>{{ csrf_input() }}<button type="submit" class="ghost">Abmelden</button></form>
 </details>

@@ -2,11 +2,15 @@
 {% block title %}Lernstand – Karo{% endblock %}
 {% block content %}
 <h1>Deine Erfolge</h1><p class="sub">Du lernst Schritt für Schritt. Hier siehst du, was schon gut klappt.</p>
-{% if zeilen %}<div class="choice-grid">
-{% for t in zeilen %}<section class="card progress-card"><span class="child-status {{ t.flag }}">{{ child_flags[t.flag] }}</span><h2>{{ t.label }}</h2>
+{% if erfolge %}<div class="choice-grid">
+{% for t in erfolge %}<section class="card progress-card"><span class="child-status gruen">Als gelernt abgehakt</span><h2>{{ t.label }}</h2>
 <p>{% if t.antworten %}{{ t.richtig }} von {{ t.antworten }} zuletzt bewerteten Antworten richtig.{% else %}Mit ein paar Fragen geht es los.{% endif %}</p>
-<a href="/lernzyklus/{{ t.id }}">{{ 'Kurz wiederholen' if t.flag == 'gruen' else 'Zusammen weiterüben' }} →</a></section>{% endfor %}
-</div>{% else %}<section class="card"><h2>Deine ersten Schritte kommen noch</h2><p>Jede Übung hilft dir weiter.</p><a class="btn" href="/lernen">Zum Lernen</a></section>{% endif %}
+<a href="/lernzyklus/{{ t.id }}">Noch einmal ansehen →</a>
+{% with progress_topic=t %}{% include "gelernt_form.html" %}{% endwith %}
+</section>{% endfor %}
+</div>{% else %}<section class="card"><h2>Deine ersten Erfolge kommen noch</h2><p>Hake ein Thema unter „Lernen“ als gelernt ab. Dann erscheint es hier.</p><a class="btn" href="/lernen">Zum Lernen</a></section>{% endif %}
+{% if role == 'parent' and not full_progress %}<a href="/messung/fortschritt">Ausführlichen Lernstand und Export öffnen</a>{% endif %}
+{% if role == 'parent' and full_progress %}
 <details class="card disclosure" id="ausfuehrlich"><summary>Für Eltern: Lernstand, Verlauf und Export</summary>
 <div class="lernstand-kopf">
   <div>
@@ -169,4 +173,5 @@ etwas, sobald welche freigegeben sind.</div>
 })();
 </script>
 </details>
+{% endif %}
 {% endblock %}

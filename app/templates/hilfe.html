@@ -2,7 +2,8 @@
 {% block title %}Hilfe – Karo{% endblock %}
 {% block content %}
 <h1>So geht Karo</h1><p class="sub">Du brauchst immer nur den nächsten Schritt.</p>
-<ol class="simple-steps card"><li><strong>Thema wählen</strong><span>Tippe auf „Lernen“ und such dir ein Thema aus.</span></li><li><strong>Anschauen und üben</strong><span>Karo erklärt es dir. Danach beantwortest du Fragen.</span></li><li><strong>Gemeinsam nachsehen</strong><span>Ein Erwachsener schaut deine Antworten an. Unter „Erfolge“ siehst du deinen Lernstand.</span></li></ol>
+<ol class="simple-steps card"><li><strong>Thema wählen</strong><span>Tippe auf „Lernen“ und such dir ein Thema aus.</span></li><li><strong>Anschauen und üben</strong><span>Karo erklärt es dir. Danach beantwortest du Fragen.</span></li><li><strong>Gemeinsam nachsehen</strong><span>Ein Erwachsener schaut deine Antworten an. Hake ein Thema als gelernt ab. Dann erscheint es unter „Erfolge“.</span></li></ol>
+<p class="hint">Unter „Lernen“ findest du „Neue Themen“ und „In Bearbeitung“. Wenn Klassenarbeiten für dich aktiviert sind, gibt es dort dieselbe Unterteilung. Ein entferntes Gelernt-Häkchen bringt das Thema zurück nach „In Bearbeitung“.</p>
 <a class="btn" href="/lernen">Zum Lernen</a>
 <details class="card disclosure section-space"><summary>Für Eltern: alle Funktionen und Erklärungen</summary>
 <section id="hilfe-start">
@@ -19,7 +20,7 @@
       <ol class="hilfe-schritte">
         <li><strong>Schulmaterial einlesen</strong><span>Unter „Für Eltern → Schulblätter“ ein Blatt hochladen oder aus dem Ablageordner einlesen.</span></li>
         <li><strong>Themen freigeben</strong><span>Karo schlägt Themen vor. Sie prüfen die Namen und übernehmen nur, was passt.</span></li>
-        <li><strong>Lernen starten</strong><span>Unter „Lernen“ ein Thema auswählen und eine Erklärung oder Fragen starten.</span></li>
+        <li><strong>Lernen starten</strong><span>Im Kindbereich unter „Lernen“ ein Thema auswählen und zuerst die Themenprüfung abschließen. Nach Bestätigung der Bewertungen erscheint direkt beim Thema „Lerninhalte erstellen“.</span></li>
       </ol>
     </section>
     <section class="card hilfe-card">
@@ -35,9 +36,9 @@
     <table class="hilfe-tabelle">
       <thead><tr><th>Aufgabe</th><th>Wo?</th><th>Ergebnis</th></tr></thead>
       <tbody>
-        <tr><td>Neues Blatt hinzufügen</td><td>Für Eltern &gt; Schulblätter</td><td>Erklärungen, Regeln und Aufgaben werden erkannt.</td></tr>
+        <tr><td>Neues Blatt hinzufügen</td><td>{{ 'Heute oder Lernen → Schulblätter' if cfg.schulblaetter_kind else 'Für Eltern → Schulblätter' }}</td><td>Erklärungen, Regeln und Aufgaben werden erkannt. Unter Einstellungen &gt; Schulblätter und Speicherort können Eltern „Schulblätter“ beim Kind anzeigen aktivieren.</td></tr>
         <tr><td>Themen prüfen</td><td>Für Eltern &gt; Themen</td><td>Nur freigegebene Themen erscheinen im Lernbereich.</td></tr>
-        <tr><td>Antworten freigeben</td><td>Für Eltern &gt; Antworten prüfen</td><td>Erst nach Ihrer Bestätigung fließt eine Antwort in die Flagge ein.</td></tr>
+        <tr><td>Antworten freigeben</td><td>{{ 'Heute oder Lernen &gt; Antworten prüfen' if cfg.antworten_pruefen_kind else 'Für Eltern &gt; Antworten prüfen' }}</td><td>Erst nach der Bestätigung fließt eine Antwort in die Flagge ein. Unter Einstellungen &gt; Lernen und Internetquellen entscheiden Eltern mit der Checkbox „Antworten prüfen“ beim Kind anzeigen, wer prüft.</td></tr>
         <tr><td>Lernstand ansehen</td><td>Lernstand</td><td>Status und Antworten je Thema werden verständlich zusammengefasst.</td></tr>
       </tbody>
     </table>
@@ -92,7 +93,7 @@
         <tr><td><a href="/themen">Themen</a></td><td>Themen freigeben, prüfen und Erklärungen starten.</td><td>Vorschlag übernehmen, lernen</td></tr>
         <tr><td><a href="/recherche">Recherche</a></td><td>Zusätzliche, erlaubte Lernquellen verwalten und Fundstellen freigeben.</td><td>Quelle aktivieren, Fund freigeben</td></tr>
         <tr><td><a href="/lernstand">Lernstand</a></td><td>Status, Antwortquoten und zeitlichen Verlauf ansehen.</td><td>Verlauf nach Jahr, Monat, Woche oder Tag gruppieren</td></tr>
-        <tr><td><a href="/klassenarbeit">Klassenarbeit</a></td><td>Prüfungen und Themen für einen Termin vorbereiten.</td><td>Themenblatt hochladen, Arbeit anlegen, Lernplan ansehen</td></tr>
+        <tr><td>{% if role == 'parent' or cfg.klassenarbeit_kind %}<a href="/klassenarbeit">Klassenarbeit</a>{% else %}Klassenarbeit{% endif %}</td><td>Prüfungen und Themen für einen Termin vorbereiten.</td><td>Unter Einstellungen &gt; Lernen und Internetquellen entscheiden Eltern, ob „Dein Plan für die Klassenarbeit“ beim Kind oder bei den Eltern erscheint.</td></tr>
         <tr><td><a href="/protokoll">Protokoll</a></td><td>Jeden Modellaufruf im Wortlaut einsehen, inklusive geschätzter Kosten.</td><td>Gesendeten Text prüfen, Trefferquote bewerten</td></tr>
         <tr><td><a href="/setup">Einstellungen</a></td><td>Kind, Fach, Klassenstufe, Ausgabeformate und Verbindungen verwalten.</td><td>Ausgabeformat auswählen</td></tr>
       </tbody>

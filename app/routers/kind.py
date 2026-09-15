@@ -6,12 +6,13 @@ anderen Router direkt anzusprechen (KaroRefactoring_Plan.md, Abschnitt 10).
 """
 
 import logging
-from fastapi import APIRouter, Form, Request, UploadFile
+import json
+from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from .. import quizzes, teaching
 from ..teaching import TeachingError
-from ..services import workflow
+from ..services import quiz_drafts, workflow
 from .shared import flash, zurueck
 
 log = logging.getLogger("karo.kind")
@@ -36,6 +37,16 @@ def quiz_status(quiz_id: int):
 @router.post("/quiz/{quiz_id}/antworten")
 async def quiz_antworten(request: Request, quiz_id: int):
     return await workflow.handle_quiz_antworten(request, quiz_id)
+
+
+@router.post('/quiz/{quiz_id}/entwurf')
+def quiz_entwurf(request: Request, quiz_id: int, phase: str = Form(...),
+                 revision: int = Form(...), values: str = Form(...), position: int = Form(0)):
+    try:
+        data = json.loads(values)
+    except ValueError:
+        raise HTTPException(400, 'Ungültiger Entwurf.')
+    return quiz_drafts.save(quiz_id, request.session.get('role'), phase, revision, data, position)
 
 
 @router.post("/quiz/{quiz_id}/blatt")
