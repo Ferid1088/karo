@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ lesson.thema.label if lesson.thema else 'Lernen' }} – Karo{% endblock %}
+{% block title %}{{ lesson.thema.label if lesson.thema else 'Lernen' }} – {{ companion_name }}{% endblock %}
 {% block content %}
 {% set thema = lesson.thema or {} %}{% set r = lesson.aktuelle %}
 {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
@@ -39,7 +39,7 @@
 <section class="card"><h2>Das kannst du gut!</h2><p>Diese Lernrunde ist geschafft.</p><div class="actions"><a class="btn" href="/lernstand">Meine Erfolge ansehen</a><form method="post" action="/lernzyklus/{{ lesson.topic_id }}/quiz/starten">{{ csrf_input() }}<input type="hidden" name="erneut" value="ja"><button class="ghost" type="submit">Mit Fragen wiederholen</button></form></div></section>
 {% elif lesson.state == 'wartet' %}
 <section class="card"><h2>{{ 'Bereit für deine Erklärung?' if lesson.runden == 0 else 'Noch einmal zusammen üben' }}</h2>
-{% if hat_material %}<p>Karo zeigt dir den Rechenweg Schritt für Schritt.</p>
+{% if hat_material %}<p>{{ companion_name }} zeigt dir den Rechenweg Schritt für Schritt.</p>
 {% if lesson.runden == 0 and progress_topic.can_create_content %}
 {% with content_topic=progress_topic %}{% include "lerninhalte_form.html" %}{% endwith %}
 {% else %}
@@ -48,7 +48,7 @@
 {% else %}<p>Hier fehlt noch ein Schulblatt. Hol einen Erwachsenen dazu.</p><a class="btn" href="/wissen">Schulblatt hinzufügen</a>{% endif %}
 <details class="disclosure" {{ 'open' if not hat_material }}><summary>Für Eltern: Lernquellen auswählen</summary>
   {% if vorschlaege %}
-  <p>Karo hat diese Quellen gefunden.
+  <p>{{ companion_name }} hat diese Quellen gefunden.
   {% if hat_material %}Nur der Titel zählt als Hinweis — die Fakten kommen
   weiterhin aus Ihrem Schulmaterial.{% else %}Eine freigegebene Quelle wird
   hier zur Faktengrundlage, da kein eigenes Material vorliegt.{% endif %}
@@ -96,7 +96,7 @@
 <section class="card" role="status">
 {% if r.job_fehler %}<h2>Hier brauchen wir Hilfe</h2><p>Bitte einen Erwachsenen dazu holen.</p><details class="disclosure"><summary>Problem ansehen</summary><p>{{ r.job_fehler }}</p><p>Diese Runde ist stehen geblieben. Unten können Sie über „Mehr zum Thema“ eine neue Erklärung starten.</p></details>
 {% else %}<h2>Deine Erklärung wird vorbereitet</h2><p>Du musst nichts drücken. Sie erscheint hier, sobald sie fertig ist.</p>
-<details class="disclosure"><summary>Was macht Karo gerade?</summary><ol class="schritte"><li class="fertig">Schulmaterial sammeln</li><li class="{{ 'fertig' if r.erklaerung else 'laeuft' }}">Erklärung schreiben</li><li class="{{ 'fertig' if r.pruefung else '' }}">Mit dem Schulmaterial vergleichen</li><li>Erklärung fertigstellen</li></ol>
+<details class="disclosure"><summary>Was macht {{ companion_name }} gerade?</summary><ol class="schritte"><li class="fertig">Schulmaterial sammeln</li><li class="{{ 'fertig' if r.erklaerung else 'laeuft' }}">Erklärung schreiben</li><li class="{{ 'fertig' if r.pruefung else '' }}">Mit dem Schulmaterial vergleichen</li><li>Erklärung fertigstellen</li></ol>
 {% if r.notebooklm_quelle_pfad %}<a href="/material/{{ r.id }}/notebooklm-quelle" target="_blank" rel="noopener">An NotebookLM gesendeter Text (vor dem Versand einsehbar)</a>{% endif %}</details>
 <script>karoAutoRefresh("/lernen/{{ lesson.id }}/status", "{{ signatur }}");</script>
 {% endif %}</section>{% endif %}

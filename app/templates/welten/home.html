@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Meine Welt – Karo{% endblock %}
+{% block content %}
+<p class="eyebrow">DEIN BEGLEITER</p><h1>Meine Welt</h1>
+<p class="sub">Gib deinem Begleiter ein Bild und einen Namen. Erzähl außerdem, was dich gerade interessiert.</p>
+
+<section class="card">
+<h2>Dein Begleiter</h2>
+{% if begleiter %}
+<div class="companion-preview">
+{% if begleiter.foto_pfad %}<img src="/welten/foto/{{ begleiter.foto_pfad }}" alt="" class="companion-photo">{% endif %}
+<div><p><strong>{{ begleiter.name }}</strong> begleitet dich gerade.</p>{% if begleiter.spass_antwort %}<p class="klein">Macht dir Spaß: {{ begleiter.spass_antwort }}</p>{% endif %}</div>
+</div>
+{% else %}
+<p>Noch kein eigener Begleiter — bis dahin heißt es weiter „Karo“.</p>
+{% endif %}
+<details class="disclosure" {{ 'open' if not begleiter }}><summary>{{ 'Begleiter ändern' if begleiter else 'Begleiter einrichten' }}</summary>
+{% if error %}<p class="msg err">{{ error }}</p>{% endif %}
+<form method="post" action="/welten/begleiter" enctype="multipart/form-data" class="card">
+  {{ csrf_input() }}
+  <div class="field"><label for="begleiter-foto">Foto deines Kuscheltiers (oder was du willst)</label>
+    <input type="file" id="begleiter-foto" name="foto" accept="image/*"></div>
+  <div class="field"><label for="begleiter-name">Name · bis 40 Zeichen</label>
+    <input type="text" id="begleiter-name" name="name" maxlength="40" required value="{{ begleiter.name if begleiter else '' }}" placeholder="Zum Beispiel Flafi"></div>
+  <div class="field"><label for="begleiter-farbe">Lieblingsfarbe</label>
+    <select id="begleiter-farbe" name="farbe" data-theme-picker="child">
+      {% for wert, name in farben.items() %}<option value="{{ wert }}" {{ 'selected' if begleiter and begleiter.farbe == wert }}>{{ name }}</option>{% endfor %}
+    </select></div>
+  <div class="field"><label for="begleiter-spass">Was macht dir am meisten Spaß? · optional</label>
+    <input type="text" id="begleiter-spass" name="spass_antwort" maxlength="200" value="{{ begleiter.spass_antwort if begleiter else '' }}"></div>
+  <button type="submit">Speichern</button>
+</form>
+</details>
+{% if begleiter_verlauf|length > 1 %}<details class="disclosure"><summary>Frühere Begleiter</summary><div class="simple-list">
+{% for alt in begleiter_verlauf[1:] %}<div class="simple-list-link"><span><strong>{{ alt.name }}</strong><small>{{ alt.created_at[:10] }}</small></span></div>{% endfor %}
+</div></details>{% endif %}
+</section>
+
+<section class="card">
+<h2>Was interessiert dich gerade?</h2>
+{% if interesse %}<p>{{ interesse.text }}</p>{% if interesse.audio_pfad %}<audio controls src="/welten/clip/{{ interesse.audio_pfad }}"></audio>{% endif %}
+{% else %}<p>Noch nichts eingetragen.</p>{% endif %}
+<form method="post" action="/welten/interesse" enctype="multipart/form-data" class="card">
+  {{ csrf_input() }}
+  <div class="field"><label for="interesse-text">Schreib es auf, oder sprich es ein</label>
+    <input type="text" id="interesse-text" name="text" maxlength="300" placeholder="Zum Beispiel Dinosaurier, Fußball oder Musik"></div>
+  <input type="file" id="interesse-audio" name="audio" accept="audio/*" hidden>
+  <button type="button" id="aufnahmeknopf" class="ghost">Sprachnachricht aufnehmen</button>
+  <span id="aufnahmestatus" class="klein"></span>
+  <audio id="aufnahme-vorschau" controls hidden></audio>
+  <button type="submit">Interesse speichern</button>
+</form>
+{% if interesse_verlauf|length > 1 %}<details class="disclosure"><summary>Frühere Interessen</summary><div class="simple-list">
+{% for alt in interesse_verlauf[1:] %}<div class="simple-list-link"><span><strong>{{ alt.text or 'Sprachnachricht' }}</strong><small>{{ alt.created_at[:10] }}</small></span></div>{% endfor %}
+</div></details>{% endif %}
+</section>
+<script src="/static/begleiter.js?v={{ asset_version }}" defer></script>
+{% endblock %}

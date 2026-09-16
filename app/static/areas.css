@@ -96,3 +96,18 @@
   [data-ui-area="parent"] .parent-link { padding-inline: .7rem; }
   [data-ui-area="child"] .card { padding: 1.2rem; }
 }
+
+/* The fourth child link stays readable on small phones. */
+@media (max-width: 420px) {
+  [data-ui-area="child"] .simple-header .simple-nav {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Five child links fit phone widths without squeezing the labels. */
+@media(max-width:680px) {
+ [data-ui-area="child"] .simple-header .simple-nav {
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ }
+ [data-ui-area="child"] .simple-nav a:last-child:nth-child(odd) {grid-column:1 / -1;}
+}

@@ -28,8 +28,6 @@ from . import config, db, jobs, security
 from .config import ConfigUnreadable
 from .routers import (auth, eltern, kind, admin, dashboard, lernzyklus,
                       vorbereitung, messung)
-from .woche import router as woche
-from .welten import router as welten
 
 security.configure_logging(os.environ.get("KARO_LOG_LEVEL", "INFO"))
 log = logging.getLogger("karo")
@@ -58,7 +56,7 @@ VALID_ROLES = frozenset({"parent", "child"})
 # wird hier zentral erzwungen, nicht nur durch ausgeblendete Menuepunkte.
 CHILD_ALLOWED_EXACT = frozenset({"/", "/hilfe", "/lernstand"})
 CHILD_ALLOWED_PREFIXES = ("/lernen", "/lernzyklus", "/quiz", "/material",
-                          "/klassenarbeit/material", "/woche", "/welten")
+                          "/klassenarbeit/material")
 
 # Die Freigabe bleibt Elternsache, bis Eltern sie in den Einstellungen
 # ausdruecklich auch fuer das Kind aktivieren. Gilt fuer beide Routenfamilien.
@@ -122,9 +120,6 @@ app.include_router(kind.router)
 app.include_router(admin.router)
 app.include_router(vorbereitung.router)
 app.include_router(messung.router)
-# „Meine Woche“ verwendet die bestehende Anmeldung; Schema in db.init().
-app.include_router(woche.router)
-app.include_router(welten.router)
 
 
 class Gate:

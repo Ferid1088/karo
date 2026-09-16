@@ -499,3 +499,24 @@ Liegt sie unter etwa 80 %, ist die Freigabe keine Formalie, sondern die
 eigentliche Arbeit — dann ist Karo ein Aufschreibewerkzeug und noch kein
 Diagnosewerkzeug. Diese Messung ist der Grund, warum die Freigabe nicht
 abschaltbar ist.
+
+## Meine Woche
+
+Ein gemeinsamer Wochenplan mit Ziel, Routine und Elternzusage ergänzt Karo.
+Das Kind findet **Meine Woche** in seiner Navigation; Eltern öffnen die neue
+Karte auf ihrer Übersicht. Hilfe, Pause und Rückmeldungen bleiben innerhalb
+von Karo und verändern keine Lernstände.
+
+[Bedienung, Startbefehle, Migration und Prüfliste](docs/meine-woche.md)
+
+## Meine Welt
+
+Kinder nennen zuerst ein aktuelles Interesse. Karo macht daraus drei passende,
+vollständig spielbare Ideen; das Kind wählt eine und die Eltern sehen genau
+diese Vorschau zur Freigabe. Die aktive Welt übernimmt Karos nächsten echten
+Lernschritt. Bei neuen Lernmaterialien dürfen Geschichte und Beispiele zum
+Interesse passen, während Fachinhalt und Lösungen weiterhin aus den geprüften
+Schulunterlagen kommen. Interessen lassen sich jederzeit wechseln oder
+pausieren; fertige Werke bleiben erhalten.
+
+[Ablauf, Datenschutz, technische Grenzen und Prüfliste](docs/interessenwelten.md)

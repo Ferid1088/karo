@@ -264,6 +264,11 @@ def voices_dir() -> Path:
     return _ensure(DATA_DIR / "stimmen")
 
 
+def begleiter_dir() -> Path:
+    """Begleiter-Foto und Interessen-Sprachclips ("Meine Welt")."""
+    return _ensure(DATA_DIR / "begleiter")
+
+
 def drive_root() -> Path:
     sub = load_safe().drive_subdir
     return DRIVE_DIR / sub if sub else DRIVE_DIR

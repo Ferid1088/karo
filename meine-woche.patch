@@ -1,0 +1,4486 @@
+From 421af8757da6c78b2303032a0215ab7808ed536f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 15 Sep 2026 08:59:05 +0000
+Subject: [PATCH] =?UTF-8?q?feat(woche):=20Begleiter=20=E2=80=9EMeine=20Woc?=
+ =?UTF-8?q?he"=20=E2=80=94=20nur=20neue=20Dateien?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Dieselben Dateien wie zuvor, aber ohne Aenderung an app/main.py und README.md.
+Die beiden Zeilen in main.py ergaenzt einbau.py oder die Hand — so gibt es
+keinen Konflikt mit einem lokal abweichenden main.py.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BJf6m34pAjoM2H1BeJFqkM
+---
+ app/static/woche.css                  | 267 ++++++++++
+ app/static/woche.js                   | 111 +++++
+ app/templates/woche/abschluss.html    |  57 +++
+ app/templates/woche/anpassung.html    |  50 ++
+ app/templates/woche/base.html         |  46 ++
+ app/templates/woche/einrichtung.html  |  84 ++++
+ app/templates/woche/eltern.html       |  96 ++++
+ app/templates/woche/form.html         |  54 ++
+ app/templates/woche/grund.html        |  19 +
+ app/templates/woche/heute.html        |  55 +++
+ app/templates/woche/hilfe.html        |  39 ++
+ app/templates/woche/karte.html        |  22 +
+ app/templates/woche/notfall.html      |  64 +++
+ app/templates/woche/pause.html        |  14 +
+ app/templates/woche/plan.html         | 124 +++++
+ app/templates/woche/rueckmeldung.html |  16 +
+ app/templates/woche/stundenplan.html  |  50 ++
+ app/templates/woche/ueber_dich.html   |  41 ++
+ app/templates/woche/weiter.html       |  17 +
+ app/woche/__init__.py                 |  30 ++
+ app/woche/bruecke.py                  | 202 ++++++++
+ app/woche/regeln.py                   | 601 ++++++++++++++++++++++
+ app/woche/router.py                   | 686 ++++++++++++++++++++++++++
+ app/woche/schema.sql                  | 217 ++++++++
+ app/woche/store.py                    | 503 +++++++++++++++++++
+ app/woche/vorschlaege.py              | 247 ++++++++++
+ tests/test_woche.py                   | 537 ++++++++++++++++++++
+ 27 files changed, 4249 insertions(+)
+ create mode 100644 app/static/woche.css
+ create mode 100644 app/static/woche.js
+ create mode 100644 app/templates/woche/abschluss.html
+ create mode 100644 app/templates/woche/anpassung.html
+ create mode 100644 app/templates/woche/base.html
+ create mode 100644 app/templates/woche/einrichtung.html
+ create mode 100644 app/templates/woche/eltern.html
+ create mode 100644 app/templates/woche/form.html
+ create mode 100644 app/templates/woche/grund.html
+ create mode 100644 app/templates/woche/heute.html
+ create mode 100644 app/templates/woche/hilfe.html
+ create mode 100644 app/templates/woche/karte.html
+ create mode 100644 app/templates/woche/notfall.html
+ create mode 100644 app/templates/woche/pause.html
+ create mode 100644 app/templates/woche/plan.html
+ create mode 100644 app/templates/woche/rueckmeldung.html
+ create mode 100644 app/templates/woche/stundenplan.html
+ create mode 100644 app/templates/woche/ueber_dich.html
+ create mode 100644 app/templates/woche/weiter.html
+ create mode 100644 app/woche/__init__.py
+ create mode 100644 app/woche/bruecke.py
+ create mode 100644 app/woche/regeln.py
+ create mode 100644 app/woche/router.py
+ create mode 100644 app/woche/schema.sql
+ create mode 100644 app/woche/store.py
+ create mode 100644 app/woche/vorschlaege.py
+ create mode 100644 tests/test_woche.py
+
+diff --git a/app/static/woche.css b/app/static/woche.css
+new file mode 100644
+index 0000000..57c2e36
+--- /dev/null
++++ b/app/static/woche.css
+@@ -0,0 +1,267 @@
++/* „Meine Woche" — eigenes Aussehen, bewusst nicht Karos.
++ *
++ * Grundsaetze: ein Bildschirm, eine Handlung. Grosse Ziele fuer Daumen.
++ * Nichts blinkt, nichts zaehlt hoch, nichts wird rot. Ruhig genug, dass ein
++ * gestresstes Kind es abends aufmacht.
++ */
++
++:root {
++  color-scheme: light;
++  --grund: #fbf7f2;
++  --karte: #ffffff;
++  --rand: #e8e0d6;
++  --text: #2a2622;
++  --leise: #7c7168;
++  --haupt: #3f7d6e;
++  --haupt-text: #ffffff;
++  --still: #f1ece5;
++  --akzent: #e8a33d;
++  --radius: 20px;
++  --schatten: 0 2px 10px rgba(60, 45, 30, .07);
++}
++
++@media (prefers-color-scheme: dark) {
++  :root {
++    color-scheme: dark;
++    --grund: #1a1815;
++    --karte: #242019;
++    --rand: #38322a;
++    --text: #f0ebe4;
++    --leise: #a89d92;
++    --haupt: #5aa694;
++    --haupt-text: #10201c;
++    --still: #2e2820;
++    --akzent: #e8a33d;
++    --schatten: none;
++  }
++}
++
++* { box-sizing: border-box; }
++
++body {
++  margin: 0;
++  padding: env(safe-area-inset-top, 0) 0 calc(76px + env(safe-area-inset-bottom, 0));
++  background: var(--grund);
++  color: var(--text);
++  font: 17px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
++  -webkit-text-size-adjust: 100%;
++}
++
++main {
++  max-width: 34rem;
++  margin: 0 auto;
++  padding: 20px 16px 8px;
++}
++
++h1 { font-size: 1.6rem; line-height: 1.25; margin: 0 0 .6rem; }
++h2 { font-size: 1.05rem; margin: 1.6rem 0 .5rem; }
++p { margin: 0 0 .7rem; }
++a { color: var(--haupt); }
++
++.leise { color: var(--leise); }
++.klein { font-size: .85rem; }
++.gross-text { font-size: 1.25rem; line-height: 1.4; }
++
++/* --- Karten ------------------------------------------------------------ */
++
++.karte {
++  background: var(--karte);
++  border: 1px solid var(--rand);
++  border-radius: var(--radius);
++  padding: 18px;
++  margin: 0 0 18px;
++  box-shadow: var(--schatten);
++}
++.karte.fertig { opacity: .55; }
++.karte.ruhig { background: var(--still); box-shadow: none; }
++
++/* --- Heute: die eine Sache --------------------------------------------- */
++
++main.heute { display: flex; flex-direction: column; min-height: 62vh; justify-content: center; }
++
++.heute-karte {
++  background: var(--karte);
++  border: 1px solid var(--rand);
++  border-radius: 26px;
++  padding: 28px 22px;
++  text-align: center;
++  box-shadow: var(--schatten);
++}
++.heute-karte.ruhig { background: var(--still); }
++.heute-karte h1 { font-size: 1.5rem; }
++.heute-karte .fach {
++  color: var(--leise); font-size: .85rem; text-transform: uppercase;
++  letter-spacing: .08em; margin: 0 0 .4rem;
++}
++
++.avatar {
++  display: block; width: 64px; height: 64px; margin: 0 auto 14px;
++  border-radius: 50%; object-fit: cover; background: var(--still);
++  font-size: 34px; line-height: 64px; text-align: center;
++}
++.avatar.gross { width: 92px; height: 92px; font-size: 48px; line-height: 92px; }
++
++/* --- Knoepfe ----------------------------------------------------------- */
++
++button, .knopf {
++  font: inherit; cursor: pointer; border-radius: 14px;
++  border: 1px solid var(--rand); background: var(--karte); color: var(--text);
++  padding: 12px 18px; text-decoration: none; display: inline-block;
++}
++button:active, .knopf:active { transform: translateY(1px); }
++
++.gross {
++  display: block; width: 100%; padding: 17px 18px; margin: 10px 0 0;
++  font-size: 1.05rem; font-weight: 600; text-align: center;
++}
++.haupt { background: var(--haupt); color: var(--haupt-text); border-color: var(--haupt); }
++.still { background: var(--still); }
++button.linklike {
++  background: none; border: none; color: var(--leise);
++  text-decoration: underline; padding: 10px 4px;
++}
++.knopfreihe { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
++.knopfreihe > * { flex: 1 1 auto; }
++.inline { display: inline; }
++.liste { display: flex; flex-direction: column; }
++
++/* --- Smileys ----------------------------------------------------------- */
++
++.smileys { display: flex; gap: 10px; margin-top: 14px; }
++.smileys button {
++  flex: 1; display: flex; flex-direction: column; gap: 6px; align-items: center;
++  padding: 18px 6px; font-size: .9rem; color: var(--leise);
++}
++.smileys b { font-size: 2rem; }
++
++/* --- Chips ------------------------------------------------------------- */
++
++.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
++.chip { position: relative; }
++.chip input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
++.chip span, .chip-knopf {
++  display: inline-block; padding: 9px 14px; border-radius: 999px;
++  border: 1px solid var(--rand); background: var(--karte); font-size: .92rem;
++}
++.chip input:checked + span, .chip-knopf.an {
++  background: var(--haupt); color: var(--haupt-text); border-color: var(--haupt);
++}
++.chip-knopf { cursor: pointer; }
++
++/* --- Formularfelder ---------------------------------------------------- */
++
++input[type=text], input[type=number], select {
++  font: inherit; width: 100%; padding: 13px 14px; margin: 0 0 12px;
++  border: 1px solid var(--rand); border-radius: 14px;
++  background: var(--grund); color: var(--text);
++}
++input[type=number] { width: 6rem; }
++.zeile { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
++.zeile input, .zeile select { margin: 0; }
++.datei {
++  display: block; padding: 14px; border: 1px dashed var(--rand);
++  border-radius: 14px; text-align: center; margin-bottom: 12px; cursor: pointer;
++}
++.datei input { display: none; }
++
++/* --- Listen ------------------------------------------------------------ */
++
++.angebot, .rueckblick, .wissen { list-style: none; padding: 0; margin: 0 0 16px; }
++.angebot li {
++  background: var(--karte); border: 1px solid var(--rand);
++  border-radius: 14px; padding: 13px 16px; margin-bottom: 8px;
++  display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
++}
++.rueckblick li {
++  background: var(--still); border-radius: 14px; padding: 13px 16px;
++  margin-bottom: 8px; font-size: 1.05rem;
++}
++.wissen li {
++  display: flex; align-items: center; gap: 12px;
++  background: var(--karte); border: 1px solid var(--rand);
++  border-radius: 14px; padding: 12px 14px; margin-bottom: 8px;
++}
++.wissen .sym { font-size: 1.3rem; }
++.wissen .txt { flex: 1; }
++.wissen .weg { border: none; background: none; color: var(--leise); padding: 6px 8px; }
++
++/* --- Sammelkarten ------------------------------------------------------ */
++
++.karten { display: flex; flex-wrap: wrap; gap: 10px; }
++.sammelkarte {
++  width: 96px; padding: 12px 8px; text-align: center;
++  background: var(--karte); border: 1px solid var(--rand); border-radius: 16px;
++}
++.sammelkarte img, .sammelkarte span {
++  display: block; width: 56px; height: 56px; margin: 0 auto 8px;
++  border-radius: 50%; object-fit: cover; font-size: 32px; line-height: 56px;
++}
++.sammelkarte b { font-size: .8rem; font-weight: 600; }
++.sammelkarte.gross { width: auto; padding: 22px; margin: 14px 0; }
++.sammelkarte.gross img, .sammelkarte.gross span {
++  width: 84px; height: 84px; line-height: 84px; font-size: 46px;
++}
++
++/* --- Uhr (Speedrun / Timer) -------------------------------------------- */
++
++.uhr {
++  font-size: 3rem; font-variant-numeric: tabular-nums; font-weight: 600;
++  margin: 16px 0 8px; letter-spacing: .02em;
++}
++.bestzeit { color: var(--leise); font-size: .9rem; }
++.spaeter { margin-top: 18px; }
++video { width: 100%; border-radius: 14px; margin-top: 12px; }
++
++/* --- Sonstiges --------------------------------------------------------- */
++
++.sagt {
++  background: var(--still); border-radius: 14px; padding: 12px 16px;
++  margin-bottom: 16px; text-align: center;
++}
++.fokus { font-size: 1.15rem; font-weight: 600; margin-bottom: .3rem; }
++.termin { background: var(--still); border-radius: 14px; padding: 13px 16px; }
++.neuer-schritt { font-size: 1.15rem; font-weight: 600; margin: 12px 0; }
++.planbild { width: 100%; border-radius: 16px; border: 1px solid var(--rand); margin-bottom: 14px; }
++.notruf { display: flex; justify-content: space-between; align-items: center;
++          margin-top: 22px; font-size: .9rem; }
++.notruf a { color: var(--leise); }
++
++table.plan { width: 100%; border-collapse: collapse; font-size: .9rem; margin-bottom: 12px; }
++table.plan th, table.plan td { padding: 6px 2px; text-align: center; }
++table.plan td:first-child, table.plan th:first-child { text-align: left; }
++.haken input { width: 22px; height: 22px; }
++
++/* --- Eltern ------------------------------------------------------------ */
++
++main.eltern { max-width: 30rem; }
++.zustand {
++  background: var(--karte); border: 1px solid var(--rand);
++  border-radius: var(--radius); padding: 18px; margin: 16px 0;
++}
++.zustand h2 { margin: 0 0 .3rem; font-size: 1.2rem; }
++.gemacht { font-size: 1.05rem; }
++.satz { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
++.satz button { min-width: 44px; }
++.satz button.an { background: var(--haupt); color: var(--haupt-text); border-color: var(--haupt); }
++.regeln { margin-top: 24px; color: var(--leise); font-size: .9rem; }
++.regeln ul { padding-left: 1.1rem; }
++
++/* --- Untere Leiste ----------------------------------------------------- */
++
++nav.unten {
++  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
++  display: flex; background: var(--karte); border-top: 1px solid var(--rand);
++  padding-bottom: env(safe-area-inset-bottom, 0);
++}
++nav.unten a {
++  flex: 1; text-align: center; padding: 9px 2px 10px; text-decoration: none;
++  color: var(--leise); font-size: .68rem; line-height: 1.3;
++}
++nav.unten a b { display: block; font-size: 1.32rem; font-weight: 400; }
++nav.unten a.on { color: var(--haupt); }
++
++@media (min-width: 40rem) {
++  body { padding-bottom: 40px; }
++  nav.unten { position: static; border-radius: var(--radius); max-width: 34rem;
++              margin: 20px auto; border: 1px solid var(--rand); }
++}
+diff --git a/app/static/woche.js b/app/static/woche.js
+new file mode 100644
+index 0000000..963737a
+--- /dev/null
++++ b/app/static/woche.js
+@@ -0,0 +1,111 @@
++/* „Meine Woche" — Stoppuhr, Timer, Clip.
++ *
++ * Alles laeuft im Browser. Der Clip wird nicht hochgeladen und nicht
++ * gespeichert: er existiert, solange die Seite offen ist, und ist danach weg.
++ * Das ist keine Sparmassnahme, sondern die Zusage an das Kind.
++ */
++(function () {
++  "use strict";
++
++  var karte = document.getElementById("formkarte");
++  if (!karte) return;
++
++  var art = karte.dataset.form || "einfach";
++  var minuten = parseInt(karte.dataset.minuten || "8", 10);
++  var uhr = document.getElementById("uhr");
++
++  // ---------------------------------------------------------------- Speedrun
++  if (art === "speedrun") {
++    var start = null, timer = null;
++    var startknopf = document.getElementById("startknopf");
++    var fertigknopf = document.getElementById("fertigknopf");
++    var feld = document.getElementById("sekunden");
++
++    startknopf.addEventListener("click", function () {
++      if (timer) return;
++      start = Date.now();
++      startknopf.hidden = true;
++      fertigknopf.hidden = false;
++      timer = setInterval(function () {
++        var s = (Date.now() - start) / 1000;
++        uhr.textContent = s.toFixed(1).replace(".", ",");
++      }, 100);
++    });
++
++    fertigknopf.addEventListener("click", function () {
++      if (!start) return;
++      clearInterval(timer);
++      feld.value = Math.max(1, Math.round((Date.now() - start) / 1000));
++    });
++    return;
++  }
++
++  // -------------------------------------------------------------------- Clip
++  if (art === "clip") {
++    var clipknopf = document.getElementById("clipknopf");
++    var vorschau = document.getElementById("vorschau");
++    var rec = null, strom = null, teile = [], rest = 60, lauf = null;
++
++    clipknopf.addEventListener("click", function () {
++      if (rec) { stopp(); return; }
++      navigator.mediaDevices.getUserMedia({audio: true, video: true})
++        .then(function (s) {
++          strom = s;
++          teile = [];
++          rec = new MediaRecorder(s);
++          rec.ondataavailable = function (e) { teile.push(e.data); };
++          rec.onstop = function () {
++            vorschau.src = URL.createObjectURL(new Blob(teile));
++            vorschau.hidden = false;
++          };
++          rec.start();
++          clipknopf.textContent = "fertig";
++          rest = 60;
++          uhr.textContent = rest;
++          lauf = setInterval(function () {
++            rest -= 1;
++            uhr.textContent = rest;
++            if (rest <= 0) stopp();
++          }, 1000);
++        })
++        .catch(function () {
++          uhr.textContent = "—";
++          clipknopf.textContent = "geht hier nicht";
++          clipknopf.disabled = true;
++        });
++    });
++
++    function stopp() {
++      if (lauf) clearInterval(lauf);
++      if (rec && rec.state !== "inactive") rec.stop();
++      if (strom) strom.getTracks().forEach(function (t) { t.stop(); });
++      rec = null;
++      clipknopf.textContent = "nochmal";
++    }
++    return;
++  }
++
++  // ------------------------------------------------------------------ Timer
++  var knopf = document.getElementById("startknopf");
++  var rest2 = minuten * 60, lauf2 = null;
++
++  function zeige() {
++    var m = Math.floor(rest2 / 60), s = rest2 % 60;
++    uhr.textContent = m + ":" + (s < 10 ? "0" : "") + s;
++  }
++
++  knopf.addEventListener("click", function () {
++    if (lauf2) { clearInterval(lauf2); lauf2 = null; knopf.textContent = "weiter"; return; }
++    knopf.textContent = "Pause";
++    lauf2 = setInterval(function () {
++      rest2 -= 1;
++      zeige();
++      if (rest2 <= 0) {
++        clearInterval(lauf2);
++        lauf2 = null;
++        uhr.textContent = "fertig";
++        knopf.hidden = true;
++      }
++    }, 1000);
++  });
++})();
+diff --git a/app/templates/woche/abschluss.html b/app/templates/woche/abschluss.html
+new file mode 100644
+index 0000000..4b39a06
+--- /dev/null
++++ b/app/templates/woche/abschluss.html
+@@ -0,0 +1,57 @@
++{% extends "woche/base.html" %}
++{% block title %}Fertig{% endblock %}
++
++{% block content %}
++<h1>Das war deine Woche</h1>
++
++{% if saetze %}
++  <ul class="rueckblick">
++    {% for s in saetze %}<li>{{ s }}</li>{% endfor %}
++  </ul>
++{% else %}
++  <p class="gross-text">{{ leer_text }}</p>
++  {% if leer_optionen %}
++    <form method="post" action="/woche/abschluss" class="liste">
++      {{ csrf_input() }}
++      <input type="hidden" name="gefuehl" value="schwierig">
++      {% for key, label in leer_optionen %}
++        <button type="submit" name="wunsch" value="{{ key }}"
++                class="gross still">{{ label }}</button>
++      {% endfor %}
++    </form>
++  {% endif %}
++{% endif %}
++
++<form method="post" action="/woche/abschluss" class="karte">
++  {{ csrf_input() }}
++
++  {% if gemacht %}
++    <p class="leise">Was war am leichtesten?</p>
++    <div class="chips">
++      {% for s in gemacht %}
++        <label class="chip"><input type="radio" name="leicht" value="{{ s.id }}">
++          <span>{{ s.titel }}</span></label>
++      {% endfor %}
++    </div>
++  {% endif %}
++
++  <p class="leise">Wie war deine Woche?</p>
++  <div class="chips">
++    {% for k, l in [('gut','😊 gut'), ('okay','😐 okay'), ('schwierig','😣 schwierig')] %}
++      <label class="chip"><input type="radio" name="gefuehl" value="{{ k }}"
++        {{ 'checked' if k == 'okay' }}><span>{{ l }}</span></label>
++    {% endfor %}
++  </div>
++
++  <p class="leise">Was möchtest du als Nächstes?</p>
++  <div class="chips">
++    {% for k, l in [('genauso','genauso'), ('mehr','etwas mehr'),
++                    ('leichter','etwas leichter'), ('anders','etwas anderes')] %}
++      <label class="chip"><input type="radio" name="wunsch" value="{{ k }}"
++        {{ 'checked' if k == 'genauso' }}><span>{{ l }}</span></label>
++    {% endfor %}
++  </div>
++
++  <button type="submit" class="gross haupt">fertig</button>
++</form>
++{% endblock %}
+diff --git a/app/templates/woche/anpassung.html b/app/templates/woche/anpassung.html
+new file mode 100644
+index 0000000..dbc37f2
+--- /dev/null
++++ b/app/templates/woche/anpassung.html
+@@ -0,0 +1,50 @@
++{% extends "woche/base.html" %}
++{% block title %}Anpassen{% endblock %}
++{% block mainclass %}heute{% endblock %}
++
++{% block content %}
++<div class="heute-karte">
++  <h1>{{ vorschlag.text }}</h1>
++
++  {% if vorschlag.art == 'kleiner' %}
++    <p class="neuer-schritt">{{ vorschlag.neu.titel }}</p>
++    <form method="post" action="/woche/schritt/{{ schritt.id }}/anpassung">
++      {{ csrf_input() }}
++      <input type="hidden" name="art" value="kleiner">
++      <button type="submit" name="wert" value="annehmen" class="gross haupt">passt</button>
++      <button type="submit" name="wert" value="lassen" class="still">lass so</button>
++    </form>
++
++  {% elif vorschlag.art == 'zeitpunkt' %}
++    <form method="post" action="/woche/schritt/{{ schritt.id }}/anpassung"
++          class="liste">
++      {{ csrf_input() }}
++      <input type="hidden" name="art" value="zeitpunkt">
++      {% for o in vorschlag.optionen %}
++        <button type="submit" name="wert" value="{{ o }}" class="gross still">{{ o }}</button>
++      {% endfor %}
++    </form>
++
++  {% elif vorschlag.art == 'strategie' %}
++    <div class="liste">
++      <form method="post" action="/woche/schritt/{{ schritt.id }}/anpassung">
++        {{ csrf_input() }}
++        <input type="hidden" name="art" value="ruhen">
++        <button type="submit" class="gross still">diese Woche ruhen lassen</button>
++      </form>
++      <a href="/woche/hilfe" class="gross knopf">jemanden fragen</a>
++      <a href="/woche/plan" class="gross knopf still">anderen Schritt wählen</a>
++    </div>
++    <p class="leise klein">Deine Eltern bekommen den Hinweis, kurz mit dir zu
++      reden. Du siehst das hier — es passiert nichts hinter deinem Rücken.</p>
++
++  {% else %}
++    <form method="post" action="/woche/schritt/{{ schritt.id }}/anpassung">
++      {{ csrf_input() }}
++      <input type="hidden" name="art" value="kurz">
++      <button type="submit" name="wert" value="annehmen" class="gross haupt">okay</button>
++      <button type="submit" name="wert" value="lassen" class="still">lass so</button>
++    </form>
++  {% endif %}
++</div>
++{% endblock %}
+diff --git a/app/templates/woche/base.html b/app/templates/woche/base.html
+new file mode 100644
+index 0000000..687e44c
+--- /dev/null
++++ b/app/templates/woche/base.html
+@@ -0,0 +1,46 @@
++<!doctype html>
++<html lang="de">
++<head>
++  <meta charset="utf-8">
++  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
++  <meta name="referrer" content="same-origin">
++  <title>{% block title %}Meine Woche{% endblock %}</title>
++  <link rel="stylesheet" href="/static/woche.css?v={{ asset_version|default('0') }}">
++  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🧸</text></svg>">
++</head>
++<body>
++
++{% macro csrf_input() -%}
++<input type="hidden" name="{{ csrf_field }}" value="{{ csrf }}">
++{%- endmacro %}
++
++{% macro ding_bild(klasse='avatar') -%}
++  {% if ding and ding.bild %}
++    <img class="{{ klasse }}" src="/woche/bild/{{ ding.bild }}" alt="">
++  {% else %}
++    <span class="{{ klasse }} platzhalter">{{ formen.get(ding.form if ding else 'einfach', {}).get('symbol', '🧸') }}</span>
++  {% endif %}
++{%- endmacro %}
++
++<main class="{% block mainclass %}{% endblock %}">
++  {% if sagt %}<p class="sagt">{{ sagt }}</p>{% endif %}
++  {% block content %}{% endblock %}
++</main>
++
++{% if nav|default(true) %}
++<nav class="unten">
++  <a href="/woche" class="{{ 'on' if path == '/woche' or path == '/woche/' }}">
++    <b>☀️</b><span>Heute</span></a>
++  <a href="/woche/plan" class="{{ 'on' if path.startswith('/woche/plan') }}">
++    <b>🗒</b><span>Woche</span></a>
++  <a href="/woche/hilfe" class="{{ 'on' if path.startswith('/woche/hilfe') }}">
++    <b>🤝</b><span>Hilfe</span></a>
++  <a href="/woche/ueber-dich" class="{{ 'on' if path.startswith('/woche/ueber') }}">
++    <b>💭</b><span>Über dich</span></a>
++  <a href="/woche/stundenplan" class="{{ 'on' if path.startswith('/woche/stundenplan') }}">
++    <b>📅</b><span>Plan</span></a>
++</nav>
++{% endif %}
++
++</body>
++</html>
+diff --git a/app/templates/woche/einrichtung.html b/app/templates/woche/einrichtung.html
+new file mode 100644
+index 0000000..cf718f0
+--- /dev/null
++++ b/app/templates/woche/einrichtung.html
+@@ -0,0 +1,84 @@
++{% extends "woche/base.html" %}
++{% block title %}Einrichtung{% endblock %}
++{% block content %}
++
++<h1>Drei Minuten, dann geht's los</h1>
++
++<!-- 1 ------------------------------------------------------------------ -->
++<form method="post" action="/woche/einrichtung/faecher" class="karte {{ 'fertig' if schritt > 1 }}">
++  {{ csrf_input() }}
++  <h2>1 · Deine Fächer</h2>
++  <p class="leise">Hak an, was du hast.</p>
++  <div class="chips">
++    {% for name in standard %}
++      <label class="chip">
++        <input type="checkbox" name="fach" value="{{ name }}"
++               {{ 'checked' if name in faecher|map(attribute='name')|list }}>
++        <span>{{ name }}</span>
++      </label>
++    {% endfor %}
++  </div>
++  <label class="zeile">Klasse
++    <input type="number" name="klasse" min="1" max="13"
++           value="{{ kind.klasse if kind else 6 }}">
++  </label>
++  <button type="submit" class="still">speichern</button>
++  <p class="leise klein">Später kannst du auf „Plan" auch den Stundenplan
++    fotografieren.</p>
++</form>
++
++<!-- 2 ------------------------------------------------------------------ -->
++<form method="post" action="/woche/einrichtung/ding" enctype="multipart/form-data"
++      class="karte {{ 'fertig' if schritt > 2 }}">
++  {{ csrf_input() }}
++  <h2>2 · Mein Ding</h2>
++  <p class="leise">Was ist gerade dein Ding?</p>
++  <input type="text" name="wort" maxlength="40"
++         placeholder="z. B. Jellycats, Fußball, Minecraft">
++  <p class="leise">Und was machst du damit?</p>
++  <div class="chips">
++    {% for key, f in formen.items() %}
++      <label class="chip">
++        <input type="radio" name="form" value="{{ key }}"
++               {{ 'checked' if key == 'einfach' }}>
++        <span>{{ f.symbol }} {{ f.label }}</span>
++      </label>
++    {% endfor %}
++  </div>
++  <label class="datei">📷 Zeig's mir
++    <input type="file" name="bild" accept="image/*">
++  </label>
++  <button type="submit" class="still">speichern</button>
++  <p class="leise klein">Dein eigenes Foto — dein Kuscheltier, dein Trikot,
++    dein Poster. Es bleibt auf diesem Rechner.</p>
++</form>
++
++<!-- 3 ------------------------------------------------------------------ -->
++<form method="post" action="/woche/einrichtung/helfer" class="karte">
++  {{ csrf_input() }}
++  <h2>3 · Wer hilft dir?</h2>
++  {% if helfer %}
++    <ul class="angebot">
++      {% for h in helfer %}<li><b>{{ h.name }}</b>
++        {% if h.fester_tag %}<span class="leise">{{ tage[h.fester_tag] }}
++          {{ h.feste_zeit or '' }}</span>{% endif %}</li>{% endfor %}
++    </ul>
++  {% endif %}
++  <input type="text" name="name" maxlength="40"
++         placeholder="z. B. Mama, Lena, Tim">
++  <label class="zeile">Feste Zeit
++    <select name="fester_tag">
++      <option value="0">— keine —</option>
++      {% for t in range(1, 8) %}<option value="{{ t }}">{{ tage[t] }}</option>{% endfor %}
++    </select>
++    <input type="text" name="feste_zeit" maxlength="10" placeholder="18:00">
++  </label>
++  <div class="knopfreihe">
++    <button type="submit" class="still">noch jemand</button>
++    <button type="submit" name="fertig" value="1" class="gross haupt">fertig</button>
++  </div>
++  <p class="leise klein">Eine feste Zeit heißt: du musst nicht fragen. Der
++    Termin ist schon da.</p>
++</form>
++
++{% endblock %}
+diff --git a/app/templates/woche/eltern.html b/app/templates/woche/eltern.html
+new file mode 100644
+index 0000000..38f54f7
+--- /dev/null
++++ b/app/templates/woche/eltern.html
+@@ -0,0 +1,96 @@
++{% extends "woche/base.html" %}
++{% set nav = false %}
++{% block title %}Meine Woche — für Eltern{% endblock %}
++{% block mainclass %}eltern{% endblock %}
++
++{% block content %}
++{% set z = zusammenfassung %}
++
++{% if zusagen|length < 3 %}
++  <div class="karte zusage">
++    <h1>Bevor Sie hineinschauen</h1>
++    <p>Drei Sätze. Jeden einzeln bestätigen — ohne sie ist dieses Dashboard ein
++      Kontrollwerkzeug, egal wie freundlich es formuliert ist.</p>
++    {% for nr, satz in [
++        (1, 'Ich frage nicht nach, was erledigt wurde.'),
++        (2, 'Ich halte meinen festen Termin ein, auch wenn nichts anliegt.'),
++        (3, 'Wenn mein Kind eine Woche nichts macht, spreche ich es nicht auf die App an.')] %}
++      <form method="post" action="/woche/eltern/zusage" class="satz">
++        {{ csrf_input() }}
++        <input type="hidden" name="nr" value="{{ nr }}">
++        <button type="submit" class="{{ 'an' if nr in zusagen }}" {{ 'disabled' if nr in zusagen }}>
++          {{ '✓' if nr in zusagen else '○' }}</button>
++        <span>{{ satz }}</span>
++      </form>
++    {% endfor %}
++  </div>
++{% else %}
++
++  <h1>Diese Woche</h1>
++  {% if z.fokus %}<p class="fokus">🎯 {{ z.fokus }}</p>{% endif %}
++
++  {% if z.gemacht %}
++    <p class="gemacht">✓ {{ z.gemacht|join(', ') }}</p>
++  {% endif %}
++  {% if z.stimmung %}<p class="leise">🙂 {{ z.stimmung }}</p>{% endif %}
++
++  <div class="zustand">
++    <h2>{{ z.titel }}</h2>
++    <p>{{ z.impuls }}</p>
++  </div>
++
++  {% if termin %}
++    <p class="termin">👤 Ihr fester Termin: {{ tage[termin.fester_tag] }}
++      {{ termin.feste_zeit or '' }} — {{ termin.name }}</p>
++  {% endif %}
++
++  {% if freigaben %}
++    <div class="karte">
++      <h2>Kurz bestätigen</h2>
++      {% for d in freigaben %}
++        <form method="post" action="/woche/eltern/freigabe/{{ d.id }}" class="satz">
++          {{ csrf_input() }}
++          <span>Ihr Kind möchte <b>{{ d.wort }}</b> als sein Ding.</span>
++          <button type="submit" name="ja" value="1">ja</button>
++          <button type="submit">lieber nicht</button>
++        </form>
++      {% endfor %}
++      <p class="leise klein">Solange nichts bestätigt ist, läuft die App
++        weiter — sie sagt dann nur die Form statt des Wortes.</p>
++    </div>
++  {% endif %}
++
++  <div class="karte">
++    <h2>Karo mitlesen</h2>
++    <p class="leise">Der Begleiter kann Karos Themen und den Arbeitstermin
++      mitlesen{% if karo_fach %} — für {{ karo_fach }}{% endif %}. Dann steht im
++      Angebot der Name der Lücke statt einer allgemeinen Formulierung, und der
++      Wochenanker wird aus dem letzten eingelesenen Blatt vorgeschlagen.
++      Er schreibt dabei nichts in Karo zurück.</p>
++    <form method="post" action="/woche/eltern/bruecke">
++      {{ csrf_input() }}
++      {% if bruecke_an %}
++        <button type="submit" class="still">ausschalten</button>
++        <span class="leise klein">ist an</span>
++      {% else %}
++        <button type="submit" name="an" value="1" class="still">einschalten</button>
++        <span class="leise klein">ist aus</span>
++      {% endif %}
++    </form>
++  </div>
++
++  <details class="regeln">
++    <summary>Wie entsteht das?</summary>
++    <ul>
++      {% for key, text in regeln_liste %}
++        <li><b>{{ key }}</b> — {{ text }}</li>
++      {% endfor %}
++    </ul>
++    <p class="leise klein">Es gibt keine weitere Stufe, keine Farbe, keine
++      Quote und keine Liste des Liegengebliebenen. Sie sehen keine einzelnen
++      Tagesrückmeldungen, keine Gründe, keine Uhrzeiten und nicht, welche
++      Fächer Ihr Kind meidet. Eine Stimmung erscheint erst, wenn es
++        dafür mehr als eine Rückmeldung gibt.</p>
++  </details>
++{% endif %}
++{% endblock %}
+diff --git a/app/templates/woche/form.html b/app/templates/woche/form.html
+new file mode 100644
+index 0000000..56efe8e
+--- /dev/null
++++ b/app/templates/woche/form.html
+@@ -0,0 +1,54 @@
++{% extends "woche/base.html" %}
++{% block title %}{{ formen.get(schritt.form, {}).get('label', 'Los') }}{% endblock %}
++{% block mainclass %}heute{% endblock %}
++
++{% block content %}
++<div class="heute-karte" id="formkarte"
++     data-form="{{ schritt.form }}" data-minuten="{{ minuten }}">
++  {{ ding_bild('avatar') }}
++  <p class="fach">{{ schritt.fach_name or '' }}</p>
++  <h1>{{ schritt.titel }}</h1>
++
++  {% if schritt.form == 'speedrun' %}
++    <p class="leise">{{ formen.speedrun.hinweis }}</p>
++    {% if bestzeit %}<p class="bestzeit">Deine Bestzeit: {{ bestzeit }} s</p>{% endif %}
++    <div class="uhr" id="uhr">0,0</div>
++    <button type="button" class="gross haupt" id="startknopf">Start</button>
++    <form method="post" action="/woche/schritt/{{ schritt.id }}/bestzeit" id="zeitform">
++      {{ csrf_input() }}
++      <input type="hidden" name="sekunden" id="sekunden" value="0">
++      <button type="submit" class="gross still" id="fertigknopf" hidden>fertig</button>
++    </form>
++
++  {% elif schritt.form == 'clip' %}
++    <p class="leise">{{ formen.clip.hinweis }}</p>
++    <div class="uhr" id="uhr">60</div>
++    <button type="button" class="gross haupt" id="clipknopf">Aufnehmen</button>
++    <video id="vorschau" playsinline controls hidden></video>
++    <p class="leise klein">Bleibt auf deinem Gerät. Nichts wird hochgeladen.</p>
++    <form method="post" action="/woche/schritt/{{ schritt.id }}/rueckmeldung" class="spaeter">
++      {{ csrf_input() }}
++      <input type="hidden" name="wert" value="okay">
++      <button type="submit" class="still">fertig</button>
++    </form>
++
++  {% else %}
++    <p class="leise">{{ formen.einfach.hinweis }}</p>
++    <div class="uhr" id="uhr">{{ minuten }}:00</div>
++    <button type="button" class="gross haupt" id="startknopf">Start</button>
++    <form method="post" action="/woche/schritt/{{ schritt.id }}/rueckmeldung" class="spaeter">
++      {{ csrf_input() }}
++      <input type="hidden" name="wert" value="okay">
++      <button type="submit" class="still">fertig</button>
++    </form>
++  {% endif %}
++</div>
++
++{% if lerneinheit %}
++  <p class="leise klein">Karo hat zu „{{ thema }}" schon eine Erklärung.
++    <a href="/lernen/{{ lerneinheit }}">anschauen</a> — dauert länger als
++    diese Minuten hier.</p>
++{% endif %}
++
++<script src="/static/woche.js?v={{ asset_version }}" defer></script>
++{% endblock %}
+diff --git a/app/templates/woche/grund.html b/app/templates/woche/grund.html
+new file mode 100644
+index 0000000..82367ee
+--- /dev/null
++++ b/app/templates/woche/grund.html
+@@ -0,0 +1,19 @@
++{% extends "woche/base.html" %}
++{% block title %}Was war los?{% endblock %}
++{% block mainclass %}heute{% endblock %}
++
++{% block content %}
++<div class="heute-karte">
++  <h1>Was war heute das Problem?</h1>
++  <form method="post" action="/woche/schritt/{{ schritt.id }}/grund"
++        class="liste">
++    {{ csrf_input() }}
++    {% for key, label in gruende.items() %}
++      <button type="submit" name="wert" value="{{ key }}" class="gross still">{{ label }}</button>
++    {% endfor %}
++    <button type="submit" name="wert" value="" class="linklike">etwas anderes</button>
++  </form>
++  <p class="leise klein">Ein Tap. Danach passen wir es an — es wird nichts
++    bewertet.</p>
++</div>
++{% endblock %}
+diff --git a/app/templates/woche/heute.html b/app/templates/woche/heute.html
+new file mode 100644
+index 0000000..221539c
+--- /dev/null
++++ b/app/templates/woche/heute.html
+@@ -0,0 +1,55 @@
++{% extends "woche/base.html" %}
++{% block title %}Heute{% endblock %}
++{% block mainclass %}heute{% endblock %}
++
++{% block content %}
++
++{% if anker_fach %}
++<form method="post" action="/woche/anker" class="karte anker">
++  {{ csrf_input() }}
++  <input type="hidden" name="fach_id" value="{{ anker_fach.id }}">
++  <h2>Du hattest heute {{ anker_fach.name }}.</h2>
++  <p class="leise">Was war dran?</p>
++  <input type="text" name="text" maxlength="120" autocomplete="off"
++         value="{{ anker_vorschlag|default('') }}"
++         placeholder="z. B. Brüche, S. 42">
++  {% if anker_vorschlag %}
++    <p class="leise klein">Das stand auf dem letzten Blatt. Ändern ist okay.</p>
++  {% endif %}
++  <div class="knopfreihe">
++    <button type="submit" class="gross">Passt</button>
++    <button type="submit" name="text" value="weiß nicht" class="still">weiß nicht</button>
++  </div>
++</form>
++{% endif %}
++
++{% if schritt %}
++  <div class="heute-karte">
++    {{ ding_bild('avatar gross') }}
++    <p class="fach">{{ schritt.fach_name or zyklus.fokus or 'Heute' }}</p>
++    <h1>{{ schritt.einstieg }}</h1>
++
++    <form method="post" action="/woche/schritt/{{ schritt.id }}/einstieg">
++      {{ csrf_input() }}
++      <button type="submit" name="wert" value="gemacht" class="gross haupt">gemacht</button>
++      <button type="submit" name="wert" value="nicht" class="still">geht gerade nicht</button>
++    </form>
++  </div>
++{% elif zyklus %}
++  <div class="heute-karte ruhig">
++    {{ ding_bild('avatar gross') }}
++    <h1>Heute nichts.</h1>
++    <p class="leise">Das ist kein Rückstand. Morgen wieder.</p>
++  </div>
++{% endif %}
++
++<div class="notruf">
++  <a href="/woche/notfall">Morgen ist was</a>
++  <form method="post" action="/woche/pause" class="inline">
++    {{ csrf_input() }}
++    <input type="hidden" name="wochen" value="1">
++    <button type="submit" class="linklike">Ich will gerade nicht</button>
++  </form>
++</div>
++
++{% endblock %}
+diff --git a/app/templates/woche/hilfe.html b/app/templates/woche/hilfe.html
+new file mode 100644
+index 0000000..d0875d0
+--- /dev/null
++++ b/app/templates/woche/hilfe.html
+@@ -0,0 +1,39 @@
++{% extends "woche/base.html" %}
++{% block title %}Hilfe{% endblock %}
++
++{% block content %}
++<h1>Ich brauche Hilfe</h1>
++
++{% if termin %}
++  <p class="termin">👤 {{ termin.name }} hat
++    {{ tage[termin.fester_tag]|lower }}s{% if termin.feste_zeit %} um
++    {{ termin.feste_zeit }}{% endif %} Zeit für dich.</p>
++  <p class="leise klein">Du musst nicht fragen. Der Termin ist schon da.</p>
++{% endif %}
++
++<form method="post" action="/woche/hilfe" class="karte">
++  {{ csrf_input() }}
++  <input type="text" name="frage" maxlength="400" autocomplete="off"
++         placeholder="Was ist die Frage? (kannst du auch leer lassen)">
++
++  <div class="liste">
++    {% for h in helfer %}
++      <button type="submit" name="helfer_id" value="{{ h.id }}" class="gross">
++        {{ h.name }} fragen{% if h.fach_name %} ({{ h.fach_name }}){% endif %}
++      </button>
++    {% endfor %}
++    <button type="submit" name="helfer_id" value="0" class="gross still">
++      Frage aufschreiben für später</button>
++  </div>
++</form>
++
++{% if nie_gefragt %}
++  <p class="leise">Du hast noch nie gefragt. Das Aufschreiben geht auch —
++    dann liest es jemand beim nächsten festen Termin.</p>
++{% endif %}
++
++{% if not helfer %}
++  <p class="leise">Noch niemand eingetragen.
++    <a href="/woche/einrichtung">Jemanden eintragen</a></p>
++{% endif %}
++{% endblock %}
+diff --git a/app/templates/woche/karte.html b/app/templates/woche/karte.html
+new file mode 100644
+index 0000000..1fff5a3
+--- /dev/null
++++ b/app/templates/woche/karte.html
+@@ -0,0 +1,22 @@
++{% extends "woche/base.html" %}
++{% block title %}Neue Karte{% endblock %}
++{% block mainclass %}heute{% endblock %}
++
++{% block content %}
++<div class="heute-karte">
++  <h1>Willst du das als Karte?</h1>
++  <div class="sammelkarte gross">
++    {% if ding and ding.bild %}
++      <img src="/woche/bild/{{ ding.bild }}" alt="">
++    {% else %}<span>🧸</span>{% endif %}
++    <b>{{ thema }}</b>
++  </div>
++  <form method="post" action="/woche/schritt/{{ schritt.id }}/karte">
++    {{ csrf_input() }}
++    <input type="hidden" name="thema" value="{{ thema }}">
++    <button type="submit" class="gross haupt">ja</button>
++    <button type="submit" name="nein" value="1" class="still">nein</button>
++  </form>
++  <p class="leise klein">Karten laufen nicht ab und gehen nicht verloren.</p>
++</div>
++{% endblock %}
+diff --git a/app/templates/woche/notfall.html b/app/templates/woche/notfall.html
+new file mode 100644
+index 0000000..2309759
+--- /dev/null
++++ b/app/templates/woche/notfall.html
+@@ -0,0 +1,64 @@
++{% extends "woche/base.html" %}
++{% block title %}Morgen ist was{% endblock %}
++{% block mainclass %}heute{% endblock %}
++
++{% block content %}
++{% if ergebnis %}
++  <div class="heute-karte">
++    {% if ergebnis.schlaf %}
++      <h1>🌙</h1>
++      <p class="gross-text">{{ ergebnis.text }}</p>
++    {% else %}
++      <p class="leise">{{ ergebnis.text }}</p>
++      <h1>{{ ergebnis.schritt.titel }}</h1>
++      <p class="leise">{{ ergebnis.schritt.einstieg }}</p>
++      {% if helfer %}
++        <form method="post" action="/woche/hilfe">
++          {{ csrf_input() }}
++          <input type="hidden" name="frage" value="Morgen ist {{ fach.name if fach }}.">
++          <button type="submit" name="helfer_id" value="{{ helfer[0].id }}"
++                  class="gross haupt">{{ helfer[0].name }} sofort fragen</button>
++        </form>
++      {% endif %}
++      {% if ergebnis.lerneinheit %}
++        <a href="/lernen/{{ ergebnis.lerneinheit }}" class="gross knopf">
++          Karos Erklärung dazu</a>
++      {% endif %}
++      <a href="/woche" class="gross knopf still">okay, ich fang an</a>
++    {% endif %}
++  </div>
++{% else %}
++  <div class="heute-karte">
++    <h1>Morgen ist was</h1>
++    <form method="post" action="/woche/notfall" class="liste">
++      {{ csrf_input() }}
++      <p class="leise">Was ist morgen?</p>
++      <div class="chips">
++        {% for k, l in [('arbeit','Arbeit'), ('abgabe','Abgabe'),
++                        ('referat','Referat'), ('anderes','anderes')] %}
++          <label class="chip"><input type="radio" name="was" value="{{ k }}"
++            {{ 'checked' if k == 'arbeit' }}><span>{{ l }}</span></label>
++        {% endfor %}
++      </div>
++
++      <p class="leise">In welchem Fach?</p>
++      <div class="chips">
++        {% for f in faecher %}
++          <label class="chip"><input type="radio" name="fach_id" value="{{ f.id }}">
++            <span>{{ f.name }}</span></label>
++        {% endfor %}
++      </div>
++
++      <p class="leise">Wie viel Zeit hast du heute noch?</p>
++      <div class="chips">
++        {% for m, l in [(20,'20 Minuten'), (60,'1 Stunde'), (120,'mehr')] %}
++          <label class="chip"><input type="radio" name="minuten" value="{{ m }}"
++            {{ 'checked' if m == 20 }}><span>{{ l }}</span></label>
++        {% endfor %}
++      </div>
++
++      <button type="submit" class="gross haupt">zeig mir das Wichtigste</button>
++    </form>
++  </div>
++{% endif %}
++{% endblock %}
+diff --git a/app/templates/woche/pause.html b/app/templates/woche/pause.html
+new file mode 100644
+index 0000000..e79440e
+--- /dev/null
++++ b/app/templates/woche/pause.html
+@@ -0,0 +1,14 @@
++{% extends "woche/base.html" %}
++{% block title %}Pause{% endblock %}
++{% block mainclass %}heute{% endblock %}
++{% block content %}
++<div class="heute-karte ruhig">
++  {{ ding_bild('avatar gross') }}
++  <h1>Pause.</h1>
++  <p class="leise">Bis {{ datum_kurz(pause.bis) }} Ich melde mich nicht.</p>
++  <form method="post" action="/woche/pause/ende">
++    {{ csrf_input() }}
++    <button type="submit" class="gross still">doch wieder anfangen</button>
++  </form>
++</div>
++{% endblock %}
+diff --git a/app/templates/woche/plan.html b/app/templates/woche/plan.html
+new file mode 100644
+index 0000000..b80b170
+--- /dev/null
++++ b/app/templates/woche/plan.html
+@@ -0,0 +1,124 @@
++{% extends "woche/base.html" %}
++{% block title %}Meine Woche{% endblock %}
++
++{% block content %}
++
++{% if karo_satz %}<p class="termin">📌 {{ karo_satz }}</p>{% endif %}
++
++{% if zyklus %}
++  <h1>Meine Woche</h1>
++  {% if zyklus.fokus %}<p class="fokus">🎯 {{ zyklus.fokus }}</p>{% endif %}
++  <p class="leise">Das steht dir zur Verfügung. Du musst nichts davon machen.</p>
++
++  <ul class="angebot">
++    {% for s in schritte %}
++      <li>
++        <b>{{ s.titel }}</b>
++        {% if s.fach_name %}<span class="leise">{{ s.fach_name }}</span>{% endif %}
++      </li>
++    {% endfor %}
++  </ul>
++
++  <p class="leise klein">Bis {{ datum_kurz(zyklus.ende) }} Danach fängt alles
++    neu an — nichts wird übertragen.</p>
++{% else %}
++  <h1>Was ist gerade wichtig für dich?</h1>
++  <form method="post" action="/woche/start" class="karte">
++    {{ csrf_input() }}
++    <input type="text" name="fokus" maxlength="80" autocomplete="off"
++           placeholder="z. B. Mathearbeit, weniger aufschieben">
++
++    <p class="leise">Welche Fächer nimmst du mit?</p>
++    <div class="chips">
++      {% for f in faecher %}
++        <label class="chip">
++          <input type="checkbox" name="fach_id" value="{{ f.id }}">
++          <span>{{ f.name }}</span>
++        </label>
++      {% endfor %}
++    </div>
++
++    {% if frage %}
++      <div class="frage">
++        <p>{{ frage.symbol }} {{ frage.frage }}</p>
++        <input type="hidden" name="frage_schluessel" value="{{ frage.schluessel }}">
++        {% if frage.antworten %}
++          <div class="chips">
++            {% for a in frage.antworten %}
++              <label class="chip">
++                <input type="radio" name="frage_antwort" value="{{ a }}">
++                <span>{{ a }}</span>
++              </label>
++            {% endfor %}
++          </div>
++        {% else %}
++          <input type="text" name="frage_antwort" maxlength="40"
++                 placeholder="kannst du auch überspringen">
++        {% endif %}
++      </div>
++    {% endif %}
++
++    <button type="submit" class="gross haupt">Los</button>
++    <p class="leise klein">{{ horizont }} Tage. Wenn es zäh ist, macht die App
++      es von selbst kürzer.</p>
++  </form>
++{% endif %}
++
++{% if gemieden %}
++  <div class="karte ruhig">
++    {% set f = gemieden[0] %}
++    <p>{{ f.name }} war vier Wochen nicht dabei. Was passt für dich?</p>
++    <div class="knopfreihe">
++      <form method="post" action="/woche/start" class="inline">
++        {{ csrf_input() }}
++        <input type="hidden" name="fokus" value="{{ f.name }}">
++        <input type="hidden" name="fach_id" value="{{ f.id }}">
++        <button type="submit" class="still">kurz reinschauen</button>
++      </form>
++      <form method="post" action="/woche/weglassen" class="inline">
++        {{ csrf_input() }}
++        <input type="hidden" name="fach_id" value="{{ f.id }}">
++        <button type="submit" class="still">bewusst weglassen</button>
++      </form>
++    </div>
++  </div>
++{% endif %}
++
++<h2>Mein Ding</h2>
++<form method="post" action="/woche/ding" enctype="multipart/form-data" class="karte ding">
++  {{ csrf_input() }}
++  {{ ding_bild('avatar') }}
++  <input type="text" name="wort" maxlength="40" value="{{ ding.wort if ding }}"
++         placeholder="z. B. Jellycats, Fußball, Minecraft">
++  <div class="chips">
++    {% for key, f in formen.items() %}
++      <label class="chip">
++        <input type="radio" name="form" value="{{ key }}"
++               {{ 'checked' if ding and ding.form == key or (not ding and key == 'einfach') }}>
++        <span>{{ f.symbol }} {{ f.label }}</span>
++      </label>
++    {% endfor %}
++  </div>
++  <label class="datei">Zeig's mir
++    <input type="file" name="bild" accept="image/*">
++  </label>
++  <button type="submit" class="still">Ist jetzt mein Ding</button>
++  {% if ding and ding.freigabe == 'offen' %}
++    <p class="leise klein">Deine Eltern müssen das Wort noch kurz bestätigen.
++      Bis dahin sagt die App einfach „{{ ding_wort }}".</p>
++  {% endif %}
++</form>
++
++{% if karten %}
++  <h2>Meine Karten</h2>
++  <div class="karten">
++    {% for k in karten %}
++      <div class="sammelkarte">
++        {% if k.bild %}<img src="/woche/bild/{{ k.bild }}" alt="">{% else %}<span>🧸</span>{% endif %}
++        <b>{{ k.thema }}</b>
++      </div>
++    {% endfor %}
++  </div>
++{% endif %}
++
++{% endblock %}
+diff --git a/app/templates/woche/rueckmeldung.html b/app/templates/woche/rueckmeldung.html
+new file mode 100644
+index 0000000..0d756c1
+--- /dev/null
++++ b/app/templates/woche/rueckmeldung.html
+@@ -0,0 +1,16 @@
++{% extends "woche/base.html" %}
++{% block title %}Wie war es?{% endblock %}
++{% block mainclass %}heute{% endblock %}
++
++{% block content %}
++<div class="heute-karte">
++  <h1>Wie war es?</h1>
++  <form method="post" action="/woche/schritt/{{ schritt.id }}/rueckmeldung"
++        class="smileys">
++    {{ csrf_input() }}
++    <button type="submit" name="wert" value="gut"><b>😊</b>gut</button>
++    <button type="submit" name="wert" value="okay"><b>😐</b>okay</button>
++    <button type="submit" name="wert" value="schwierig"><b>😣</b>schwierig</button>
++  </form>
++</div>
++{% endblock %}
+diff --git a/app/templates/woche/stundenplan.html b/app/templates/woche/stundenplan.html
+new file mode 100644
+index 0000000..9061570
+--- /dev/null
++++ b/app/templates/woche/stundenplan.html
+@@ -0,0 +1,50 @@
++{% extends "woche/base.html" %}
++{% block title %}Mein Stundenplan{% endblock %}
++
++{% block content %}
++<h1>Mein Stundenplan</h1>
++
++{% if bild %}
++  <img class="planbild" src="/woche/bild/{{ bild }}" alt="Mein Stundenplan">
++{% endif %}
++
++<form method="post" action="/woche/stundenplan/foto" enctype="multipart/form-data"
++      class="karte">
++  {{ csrf_input() }}
++  <label class="datei">{{ 'Neues Foto' if bild else '📷 Stundenplan fotografieren' }}
++    <input type="file" name="bild" accept="image/*" capture="environment">
++  </label>
++  <button type="submit" class="still">speichern</button>
++</form>
++
++<h2>An welchen Tagen?</h2>
++<form method="post" action="/woche/stundenplan/tage" class="karte">
++  {{ csrf_input() }}
++  <table class="plan">
++    <tr><th></th>{% for t in range(1, 6) %}<th>{{ tage[t][:2] }}</th>{% endfor %}</tr>
++    {% for f in faecher %}
++      <tr>
++        <td>{{ f.name }}</td>
++        {% for t in range(1, 6) %}
++          <td>
++            <label class="haken">
++              <input type="checkbox" name="tag_{{ f.id }}" value="{{ t }}"
++                     {{ 'checked' if plan[t] and f.id in plan[t]|map(attribute='id')|list }}>
++              <span></span>
++            </label>
++          </td>
++        {% endfor %}
++      </tr>
++    {% endfor %}
++  </table>
++  <button type="submit" class="still">speichern</button>
++</form>
++
++{% if termine %}
++  <h2>Außer Schule</h2>
++  <ul class="angebot">
++    {% for t in termine %}<li><b>{{ t.label }}</b>
++      <span class="leise">{{ tage[t.tag] }} {{ t.zeit or '' }}</span></li>{% endfor %}
++  </ul>
++{% endif %}
++{% endblock %}
+diff --git a/app/templates/woche/ueber_dich.html b/app/templates/woche/ueber_dich.html
+new file mode 100644
+index 0000000..535e3b3
+--- /dev/null
++++ b/app/templates/woche/ueber_dich.html
+@@ -0,0 +1,41 @@
++{% extends "woche/base.html" %}
++{% block title %}Was ich über dich weiß{% endblock %}
++
++{% block content %}
++<h1>Was ich über dich weiß</h1>
++<p class="leise">Alles, was hier steht, hast du mir gesagt oder ich habe es
++  gemerkt. Stimmt was nicht? Tipp drauf.</p>
++
++{% if zeilen %}
++  <ul class="wissen">
++    {% for z in zeilen %}
++      <li>
++        <span class="sym">{{ z.symbol }}</span>
++        <span class="txt">{{ z.text }}</span>
++        <form method="post" action="/woche/wissen/{{ z.id }}/aus" class="inline">
++          {{ csrf_input() }}
++          <button type="submit" class="weg" title="stimmt nicht">✕</button>
++        </form>
++      </li>
++    {% endfor %}
++  </ul>
++{% else %}
++  <p class="leise">Noch nichts. Das wird von Woche zu Woche mehr.</p>
++{% endif %}
++
++<h2>Anstupser</h2>
++<form method="post" action="/woche/anstupser" class="karte">
++  {{ csrf_input() }}
++  <p class="leise">Wann soll ich dich erinnern? Du kannst das jederzeit
++    ausschalten.</p>
++  <div class="chips">
++    {% for o in anker_optionen %}
++      <button type="submit" name="wert" value="{{ o }}"
++              class="chip-knopf {{ 'an' if kind and kind.anstupser_anker == o }}">{{ o }}</button>
++    {% endfor %}
++  </div>
++  <button type="submit" name="aus" value="1" class="linklike">gar nicht</button>
++</form>
++
++<p class="leise klein">Deine Eltern sehen diese Seite nicht.</p>
++{% endblock %}
+diff --git a/app/templates/woche/weiter.html b/app/templates/woche/weiter.html
+new file mode 100644
+index 0000000..ad0b21e
+--- /dev/null
++++ b/app/templates/woche/weiter.html
+@@ -0,0 +1,17 @@
++{% extends "woche/base.html" %}
++{% block title %}Weiter?{% endblock %}
++{% block mainclass %}heute{% endblock %}
++
++{% block content %}
++<div class="heute-karte">
++  {{ ding_bild('avatar gross') }}
++  <h1>Willst du weitermachen?</h1>
++  <p class="leise">{{ minuten }} Minuten. Oder auch nicht.</p>
++  <form method="post" action="/woche/schritt/{{ schritt.id }}/weiter">
++    {{ csrf_input() }}
++    <button type="submit" name="wert" value="ja" class="gross haupt">ja, {{ minuten }} Minuten</button>
++    <button type="submit" name="wert" value="nein" class="gross still">nein, das reicht</button>
++  </form>
++  <p class="leise klein">Beides ist okay. Angefangen hast du schon.</p>
++</div>
++{% endblock %}
+diff --git a/app/woche/__init__.py b/app/woche/__init__.py
+new file mode 100644
+index 0000000..1c10ca5
+--- /dev/null
++++ b/app/woche/__init__.py
+@@ -0,0 +1,30 @@
++"""„Meine Woche" — der Begleiter.
++
++Ein eigenstaendiges Modul neben Karo, nicht in Karo. Es teilt sich mit der
++Hauptanwendung nur die Infrastruktur — Datenbankverbindung, Sitzung, CSRF —
++und beruehrt weder Themen noch Flaggen, Quizze, Lernzyklus oder Sprachmodell.
++Karo prueft den Wissensstand; der Begleiter hilft beim Anfangen. Zwei
++Aufgaben, zwei Module.
++
++Einbinden in `app/main.py` — eine Zeile:
++
++    from .woche import router as woche
++    app.include_router(woche.router)
++
++Das Schema legt sich beim ersten Aufruf selbst an (`store.ensure()`), damit
++`main.py` nichts weiter wissen muss. Alle Tabellen tragen das Praefix
++`woche_`; ein DROP dieser Tabellen entfernt den Begleiter rueckstandsfrei.
++
++Der Leitsatz, gegen den hier jede Zeile geprueft wurde:
++
++    Ein Plan, der scheitern kann, macht dieses Kind kaputt.
++    Also darf es keinen Plan geben, der scheitern kann.
++
++Deshalb gibt es im ganzen Modul kein „offen", kein „nicht erledigt", keine
++Quote, keine Punkte, keine Streak und keine Benachrichtigung, die ein
++schlechtes Gewissen erzeugt.
++"""
++
++from . import regeln, router, store, vorschlaege   # noqa: F401
++
++__all__ = ["regeln", "router", "store", "vorschlaege"]
+diff --git a/app/woche/bruecke.py b/app/woche/bruecke.py
+new file mode 100644
+index 0000000..5bb98b4
+--- /dev/null
++++ b/app/woche/bruecke.py
+@@ -0,0 +1,202 @@
++"""Die Brücke zu Karo — die einzige Datei im Modul, die Karo kennt.
++
++Der Begleiter bleibt eigenständig. Diese Datei ist das schmale, einseitige
++Fenster, durch das er hinüberschaut:
++
++    Woche  ──liest──▶  Karo        erlaubt
++    Karo   ──────────▶  Woche      niemals
++
++Drei Regeln, die den Rest des Moduls sauber halten:
++
++1. **Nur hier.** Kein anderes File in `app/woche/` importiert Karo-Logik oder
++   liest eine Karo-Tabelle. Ein Test hält das fest.
++2. **Immer optional.** Jede Funktion gibt einen neutralen Wert zurück, wenn
++   Karo nichts weiß, noch nicht eingerichtet ist oder die Tabelle gar nicht
++   existiert. Der Begleiter muss ohne Karo vollständig funktionieren — und
++   ohne Brücke genauso.
++3. **Nur lesen.** Keine Funktion schreibt in eine Karo-Tabelle. Karos Flaggen
++   entstehen weiterhin ausschließlich aus freigegebenen Antworten.
++
++Eine Eigenheit, die man leicht übersieht: **Karo deckt genau ein Fach ab**
++(`config.subject`), der Begleiter alle. Jede Auskunft hier gilt deshalb immer
++nur für dieses eine Fach; für alle anderen bleibt der Begleiter bei seiner
++eigenen Tabelle.
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++import sqlite3
++
++from .. import config, db
++
++log = logging.getLogger("karo.woche.bruecke")
++
++# Karos Flaggen in der Reihenfolge, in der sie den Begleiter interessieren.
++LUECKE = ("rot", "gelb")
++
++
++def _tabelle_da(name: str) -> bool:
++    try:
++        return db.q1("SELECT 1 AS da FROM sqlite_master WHERE type='table' "
++                     "AND name=?", name) is not None
++    except sqlite3.Error:                              # pragma: no cover
++        return False
++
++
++def karo_fach() -> str:
++    """Das eine Fach, das Karo abdeckt — oder ''."""
++    try:
++        return (config.load_safe().subject or "").strip()
++    except Exception:                                  # pragma: no cover
++        return ""
++
++
++def zustaendig(fach_name: str) -> bool:
++    """Deckt Karo dieses Fach ab?"""
++    k = karo_fach().lower()
++    f = (fach_name or "").strip().lower()
++    if not k or not f:
++        return False
++    return k == f or k.startswith(f[:4]) or f.startswith(k[:4])
++
++
++def aktiv(fach_name: str = "") -> bool:
++    """Ist die Brücke benutzbar? Schaltbar, prüfbar, standardmäßig aus."""
++    from . import store
++
++    k = store.kind()
++    if not k or not k["karo_bruecke"]:
++        return False
++    if not _tabelle_da("topic_flag"):
++        return False
++    if fach_name and not zustaendig(fach_name):
++        return False
++    return True
++
++
++# --------------------------------------------------------------------------
++# Was Karo weiß
++# --------------------------------------------------------------------------
++
++def luecken(fach_name: str, grenze: int = 3) -> list[dict]:
++    """Themen mit roter oder gelber Flagge, rot zuerst.
++
++    Das ist die wertvollste Auskunft: Karo weiß aus freigegebenen Antworten,
++    wo es hakt — der Begleiter weiß das nie, er zählt nur Anfänge.
++    """
++    if not aktiv(fach_name):
++        return []
++    try:
++        zeilen = db.q(
++            "SELECT t.label, t.code, f.flag, f.haupt_fehler "
++            "FROM topic t JOIN topic_flag f ON f.topic_id = t.id "
++            "WHERE t.subject = ? AND t.state = 'aktiv' AND f.flag IN (?, ?) "
++            "ORDER BY CASE f.flag WHEN 'rot' THEN 0 ELSE 1 END, "
++            "         COALESCE(f.letzte_uebung, '') "
++            "LIMIT ?", karo_fach(), LUECKE[0], LUECKE[1], grenze)
++    except sqlite3.Error as exc:                        # pragma: no cover
++        log.debug("Brücke: Lücken nicht lesbar (%s)", exc)
++        return []
++    return [{"label": z["label"], "code": z["code"], "flag": z["flag"]}
++            for z in zeilen]
++
++
++def naechste_arbeit(fach_name: str) -> dict | None:
++    """Die nächste eingetragene Klassenarbeit: Datum, Tage, Themen."""
++    if not aktiv(fach_name) or not _tabelle_da("exam"):
++        return None
++    try:
++        z = db.q1("SELECT exam_date, titel, themen FROM exam "
++                  "WHERE subject = ? AND exam_date >= ? "
++                  "ORDER BY exam_date LIMIT 1", karo_fach(), db.today())
++    except sqlite3.Error:                               # pragma: no cover
++        return None
++    if z is None:
++        return None
++    import datetime as dt
++    try:
++        tage = (dt.date.fromisoformat(z["exam_date"]) - dt.date.today()).days
++    except (TypeError, ValueError):                     # pragma: no cover
++        return None
++    try:
++        themen = json.loads(z["themen"] or "[]")
++    except json.JSONDecodeError:                        # pragma: no cover
++        themen = []
++    return {"datum": z["exam_date"], "tage": tage, "titel": z["titel"] or "",
++            "themen": themen if isinstance(themen, list) else []}
++
++
++def ankervorschlag(fach_name: str) -> str:
++    """Was zuletzt aus dem Unterricht eingelesen wurde.
++
++    Spart dem Kind die eine Zeile Tippen — mehr soll es nicht sein. Der
++    Vorschlag wird angeboten, nie gesetzt: der Anker gehört dem Kind.
++    """
++    if not aktiv(fach_name) or not _tabelle_da("document"):
++        return ""
++    try:
++        z = db.q1("SELECT themenname FROM document "
++                  "WHERE themenname IS NOT NULL AND TRIM(themenname) <> '' "
++                  "ORDER BY id DESC LIMIT 1")
++    except sqlite3.Error:                               # pragma: no cover
++        return ""
++    return (z["themenname"] or "").strip()[:120] if z else ""
++
++
++def lerneinheit(thema_label: str) -> int | None:
++    """Gibt es zu diesem Thema schon eine fertige Erklärung in Karo?"""
++    if not _tabelle_da("lesson") or not thema_label:
++        return None
++    try:
++        z = db.q1("SELECT l.id FROM lesson l JOIN topic t ON t.id = l.topic_id "
++                  "WHERE t.label = ? AND l.state IN ('bereit','wartet','gelernt') "
++                  "ORDER BY l.id DESC LIMIT 1", thema_label)
++    except sqlite3.Error:                               # pragma: no cover
++        return None
++    return int(z["id"]) if z else None
++
++
++# --------------------------------------------------------------------------
++# Was der Begleiter daraus macht
++# --------------------------------------------------------------------------
++
++def anlass(fach_name: str) -> str | None:
++    """Karos Sicht auf den Anlass — oder None, dann entscheidet der Begleiter.
++
++    Nur das Datum zählt, nicht Karos Einschätzung: ob es eng wird, ist eine
++    Frage des Kalenders, keine Bewertung des Kindes.
++    """
++    a = naechste_arbeit(fach_name)
++    if a is None:
++        return None
++    if a["tage"] <= 1:
++        return "morgen"
++    if a["tage"] <= 7:
++        return "arbeit_nah"
++    if a["tage"] <= 21:
++        return "arbeit_fern"
++    return None
++
++
++def titelzusatz(fach_name: str) -> str:
++    """Macht „das schwierigste Thema üben" zu „Brüche addieren üben".
++
++    Ohne Karo bleibt der Titel allgemein — das ist kein Mangel, sondern der
++    Normalfall für alle Fächer außer dem einen, das Karo kennt.
++    """
++    l = luecken(fach_name, grenze=1)
++    return l[0]["label"] if l else ""
++
++
++def hinweis(fach_name: str) -> str:
++    """Ein Satz für den Wochenstart. Nie mehr als einer."""
++    a = naechste_arbeit(fach_name)
++    if a is None:
++        return ""
++    if a["tage"] == 0:
++        return f"Heute ist die {a['titel'] or 'Arbeit'}."
++    if a["tage"] == 1:
++        return f"Morgen ist die {a['titel'] or 'Arbeit'}."
++    return f"In {a['tage']} Tagen ist die {a['titel'] or 'Arbeit'}."
+diff --git a/app/woche/regeln.py b/app/woche/regeln.py
+new file mode 100644
+index 0000000..dcbe435
+--- /dev/null
++++ b/app/woche/regeln.py
+@@ -0,0 +1,601 @@
++"""Die Regeln des Begleiters — Zaehlen statt Verstehen.
++
++Alles, was die App „ueber das Kind weiss", entsteht hier: aus Zaehlern ueber
++`woche_ereignis`, aus einer festen Tabelle und aus dem, was das Kind selbst
++gesagt hat. Kein Modell, keine Vorhersage, keine Aussage ueber die Person.
++
++Jede Regel ist als Konstante oben sichtbar, damit sie nachlesbar und
++aenderbar bleibt — und damit im Eltern-Dashboard steht, wie ein Zustand
++zustande kommt.
++"""
++
++from __future__ import annotations
++
++import datetime as dt
++import sqlite3
++
++from .. import db
++from . import bruecke, store, vorschlaege
++
++# --------------------------------------------------------------------------
++# Die Schwellen. Alle an einer Stelle.
++# --------------------------------------------------------------------------
++
++FENSTER_TAGE = 28           # Beobachtungsfenster der Zaehler
++SCHLECHTER_TAG_AB = 3       # 3x nichts an diesem Wochentag
++GUTER_TAG_AB = 3            # 3x abgeschlossen an diesem Wochentag
++GEMIEDEN_TAGE = 28          # 4 Wochen kein einziges Mal gewaehlt
++GEMIEDEN_MIN_STUNDEN = 3    # Kunst zu meiden ist kein Problem fuer eine App
++ZU_SCHWER_AB = 2            # 2x „zu schwer" -> kleinere Stufe wird Standard
++ABBRUCH_AB = 3              # 3x abgebrochen -> kuerzerer Block
++VERKLEINERN_MAX = 2         # Untergrenze: danach Strategiewechsel
++SCHWIERIG_TAGE_AB = 3       # 3 schwierige Tage -> die Woche auf eine Sache
++NULLZYKLEN_AB = 2           # 2 Zyklen ohne Ereignis -> fragen statt zusammenfassen
++KARTEN_SCHWELLE = 2         # 2x „gut" auf dasselbe Fach -> Karte anbieten
++SCHLAFGRENZE = 21           # ab 21 Uhr schlaegt die App nichts mehr vor
++
++GRUND_LABELS = {
++    "zu_schwer": "zu schwer",
++    "keine_zeit": "keine Zeit",
++    "keine_lust": "keine Lust",
++    "konzentration": "konnte mich nicht konzentrieren",
++}
++
++GRUND_ANTWORT = {
++    "zu_schwer": "Dann machen wir den nächsten Schritt kleiner.",
++    "keine_zeit": "Wann passt es dir besser?",
++    "keine_lust": "Willst du morgen nur anfangen — zwei Minuten?",
++    "konzentration": "Kürzerer Block? 8 statt 15 Minuten.",
++}
++
++
++def _seit(tage: int) -> str:
++    return (dt.date.today() - dt.timedelta(days=tage)).isoformat()
++
++
++# --------------------------------------------------------------------------
++# Zaehler
++# --------------------------------------------------------------------------
++
++def zaehler() -> dict:
++    """Alles, was gezaehlt wird. Eine Abfrage pro Zeile, nichts Geheimes."""
++    store.ensure()
++    seit = _seit(FENSTER_TAGE)
++
++    gemacht_je_tag = {z["tag"]: z["n"] for z in db.q(
++        "SELECT tag, COUNT(*) AS n FROM woche_ereignis "
++        "WHERE art='einstieg' AND wert='gemacht' AND created_at >= ? "
++        "GROUP BY tag", seit)}
++    nicht_je_tag = {z["tag"]: z["n"] for z in db.q(
++        "SELECT tag, COUNT(*) AS n FROM woche_ereignis "
++        "WHERE art='einstieg' AND wert='nicht' AND created_at >= ? "
++        "GROUP BY tag", seit)}
++
++    gruende = {z["wert"]: z["n"] for z in db.q(
++        "SELECT wert, COUNT(*) AS n FROM woche_ereignis WHERE art='grund' "
++        "AND created_at >= ? GROUP BY wert", seit)}
++
++    formen = {z["form"]: z["n"] for z in db.q(
++        "SELECT s.form AS form, COUNT(*) AS n FROM woche_ereignis e "
++        "JOIN woche_schritt s ON s.id=e.schritt_id "
++        "WHERE e.art='einstieg' AND e.wert='gemacht' AND e.created_at >= ? "
++        "GROUP BY s.form", seit)}
++
++    hilfe = db.q1("SELECT COUNT(*) AS n FROM woche_ereignis WHERE art='hilfe' "
++                  "AND created_at >= ?", seit)["n"]
++
++    schwierig_zuletzt = [z["wert"] for z in db.q(
++        "SELECT wert FROM woche_ereignis WHERE art='rueckmeldung' "
++        "ORDER BY id DESC LIMIT ?", SCHWIERIG_TAGE_AB)]
++
++    bestzeit = db.q1(
++        "SELECT MIN(CAST(wert AS INTEGER)) AS t FROM woche_ereignis "
++        "WHERE art='bestzeit'")
++
++    return {
++        "gemacht_je_tag": gemacht_je_tag,
++        "nicht_je_tag": nicht_je_tag,
++        "schlechte_tage": sorted(
++            t for t in range(1, 8)
++            if nicht_je_tag.get(t, 0) >= SCHLECHTER_TAG_AB
++            and gemacht_je_tag.get(t, 0) == 0),
++        "gute_tage": sorted(t for t in range(1, 8)
++                            if gemacht_je_tag.get(t, 0) >= GUTER_TAG_AB),
++        "gruende": gruende,
++        "zu_schwer": gruende.get("zu_schwer", 0),
++        "abbrueche": gruende.get("konzentration", 0),
++        "formen": formen,
++        "lieblingsform": max(formen, key=formen.get) if formen else None,
++        "hilfe_geholt": hilfe,
++        "schwierig_serie": (len(schwierig_zuletzt) >= SCHWIERIG_TAGE_AB
++                            and all(w == "schwierig" for w in schwierig_zuletzt)),
++        "bestzeit": bestzeit["t"] if bestzeit else None,
++    }
++
++
++def standardgroesse() -> str:
++    """Welche Schrittgroesse ist gerade der Standard?"""
++    z = zaehler()
++    if z["zu_schwer"] >= ZU_SCHWER_AB or z["abbrueche"] >= ABBRUCH_AB:
++        return "klein"
++    if z["gute_tage"]:
++        return "mittel"
++    return "klein"
++
++
++def gemiedene_faecher() -> list[sqlite3.Row]:
++    """Faecher ab drei Wochenstunden, die vier Wochen nicht vorkamen."""
++    store.ensure()
++    seit = _seit(GEMIEDEN_TAGE)
++    benutzt = {z["fach_id"] for z in db.q(
++        "SELECT DISTINCT fach_id FROM woche_ereignis "
++        "WHERE fach_id IS NOT NULL AND created_at >= ?", seit)}
++    weggelassen = {z["wert"] for z in db.q(
++        "SELECT wert FROM woche_ereignis WHERE art='weglassen' "
++        "AND created_at >= ?", seit)}
++    # Ohne Zyklushistorie ist „gemieden" bedeutungslos.
++    if not db.q("SELECT id FROM woche_zyklus WHERE created_at < ?", seit):
++        return []
++    return [f for f in store.faecher()
++            if f["id"] not in benutzt
++            and f["name"] not in weggelassen
++            and (f["stunden"] or 0) >= GEMIEDEN_MIN_STUNDEN]
++
++
++def nullzyklen() -> int:
++    """Wie viele abgeschlossene Zyklen in Folge ohne ein einziges Ereignis?"""
++    store.ensure()
++    n = 0
++    for z in db.q("SELECT id FROM woche_zyklus WHERE status='fertig' "
++                  "ORDER BY id DESC LIMIT 5"):
++        treffer = db.q1(
++            "SELECT 1 AS da FROM woche_ereignis WHERE zyklus_id=? "
++            "AND art='einstieg' AND wert='gemacht' LIMIT 1", z["id"])
++        if treffer:
++            break
++        n += 1
++    return n
++
++
++# --------------------------------------------------------------------------
++# Horizont: 3, 7 oder 14 Tage
++# --------------------------------------------------------------------------
++
++def horizont() -> int:
++    """Kuerzere Zyklen heissen mehr Neustarts — die wichtigste Funktion."""
++    z = zaehler()
++    if z["schwierig_serie"] or nullzyklen() >= 1:
++        return 3
++    letzter = db.q1("SELECT wunsch FROM woche_zyklus WHERE status='fertig' "
++                    "ORDER BY id DESC LIMIT 1")
++    if letzter and letzter["wunsch"] == "mehr":
++        return 14
++    if letzter and letzter["wunsch"] == "leichter":
++        return 3
++    return 7
++
++
++# --------------------------------------------------------------------------
++# Anlass: warum steht dieses Fach gerade an?
++# --------------------------------------------------------------------------
++
++ARBEITSWOERTER = ("arbeit", "test", "klausur", "prüfung", "pruefung", "ka",
++                  "vokabeltest", "referat")
++
++
++def passt_zum_fokus(fach_name: str, fokus: str) -> bool:
++    """„Mathearbeit" meint Mathematik.
++
++    Ein reines `in` scheitert daran: „mathematik" steckt nicht in
++    „mathearbeit". Deshalb wird über den Wortstamm verglichen — das ist die
++    Art Tippfehler, die ein Kind beim Wochenstart ständig produziert.
++    """
++    fach = (fach_name or "").strip().lower()
++    text = (fokus or "").strip().lower()
++    if not fach or not text:
++        return False
++    if fach in text or text in fach:
++        return True
++    stamm = fach[:4]
++    return len(stamm) >= 4 and stamm in text
++
++
++def anlass_fuer(fach: sqlite3.Row, fokus: str) -> str:
++    name = (fach["name"] or "").lower()
++
++    # Weiß Karo von einer eingetragenen Arbeit, zählt das Datum — es ist
++    # härter als das, was das Kind in den Fokus getippt hat. Ist die Brücke
++    # aus oder kennt Karo dieses Fach nicht, kommt None und es bleibt bei
++    # der eigenen Logik.
++    von_karo = bruecke.anlass(fach["name"])
++    if von_karo:
++        return von_karo
++
++    if passt_zum_fokus(name, fokus):
++        if any(w in (fokus or "").lower() for w in ARBEITSWOERTER):
++            return "arbeit_nah"
++        return "arbeit_fern"
++    if fach["id"] in {f["id"] for f in gemiedene_faecher()}:
++        return "gemieden"
++    if store.faecher_am_tag(store.wochentag()) and fach["id"] in {
++            f["id"] for f in store.faecher_am_tag(store.wochentag())}:
++        return "hausaufgaben"
++    return "normal"
++
++
++# --------------------------------------------------------------------------
++# Angebot bauen — nie mehr als drei Dinge
++# --------------------------------------------------------------------------
++
++def angebot_bauen(zyklus_id: int, fokus: str, fach_ids: list[int] | None = None,
++                  max_schritte: int = 3) -> int:
++    """Legt die Schritte des Zyklus an. Gibt die Anzahl zurueck."""
++    store.ensure()
++    k = store.kind()
++    klasse = k["klasse"] if k else 6
++    d = store.ding()
++    form = d["form"] if d else "einfach"
++    groesse = standardgroesse()
++
++    if zaehler()["schwierig_serie"]:
++        max_schritte = 1        # „Diese Woche machen wir nur eine Sache."
++
++    kandidaten = list(store.faecher())
++    if fach_ids:
++        kandidaten = [f for f in kandidaten if f["id"] in set(fach_ids)]
++    # Das Fach aus dem Fokus zuerst.
++    if fokus:
++        kandidaten.sort(key=lambda f: 0 if passt_zum_fokus(f["name"], fokus) else 1)
++
++    gemieden_ids = {f["id"] for f in gemiedene_faecher()}
++    gemieden_verwendet = False
++    angelegt = 0
++
++    for f in kandidaten:
++        if angelegt >= max_schritte:
++            break
++        anlass = anlass_fuer(f, fokus)
++        if anlass == "gemieden":
++            # Hoechstens ein gemiedenes Fach pro Zyklus, immer am kleinsten.
++            if gemieden_verwendet:
++                continue
++            gemieden_verwendet = True
++            stufe = "klein"
++        else:
++            stufe = groesse
++        a = store.anker(zyklus_id, f["id"])
++        v = vorschlaege.vorschlag(f["name"], anlass, stufe, klasse,
++                                  a["text"] if a else None)
++        # Kennt Karo eine Lücke in diesem Fach, wird aus „das schwierigste
++        # Thema üben" der Name des Themas. Der Schritt bleibt derselbe — er
++        # wird nur konkret.
++        luecke = bruecke.titelzusatz(f["name"])
++        if luecke and anlass in ("arbeit_nah", "arbeit_fern", "morgen"):
++            v["titel"] = f"{luecke} — {v['titel']}"
++        store.schritt_anlegen(zyklus_id, f["id"], v["titel"], v["einstieg"],
++                              stufe, anlass,
++                              form if f["id"] not in gemieden_ids else "einfach")
++        angelegt += 1
++
++    if angelegt == 0:
++        store.schritt_anlegen(zyklus_id, None, fokus or "eine Sache",
++                              "Nimm das Heft raus und schlag es auf.",
++                              "klein", "normal", "einfach")
++        angelegt = 1
++    return angelegt
++
++
++def heute_schritt(zyklus_id: int) -> sqlite3.Row | None:
++    """Die eine Sache fuer heute.
++
++    Reihenfolge: was heute Unterricht hatte, dann der Rest. An einem
++    schlechten Wochentag schlaegt die App nichts vor."""
++    tag = store.wochentag()
++    if tag in zaehler()["schlechte_tage"]:
++        return None
++    alle = [s for s in store.schritte(zyklus_id) if not store.heute_schon(s["id"])]
++    if not alle:
++        return None
++    heute_faecher = {f["id"] for f in store.faecher_am_tag(tag)}
++    alle.sort(key=lambda s: 0 if s["fach_id"] in heute_faecher else 1)
++    return alle[0]
++
++
++# --------------------------------------------------------------------------
++# Anpassung mit Untergrenze
++# --------------------------------------------------------------------------
++
++def anpassen(s: sqlite3.Row, grund: str) -> dict:
++    """Antwort auf 😣. Verkleinert hoechstens zweimal, dann Strategiewechsel."""
++    k = store.kind()
++    klasse = k["klasse"] if k else 6
++    fach_name = s["fach_name"] or "das Thema"
++
++    if s["verkleinert"] >= VERKLEINERN_MAX:
++        return {
++            "art": "strategie",
++            "text": "Das Kleinermachen hilft gerade nicht. "
++                    "Sollen wir etwas anderes probieren?",
++            "optionen": ["anderer_schritt", "hilfe", "ruhen"],
++        }
++
++    if grund == "zu_schwer":
++        neu = vorschlaege.KLEINER.get(s["groesse"], "klein")
++        a = store.anker(s["zyklus_id"], s["fach_id"]) if s["fach_id"] else None
++        v = vorschlaege.vorschlag(fach_name, s["anlass"], neu, klasse,
++                                  a["text"] if a else None)
++        return {"art": "kleiner", "text": GRUND_ANTWORT[grund],
++                "neu": v, "optionen": ["annehmen", "lassen"]}
++
++    if grund == "keine_zeit":
++        return {"art": "zeitpunkt", "text": GRUND_ANTWORT[grund],
++                "optionen": vorschlaege.TAGESANKER}
++
++    if grund == "keine_lust":
++        return {"art": "kurz", "text": GRUND_ANTWORT[grund],
++                "optionen": ["annehmen", "lassen"]}
++
++    return {"art": "kurz", "text": GRUND_ANTWORT.get(grund, "Okay."),
++            "optionen": ["annehmen", "lassen"]}
++
++
++# --------------------------------------------------------------------------
++# „Was ich ueber dich weiss"
++# --------------------------------------------------------------------------
++
++def _wissen_schreiben(schluessel: str, symbol: str, text: str) -> None:
++    """Schreibt eine berechnete Zeile — niemals ueber eine Kind-Zeile."""
++    vorhanden = db.q1("SELECT * FROM woche_wissen WHERE schluessel=?", schluessel)
++    if vorhanden and vorhanden["quelle"] == "kind":
++        return
++    with db.tx() as c:
++        if vorhanden:
++            c.execute("UPDATE woche_wissen SET symbol=?, text=? WHERE id=?",
++                      (symbol, text, vorhanden["id"]))
++        else:
++            c.execute("INSERT INTO woche_wissen (schluessel, symbol, text, "
++                      "quelle, created_at) VALUES (?,?,?,'zaehler',?)",
++                      (schluessel, symbol, text, db.now()))
++
++
++def wissen_neu_berechnen() -> None:
++    store.ensure()
++    z = zaehler()
++    k = store.kind()
++    d = store.ding()
++
++    if d:
++        form = store.FORMEN.get(d["form"], store.FORMEN["einfach"])
++        if d["freigabe"] == "ja":
++            satz = f"Dein Ding ist {d['wort']}."
++        else:
++            satz = f"Du machst es als {form['label']}."
++        _wissen_schreiben("ding", form["symbol"], satz)
++
++    for tag in z["schlechte_tage"][:1]:
++        _wissen_schreiben("schlechter_tag", "📅",
++                          f"{store.TAGE[tag]}s ist es meistens schwer.")
++    for tag in z["gute_tage"][:1]:
++        _wissen_schreiben("guter_tag", "📅",
++                          f"{store.TAGE[tag]}s klappt es am besten.")
++
++    if k and k["anstupser_anker"]:
++        _wissen_schreiben("anker", "🍽",
++                          f"Du fängst am ehesten {k['anstupser_anker']} an.")
++
++    if z["zu_schwer"] >= ZU_SCHWER_AB:
++        _wissen_schreiben("minuten", "⏱",
++                          "Kurze Blöcke passen dir besser als lange.")
++
++    if z["lieblingsform"]:
++        form = store.FORMEN.get(z["lieblingsform"], store.FORMEN["einfach"])
++        _wissen_schreiben("form", form["symbol"],
++                          f"{form['label']} klappt bei dir am besten.")
++
++    if z["bestzeit"]:
++        _wissen_schreiben("bestzeit", "⏱",
++                          f"Deine Bestzeit: {int(z['bestzeit'])} Sekunden.")
++
++    t = store.fester_termin()
++    if t and t["fester_tag"]:
++        zeit = f" um {t['feste_zeit']}" if t["feste_zeit"] else ""
++        _wissen_schreiben("termin", "👤",
++                          f"{t['name']} hat {store.TAGE[t['fester_tag']].lower()}s"
++                          f"{zeit} Zeit für dich.")
++
++
++def wissen_zeilen(alle: bool = False) -> list[sqlite3.Row]:
++    store.ensure()
++    if alle:
++        return db.q("SELECT * FROM woche_wissen ORDER BY id")
++    return db.q("SELECT * FROM woche_wissen WHERE sichtbar=1 ORDER BY id")
++
++
++def wissen_sagen(schluessel: str, symbol: str, text: str) -> None:
++    """Etwas, das das Kind selbst gesagt hat. Wird nie ueberschrieben."""
++    store.ensure()
++    with db.tx() as c:
++        c.execute(
++            "INSERT INTO woche_wissen (schluessel, symbol, text, quelle, "
++            "created_at) VALUES (?,?,?,'kind',?) "
++            "ON CONFLICT(schluessel) DO UPDATE SET text=excluded.text, "
++            "quelle='kind', sichtbar=1",
++            (schluessel, symbol, text, db.now()))
++
++
++def wissen_ausblenden(wissen_id: int) -> None:
++    with db.tx() as c:
++        c.execute("UPDATE woche_wissen SET sichtbar=0 WHERE id=?", (wissen_id,))
++
++
++# --------------------------------------------------------------------------
++# Rueckblick — nur belegte Saetze
++# --------------------------------------------------------------------------
++
++def rueckblick(zyklus_id: int) -> list[str]:
++    """Jeder Satz haengt an einem echten Ereignis. Sonst kein Satz."""
++    store.ensure()
++    saetze: list[str] = []
++    e = store.ereignisse(zyklus_id)
++    arten = [(x["art"], x["wert"]) for x in e]
++
++    angefangen = sum(1 for a, w in arten if a == "einstieg" and w == "gemacht")
++    if angefangen >= 2:
++        saetze.append(f"Du hast {angefangen}-mal angefangen.")
++    elif angefangen == 1:
++        saetze.append("Du hast angefangen.")
++
++    if any(a == "hilfe" for a, _ in arten):
++        vor_schwierig = next((i for i, (a, w) in enumerate(arten)
++                              if a == "rueckmeldung" and w == "schwierig"), 10**6)
++        erste_hilfe = next((i for i, (a, _) in enumerate(arten) if a == "hilfe"),
++                           10**6)
++        if erste_hilfe < vor_schwierig:
++            saetze.append("Du hast gefragt, bevor es schwierig wurde.")
++        else:
++            saetze.append("Du hast dir Hilfe geholt.")
++
++    if any(a == "anpassung" for a, _ in arten):
++        saetze.append("Du hast deinen Plan geändert, statt aufzugeben.")
++
++    if any(a == "weglassen" for a, _ in arten):
++        saetze.append("Du hast selbst entschieden, was nicht dran ist.")
++
++    if any(a == "notfall" for a, _ in arten):
++        saetze.append("Du hast dir abends noch selbst geholfen.")
++
++    if any(a == "karte" for a, _ in arten):
++        saetze.append("Du hast eine neue Karte dazubekommen.")
++
++    return saetze
++
++
++def rueckblick_leer_text() -> tuple[str, list | None]:
++    """Was steht da, wenn nichts passiert ist?
++
++    Ab dem zweiten Nullzyklus wird nicht mehr zusammengefasst, sondern
++    gefragt — derselbe Satz dreimal wird sonst zur Bestaetigung des
++    Scheiterns."""
++    if nullzyklen() >= NULLZYKLEN_AB:
++        return ("Zwei Mal hat's nicht geklappt. Was passt gerade besser?",
++                [("kurz", "kürzer machen (nur 3 Tage)"),
++                 ("ein_fach", "nur ein Fach"),
++                 ("pause", "Pause machen"),
++                 ("weiss_nicht", "weiß nicht")])
++    return ("Diese Woche war zäh. Das kommt vor. Montag fangen wir neu an.",
++            None)
++
++
++# --------------------------------------------------------------------------
++# Eltern: vier Zustaende, ein Impuls
++# --------------------------------------------------------------------------
++
++ZUSTAENDE = {
++    "laeuft": ("Der Plan läuft.", "Heute nichts nötig."),
++    "gefragt": ("Ihr Kind hat gefragt.",
++                "Frag kurz, ob ihr gemeinsam draufschauen sollt."),
++    "passt_nicht": ("Der Plan passt gerade nicht.",
++                    "Beim nächsten Start gemeinsam neu planen."),
++    "pause": ("Pausiert.", "Nicht ansprechen. Ihr fester Termin bleibt."),
++}
++
++ZUSTAND_REGELN = [
++    ("gefragt", "Das Kind hat um Hilfe gebeten."),
++    ("passt_nicht", "Die Anpassungsgrenze wurde erreicht, oder der Zyklus "
++                    "wurde nicht gestartet."),
++    ("pause", "Das Kind hat die App pausiert."),
++    ("laeuft", "Mindestens einmal angefangen, kein offener Hilferuf."),
++]
++
++
++def eltern_zustand() -> dict:
++    store.ensure()
++    if store.pause_aktiv():
++        return {"key": "pause", **_zustand("pause")}
++
++    z = store.zyklus()
++    if z is None:
++        return {"key": "passt_nicht", **_zustand("passt_nicht")}
++
++    e = store.ereignisse(z["id"])
++    hilfe = [x for x in e if x["art"] == "hilfe"]
++    if hilfe:
++        return {"key": "gefragt", **_zustand("gefragt")}
++
++    grenze = any(s["verkleinert"] >= VERKLEINERN_MAX for s in store.schritte(z["id"]))
++    angefangen = sum(1 for x in e if x["art"] == "einstieg" and x["wert"] == "gemacht")
++    halbzeit = dt.date.fromisoformat(z["start"]) + dt.timedelta(
++        days=max(1, z["laenge"] // 2))
++    if grenze or (angefangen == 0 and dt.date.today() > halbzeit):
++        return {"key": "passt_nicht", **_zustand("passt_nicht")}
++
++    return {"key": "laeuft", **_zustand("laeuft")}
++
++
++def _zustand(key: str) -> dict:
++    titel, impuls = ZUSTAENDE[key]
++    return {"titel": titel, "impuls": impuls}
++
++
++def eltern_zusammenfassung() -> dict:
++    """Was auf dem Elternbildschirm steht. Kein „offen", keine Quote."""
++    store.ensure()
++    z = store.zyklus() or store.zyklus_faellig()
++    if z is None:
++        return {"zyklus": None, "fokus": None, "gemacht": [], "stimmung": None,
++                **eltern_zustand()}
++
++    e = store.ereignisse(z["id"])
++    angefangen = sum(1 for x in e if x["art"] == "einstieg" and x["wert"] == "gemacht")
++    hilfe = sum(1 for x in e if x["art"] == "hilfe")
++    gemacht = []
++    if angefangen:
++        gemacht.append(f"{angefangen}-mal angefangen")
++    if hilfe:
++        gemacht.append(f"{hilfe}-mal Hilfe geholt")
++
++    # Eine einzelne Rueckmeldung ist keine Stimmung. Aus n=1 ein Urteil zu
++    # bauen waere genau die Sorte Aussage, die dieses Dashboard nicht trifft.
++    rueck = [x["wert"] for x in e if x["art"] == "rueckmeldung"]
++    if len(rueck) < 2:
++        stimmung = None
++    elif rueck.count("schwierig") > len(rueck) / 2:
++        stimmung = "oft schwierig"
++    elif rueck.count("gut") > len(rueck) / 2:
++        stimmung = "meist gut"
++    else:
++        stimmung = "meist okay"
++
++    return {"zyklus": z, "fokus": z["fokus"], "gemacht": gemacht,
++            "stimmung": stimmung, **eltern_zustand()}
++
++
++# --------------------------------------------------------------------------
++# Notfall: Triage statt Planung
++# --------------------------------------------------------------------------
++
++def notfall(fach_name: str, minuten: int, stunde: int | None = None) -> dict:
++    """Eine Sache. Ehrlich. Nach 21 Uhr gar nichts mehr."""
++    jetzt = stunde if stunde is not None else dt.datetime.now().hour
++    if jetzt >= SCHLAFGRENZE:
++        return {"schlaf": True,
++                "text": "Das reicht für heute. Schlaf lieber — müde schreibt "
++                        "sich schlechter als unvorbereitet.",
++                "schritt": None}
++
++    k = store.kind()
++    klasse = k["klasse"] if k else 6
++    groesse = "klein" if minuten <= 20 else "mittel"
++    v = vorschlaege.vorschlag(fach_name, "morgen", groesse, klasse, None)
++    ehrlich = ("Das schaffst du nicht mehr komplett. Das hier bringt am meisten:"
++               if minuten <= 20 else
++               "Alles geht nicht mehr. Das hier bringt am meisten:")
++    # Im Notfall ist Karos Wissen am wertvollsten: statt „die letzten zwei
++    # Hausaufgaben" kann genau die Lücke drinstehen, die Karo gemessen hat.
++    luecke = bruecke.titelzusatz(fach_name)
++    if luecke:
++        v["titel"] = luecke
++        v["einstieg"] = (f"Schlag {fach_name} bei „{luecke}“ auf und lies die "
++                         f"erste Aufgabe laut vor.")
++    return {"schlaf": False, "text": ehrlich, "schritt": v,
++            "lerneinheit": bruecke.lerneinheit(luecke) if luecke else None}
+diff --git a/app/woche/router.py b/app/woche/router.py
+new file mode 100644
+index 0000000..95eb7ea
+--- /dev/null
++++ b/app/woche/router.py
+@@ -0,0 +1,686 @@
++"""„Meine Woche" — Routen des Begleiters.
++
++Fünf Bildschirme für das Kind, einer für die Eltern. Wenn ein sechster
++dazukommt, ist etwas falsch gelaufen.
++
++  /woche                 Heute        eine Sache, ein Knopf
++  /woche/plan            Meine Woche  das Angebot und mein Ding
++  /woche/hilfe           Hilfe        wer da ist, mit Namen
++  /woche/ueber-dich      Was ich über dich weiß
++  /woche/stundenplan     Mein Stundenplan
++  /woche/eltern          ein Bildschirm, ein Impuls
++
++Der Begleiter benutzt von Karo nur die Infrastruktur (Verbindung, Sitzung,
++CSRF) — keine Themen, keine Flaggen, keinen Lernzyklus, kein Sprachmodell.
++"""
++
++from __future__ import annotations
++
++import datetime as dt
++import logging
++from pathlib import Path
++
++from fastapi import APIRouter, Form, Request, UploadFile
++from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
++from fastapi.templating import Jinja2Templates
++from starlette.status import HTTP_303_SEE_OTHER
++
++from .. import security
++from . import bruecke, regeln, store, vorschlaege
++
++log = logging.getLogger("karo.woche")
++router = APIRouter(prefix="/woche")
++
++BASE = Path(__file__).parent.parent
++templates = Jinja2Templates(directory=str(BASE / "templates"))
++
++try:
++    ASSET_VERSION = str(int((BASE / "static" / "woche.css").stat().st_mtime))
++except OSError:                                    # pragma: no cover
++    ASSET_VERSION = "0"
++
++MAX_BILD_BYTES = 8 * 1024 * 1024
++
++
++def render(request: Request, name: str, **ctx) -> HTMLResponse:
++    """Eigener Renderer — der Begleiter erbt Karos Kopfzeile nicht."""
++    token = request.session.get("csrf")
++    if not token:
++        token = security.new_csrf_token()
++        request.session["csrf"] = token
++    d = store.ding()
++    basis = {
++        "request": request,
++        "asset_version": ASSET_VERSION,
++        "csrf": token,
++        "csrf_field": security.CSRF_FIELD,
++        "path": request.url.path,
++        "kind": store.kind(),
++        "ding": d,
++        "ding_wort": store.wort_oder_form(d),
++        "formen": store.FORMEN,
++        "tage": store.TAGE,
++        "heute_tag": store.wochentag(),
++        "pause": store.pause_aktiv(),
++        "offene_freigaben": len(store.offene_freigaben()),
++        "datum_kurz": store.datum_kurz,
++    }
++    basis.update(ctx)
++    return templates.TemplateResponse(request, f"woche/{name}", basis)
++
++
++def zurueck(ziel: str = "/woche") -> RedirectResponse:
++    return RedirectResponse(ziel, status_code=HTTP_303_SEE_OTHER)
++
++
++def sag(request: Request, text: str) -> None:
++    request.session["woche_sagt"] = text
++
++
++# ==========================================================================
++# Bildschirm 1 — Heute
++# ==========================================================================
++
++@router.get("", response_class=HTMLResponse)
++@router.get("/", response_class=HTMLResponse)
++def heute(request: Request):
++    store.ensure()
++    if not store.eingerichtet():
++        return zurueck("/woche/einrichtung")
++
++    if store.pause_aktiv():
++        return render(request, "pause.html")
++
++    faellig = store.zyklus_faellig()
++    if faellig is not None:
++        return zurueck("/woche/abschluss")
++
++    z = store.zyklus()
++    if z is None:
++        # Stille Woche: ab Dienstag legt die App selbst etwas hin, statt
++        # „Plane deine Woche" zu verlangen. Planen ist die hoechste Huerde
++        # und darf den Zugang nie blockieren.
++        if store.wochentag() >= 2 and store.letzte_zyklen(2):
++            z_id = store.zyklus_starten("", regeln.horizont(), still=True)
++            regeln.angebot_bauen(z_id, "", max_schritte=1)
++            z = store.zyklus()
++        else:
++            return zurueck("/woche/plan")
++
++    regeln.wissen_neu_berechnen()
++    s = regeln.heute_schritt(z["id"])
++    fehlt = store.anker_fehlend_heute(z["id"])
++    return render(request, "heute.html", zyklus=z, schritt=s, anker_fach=fehlt,
++                  anker_vorschlag=bruecke.ankervorschlag(fehlt["name"]) if fehlt else "",
++                  sagt=request.session.pop("woche_sagt", None),
++                  still=bool(z["still"]))
++
++
++@router.post("/anker")
++def anker_setzen(request: Request, fach_id: int = Form(...),
++                 text: str = Form("")):
++    z = store.zyklus()
++    if z is None:
++        return zurueck()
++    if text.strip() and text.strip() != "weiß nicht":
++        store.anker_setzen(z["id"], fach_id, text)
++    else:
++        # „weiß nicht" ist eine vollwertige Antwort und wird nicht nachgehakt.
++        store.anker_setzen(z["id"], fach_id, "")
++    return zurueck()
++
++
++# --------------------------------------------------------------------------
++# Die Einstiegshandlung
++# --------------------------------------------------------------------------
++
++@router.post("/schritt/{schritt_id}/einstieg")
++def einstieg(request: Request, schritt_id: int, wert: str = Form("gemacht")):
++    s = store.schritt(schritt_id)
++    if s is None:
++        return zurueck()
++    wert = "gemacht" if wert == "gemacht" else "nicht"
++    store.ereignis("einstieg", wert, zyklus_id=s["zyklus_id"],
++                   schritt_id=schritt_id, fach_id=s["fach_id"])
++    if wert == "nicht":
++        sag(request, "Okay. Morgen wieder.")
++        return zurueck()
++    return zurueck(f"/woche/schritt/{schritt_id}/weiter")
++
++
++@router.get("/schritt/{schritt_id}/weiter", response_class=HTMLResponse)
++def weiter_fragen(request: Request, schritt_id: int):
++    s = store.schritt(schritt_id)
++    if s is None:
++        return zurueck()
++    minuten = vorschlaege.MINUTEN.get(s["groesse"], 8)
++    return render(request, "weiter.html", schritt=s, minuten=minuten)
++
++
++@router.post("/schritt/{schritt_id}/weiter")
++def weiter(request: Request, schritt_id: int, wert: str = Form("nein")):
++    s = store.schritt(schritt_id)
++    if s is None:
++        return zurueck()
++    store.ereignis("weiter", "ja" if wert == "ja" else "nein",
++                   zyklus_id=s["zyklus_id"], schritt_id=schritt_id,
++                   fach_id=s["fach_id"])
++    if wert != "ja":
++        # „Nein" ist ein vollwertiger Abschluss. Angefangen war das Ziel.
++        sag(request, "Passt. Du hast angefangen — das war's schon.")
++        return zurueck()
++    return zurueck(f"/woche/schritt/{schritt_id}/form")
++
++
++@router.get("/schritt/{schritt_id}/form", response_class=HTMLResponse)
++def form_seite(request: Request, schritt_id: int):
++    s = store.schritt(schritt_id)
++    if s is None:
++        return zurueck()
++    minuten = vorschlaege.MINUTEN.get(s["groesse"], 8)
++    z = regeln.zaehler()
++    thema = bruecke.titelzusatz(s["fach_name"] or "")
++    return render(request, "form.html", schritt=s, minuten=minuten,
++                  bestzeit=z["bestzeit"], thema=thema,
++                  lerneinheit=bruecke.lerneinheit(thema) if thema else None)
++
++
++@router.post("/schritt/{schritt_id}/bestzeit")
++def bestzeit(request: Request, schritt_id: int, sekunden: int = Form(...)):
++    s = store.schritt(schritt_id)
++    if s is None or sekunden <= 0 or sekunden > 3600:
++        return zurueck()
++    store.ereignis("bestzeit", str(int(sekunden)), zyklus_id=s["zyklus_id"],
++                   schritt_id=schritt_id, fach_id=s["fach_id"])
++    return zurueck(f"/woche/schritt/{schritt_id}/rueckmeldung")
++
++
++@router.get("/schritt/{schritt_id}/rueckmeldung", response_class=HTMLResponse)
++def rueckmeldung_seite(request: Request, schritt_id: int):
++    s = store.schritt(schritt_id)
++    if s is None:
++        return zurueck()
++    return render(request, "rueckmeldung.html", schritt=s)
++
++
++@router.post("/schritt/{schritt_id}/rueckmeldung")
++def rueckmeldung(request: Request, schritt_id: int, wert: str = Form("okay")):
++    s = store.schritt(schritt_id)
++    if s is None:
++        return zurueck()
++    wert = wert if wert in ("gut", "okay", "schwierig") else "okay"
++    store.ereignis("rueckmeldung", wert, zyklus_id=s["zyklus_id"],
++                   schritt_id=schritt_id, fach_id=s["fach_id"])
++    if wert == "schwierig":
++        return zurueck(f"/woche/schritt/{schritt_id}/grund")
++    # War es gut oder okay, passiert nichts weiter. Kein Lob, keine Rückfrage.
++    if wert == "gut" and s["fach_name"]:
++        return zurueck(f"/woche/schritt/{schritt_id}/karte")
++    sag(request, "Gut. Bis morgen.")
++    return zurueck()
++
++
++# --------------------------------------------------------------------------
++# Wenn etwas schwierig war
++# --------------------------------------------------------------------------
++
++@router.get("/schritt/{schritt_id}/grund", response_class=HTMLResponse)
++def grund_seite(request: Request, schritt_id: int):
++    s = store.schritt(schritt_id)
++    if s is None:
++        return zurueck()
++    return render(request, "grund.html", schritt=s,
++                  gruende=regeln.GRUND_LABELS)
++
++
++@router.post("/schritt/{schritt_id}/grund")
++def grund(request: Request, schritt_id: int, wert: str = Form("")):
++    s = store.schritt(schritt_id)
++    if s is None:
++        return zurueck()
++    if wert in regeln.GRUND_LABELS:
++        store.ereignis("grund", wert, zyklus_id=s["zyklus_id"],
++                       schritt_id=schritt_id, fach_id=s["fach_id"])
++        return zurueck(f"/woche/schritt/{schritt_id}/anpassung?grund={wert}")
++    return zurueck()
++
++
++@router.get("/schritt/{schritt_id}/anpassung", response_class=HTMLResponse)
++def anpassung_seite(request: Request, schritt_id: int, grund: str = ""):
++    s = store.schritt(schritt_id)
++    if s is None:
++        return zurueck()
++    return render(request, "anpassung.html", schritt=s, grund=grund,
++                  vorschlag=regeln.anpassen(s, grund),
++                  helfer=store.helfer())
++
++
++@router.post("/schritt/{schritt_id}/anpassung")
++def anpassung(request: Request, schritt_id: int, art: str = Form(""),
++              wert: str = Form("")):
++    s = store.schritt(schritt_id)
++    if s is None:
++        return zurueck()
++
++    if art == "kleiner" and wert == "annehmen":
++        v = regeln.anpassen(s, "zu_schwer")
++        if v["art"] == "kleiner":
++            store.schritt_anpassen(schritt_id, v["neu"]["titel"],
++                                   v["neu"]["einstieg"], v["neu"]["groesse"])
++            store.ereignis("anpassung", "kleiner", zyklus_id=s["zyklus_id"],
++                           schritt_id=schritt_id, fach_id=s["fach_id"])
++            sag(request, "Okay, kleiner. Morgen neu.")
++    elif art == "zeitpunkt":
++        store.ereignis("anpassung", "zeitpunkt", zyklus_id=s["zyklus_id"],
++                       schritt_id=schritt_id, notiz=wert)
++        sag(request, f"Gemerkt: {wert}.")
++    elif art == "ruhen":
++        store.schritt_ruhen(schritt_id)
++        store.ereignis("anpassung", "strategie", zyklus_id=s["zyklus_id"],
++                       schritt_id=schritt_id)
++        sag(request, "Lassen wir diese Woche ruhen.")
++    elif art == "kurz":
++        store.ereignis("anpassung", "kurz", zyklus_id=s["zyklus_id"],
++                       schritt_id=schritt_id)
++        sag(request, "Morgen nur zwei Minuten.")
++    return zurueck()
++
++
++# --------------------------------------------------------------------------
++# Sammelkarte
++# --------------------------------------------------------------------------
++
++@router.get("/schritt/{schritt_id}/karte", response_class=HTMLResponse)
++def karte_seite(request: Request, schritt_id: int):
++    s = store.schritt(schritt_id)
++    if s is None:
++        return zurueck()
++    a = store.anker(s["zyklus_id"], s["fach_id"]) if s["fach_id"] else None
++    thema = (a["text"] if a and a["text"] else s["fach_name"]) or "Thema"
++    return render(request, "karte.html", schritt=s, thema=thema)
++
++
++@router.post("/schritt/{schritt_id}/karte")
++def karte(request: Request, schritt_id: int, thema: str = Form(""),
++          nein: str = Form("")):
++    s = store.schritt(schritt_id)
++    if s is None or nein:
++        return zurueck()
++    d = store.ding()
++    store.karte_anlegen(thema or (s["fach_name"] or "Thema"),
++                        d["bild"] if d else None)
++    store.ereignis("karte", thema[:80], zyklus_id=s["zyklus_id"],
++                   schritt_id=schritt_id, fach_id=s["fach_id"])
++    sag(request, "Karte dazu.")
++    return zurueck()
++
++
++# ==========================================================================
++# Bildschirm 2 — Meine Woche
++# ==========================================================================
++
++@router.get("/plan", response_class=HTMLResponse)
++def plan(request: Request):
++    store.ensure()
++    if not store.eingerichtet():
++        return zurueck("/woche/einrichtung")
++    z = store.zyklus()
++    k = store.kind()
++    frage = None
++    if z is None:
++        idx = (k["frage_index"] or 0) % len(vorschlaege.FRAGEN)
++        frage = dict(vorschlaege.FRAGEN[idx])
++        if frage["schluessel"] == "nervt":
++            frage["antworten"] = [f["name"] for f in store.faecher()]
++    karo_satz = ""
++    for f in store.faecher():
++        karo_satz = bruecke.hinweis(f["name"])
++        if karo_satz:
++            break
++    return render(request, "plan.html", zyklus=z, faecher=store.faecher(),
++                  schritte=store.schritte(z["id"]) if z else [],
++                  karten=store.karten(), horizont=regeln.horizont(),
++                  frage=frage, gemieden=regeln.gemiedene_faecher(),
++                  karo_satz=karo_satz)
++
++
++@router.post("/start")
++async def start(request: Request):
++    formular = await request.form()
++    fokus = str(formular.get("fokus") or "").strip()
++    fach_ids = [int(v) for v in formular.getlist("fach_id") if str(v).isdigit()]
++    laenge = regeln.horizont()
++    z_id = store.zyklus_starten(fokus, laenge)
++    regeln.angebot_bauen(z_id, fokus, fach_ids or None)
++
++    # Die eine Kennenlernfrage — ueberspringbar, rotierend.
++    antwort = str(formular.get("frage_antwort") or "").strip()
++    schluessel = str(formular.get("frage_schluessel") or "").strip()
++    if antwort and schluessel:
++        eintrag = next((f for f in vorschlaege.FRAGEN
++                        if f["schluessel"] == schluessel), None)
++        if eintrag:
++            regeln.wissen_sagen(schluessel, eintrag["symbol"],
++                                eintrag["satz"].format(wert=antwort[:40]))
++    k = store.kind()
++    store.kind_setzen(frage_index=(k["frage_index"] or 0) + 1)
++    return zurueck()
++
++
++@router.post("/weglassen")
++def weglassen(request: Request, fach_id: int = Form(...)):
++    """Bewusst weglassen ist eine Entscheidung, kein Versagen."""
++    f = store.fach(fach_id)
++    if f is None:
++        return zurueck("/woche/plan")
++    store.ereignis("weglassen", f["name"], fach_id=fach_id)
++    sag(request, f"Okay. {f['name']} ist gerade kein Thema.")
++    return zurueck("/woche/plan")
++
++
++@router.post("/ding")
++async def ding_aendern(request: Request, wort: str = Form(""),
++                       form: str = Form("einfach"),
++                       bild: UploadFile | None = None):
++    """Wechseln dauert zehn Sekunden. Keine Rückfrage, keine Historie."""
++    name = None
++    if bild is not None and getattr(bild, "filename", ""):
++        puffer = bytearray()
++        while stueck := await bild.read(1 << 20):
++            puffer.extend(stueck)
++            if len(puffer) > MAX_BILD_BYTES:
++                sag(request, "Das Bild ist zu groß.")
++                return zurueck("/woche/plan")
++        name = store.ding_bild_speichern(bytes(puffer),
++                                         Path(bild.filename).suffix)
++    if wort.strip() or name:
++        store.ding_setzen(wort or "mein Ding", form, name)
++    return zurueck("/woche/plan")
++
++
++@router.get("/bild/{name}")
++def bild(name: str):
++    pfad = (store.bilder_dir() / Path(name).name)
++    if not pfad.is_file():
++        return HTMLResponse("", status_code=404)
++    return FileResponse(str(pfad))
++
++
++# ==========================================================================
++# Bildschirm 3 — Hilfe
++# ==========================================================================
++
++@router.get("/hilfe", response_class=HTMLResponse)
++def hilfe_seite(request: Request):
++    store.ensure()
++    z = regeln.zaehler()
++    return render(request, "hilfe.html", helfer=store.helfer(),
++                  termin=store.fester_termin(),
++                  nie_gefragt=(z["hilfe_geholt"] == 0),
++                  sagt=request.session.pop("woche_sagt", None))
++
++
++@router.post("/hilfe")
++def hilfe(request: Request, helfer_id: int = Form(0), frage: str = Form("")):
++    z = store.zyklus()
++    name = "aufgeschrieben"
++    if helfer_id:
++        treffer = [h for h in store.helfer() if h["id"] == helfer_id]
++        if treffer:
++            name = treffer[0]["name"]
++    store.ereignis("hilfe", name, zyklus_id=z["id"] if z else None,
++                   notiz=frage)
++    if helfer_id:
++        sag(request, f"{name} weiß Bescheid.")
++    else:
++        sag(request, "Aufgeschrieben. Kommt beim nächsten festen Termin dran.")
++    return zurueck("/woche/hilfe")
++
++
++# ==========================================================================
++# Bildschirm 4 — Was ich über dich weiß
++# ==========================================================================
++
++@router.get("/ueber-dich", response_class=HTMLResponse)
++def ueber_dich(request: Request):
++    store.ensure()
++    regeln.wissen_neu_berechnen()
++    return render(request, "ueber_dich.html", zeilen=regeln.wissen_zeilen(),
++                  anker_optionen=vorschlaege.TAGESANKER)
++
++
++@router.post("/wissen/{wissen_id}/aus")
++def wissen_aus(request: Request, wissen_id: int):
++    """Ein Tap. Keine Rückfrage, kein „bist du sicher?"."""
++    regeln.wissen_ausblenden(wissen_id)
++    return zurueck("/woche/ueber-dich")
++
++
++@router.post("/anstupser")
++def anstupser(request: Request, wert: str = Form(""), aus: str = Form("")):
++    if aus:
++        store.kind_setzen(anstupser_aus=1, anstupser_anker=None)
++    elif wert in vorschlaege.TAGESANKER:
++        store.kind_setzen(anstupser_anker=wert, anstupser_aus=0)
++    return zurueck("/woche/ueber-dich")
++
++
++# ==========================================================================
++# Bildschirm 5 — Mein Stundenplan
++# ==========================================================================
++
++@router.get("/stundenplan", response_class=HTMLResponse)
++def stundenplan(request: Request):
++    store.ensure()
++    k = store.kind()
++    return render(request, "stundenplan.html", plan=store.stundenplan(),
++                  faecher=store.faecher(), termine=store.termine(),
++                  bild=k["plan_bild"] if k else None)
++
++
++@router.post("/stundenplan/foto")
++async def stundenplan_foto(request: Request, bild: UploadFile | None = None):
++    """Das Foto bleibt nützlich, auch wenn nichts daraus gelesen wird.
++
++    Texterkennung ist bewusst nicht im MVP: eine Erkennungsquote unter 100 %
++    in der ersten Minute wäre der schlechteste denkbare Einstieg. Das Bild
++    ist der Stundenplan — antippen der Fächer kostet einen Tap mehr.
++    """
++    if bild is None or not getattr(bild, "filename", ""):
++        return zurueck("/woche/stundenplan")
++    puffer = bytearray()
++    while stueck := await bild.read(1 << 20):
++        puffer.extend(stueck)
++        if len(puffer) > MAX_BILD_BYTES:
++            sag(request, "Das Bild ist zu groß.")
++            return zurueck("/woche/stundenplan")
++    name = store.ding_bild_speichern(bytes(puffer), Path(bild.filename).suffix)
++    store.kind_setzen(plan_bild=name)
++    return zurueck("/woche/stundenplan")
++
++
++@router.post("/stundenplan/tage")
++async def stundenplan_tage(request: Request):
++    formular = await request.form()
++    for f in store.faecher():
++        tage = [int(v) for v in formular.getlist(f"tag_{f['id']}")
++                if str(v).isdigit()]
++        store.stunden_setzen(f["id"], tage)
++    return zurueck("/woche/stundenplan")
++
++
++# ==========================================================================
++# Notfall, Pause, Abschluss
++# ==========================================================================
++
++@router.get("/notfall", response_class=HTMLResponse)
++def notfall_seite(request: Request):
++    store.ensure()
++    return render(request, "notfall.html", faecher=store.faecher(),
++                  ergebnis=None, helfer=store.helfer())
++
++
++@router.post("/notfall")
++def notfall(request: Request, fach_id: int = Form(0), was: str = Form("arbeit"),
++            minuten: int = Form(20)):
++    f = store.fach(fach_id)
++    name = f["name"] if f else "das Fach"
++    z = store.zyklus()
++    store.ereignis("notfall", was, zyklus_id=z["id"] if z else None,
++                   fach_id=fach_id or None)
++    ergebnis = regeln.notfall(name, minuten)
++    return render(request, "notfall.html", faecher=store.faecher(),
++                  ergebnis=ergebnis, fach=f, helfer=store.helfer())
++
++
++@router.post("/pause")
++def pause(request: Request, wochen: int = Form(1)):
++    store.pause_setzen(wochen)
++    return zurueck()
++
++
++@router.post("/pause/ende")
++def pause_ende(request: Request):
++    store.pause_beenden()
++    return zurueck()
++
++
++@router.get("/abschluss", response_class=HTMLResponse)
++def abschluss_seite(request: Request):
++    store.ensure()
++    z = store.zyklus_faellig() or store.letzte_zyklen(1)
++    z = z if not isinstance(z, list) else (z[0] if z else None)
++    if z is None:
++        return zurueck("/woche/plan")
++    saetze = regeln.rueckblick(z["id"])
++    leer_text, leer_optionen = regeln.rueckblick_leer_text()
++    gemacht = [s for s in store.schritte(z["id"])
++               if any(e["schritt_id"] == s["id"] for e in
++                      store.ereignisse(z["id"], "einstieg"))]
++    return render(request, "abschluss.html", zyklus=z, saetze=saetze,
++                  gemacht=gemacht, leer_text=leer_text,
++                  leer_optionen=leer_optionen)
++
++
++@router.post("/abschluss")
++def abschluss(request: Request, gefuehl: str = Form("okay"),
++              wunsch: str = Form("genauso")):
++    z = store.zyklus_faellig() or store.zyklus()
++    if z is None:
++        return zurueck("/woche/plan")
++    store.zyklus_abschliessen(z["id"], gefuehl, wunsch)
++    if wunsch == "pause":
++        store.pause_setzen(1)
++        return zurueck()
++    return zurueck("/woche/plan")
++
++
++# ==========================================================================
++# Einrichtung — drei Minuten
++# ==========================================================================
++
++STANDARD_FAECHER = ["Mathematik", "Deutsch", "Englisch", "Biologie", "Physik",
++                    "Chemie", "Geschichte", "Erdkunde", "Französisch", "Latein",
++                    "Kunst", "Musik", "Sport", "Religion", "Ethik", "Politik"]
++
++
++@router.get("/einrichtung", response_class=HTMLResponse)
++def einrichtung(request: Request):
++    store.ensure()
++    return render(request, "einrichtung.html", standard=STANDARD_FAECHER,
++                  faecher=store.faecher(), helfer=store.helfer(),
++                  schritt=_einrichtungsschritt())
++
++
++def _einrichtungsschritt() -> int:
++    if not store.faecher():
++        return 1
++    if store.ding() is None:
++        return 2
++    if not store.helfer():
++        return 3
++    return 4
++
++
++@router.post("/einrichtung/faecher")
++async def einrichtung_faecher(request: Request):
++    formular = await request.form()
++    namen = [str(v) for v in formular.getlist("fach")]
++    klasse = str(formular.get("klasse") or "6")
++    store.faecher_setzen(namen)
++    if klasse.isdigit():
++        store.kind_setzen(klasse=max(1, min(13, int(klasse))))
++    return zurueck("/woche/einrichtung")
++
++
++@router.post("/einrichtung/ding")
++async def einrichtung_ding(request: Request, wort: str = Form(""),
++                           form: str = Form("einfach"),
++                           bild: UploadFile | None = None):
++    name = None
++    if bild is not None and getattr(bild, "filename", ""):
++        puffer = bytearray()
++        while stueck := await bild.read(1 << 20):
++            puffer.extend(stueck)
++            if len(puffer) > MAX_BILD_BYTES:
++                break
++        if len(puffer) <= MAX_BILD_BYTES:
++            name = store.ding_bild_speichern(bytes(puffer),
++                                             Path(bild.filename).suffix)
++    store.ding_setzen(wort or "mein Ding", form, name)
++    return zurueck("/woche/einrichtung")
++
++
++@router.post("/einrichtung/helfer")
++def einrichtung_helfer(request: Request, name: str = Form(""),
++                       fester_tag: int = Form(0), feste_zeit: str = Form(""),
++                       fertig: str = Form("")):
++    if name.strip():
++        store.helfer_anlegen(name, None,
++                             fester_tag if 1 <= fester_tag <= 7 else None,
++                             feste_zeit)
++    if fertig:
++        store.kind_setzen(eingerichtet_am=dt.date.today().isoformat())
++        return zurueck("/woche/plan")
++    return zurueck("/woche/einrichtung")
++
++
++# ==========================================================================
++# Eltern — ein Bildschirm, ein Impuls
++# ==========================================================================
++
++@router.get("/eltern", response_class=HTMLResponse)
++def eltern(request: Request):
++    store.ensure()
++    k = store.kind()
++    return render(request, "eltern.html",
++                  zusammenfassung=regeln.eltern_zusammenfassung(),
++                  zusagen=store.zusagen(),
++                  regeln_liste=regeln.ZUSTAND_REGELN,
++                  freigaben=store.offene_freigaben(),
++                  termin=store.fester_termin(),
++                  bruecke_an=bool(k and k["karo_bruecke"]),
++                  karo_fach=bruecke.karo_fach())
++
++
++@router.post("/eltern/bruecke")
++def eltern_bruecke(request: Request, an: str = Form("")):
++    """Schaltet mit, ob der Begleiter Karos Themen mitliest.
++
++    Standardmaessig aus: der Begleiter soll auch dann vollstaendig
++    funktionieren, wenn Karo leer ist oder ein anderes Fach abdeckt."""
++    store.kind_setzen(karo_bruecke=1 if an else 0)
++    return zurueck("/woche/eltern")
++
++
++@router.post("/eltern/zusage")
++def eltern_zusage(request: Request, nr: int = Form(...)):
++    if 1 <= nr <= 3:
++        store.zusage_setzen(nr)
++    return zurueck("/woche/eltern")
++
++
++@router.post("/eltern/freigabe/{ding_id}")
++def eltern_freigabe(request: Request, ding_id: int, ja: str = Form("")):
++    store.ding_freigeben(ding_id, bool(ja))
++    return zurueck("/woche/eltern")
+diff --git a/app/woche/schema.sql b/app/woche/schema.sql
+new file mode 100644
+index 0000000..986c09f
+--- /dev/null
++++ b/app/woche/schema.sql
+@@ -0,0 +1,217 @@
++-- „Meine Woche" — eigenes Schema des Begleiters.
++--
++-- Alle Tabellen tragen das Praefix woche_ und haben KEINEN Fremdschluessel
++-- auf eine Karo-Tabelle. Der Begleiter laeuft neben Karo, nicht in Karo:
++-- Themen, Flaggen, Quizze und Lernzyklus bleiben unberuehrt, und dieses
++-- Schema liesse sich mit einem DROP der woche_-Tabellen rueckstandsfrei
++-- entfernen.
++--
++-- Drei Grundsaetze, wie im Hauptschema:
++--   1. `woche_ereignis` ist append-only. Trigger verhindern UPDATE und DELETE.
++--      Es ist die einzige Wahrheit darueber, was passiert ist.
++--   2. Alles, was die App „ueber das Kind weiss", wird aus Ereignissen
++--      BERECHNET — nie im Code geraten und nie vom Modell geschrieben.
++--   3. Es gibt keine Spalte fuer „nicht erledigt". Was nicht passiert ist,
++--      wird nicht gespeichert, nicht gezaehlt und nicht angezeigt.
++
++PRAGMA foreign_keys = ON;
++
++-- ==========================================================================
++-- 1. Das Kind — genau eine Zeile (id = 1)
++-- ==========================================================================
++CREATE TABLE IF NOT EXISTS woche_kind (
++    id               INTEGER PRIMARY KEY CHECK (id = 1),
++    name             TEXT NOT NULL DEFAULT '',
++    klasse           INTEGER NOT NULL DEFAULT 6,
++    plan_bild        TEXT,              -- Foto des Stundenplans, Pfad
++    anstupser_anker  TEXT,              -- „nach dem Essen" — vom Kind gesetzt
++    anstupser_aus    INTEGER NOT NULL DEFAULT 1,
++    frage_index      INTEGER NOT NULL DEFAULT 0,   -- naechste Kennenlernfrage
++    karo_bruecke     INTEGER NOT NULL DEFAULT 0,   -- liest Karos Themen mit
++    eingerichtet_am  TEXT
++);
++
++-- ==========================================================================
++-- 2. Stundenplan
++-- ==========================================================================
++CREATE TABLE IF NOT EXISTS woche_fach (
++    id        INTEGER PRIMARY KEY,
++    name      TEXT NOT NULL UNIQUE,
++    stunden   INTEGER NOT NULL DEFAULT 0,   -- Wochenstunden, fuer die Gewichtung
++    aktiv     INTEGER NOT NULL DEFAULT 1,
++    created_at TEXT NOT NULL
++);
++
++CREATE TABLE IF NOT EXISTS woche_stunde (
++    id       INTEGER PRIMARY KEY,
++    fach_id  INTEGER NOT NULL REFERENCES woche_fach(id) ON DELETE CASCADE,
++    tag      INTEGER NOT NULL CHECK (tag BETWEEN 1 AND 5),   -- 1 = Montag
++    stunde   INTEGER NOT NULL DEFAULT 1,
++    UNIQUE (fach_id, tag, stunde)
++);
++CREATE INDEX IF NOT EXISTS idx_woche_stunde_tag ON woche_stunde(tag);
++
++-- Feste Termine ausserhalb der Schule: Training, Musik, Verein
++CREATE TABLE IF NOT EXISTS woche_termin (
++    id     INTEGER PRIMARY KEY,
++    label  TEXT NOT NULL,
++    tag    INTEGER NOT NULL CHECK (tag BETWEEN 1 AND 7),
++    zeit   TEXT
++);
++
++-- ==========================================================================
++-- 3. Wer hilft — mit Namen, nicht als abstrakter Knopf
++-- ==========================================================================
++CREATE TABLE IF NOT EXISTS woche_helfer (
++    id          INTEGER PRIMARY KEY,
++    name        TEXT NOT NULL,
++    fach_id     INTEGER REFERENCES woche_fach(id) ON DELETE SET NULL,
++    fester_tag  INTEGER CHECK (fester_tag BETWEEN 1 AND 7),
++    feste_zeit  TEXT,
++    aktiv       INTEGER NOT NULL DEFAULT 1,
++    created_at  TEXT NOT NULL
++);
++
++-- ==========================================================================
++-- 4. „Mein Ding" — Wort, Form, eigenes Bild
++-- ==========================================================================
++CREATE TABLE IF NOT EXISTS woche_ding (
++    id         INTEGER PRIMARY KEY,
++    wort       TEXT NOT NULL,
++    form       TEXT NOT NULL DEFAULT 'einfach',   -- speedrun | clip | einfach
++    bild       TEXT,
++    freigabe   TEXT NOT NULL DEFAULT 'offen',     -- offen | ja | nein
++    aktiv      INTEGER NOT NULL DEFAULT 1,
++    created_at TEXT NOT NULL
++);
++CREATE INDEX IF NOT EXISTS idx_woche_ding_aktiv ON woche_ding(aktiv);
++
++-- ==========================================================================
++-- 5. Zyklus — 3, 7 oder 14 Tage. Nie „Plan": ein Angebot.
++-- ==========================================================================
++CREATE TABLE IF NOT EXISTS woche_zyklus (
++    id            INTEGER PRIMARY KEY,
++    start         TEXT NOT NULL,
++    ende          TEXT NOT NULL,
++    fokus         TEXT,
++    laenge        INTEGER NOT NULL DEFAULT 7,
++    status        TEXT NOT NULL DEFAULT 'offen',   -- offen | fertig
++    gefuehl       TEXT,          -- Abschluss: gut | okay | schwierig
++    wunsch        TEXT,          -- genauso | mehr | leichter | anders
++    still         INTEGER NOT NULL DEFAULT 0,      -- von der App hingelegt
++    created_at    TEXT NOT NULL
++);
++CREATE INDEX IF NOT EXISTS idx_woche_zyklus_status ON woche_zyklus(status, start);
++
++-- Der Wochenanker: eine Zeile pro Fach, vom Kind, am Tag des Fachs gefragt.
++CREATE TABLE IF NOT EXISTS woche_anker (
++    id         INTEGER PRIMARY KEY,
++    zyklus_id  INTEGER NOT NULL REFERENCES woche_zyklus(id) ON DELETE CASCADE,
++    fach_id    INTEGER NOT NULL REFERENCES woche_fach(id) ON DELETE CASCADE,
++    text       TEXT NOT NULL,
++    created_at TEXT NOT NULL,
++    UNIQUE (zyklus_id, fach_id)
++);
++
++-- Ein Angebot. Nicht erledigte Angebote werden nicht markiert und nicht
++-- uebertragen — sie laufen mit dem Zyklus einfach aus.
++CREATE TABLE IF NOT EXISTS woche_schritt (
++    id           INTEGER PRIMARY KEY,
++    zyklus_id    INTEGER NOT NULL REFERENCES woche_zyklus(id) ON DELETE CASCADE,
++    fach_id      INTEGER REFERENCES woche_fach(id) ON DELETE SET NULL,
++    titel        TEXT NOT NULL,
++    einstieg     TEXT NOT NULL,          -- die Handlung unter zwei Minuten
++    groesse      TEXT NOT NULL DEFAULT 'klein',   -- klein | mittel | gross
++    anlass       TEXT NOT NULL DEFAULT 'normal',
++    form         TEXT NOT NULL DEFAULT 'einfach', -- speedrun | clip | einfach
++    verkleinert  INTEGER NOT NULL DEFAULT 0,      -- Untergrenze: max. 2
++    ruht         INTEGER NOT NULL DEFAULT 0,
++    created_at   TEXT NOT NULL
++);
++CREATE INDEX IF NOT EXISTS idx_woche_schritt_zyklus ON woche_schritt(zyklus_id);
++
++-- ==========================================================================
++-- 6. Ereignisse — APPEND ONLY. Die einzige Wahrheit.
++-- ==========================================================================
++-- art:
++--   einstieg        wert = 'gemacht' | 'nicht'
++--   weiter          wert = 'ja' | 'nein'
++--   rueckmeldung    wert = 'gut' | 'okay' | 'schwierig'
++--   grund           wert = 'zu_schwer'|'keine_zeit'|'keine_lust'|'konzentration'
++--   anpassung       wert = 'kleiner' | 'zeitpunkt' | 'kurz' | 'strategie'
++--   hilfe           wert = Name des Helfers, notiz = Frage
++--   notfall         wert = 'arbeit'|'abgabe'|'referat'|'anderes'
++--   weglassen       wert = Fachname (bewusst weggelassen)
++--   karte           wert = Thema
++--   pause           wert = Anzahl Wochen
++--   bestzeit        wert = Sekunden (Speedrun)
++CREATE TABLE IF NOT EXISTS woche_ereignis (
++    id          INTEGER PRIMARY KEY,
++    zyklus_id   INTEGER REFERENCES woche_zyklus(id),
++    schritt_id  INTEGER REFERENCES woche_schritt(id),
++    fach_id     INTEGER REFERENCES woche_fach(id),
++    tag         INTEGER,                 -- 1..7, fuer die Wochentag-Zaehler
++    art         TEXT NOT NULL,
++    wert        TEXT,
++    notiz       TEXT,
++    created_at  TEXT NOT NULL
++);
++CREATE INDEX IF NOT EXISTS idx_woche_ereignis_art ON woche_ereignis(art, created_at);
++CREATE INDEX IF NOT EXISTS idx_woche_ereignis_zyklus ON woche_ereignis(zyklus_id, art);
++
++CREATE TRIGGER IF NOT EXISTS woche_ereignis_no_update
++BEFORE UPDATE ON woche_ereignis
++BEGIN
++    SELECT RAISE(ABORT, 'woche_ereignis ist append-only: UPDATE nicht erlaubt');
++END;
++
++CREATE TRIGGER IF NOT EXISTS woche_ereignis_no_delete
++BEFORE DELETE ON woche_ereignis
++BEGIN
++    SELECT RAISE(ABORT, 'woche_ereignis ist append-only: DELETE nicht erlaubt');
++END;
++
++-- ==========================================================================
++-- 7. „Was ich ueber dich weiss" — sichtbar, aenderbar, loeschbar
++-- ==========================================================================
++-- quelle='kind'   : vom Kind gesagt oder korrigiert. Wird nie ueberschrieben.
++-- quelle='zaehler': aus Ereignissen berechnet. Wird bei jedem Neurechnen
++--                   aktualisiert, aber niemals ueber eine Kind-Zeile.
++CREATE TABLE IF NOT EXISTS woche_wissen (
++    id          INTEGER PRIMARY KEY,
++    schluessel  TEXT NOT NULL UNIQUE,
++    symbol      TEXT NOT NULL DEFAULT '•',
++    text        TEXT NOT NULL,
++    quelle      TEXT NOT NULL DEFAULT 'zaehler',
++    sichtbar    INTEGER NOT NULL DEFAULT 1,
++    created_at  TEXT NOT NULL
++);
++
++-- ==========================================================================
++-- 8. Sammelkarten — eine pro verstandenem Thema, mit eigenem Bild
++-- ==========================================================================
++CREATE TABLE IF NOT EXISTS woche_karte (
++    id         INTEGER PRIMARY KEY,
++    thema      TEXT NOT NULL,
++    bild       TEXT,
++    created_at TEXT NOT NULL
++);
++
++-- ==========================================================================
++-- 9. Pause — Aufhoeren ist eine Funktion, kein Versickern
++-- ==========================================================================
++CREATE TABLE IF NOT EXISTS woche_pause (
++    id         INTEGER PRIMARY KEY,
++    von        TEXT NOT NULL,
++    bis        TEXT NOT NULL,
++    created_at TEXT NOT NULL
++);
++CREATE INDEX IF NOT EXISTS idx_woche_pause_bis ON woche_pause(bis);
++
++-- ==========================================================================
++-- 10. Elternseite: die drei Saetze, einzeln bestaetigt
++-- ==========================================================================
++CREATE TABLE IF NOT EXISTS woche_eltern_zusage (
++    nr          INTEGER PRIMARY KEY CHECK (nr BETWEEN 1 AND 3),
++    bestaetigt_am TEXT NOT NULL
++);
+diff --git a/app/woche/store.py b/app/woche/store.py
+new file mode 100644
+index 0000000..cae3bc8
+--- /dev/null
++++ b/app/woche/store.py
+@@ -0,0 +1,503 @@
++"""Datenzugriff des Begleiters.
++
++Benutzt Karos Verbindung (`app.db`) und Karos Datenverzeichnis, aber kein
++einziges Karo-Tabellenobjekt. Das Schema legt sich beim ersten Aufruf selbst
++an; dadurch braucht `app/main.py` genau eine geaenderte Zeile.
++"""
++
++from __future__ import annotations
++
++import datetime as dt
++import logging
++import secrets
++import sqlite3
++from pathlib import Path
++
++from .. import config, db
++
++log = logging.getLogger("karo.woche")
++
++SCHEMA_PATH = Path(__file__).with_name("schema.sql")
++
++_bereit = False
++
++TAGE = {1: "Montag", 2: "Dienstag", 3: "Mittwoch", 4: "Donnerstag",
++        5: "Freitag", 6: "Samstag", 7: "Sonntag"}
++
++FORMEN = {
++    "speedrun": {"symbol": "🎮", "label": "Speedrun",
++                 "hinweis": "Stoppuhr läuft. Sofort nochmal, wenn du willst."},
++    "clip": {"symbol": "📱", "label": "Clip",
++             "hinweis": "60 Sekunden erklären. Nur du siehst es."},
++    "einfach": {"symbol": "🧘", "label": "Einfach",
++                "hinweis": "Nur ein Timer, sonst nichts."},
++}
++
++
++# --------------------------------------------------------------------------
++# Einrichtung
++# --------------------------------------------------------------------------
++
++def bilder_dir() -> Path:
++    pfad = config.DATA_DIR / "woche" / "bilder"
++    pfad.mkdir(parents=True, exist_ok=True)
++    return pfad
++
++
++def ensure() -> None:
++    """Legt das Schema an. Idempotent, billig, beim ersten Zugriff."""
++    global _bereit
++    if _bereit:
++        return
++    c = db.conn()
++    c.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
++    c.execute("INSERT OR IGNORE INTO woche_kind (id) VALUES (1)")
++    _nachziehen(c)
++    _bereit = True
++
++
++# Spalten, die spaeter dazugekommen sind. CREATE TABLE IF NOT EXISTS legt sie
++# in einer bestehenden Datenbank nicht an — gleiches Muster wie in app/db.py.
++_NACHGEZOGEN = [
++    ("woche_kind", "karo_bruecke", "INTEGER NOT NULL DEFAULT 0"),
++]
++
++
++def _nachziehen(c) -> None:
++    for tabelle, spalte, decl in _NACHGEZOGEN:
++        try:
++            da = {r["name"] for r in c.execute(f"PRAGMA table_info({tabelle})")}
++        except sqlite3.Error:                          # pragma: no cover
++            continue
++        if da and spalte not in da:
++            try:
++                c.execute(f"ALTER TABLE {tabelle} ADD COLUMN {spalte} {decl}")
++                log.info("Spalte %s.%s ergänzt", tabelle, spalte)
++            except sqlite3.Error as exc:               # pragma: no cover
++                log.warning("Konnte %s.%s nicht ergänzen: %s", tabelle, spalte, exc)
++
++
++def reset_cache() -> None:
++    """Nur fuer Tests: erzwingt ein erneutes ensure()."""
++    global _bereit
++    _bereit = False
++
++
++# --------------------------------------------------------------------------
++# Kind
++# --------------------------------------------------------------------------
++
++def kind() -> sqlite3.Row:
++    ensure()
++    return db.q1("SELECT * FROM woche_kind WHERE id=1")
++
++
++def kind_setzen(**felder) -> None:
++    erlaubt = {"name", "klasse", "plan_bild", "anstupser_anker",
++               "anstupser_aus", "frage_index", "eingerichtet_am",
++               "karo_bruecke"}
++    felder = {k: v for k, v in felder.items() if k in erlaubt}
++    if not felder:
++        return
++    sql = ", ".join(f"{k}=?" for k in felder)
++    with db.tx() as c:
++        c.execute(f"UPDATE woche_kind SET {sql} WHERE id=1", tuple(felder.values()))
++
++
++def eingerichtet() -> bool:
++    k = kind()
++    return bool(k and k["eingerichtet_am"])
++
++
++# --------------------------------------------------------------------------
++# Faecher und Stundenplan
++# --------------------------------------------------------------------------
++
++def faecher(nur_aktive: bool = True) -> list[sqlite3.Row]:
++    ensure()
++    if nur_aktive:
++        return db.q("SELECT * FROM woche_fach WHERE aktiv=1 ORDER BY name")
++    return db.q("SELECT * FROM woche_fach ORDER BY name")
++
++
++def fach(fach_id: int) -> sqlite3.Row | None:
++    return db.q1("SELECT * FROM woche_fach WHERE id=?", fach_id)
++
++
++def fach_nach_name(name: str) -> sqlite3.Row | None:
++    return db.q1("SELECT * FROM woche_fach WHERE name=?", name)
++
++
++def faecher_setzen(namen: list[str]) -> None:
++    """Setzt die Fachliste. Bestehende Faecher bleiben erhalten."""
++    ensure()
++    namen = [n.strip() for n in namen if n and n.strip()]
++    with db.tx() as c:
++        c.execute("UPDATE woche_fach SET aktiv=0")
++        for name in namen:
++            c.execute(
++                "INSERT INTO woche_fach (name, aktiv, created_at) VALUES (?,1,?) "
++                "ON CONFLICT(name) DO UPDATE SET aktiv=1",
++                (name, db.now()))
++
++
++def stunden_setzen(fach_id: int, tage: list[int]) -> None:
++    with db.tx() as c:
++        c.execute("DELETE FROM woche_stunde WHERE fach_id=?", (fach_id,))
++        for tag in sorted(set(t for t in tage if 1 <= t <= 5)):
++            c.execute("INSERT INTO woche_stunde (fach_id, tag, stunde) "
++                      "VALUES (?,?,1)", (fach_id, tag))
++        c.execute("UPDATE woche_fach SET stunden=? WHERE id=?",
++                  (len(set(tage)), fach_id))
++
++
++def stundenplan() -> dict[int, list[sqlite3.Row]]:
++    """Tag -> Faecher."""
++    ensure()
++    plan: dict[int, list[sqlite3.Row]] = {t: [] for t in range(1, 6)}
++    for zeile in db.q(
++            "SELECT s.tag, f.id, f.name FROM woche_stunde s "
++            "JOIN woche_fach f ON f.id=s.fach_id WHERE f.aktiv=1 "
++            "ORDER BY s.tag, s.stunde, f.name"):
++        plan[zeile["tag"]].append(zeile)
++    return plan
++
++
++def faecher_am_tag(tag: int) -> list[sqlite3.Row]:
++    return db.q(
++        "SELECT f.* FROM woche_stunde s JOIN woche_fach f ON f.id=s.fach_id "
++        "WHERE s.tag=? AND f.aktiv=1 ORDER BY s.stunde", tag)
++
++
++def naechster_tag_mit(fach_id: int, ab_tag: int) -> int | None:
++    """Wann ist dieses Fach das naechste Mal dran? Fuer die Hausaufgabenfrist."""
++    tage = [z["tag"] for z in db.q(
++        "SELECT DISTINCT tag FROM woche_stunde WHERE fach_id=? ORDER BY tag",
++        fach_id)]
++    if not tage:
++        return None
++    spaeter = [t for t in tage if t > ab_tag]
++    return spaeter[0] if spaeter else tage[0]
++
++
++# --------------------------------------------------------------------------
++# Termine und Helfer
++# --------------------------------------------------------------------------
++
++def termine() -> list[sqlite3.Row]:
++    ensure()
++    return db.q("SELECT * FROM woche_termin ORDER BY tag, zeit")
++
++
++def termin_anlegen(label: str, tag: int, zeit: str = "") -> None:
++    with db.tx() as c:
++        c.execute("INSERT INTO woche_termin (label, tag, zeit) VALUES (?,?,?)",
++                  (label.strip()[:60], tag, zeit.strip()[:10]))
++
++
++def helfer(nur_aktive: bool = True) -> list[sqlite3.Row]:
++    ensure()
++    sql = ("SELECT h.*, f.name AS fach_name FROM woche_helfer h "
++           "LEFT JOIN woche_fach f ON f.id=h.fach_id")
++    if nur_aktive:
++        sql += " WHERE h.aktiv=1"
++    return db.q(sql + " ORDER BY h.id")
++
++
++def helfer_anlegen(name: str, fach_id: int | None = None,
++                   fester_tag: int | None = None,
++                   feste_zeit: str = "") -> int:
++    ensure()
++    with db.tx() as c:
++        cur = c.execute(
++            "INSERT INTO woche_helfer (name, fach_id, fester_tag, feste_zeit, "
++            "created_at) VALUES (?,?,?,?,?)",
++            (name.strip()[:40], fach_id, fester_tag, feste_zeit.strip()[:10],
++             db.now()))
++        return int(cur.lastrowid)
++
++
++def fester_termin() -> sqlite3.Row | None:
++    ensure()
++    return db.q1("SELECT * FROM woche_helfer WHERE aktiv=1 AND fester_tag "
++                 "IS NOT NULL ORDER BY id LIMIT 1")
++
++
++# --------------------------------------------------------------------------
++# Mein Ding
++# --------------------------------------------------------------------------
++
++def ding() -> sqlite3.Row | None:
++    ensure()
++    return db.q1("SELECT * FROM woche_ding WHERE aktiv=1 ORDER BY id DESC LIMIT 1")
++
++
++def ding_setzen(wort: str, form: str, bild: str | None = None) -> int:
++    """Ein neues Ding ersetzt das alte. Keine Historie — das waere peinlich."""
++    ensure()
++    form = form if form in FORMEN else "einfach"
++    with db.tx() as c:
++        c.execute("UPDATE woche_ding SET aktiv=0")
++        cur = c.execute(
++            "INSERT INTO woche_ding (wort, form, bild, freigabe, created_at) "
++            "VALUES (?,?,?,'offen',?)",
++            (wort.strip()[:40], form, bild, db.now()))
++        return int(cur.lastrowid)
++
++
++def ding_freigeben(ding_id: int, ja: bool) -> None:
++    with db.tx() as c:
++        c.execute("UPDATE woche_ding SET freigabe=? WHERE id=?",
++                  ("ja" if ja else "nein", ding_id))
++
++
++def ding_bild_speichern(daten: bytes, endung: str) -> str:
++    """Legt ein Bild ab und gibt den Dateinamen zurueck."""
++    endung = endung.lower()
++    if endung not in (".jpg", ".jpeg", ".png", ".webp", ".heic"):
++        endung = ".jpg"
++    name = f"ding_{secrets.token_hex(8)}{endung}"
++    (bilder_dir() / name).write_bytes(daten)
++    return name
++
++
++def datum_kurz(iso: str) -> str:
++    """2026-09-21 -> „Montag, 21.9." — ein Kind liest keine ISO-Daten."""
++    try:
++        d = dt.date.fromisoformat(iso)
++    except (TypeError, ValueError):
++        return iso or ""
++    return f"{TAGE[d.isoweekday()]}, {d.day}.{d.month}."
++
++
++def wort_oder_form(d: sqlite3.Row | None) -> str:
++    """Bis die Eltern freigeben, sagt die App die Form statt des Wortes.
++
++    Nichts ist blockiert, nur unpersoenlicher."""
++    if d is None:
++        return "deine Sache"
++    if d["freigabe"] == "ja":
++        return d["wort"]
++    return FORMEN.get(d["form"], FORMEN["einfach"])["label"]
++
++
++# --------------------------------------------------------------------------
++# Zyklus
++# --------------------------------------------------------------------------
++
++def heute() -> dt.date:
++    return dt.date.today()
++
++
++def wochentag() -> int:
++    return heute().isoweekday()
++
++
++def zyklus() -> sqlite3.Row | None:
++    """Der laufende Zyklus, falls einer laeuft und nicht abgelaufen ist."""
++    ensure()
++    return db.q1("SELECT * FROM woche_zyklus WHERE status='offen' "
++                 "AND ende >= ? ORDER BY id DESC LIMIT 1", db.today())
++
++
++def zyklus_faellig() -> sqlite3.Row | None:
++    """Ein offener Zyklus, dessen Ende vorbei ist — wartet auf den Abschluss."""
++    ensure()
++    return db.q1("SELECT * FROM woche_zyklus WHERE status='offen' "
++                 "AND ende < ? ORDER BY id DESC LIMIT 1", db.today())
++
++
++def zyklus_starten(fokus: str, laenge: int = 7, still: bool = False) -> int:
++    ensure()
++    start = heute()
++    ende = start + dt.timedelta(days=max(1, laenge) - 1)
++    with db.tx() as c:
++        c.execute("UPDATE woche_zyklus SET status='fertig' WHERE status='offen'")
++        cur = c.execute(
++            "INSERT INTO woche_zyklus (start, ende, fokus, laenge, still, "
++            "created_at) VALUES (?,?,?,?,?,?)",
++            (start.isoformat(), ende.isoformat(), fokus.strip()[:80], laenge,
++             1 if still else 0, db.now()))
++        zid = int(cur.lastrowid)
++        c.execute("INSERT INTO woche_ereignis (zyklus_id, tag, art, wert, "
++                  "created_at) VALUES (?,?,'zyklus_start',?,?)",
++                  (zid, wochentag(), str(laenge), db.now()))
++    return zid
++
++
++def zyklus_abschliessen(zyklus_id: int, gefuehl: str, wunsch: str) -> None:
++    with db.tx() as c:
++        c.execute("UPDATE woche_zyklus SET status='fertig', gefuehl=?, wunsch=? "
++                  "WHERE id=?", (gefuehl, wunsch, zyklus_id))
++        c.execute("INSERT INTO woche_ereignis (zyklus_id, tag, art, wert, "
++                  "notiz, created_at) VALUES (?,?,'zyklus_ende',?,?,?)",
++                  (zyklus_id, wochentag(), gefuehl, wunsch, db.now()))
++
++
++def letzte_zyklen(n: int = 6) -> list[sqlite3.Row]:
++    ensure()
++    return db.q("SELECT * FROM woche_zyklus ORDER BY id DESC LIMIT ?", n)
++
++
++# --------------------------------------------------------------------------
++# Anker und Schritte
++# --------------------------------------------------------------------------
++
++def anker(zyklus_id: int, fach_id: int) -> sqlite3.Row | None:
++    return db.q1("SELECT * FROM woche_anker WHERE zyklus_id=? AND fach_id=?",
++                 zyklus_id, fach_id)
++
++
++def anker_setzen(zyklus_id: int, fach_id: int, text: str) -> None:
++    with db.tx() as c:
++        c.execute(
++            "INSERT INTO woche_anker (zyklus_id, fach_id, text, created_at) "
++            "VALUES (?,?,?,?) ON CONFLICT(zyklus_id, fach_id) "
++            "DO UPDATE SET text=excluded.text",
++            (zyklus_id, fach_id, text.strip()[:120], db.now()))
++
++
++def anker_fehlend_heute(zyklus_id: int) -> sqlite3.Row | None:
++    """Ein Fach, das heute Unterricht hatte und noch keinen Anker hat."""
++    for f in faecher_am_tag(wochentag()):
++        if anker(zyklus_id, f["id"]) is None:
++            return f
++    return None
++
++
++def schritte(zyklus_id: int) -> list[sqlite3.Row]:
++    return db.q(
++        "SELECT s.*, f.name AS fach_name FROM woche_schritt s "
++        "LEFT JOIN woche_fach f ON f.id=s.fach_id "
++        "WHERE s.zyklus_id=? AND s.ruht=0 ORDER BY s.id", zyklus_id)
++
++
++def schritt(schritt_id: int) -> sqlite3.Row | None:
++    return db.q1(
++        "SELECT s.*, f.name AS fach_name FROM woche_schritt s "
++        "LEFT JOIN woche_fach f ON f.id=s.fach_id WHERE s.id=?", schritt_id)
++
++
++def schritt_anlegen(zyklus_id: int, fach_id: int | None, titel: str,
++                    einstieg: str, groesse: str = "klein",
++                    anlass: str = "normal", form: str = "einfach") -> int:
++    with db.tx() as c:
++        cur = c.execute(
++            "INSERT INTO woche_schritt (zyklus_id, fach_id, titel, einstieg, "
++            "groesse, anlass, form, created_at) VALUES (?,?,?,?,?,?,?,?)",
++            (zyklus_id, fach_id, titel[:120], einstieg[:240], groesse, anlass,
++             form, db.now()))
++        return int(cur.lastrowid)
++
++
++def schritt_anpassen(schritt_id: int, titel: str, einstieg: str,
++                     groesse: str) -> None:
++    with db.tx() as c:
++        c.execute("UPDATE woche_schritt SET titel=?, einstieg=?, groesse=?, "
++                  "verkleinert=verkleinert+1 WHERE id=?",
++                  (titel[:120], einstieg[:240], groesse, schritt_id))
++
++
++def schritt_ruhen(schritt_id: int) -> None:
++    with db.tx() as c:
++        c.execute("UPDATE woche_schritt SET ruht=1 WHERE id=?", (schritt_id,))
++
++
++# --------------------------------------------------------------------------
++# Ereignisse — append only
++# --------------------------------------------------------------------------
++
++def ereignis(art: str, wert: str | None = None, *, zyklus_id: int | None = None,
++             schritt_id: int | None = None, fach_id: int | None = None,
++             notiz: str | None = None) -> None:
++    ensure()
++    with db.tx() as c:
++        c.execute(
++            "INSERT INTO woche_ereignis (zyklus_id, schritt_id, fach_id, tag, "
++            "art, wert, notiz, created_at) VALUES (?,?,?,?,?,?,?,?)",
++            (zyklus_id, schritt_id, fach_id, wochentag(), art,
++             None if wert is None else str(wert)[:80],
++             None if notiz is None else str(notiz)[:400], db.now()))
++
++
++def ereignisse(zyklus_id: int, art: str | None = None) -> list[sqlite3.Row]:
++    if art:
++        return db.q("SELECT * FROM woche_ereignis WHERE zyklus_id=? AND art=? "
++                    "ORDER BY id", zyklus_id, art)
++    return db.q("SELECT * FROM woche_ereignis WHERE zyklus_id=? ORDER BY id",
++                zyklus_id)
++
++
++def heute_schon(schritt_id: int) -> bool:
++    """Wurde dieser Schritt heute schon angefangen?"""
++    zeile = db.q1(
++        "SELECT 1 AS da FROM woche_ereignis WHERE schritt_id=? AND art='einstieg' "
++        "AND wert='gemacht' AND substr(created_at,1,10)=? LIMIT 1",
++        schritt_id, db.today())
++    return zeile is not None
++
++
++# --------------------------------------------------------------------------
++# Karten
++# --------------------------------------------------------------------------
++
++def karten() -> list[sqlite3.Row]:
++    ensure()
++    return db.q("SELECT * FROM woche_karte ORDER BY id DESC")
++
++
++def karte_anlegen(thema: str, bild: str | None) -> None:
++    with db.tx() as c:
++        c.execute("INSERT INTO woche_karte (thema, bild, created_at) "
++                  "VALUES (?,?,?)", (thema.strip()[:80], bild, db.now()))
++
++
++# --------------------------------------------------------------------------
++# Pause
++# --------------------------------------------------------------------------
++
++def pause_aktiv() -> sqlite3.Row | None:
++    ensure()
++    return db.q1("SELECT * FROM woche_pause WHERE bis >= ? "
++                 "ORDER BY id DESC LIMIT 1", db.today())
++
++
++def pause_setzen(wochen: int) -> None:
++    ensure()
++    von = heute()
++    bis = von + dt.timedelta(weeks=max(1, wochen))
++    with db.tx() as c:
++        c.execute("UPDATE woche_zyklus SET status='fertig' WHERE status='offen'")
++        c.execute("INSERT INTO woche_pause (von, bis, created_at) VALUES (?,?,?)",
++                  (von.isoformat(), bis.isoformat(), db.now()))
++        c.execute("INSERT INTO woche_ereignis (tag, art, wert, created_at) "
++                  "VALUES (?,'pause',?,?)", (wochentag(), str(wochen), db.now()))
++
++
++def pause_beenden() -> None:
++    """Rueckkehr ist ein Tap. Kein Rueckblick, kein Aufholen."""
++    ensure()
++    gestern = (heute() - dt.timedelta(days=1)).isoformat()
++    with db.tx() as c:
++        c.execute("UPDATE woche_pause SET bis=? WHERE bis >= ?",
++                  (gestern, db.today()))
++
++
++# --------------------------------------------------------------------------
++# Eltern
++# --------------------------------------------------------------------------
++
++def zusagen() -> set[int]:
++    ensure()
++    return {z["nr"] for z in db.q("SELECT nr FROM woche_eltern_zusage")}
++
++
++def zusage_setzen(nr: int) -> None:
++    with db.tx() as c:
++        c.execute("INSERT OR IGNORE INTO woche_eltern_zusage (nr, bestaetigt_am) "
++                  "VALUES (?,?)", (nr, db.now()))
++
++
++def offene_freigaben() -> list[sqlite3.Row]:
++    ensure()
++    return db.q("SELECT * FROM woche_ding WHERE aktiv=1 AND freigabe='offen'")
+diff --git a/app/woche/vorschlaege.py b/app/woche/vorschlaege.py
+new file mode 100644
+index 0000000..1aa9069
+--- /dev/null
++++ b/app/woche/vorschlaege.py
+@@ -0,0 +1,247 @@
++"""Die Vorschlagstabelle — ein Nachschlagewerk, kein Generator.
++
++Kein Modell, keine Erzeugung, keine laufenden Kosten: Fach x Klassenstufe x
++Anlass x Groesse ergibt einen Schritt. Das ist nachlesbar, pruefbar und kann
++nichts erfinden.
++
++Zwei Begriffe:
++
++* **titel** — was im Angebot steht („einen Uebungstest machen").
++* **einstieg** — die Handlung unter zwei Minuten, die keine Entscheidung
++  verlangt („Schlag Mathe auf Seite 42 auf und lies die erste Aufgabe laut
++  vor."). Sie ist das eigentliche Produkt: der Widerstand sitzt fast
++  vollstaendig im Anfangen.
++
++Der Anker (eine Zeile, die das Kind am Tag des Fachs selbst eingibt, z. B.
++„Brueche, S. 42") macht den Einstieg konkret. Fehlt er, greift eine
++koerperliche Variante, die ohne Inhaltskenntnis auskommt.
++"""
++
++from __future__ import annotations
++
++# --------------------------------------------------------------------------
++# Fachgruppen — damit die Tabelle nicht pro Fach vervielfacht werden muss
++# --------------------------------------------------------------------------
++
++GRUPPEN = {
++    "mathe": ("mathematik", "mathe"),
++    "sprache": ("deutsch", "englisch", "franzoesisch", "französisch", "latein",
++                "spanisch"),
++    "natur": ("biologie", "chemie", "physik", "nwt", "naturwissenschaften"),
++    "gesell": ("geschichte", "erdkunde", "geografie", "politik", "gemeinschaftskunde",
++               "religion", "ethik", "wirtschaft"),
++}
++
++ANLAESSE = ("arbeit_fern", "arbeit_nah", "morgen", "hausaufgaben",
++            "gemieden", "normal")
++
++GROESSEN = ("klein", "mittel", "gross")
++
++# Reihenfolge der Verkleinerung. Tiefer als 'klein' geht es nicht — das ist
++# die Untergrenze aus dem Konzept.
++KLEINER = {"gross": "mittel", "mittel": "klein", "klein": "klein"}
++
++MINUTEN = {"klein": 2, "mittel": 8, "gross": 15}
++
++
++def gruppe(fach: str) -> str:
++    """Ordnet ein Fach einer Gruppe zu. Unbekanntes landet bei 'gesell'."""
++    name = (fach or "").strip().lower()
++    for schluessel, namen in GRUPPEN.items():
++        if name in namen:
++            return schluessel
++    return "gesell"
++
++
++# --------------------------------------------------------------------------
++# Die Tabelle
++# --------------------------------------------------------------------------
++# (gruppe, anlass, groesse) -> titel
++# --------------------------------------------------------------------------
++
++_TITEL: dict[tuple[str, str, str], str] = {
++    # ---- Mathe -----------------------------------------------------------
++    ("mathe", "arbeit_fern", "klein"): "herausfinden, was in der Arbeit drankommt",
++    ("mathe", "arbeit_fern", "mittel"): "die letzten drei Hausaufgaben durchsehen",
++    ("mathe", "arbeit_fern", "gross"): "eine alte Aufgabe pro Thema rechnen",
++    ("mathe", "arbeit_nah", "klein"): "das schwierigste Thema heraussuchen",
++    ("mathe", "arbeit_nah", "mittel"): "das schwierigste Thema üben",
++    ("mathe", "arbeit_nah", "gross"): "einen Übungstest machen",
++    ("mathe", "morgen", "klein"): "die letzten zwei Hausaufgaben anschauen",
++    ("mathe", "morgen", "mittel"): "eine Aufgabe pro Thema rechnen",
++    ("mathe", "morgen", "gross"): "die Aufgaben vom letzten Blatt nachrechnen",
++    ("mathe", "hausaufgaben", "klein"): "die erste Aufgabe lesen",
++    ("mathe", "hausaufgaben", "mittel"): "die Hausaufgabe rechnen",
++    ("mathe", "hausaufgaben", "gross"): "die Hausaufgabe rechnen und nachprüfen",
++    ("mathe", "gemieden", "klein"): "5 Minuten reinschauen, nichts rechnen",
++    ("mathe", "gemieden", "mittel"): "eine einzige leichte Aufgabe",
++    ("mathe", "gemieden", "gross"): "eine Aufgabe, die du schon kannst",
++    ("mathe", "normal", "klein"): "eine Aufgabe von heute ansehen",
++    ("mathe", "normal", "mittel"): "drei Aufgaben rechnen",
++    ("mathe", "normal", "gross"): "das aktuelle Thema durchrechnen",
++
++    # ---- Sprachen --------------------------------------------------------
++    ("sprache", "arbeit_fern", "klein"): "herausfinden, was in der Arbeit drankommt",
++    ("sprache", "arbeit_fern", "mittel"): "die neuen Wörter einmal durchgehen",
++    ("sprache", "arbeit_fern", "gross"): "den Text aus dem Unterricht noch einmal lesen",
++    ("sprache", "arbeit_nah", "klein"): "die Wörter heraussuchen, die noch wackeln",
++    ("sprache", "arbeit_nah", "mittel"): "die wackligen Wörter üben",
++    ("sprache", "arbeit_nah", "gross"): "einen kurzen Text schreiben oder übersetzen",
++    ("sprache", "morgen", "klein"): "die Wörter von den letzten zwei Stunden ansehen",
++    ("sprache", "morgen", "mittel"): "die wichtigsten Regeln überfliegen",
++    ("sprache", "morgen", "gross"): "die letzten Aufgaben noch einmal machen",
++    ("sprache", "hausaufgaben", "klein"): "die Aufgabe einmal lesen",
++    ("sprache", "hausaufgaben", "mittel"): "die Hausaufgabe machen",
++    ("sprache", "hausaufgaben", "gross"): "die Hausaufgabe machen und laut lesen",
++    ("sprache", "gemieden", "klein"): "5 Minuten reinschauen, nichts schreiben",
++    ("sprache", "gemieden", "mittel"): "fünf Wörter, mehr nicht",
++    ("sprache", "gemieden", "gross"): "einen kurzen Abschnitt lesen",
++    ("sprache", "normal", "klein"): "die Wörter von heute einmal durchgehen",
++    ("sprache", "normal", "mittel"): "zehn Wörter üben",
++    ("sprache", "normal", "gross"): "Wörter üben und einen Satz damit bauen",
++
++    # ---- Naturwissenschaften --------------------------------------------
++    ("natur", "arbeit_fern", "klein"): "herausfinden, was in der Arbeit drankommt",
++    ("natur", "arbeit_fern", "mittel"): "die Überschriften im Heft durchgehen",
++    ("natur", "arbeit_fern", "gross"): "zu jedem Thema einen Satz aufschreiben",
++    ("natur", "arbeit_nah", "klein"): "das schwierigste Thema heraussuchen",
++    ("natur", "arbeit_nah", "mittel"): "das schwierigste Thema erklären",
++    ("natur", "arbeit_nah", "gross"): "die Zeichnungen und Begriffe wiederholen",
++    ("natur", "morgen", "klein"): "die letzten zwei Heftseiten ansehen",
++    ("natur", "morgen", "mittel"): "die wichtigsten Begriffe durchgehen",
++    ("natur", "morgen", "gross"): "das ganze Kapitel überfliegen",
++    ("natur", "hausaufgaben", "klein"): "die Aufgabe einmal lesen",
++    ("natur", "hausaufgaben", "mittel"): "die Hausaufgabe machen",
++    ("natur", "hausaufgaben", "gross"): "die Hausaufgabe machen und ergänzen",
++    ("natur", "gemieden", "klein"): "5 Minuten reinschauen, nichts aufschreiben",
++    ("natur", "gemieden", "mittel"): "eine Seite im Heft ansehen",
++    ("natur", "gemieden", "gross"): "ein Thema, das dich interessiert",
++    ("natur", "normal", "klein"): "die Heftseite von heute ansehen",
++    ("natur", "normal", "mittel"): "die Begriffe von heute erklären",
++    ("natur", "normal", "gross"): "das Thema von heute zusammenfassen",
++
++    # ---- Gesellschaft ----------------------------------------------------
++    ("gesell", "arbeit_fern", "klein"): "herausfinden, was in der Arbeit drankommt",
++    ("gesell", "arbeit_fern", "mittel"): "die Überschriften im Heft durchgehen",
++    ("gesell", "arbeit_fern", "gross"): "zu jedem Thema drei Stichpunkte",
++    ("gesell", "arbeit_nah", "klein"): "das schwierigste Thema heraussuchen",
++    ("gesell", "arbeit_nah", "mittel"): "das schwierigste Thema erzählen",
++    ("gesell", "arbeit_nah", "gross"): "die Zeitleiste oder Übersicht wiederholen",
++    ("gesell", "morgen", "klein"): "die letzten zwei Heftseiten ansehen",
++    ("gesell", "morgen", "mittel"): "die wichtigsten Namen und Jahre durchgehen",
++    ("gesell", "morgen", "gross"): "das ganze Thema überfliegen",
++    ("gesell", "hausaufgaben", "klein"): "die Aufgabe einmal lesen",
++    ("gesell", "hausaufgaben", "mittel"): "die Hausaufgabe machen",
++    ("gesell", "hausaufgaben", "gross"): "die Hausaufgabe machen und ergänzen",
++    ("gesell", "gemieden", "klein"): "5 Minuten reinschauen, nichts aufschreiben",
++    ("gesell", "gemieden", "mittel"): "eine Seite im Heft ansehen",
++    ("gesell", "gemieden", "gross"): "ein Thema, das dich interessiert",
++    ("gesell", "normal", "klein"): "die Heftseite von heute ansehen",
++    ("gesell", "normal", "mittel"): "das Thema von heute erzählen",
++    ("gesell", "normal", "gross"): "das Thema von heute zusammenfassen",
++}
++
++
++# --------------------------------------------------------------------------
++# Einstiegshandlungen
++# --------------------------------------------------------------------------
++# Regeln (aus dem Konzept):
++#   unter 2 Minuten * keine Wahl * koerperlich und konkret * keine Leistung
++# --------------------------------------------------------------------------
++
++_EINSTIEG_MIT_ANKER = {
++    "mathe": "Schlag {fach} bei „{anker}“ auf und lies die erste Aufgabe laut vor.",
++    "sprache": "Schlag {fach} bei „{anker}“ auf und lies die ersten drei Wörter laut vor.",
++    "natur": "Schlag {fach} bei „{anker}“ auf und lies die Überschrift laut vor.",
++    "gesell": "Schlag {fach} bei „{anker}“ auf und lies die Überschrift laut vor.",
++}
++
++_EINSTIEG_OHNE_ANKER = {
++    "mathe": "Nimm das {fach}-Heft raus und schlag die letzte beschriebene Seite auf.",
++    "sprache": "Nimm das {fach}-Heft raus und lies die letzten drei Wörter laut vor.",
++    "natur": "Nimm das {fach}-Heft raus und schlag die letzte beschriebene Seite auf.",
++    "gesell": "Nimm das {fach}-Heft raus und schlag die letzte beschriebene Seite auf.",
++}
++
++# Ein gemiedenes Fach bekommt einen Einstieg, der Leistung ausdruecklich
++# verbietet. Das senkt die Schwelle eines angstbesetzten Fachs auf fast null.
++_EINSTIEG_GEMIEDEN = ("Schlag {fach} irgendwo auf und schau 30 Sekunden hin. "
++                      "Du sollst nichts machen.")
++
++
++def einstieg(fach: str, anlass: str = "normal", anker: str | None = None) -> str:
++    """Die Handlung unter zwei Minuten."""
++    g = gruppe(fach)
++    if anlass == "gemieden":
++        return _EINSTIEG_GEMIEDEN.format(fach=fach)
++    anker = (anker or "").strip()
++    if anker:
++        return _EINSTIEG_MIT_ANKER[g].format(fach=fach, anker=anker)
++    return _EINSTIEG_OHNE_ANKER[g].format(fach=fach)
++
++
++def titel(fach: str, anlass: str = "normal", groesse: str = "klein",
++          klasse: int = 6) -> str:
++    """Was im Angebot steht."""
++    g = gruppe(fach)
++    anlass = anlass if anlass in ANLAESSE else "normal"
++    groesse = groesse if groesse in GROESSEN else "klein"
++    text = _TITEL.get((g, anlass, groesse))
++    if text is None:                       # pragma: no cover - Sicherheitsnetz
++        text = _TITEL[(g, "normal", "klein")]
++    # Klasse 5-6 bekommt mehr Struktur, 7-8 mehr Eigenverantwortung.
++    if klasse <= 6 and groesse == "gross":
++        text = _TITEL[(g, anlass, "mittel")]
++    return text
++
++
++def vorschlag(fach: str, anlass: str = "normal", groesse: str = "klein",
++              klasse: int = 6, anker: str | None = None) -> dict:
++    """Ein vollstaendiger Schritt: Titel, Einstieg, Minuten."""
++    return {
++        "fach": fach,
++        "titel": titel(fach, anlass, groesse, klasse),
++        "einstieg": einstieg(fach, anlass, anker),
++        "groesse": groesse,
++        "anlass": anlass,
++        "minuten": MINUTEN[groesse],
++    }
++
++
++# --------------------------------------------------------------------------
++# Kennenlernfragen — eine pro Zyklus, ueberspringbar, rotierend
++# --------------------------------------------------------------------------
++
++FRAGEN = [
++    {"schluessel": "ort", "symbol": "🍳",
++     "frage": "Wo lernst du am liebsten?",
++     "antworten": ["am Schreibtisch", "in der Küche", "auf dem Bett", "woanders"],
++     "satz": "Du lernst am liebsten {wert}."},
++    {"schluessel": "zeit_tag", "symbol": "📅",
++     "frage": "An welchem Tag hast du am meisten Zeit?",
++     "antworten": ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag",
++                   "am Wochenende"],
++     "satz": "Am meisten Zeit hast du {wert}."},
++    {"schluessel": "anfangen", "symbol": "🚀",
++     "frage": "Was hilft dir, wenn du nicht anfangen kannst?",
++     "antworten": ["ganz kurz anfangen", "jemand sitzt dabei", "Musik",
++                   "erst was essen", "weiß nicht"],
++     "satz": "Beim Anfangen hilft dir: {wert}."},
++    {"schluessel": "nervt", "symbol": "😤",
++     "frage": "Welches Fach nervt dich gerade am meisten?",
++     "antworten": [],          # wird aus den Faechern des Kindes gefuellt
++     "satz": "Gerade nervt dich {wert} am meisten."},
++    {"schluessel": "fertig", "symbol": "🕕",
++     "frage": "Wann bist du meistens mit Hausaufgaben fertig?",
++     "antworten": ["vor dem Abendessen", "nach dem Abendessen", "sehr spät",
++                   "mal so, mal so"],
++     "satz": "Mit Hausaufgaben bist du meistens {wert} fertig."},
++    {"schluessel": "nachmittag", "symbol": "🧸",
++     "frage": "Was machst du nach der Schule am liebsten?",
++     "antworten": [],          # Freitext
++     "satz": "Nach der Schule machst du am liebsten {wert}."},
++]
++
++# Tagesanker fuer „wann faengst du an?" — die App misst nichts, sie fragt nur.
++TAGESANKER = ["wenn ich heimkomme", "nach dem Essen", "vor dem Training",
++              "nach dem Zocken", "am Abend"]
+diff --git a/tests/test_woche.py b/tests/test_woche.py
+new file mode 100644
+index 0000000..e0b7720
+--- /dev/null
++++ b/tests/test_woche.py
+@@ -0,0 +1,537 @@
++"""Tests für „Meine Woche" — den Begleiter.
++
++Geprüft wird nicht nur, dass die Wege funktionieren, sondern vor allem die
++Zusagen, die das Konzept dem Kind macht. Ein Test, der nur Statuscodes zählt,
++würde die eigentlichen Fehlerklassen dieses Moduls übersehen:
++
++  * irgendwo taucht doch ein „nicht erledigt" auf,
++  * die Verkleinerung läuft ohne Untergrenze weiter,
++  * die Eltern sehen mehr, als ihnen zusteht,
++  * ein Lob erscheint, für das es kein Ereignis gibt,
++  * der Begleiter fasst eine Karo-Tabelle an.
++"""
++
++from __future__ import annotations
++
++import sqlite3
++
++import pytest
++
++from .conftest import csrf_from
++from .test_app import ALLE, TOKEN, einrichten
++
++
++# --------------------------------------------------------------------------
++# Helfer
++# --------------------------------------------------------------------------
++
++def anmelden(client, fake):
++    passwort = einrichten(client, fake, backend="abo")
++    seite = client.get("/login")
++    client.post("/login", data={"_csrf": csrf_from(seite.text),
++                                "password": passwort})
++    return passwort
++
++
++def csrf(client, pfad="/woche/einrichtung"):
++    return csrf_from(client.get(pfad).text)
++
++
++def woche_einrichten(client, faecher=("Mathematik", "Englisch"),
++                     wort="Jellycats", form="einfach", helfer="Mama"):
++    t = csrf(client)
++    r = client.post("/woche/einrichtung/faecher",
++                    data={"_csrf": t, "klasse": "7", "fach": list(faecher)})
++    assert r.status_code in (200, 303)
++    client.post("/woche/einrichtung/ding",
++                data={"_csrf": t, "wort": wort, "form": form})
++    client.post("/woche/einrichtung/helfer",
++                data={"_csrf": t, "name": helfer, "fester_tag": "2",
++                      "feste_zeit": "18:00", "fertig": "1"})
++
++
++def zyklus_starten(client, fokus="Mathearbeit"):
++    t = csrf(client, "/woche/plan")
++    r = client.post("/woche/start", data={"_csrf": t, "fokus": fokus},
++                    follow_redirects=False)
++    assert r.status_code == 303
++    return r
++
++
++def ersten_schritt_id(app_env):
++    zeile = app_env.db.q1("SELECT id FROM woche_schritt ORDER BY id LIMIT 1")
++    assert zeile is not None, "kein Schritt angelegt"
++    return zeile["id"]
++
++
++@pytest.fixture
++def woche(client, fake_llm, fake_cli):
++    fake_llm.responses = dict(ALLE)
++    anmelden(client, fake_llm)
++    woche_einrichten(client)
++    return client
++
++
++# --------------------------------------------------------------------------
++# Einrichtung
++# --------------------------------------------------------------------------
++
++def test_ohne_anmeldung_kein_zugang(client):
++    r = client.get("/woche", follow_redirects=False)
++    assert r.status_code == 303
++    assert r.headers["location"] in ("/setup", "/login")
++
++
++def test_einrichtung_in_drei_schritten(client, fake_llm, fake_cli, app_env):
++    anmelden(client, fake_llm)
++    r = client.get("/woche", follow_redirects=False)
++    assert r.headers["location"] == "/woche/einrichtung"
++
++    woche_einrichten(client)
++
++    assert len(app_env.db.q("SELECT * FROM woche_fach WHERE aktiv=1")) == 2
++    assert app_env.db.q1("SELECT * FROM woche_ding WHERE aktiv=1")["wort"] == "Jellycats"
++    assert app_env.db.q1("SELECT * FROM woche_helfer")["name"] == "Mama"
++    assert app_env.db.q1("SELECT * FROM woche_kind")["eingerichtet_am"]
++
++
++def test_ding_wartet_auf_freigabe_blockiert_aber_nichts(woche, app_env):
++    """Bis die Eltern bestätigen, sagt die App die Form statt des Wortes."""
++    from app.woche import store
++
++    d = store.ding()
++    assert d["freigabe"] == "offen"
++    assert store.wort_oder_form(d) == "Einfach"      # die Form, nicht das Wort
++
++    seite = woche.get("/woche/plan")
++    assert seite.status_code == 200          # nichts ist blockiert
++
++    store.ding_freigeben(d["id"], True)
++    assert store.wort_oder_form(store.ding()) == "Jellycats"
++
++
++# --------------------------------------------------------------------------
++# Der Kernweg
++# --------------------------------------------------------------------------
++
++def test_fokus_trifft_das_fach_trotz_wortstamm(woche, app_env):
++    """„Mathearbeit" muss Mathematik treffen — ein reines `in` tut das nicht."""
++    from app.woche import regeln, store
++
++    assert regeln.passt_zum_fokus("Mathematik", "Mathearbeit")
++    assert regeln.passt_zum_fokus("Englisch", "englisch vokabeltest")
++    assert not regeln.passt_zum_fokus("Biologie", "Mathearbeit")
++
++    zyklus_starten(woche, "Mathearbeit")
++    erster = app_env.db.q1(
++        "SELECT s.*, f.name AS fach FROM woche_schritt s "
++        "JOIN woche_fach f ON f.id=s.fach_id ORDER BY s.id LIMIT 1")
++    assert erster["fach"] == "Mathematik"
++    assert erster["anlass"] == "arbeit_nah"
++
++
++def test_zyklus_legt_angebot_an(woche, app_env):
++    zyklus_starten(woche)
++    schritte = app_env.db.q("SELECT * FROM woche_schritt")
++    assert 1 <= len(schritte) <= 3
++    for s in schritte:
++        assert s["einstieg"], "jeder Schritt braucht eine Einstiegshandlung"
++
++
++def test_einstieg_und_nein_ist_ein_vollwertiger_abschluss(woche, app_env):
++    zyklus_starten(woche)
++    sid = ersten_schritt_id(app_env)
++    t = csrf(woche, "/woche")
++
++    r = woche.post(f"/woche/schritt/{sid}/einstieg",
++                   data={"_csrf": t, "wert": "gemacht"}, follow_redirects=False)
++    assert r.headers["location"] == f"/woche/schritt/{sid}/weiter"
++
++    r = woche.post(f"/woche/schritt/{sid}/weiter",
++                   data={"_csrf": t, "wert": "nein"}, follow_redirects=False)
++    assert r.headers["location"] == "/woche"
++
++    seite = woche.get("/woche")
++    assert "Du hast angefangen" in seite.text
++
++    arten = [z["art"] for z in app_env.db.q("SELECT art FROM woche_ereignis")]
++    assert "einstieg" in arten and "weiter" in arten
++
++
++def test_gut_und_okay_loesen_keine_rueckfrage_aus(woche, app_env):
++    zyklus_starten(woche)
++    sid = ersten_schritt_id(app_env)
++    t = csrf(woche, "/woche")
++    r = woche.post(f"/woche/schritt/{sid}/rueckmeldung",
++                   data={"_csrf": t, "wert": "okay"}, follow_redirects=False)
++    assert r.headers["location"] == "/woche"
++
++
++def test_schwierig_fuehrt_zu_genau_einer_frage(woche, app_env):
++    zyklus_starten(woche)
++    sid = ersten_schritt_id(app_env)
++    t = csrf(woche, "/woche")
++
++    r = woche.post(f"/woche/schritt/{sid}/rueckmeldung",
++                   data={"_csrf": t, "wert": "schwierig"}, follow_redirects=False)
++    assert r.headers["location"] == f"/woche/schritt/{sid}/grund"
++
++    seite = woche.get(f"/woche/schritt/{sid}/grund")
++    assert "zu schwer" in seite.text and "keine Zeit" in seite.text
++
++
++# --------------------------------------------------------------------------
++# Die Zusagen des Konzepts
++# --------------------------------------------------------------------------
++
++def test_verkleinern_hat_eine_untergrenze(woche, app_env):
++    """Höchstens zweimal kleiner, danach Strategiewechsel statt Schrumpfen."""
++    from app.woche import regeln, store
++
++    zyklus_starten(woche)
++    sid = ersten_schritt_id(app_env)
++    t = csrf(woche, "/woche")
++
++    for _ in range(3):
++        woche.post(f"/woche/schritt/{sid}/anpassung",
++                   data={"_csrf": t, "art": "kleiner", "wert": "annehmen"})
++
++    s = store.schritt(sid)
++    assert s["verkleinert"] <= regeln.VERKLEINERN_MAX
++    assert regeln.anpassen(s, "zu_schwer")["art"] == "strategie"
++
++
++def test_nirgends_steht_nicht_erledigt(woche, app_env):
++    """Kein „offen", keine Quote — weder beim Kind noch bei den Eltern."""
++    zyklus_starten(woche)
++    from app.woche import store
++    for nr in (1, 2, 3):
++        store.zusage_setzen(nr)
++
++    verboten = ["nicht erledigt", "nicht geschafft", "offen:", "erledigt von",
++                "0 %", "Quote", "Rückstand"]
++    for pfad in ("/woche", "/woche/plan", "/woche/ueber-dich", "/woche/eltern",
++                 "/woche/hilfe", "/woche/stundenplan"):
++        text = woche.get(pfad).text
++        # Der Aufklapptext „Wie entsteht das?" und die Beruhigung auf dem
++        # Heute-Bildschirm benennen genau das, was NICHT gezeigt wird. Geprüft
++        # wird die Anzeige selbst, nicht die Erklärung darüber.
++        text = _ohne(text, "<details", "</details>")
++        text = _ohne(text, '<p class="leise">Das ist kein', "</p>")
++        for wort in verboten:
++            assert wort not in text, f"{wort!r} steht auf {pfad}"
++
++
++def _ohne(text: str, von: str, bis: str) -> str:
++    while von in text:
++        a = text.index(von)
++        e = text.index(bis, a) + len(bis) if bis in text[a:] else len(text)
++        text = text[:a] + text[e:]
++    return text
++
++
++def test_rueckblick_lobt_nur_mit_ereignis(woche, app_env):
++    """Ohne Ereignis kein Lob — ein Kind erkennt unverdientes Lob sofort."""
++    from app.woche import regeln, store
++
++    zyklus_starten(woche)
++    z = store.zyklus()
++    assert regeln.rueckblick(z["id"]) == []
++
++    sid = ersten_schritt_id(app_env)
++    t = csrf(woche, "/woche")
++    for _ in range(2):
++        woche.post(f"/woche/schritt/{sid}/einstieg",
++                   data={"_csrf": t, "wert": "gemacht"})
++
++    saetze = regeln.rueckblick(z["id"])
++    assert any("angefangen" in s for s in saetze)
++    assert all("toll" not in s.lower() for s in saetze)
++
++
++def test_eltern_sehen_die_gruende_nicht(woche, app_env):
++    from app.woche import store
++
++    zyklus_starten(woche)
++    sid = ersten_schritt_id(app_env)
++    t = csrf(woche, "/woche")
++    woche.post(f"/woche/schritt/{sid}/rueckmeldung",
++               data={"_csrf": t, "wert": "schwierig"})
++    woche.post(f"/woche/schritt/{sid}/grund",
++               data={"_csrf": t, "wert": "keine_lust"})
++    for nr in (1, 2, 3):
++        store.zusage_setzen(nr)
++
++    text = woche.get("/woche/eltern").text
++    assert "keine Lust" not in text
++    assert "schwierig" not in text
++
++
++def test_eltern_muessen_erst_zusagen(woche):
++    seite = woche.get("/woche/eltern")
++    assert "Ich frage nicht nach" in seite.text
++    assert "Der Plan läuft" not in seite.text
++
++
++def test_hilferuf_setzt_den_elternzustand(woche, app_env):
++    from app.woche import regeln, store
++
++    zyklus_starten(woche)
++    t = csrf(woche, "/woche/hilfe")
++    h = store.helfer()[0]
++    woche.post("/woche/hilfe", data={"_csrf": t, "helfer_id": str(h["id"]),
++                                     "frage": "Bruchrechnen"})
++    assert regeln.eltern_zustand()["key"] == "gefragt"
++
++
++def test_pause_ist_eine_funktion_und_umkehrbar(woche, app_env):
++    from app.woche import regeln, store
++
++    t = csrf(woche, "/woche")
++    woche.post("/woche/pause", data={"_csrf": t, "wochen": "1"})
++    assert store.pause_aktiv() is not None
++    assert regeln.eltern_zustand()["key"] == "pause"
++    assert "Pause" in woche.get("/woche").text
++
++    woche.post("/woche/pause/ende", data={"_csrf": t})
++    assert store.pause_aktiv() is None
++
++
++def test_notfall_ist_ehrlich_und_kennt_die_schlafgrenze(woche):
++    from app.woche import regeln
++
++    frueh = regeln.notfall("Mathematik", 20, stunde=19)
++    assert frueh["schlaf"] is False
++    assert "nicht mehr komplett" in frueh["text"]
++    assert frueh["schritt"]["titel"]
++
++    spaet = regeln.notfall("Mathematik", 20, stunde=22)
++    assert spaet["schlaf"] is True
++    assert spaet["schritt"] is None
++
++
++def test_weglassen_ist_eine_entscheidung(woche, app_env):
++    from app.woche import store
++
++    f = store.faecher()[0]
++    t = csrf(woche, "/woche/plan")
++    woche.post("/woche/weglassen", data={"_csrf": t, "fach_id": str(f["id"])})
++    zeile = app_env.db.q1("SELECT * FROM woche_ereignis WHERE art='weglassen'")
++    assert zeile["wert"] == f["name"]
++
++
++def test_wissen_ist_sichtbar_und_loeschbar(woche, app_env):
++    from app.woche import regeln
++
++    regeln.wissen_sagen("ort", "🍳", "Du lernst am liebsten in der Küche.")
++    seite = woche.get("/woche/ueber-dich")
++    assert "in der Küche" in seite.text
++
++    zid = app_env.db.q1("SELECT id FROM woche_wissen WHERE schluessel='ort'")["id"]
++    t = csrf_from(seite.text)
++    woche.post(f"/woche/wissen/{zid}/aus", data={"_csrf": t})
++    assert "in der Küche" not in woche.get("/woche/ueber-dich").text
++
++
++def test_kind_wissen_wird_nicht_ueberschrieben(woche):
++    """Was das Kind korrigiert hat, gewinnt gegen jeden Zähler."""
++    from app.woche import regeln
++
++    regeln.wissen_sagen("ding", "🧸", "Mein Ding ist geheim.")
++    regeln.wissen_neu_berechnen()
++    zeilen = {z["schluessel"]: z["text"] for z in regeln.wissen_zeilen()}
++    assert zeilen["ding"] == "Mein Ding ist geheim."
++
++
++# --------------------------------------------------------------------------
++# Unabhängigkeit von Karo
++# --------------------------------------------------------------------------
++
++def test_ereignisse_sind_append_only(woche, app_env):
++    from app.woche import store
++
++    store.ereignis("einstieg", "gemacht")
++    with pytest.raises(sqlite3.IntegrityError if False else Exception):
++        with app_env.db.tx() as c:
++            c.execute("UPDATE woche_ereignis SET wert='nicht'")
++    with pytest.raises(Exception):
++        with app_env.db.tx() as c:
++            c.execute("DELETE FROM woche_ereignis")
++
++
++def test_begleiter_fasst_keine_karo_tabelle_an(woche, app_env):
++    """Der Begleiter läuft neben Karo, nicht in Karo."""
++    zyklus_starten(woche)
++    sid = ersten_schritt_id(app_env)
++    t = csrf(woche, "/woche")
++    woche.post(f"/woche/schritt/{sid}/einstieg", data={"_csrf": t, "wert": "gemacht"})
++
++    for tabelle in ("topic", "quiz", "answer_log", "lesson", "document",
++                    "kb_chunk"):
++        n = app_env.db.q1(f"SELECT COUNT(*) AS n FROM {tabelle}")["n"]
++        assert n == 0, f"{tabelle} wurde vom Begleiter berührt"
++
++
++def test_quelltext_importiert_keine_karo_lernlogik():
++    """Statische Zusicherung: kein Import aus Karos Lernteil."""
++    from pathlib import Path
++
++    import app.woche as paket
++
++    verboten = ("topics", "quizzes", "teaching", "kb", "llm", "research",
++                "pipeline", "exam_plan", "ingest", "prompts")
++    ordner = Path(paket.__file__).parent
++    for datei in ordner.glob("*.py"):
++        text = datei.read_text(encoding="utf-8")
++        for name in verboten:
++            assert f"from ..{name}" not in text, f"{datei.name} importiert {name}"
++            assert f"from .. import {name}" not in text, f"{datei.name}: {name}"
++
++
++def test_nur_die_bruecke_kennt_karo_tabellen():
++    """Karo-Tabellen dürfen ausschließlich in bruecke.py vorkommen.
++
++    Das ist die Zusicherung, die die Trennung trotz Integration hält: wer
++    anderswo `topic` oder `lesson` abfragt, bricht sie auf."""
++    from pathlib import Path
++
++    import app.woche as paket
++
++    karo_tabellen = ("FROM topic", "FROM lesson", "FROM exam", "FROM document",
++                     "FROM kb_chunk", "FROM answer_log", "JOIN topic",
++                     "JOIN lesson")
++    ordner = Path(paket.__file__).parent
++    for datei in ordner.glob("*.py"):
++        if datei.name == "bruecke.py":
++            continue
++        text = datei.read_text(encoding="utf-8")
++        for name in karo_tabellen:
++            assert name not in text, f"{datei.name} liest {name}"
++
++
++# --------------------------------------------------------------------------
++# Die Brücke zu Karo
++# --------------------------------------------------------------------------
++
++def test_bruecke_ist_standardmaessig_aus(woche):
++    from app.woche import bruecke, store
++
++    assert store.kind()["karo_bruecke"] == 0
++    assert bruecke.aktiv("Mathematik") is False
++    assert bruecke.luecken("Mathematik") == []
++    assert bruecke.naechste_arbeit("Mathematik") is None
++    assert bruecke.titelzusatz("Mathematik") == ""
++
++
++def test_bruecke_liest_luecke_und_termin(woche, app_env):
++    """Eingeschaltet macht sie den Schritt konkret — und nur dann."""
++    from app.woche import bruecke, regeln, store
++
++    heute = app_env.db.today()
++    with app_env.db.tx() as c:
++        c.execute("INSERT INTO topic (id, subject, code, label, state, created_at) "
++                  "VALUES (1,'Mathematik','BR.ADD','Brüche addieren','aktiv',?)",
++                  (heute,))
++        c.execute("INSERT INTO topic_flag (topic_id, flag, computed_at) "
++                  "VALUES (1,'rot',?)", (heute,))
++        c.execute("INSERT INTO exam (subject, exam_date, titel, themen, created_at) "
++                  "VALUES ('Mathematik', date('now','+3 day'), 'Mathearbeit', "
++                  "'[\"Brüche\"]', ?)", (heute,))
++
++    # Aus: nichts davon wirkt.
++    assert bruecke.titelzusatz("Mathematik") == ""
++
++    store.kind_setzen(karo_bruecke=1)
++    assert bruecke.titelzusatz("Mathematik") == "Brüche addieren"
++    assert bruecke.anlass("Mathematik") == "arbeit_nah"
++    assert "3 Tagen" in bruecke.hinweis("Mathematik")
++
++    # Und im Angebot steht jetzt der Name der Lücke.
++    zyklus_starten(woche, "Mathearbeit")
++    titel = [s["titel"] for s in store.schritte(store.zyklus()["id"])]
++    assert any("Brüche addieren" in t for t in titel), titel
++
++
++def test_bruecke_gilt_nur_fuer_karos_fach(woche, app_env):
++    """Karo deckt ein Fach ab. Für alle anderen bleibt der Begleiter allein."""
++    from app.woche import bruecke, store
++
++    store.kind_setzen(karo_bruecke=1)
++    assert bruecke.zustaendig("Mathematik") is True      # config.subject
++    assert bruecke.zustaendig("Englisch") is False
++    assert bruecke.luecken("Englisch") == []
++
++
++def test_bruecke_schreibt_nie_in_karo(woche, app_env):
++    from app.woche import bruecke, regeln, store
++
++    store.kind_setzen(karo_bruecke=1)
++    zyklus_starten(woche, "Mathearbeit")
++    regeln.notfall("Mathematik", 20, stunde=18)
++    bruecke.luecken("Mathematik")
++    bruecke.ankervorschlag("Mathematik")
++
++    for tabelle in ("topic", "topic_flag", "quiz", "answer_log", "lesson",
++                    "document"):
++        n = app_env.db.q1(f"SELECT COUNT(*) AS n FROM {tabelle}")["n"]
++        assert n == 0, f"{tabelle} wurde beschrieben"
++
++
++def test_bruecke_ueberlebt_leeres_karo(woche):
++    """Kein Thema, keine Arbeit, kein Blatt — der Begleiter läuft weiter."""
++    from app.woche import store
++
++    store.kind_setzen(karo_bruecke=1)
++    zyklus_starten(woche)
++    for pfad in ("/woche", "/woche/plan", "/woche/eltern", "/woche/notfall"):
++        assert woche.get(pfad).status_code == 200, pfad
++
++
++def test_alle_bildschirme_rendern(woche, app_env):
++    """Jede Seite einmal aufrufen — Templatefehler fallen sonst erst live auf."""
++    zyklus_starten(woche)
++    sid = ersten_schritt_id(app_env)
++    seiten = [
++        "/woche", "/woche/plan", "/woche/hilfe", "/woche/ueber-dich",
++        "/woche/stundenplan", "/woche/eltern", "/woche/einrichtung",
++        "/woche/notfall", "/woche/abschluss",
++        f"/woche/schritt/{sid}/weiter",
++        f"/woche/schritt/{sid}/form",
++        f"/woche/schritt/{sid}/rueckmeldung",
++        f"/woche/schritt/{sid}/grund",
++        f"/woche/schritt/{sid}/anpassung?grund=zu_schwer",
++        f"/woche/schritt/{sid}/karte",
++    ]
++    for pfad in seiten:
++        r = woche.get(pfad)
++        assert r.status_code == 200, f"{pfad}: {r.status_code}"
++        assert "<main" in r.text, pfad
++
++
++def test_notfall_zeigt_genau_eine_sache(woche, app_env):
++    from app.woche import store
++
++    f = store.faecher()[0]
++    t = csrf(woche, "/woche/notfall")
++    r = woche.post("/woche/notfall", data={"_csrf": t, "fach_id": str(f["id"]),
++                                           "was": "arbeit", "minuten": "20"})
++    assert r.status_code == 200
++    assert "zeig mir das Wichtigste" not in r.text      # Ergebnis, nicht Formular
++
++
++def test_jede_form_hat_eine_seite(woche, app_env):
++    from app.woche import store
++
++    for form in ("speedrun", "clip", "einfach"):
++        store.ding_setzen("Test", form)
++        zyklus_starten(woche, "Mathearbeit")
++        sid = app_env.db.q1("SELECT id FROM woche_schritt ORDER BY id DESC")["id"]
++        r = woche.get(f"/woche/schritt/{sid}/form")
++        assert r.status_code == 200, form
++        assert f'data-form="{form}"' in r.text
++
++
++def test_karo_laeuft_unveraendert_weiter(woche):
++    """Die Hauptanwendung darf von dem Modul nichts merken."""
++    for pfad in ("/", "/themen", "/wissen", "/lernstand"):
++        assert woche.get(pfad).status_code == 200
+-- 
+2.43.0
+

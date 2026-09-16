@@ -106,6 +106,10 @@ def init() -> None:
     c = conn()
     c.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     _migrate(c)
+    from .woche.pilot_store import init as init_woche
+    init_woche()
+    from .welten.store import init as init_welten
+    init_welten()
     row = c.execute("SELECT MAX(version) AS v FROM schema_version").fetchone()
     if row is None or row["v"] is None or row["v"] < SCHEMA_VERSION:
         with tx() as migration:

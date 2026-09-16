@@ -19,7 +19,7 @@ from .. import (config, db, exam_learning, export, ingest, jobs, kb, materials,
 from ..domain import FLAG_ORDER, Flag
 from ..quizzes import QuizError
 from ..teaching import TeachingError
-from ..routers.shared import flash, render, zurueck
+from ..routers.shared import companion_name, flash, render, zurueck
 from . import learning_content, learning_progress, topic_workflow
 
 
@@ -100,7 +100,7 @@ async def handle_quiz_blatt(request: Request, quiz_id: int,
         flash(request, str(exc), "err")
         return zurueck(f"/quiz/{quiz_id}")
 
-    flash(request, "Antwortblatt aufgenommen. Karo liest es jetzt ab.")
+    flash(request, f"Antwortblatt aufgenommen. {companion_name(request)} liest es jetzt ab.")
     return zurueck(f"/quiz/{quiz_id}")
 
 
@@ -333,7 +333,7 @@ def handle_lernen_forschen(request: Request, lesson_id: int):
         flash(request, str(exc), "err")
         return zurueck(f"/lernen/{lesson_id}")
     if ok:
-        flash(request, "Karo sucht auf den zugelassenen Seiten. Diese Seite "
+        flash(request, f"{companion_name(request)} sucht auf den zugelassenen Seiten. Diese Seite "
                        "in ein bis zwei Minuten neu laden.")
     else:
         flash(request, "Die Recherche ist ausgeschaltet oder läuft schon "

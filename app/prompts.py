@@ -822,3 +822,84 @@ Lies daraus:
 
 Kein Name, keine Schule, keine Lehrkraft — falls auf dem Blatt vorhanden,
 einfach ignorieren."""
+
+
+# ==========================================================================
+# 10. "Meine Welt": Ideen zu einem Interesse des Kindes
+# ==========================================================================
+#
+# Die drei Spielrahmen (cafe/atelier/station) und die Verteil-Mechanik der
+# Mission sind fest und werden hier NICHT veraendert — Name, Tagline,
+# Beschreibung UND welches Bild (`art`, aus einer festen, gepruesten
+# Bibliothek — siehe `welten/catalog.py:SCENES`) angezeigt wird, duerfen
+# sich am Interesse des Kindes orientieren. Bei jedem Fehler (Zeitlimit,
+# unpassende Antwort, falsches Schema) faellt der Aufruf auf die feste
+# Schablone zurueck (siehe `welten/catalog.py:ideas()`).
+
+WELTEN_SYSTEM = (
+    "Du schreibst kurze, harmlose Spielbeschreibungen fuer Kinder in "
+    "Deutschland. Bleibe freundlich, ermutigend und altersgerecht. Keine "
+    "gruseligen, gewaltsamen, traurigen oder fuer Kinder unpassenden "
+    "Inhalte. Erfinde keine echten Personen, Marken oder Orte. Du "
+    "erfindest keine Lerninhalte — hier geht es nur um eine Spielidee, "
+    "nicht um Unterrichtsstoff."
+)
+
+WELTEN_IDEAS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "ideen": {
+            "type": "array", "minItems": 3, "maxItems": 3,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string", "enum": ["cafe", "atelier", "station"]},
+                    "art": {"type": "string", "maxLength": 20},
+                    "name": {"type": "string", "maxLength": 60},
+                    "tagline": {"type": "string", "maxLength": 120},
+                    "description": {"type": "string", "maxLength": 200},
+                },
+                "required": ["key", "art", "name", "tagline", "description"],
+            },
+        },
+    },
+    "required": ["ideen"],
+}
+
+
+def welten_ideas_prompt(interest: str, grade: int, scenes: dict[str, str]) -> str:
+    bildliste = "\n".join(f"- {key}: {label}" for key, label in scenes.items())
+    return f"""Ein Kind der {grade}. Klasse in Deutschland hat als eigenes
+Interesse eingegeben: „{interest}“.
+
+Es gibt drei feste Spielrahmen. Ihre Mechanik (etwas wird gerecht auf vier
+Plaetze verteilt) aendert sich NICHT — nur Name, Tagline, Beschreibung und
+das gezeigte Bild sollen wirklich zum Interesse passen, nicht nur das Wort
+hineinsetzen:
+
+- cafe: ein gemeinsamer Treffpunkt/Tisch
+- atelier: ein Kreativstudio zum Gestalten
+- station: eine Entdeckerreise/Forschungsstation
+
+Fuer jeden Rahmen waehlst du zusaetzlich ein Bild (`art`) aus dieser festen,
+bereits gepruesten Bibliothek — nutze den Schluessel links, nicht die
+Beschreibung rechts:
+{bildliste}
+
+Waehle das Bild, das inhaltlich am besten zum Interesse „{interest}" passt
+(z. B. „dino" fuer Dinosaurier-Interessen, „sport" fuer Fussball/Sport,
+„meer" fuer Meerestiere). Wenn kein Bild wirklich passt, nimm das Bild mit
+demselben Schluessel wie der Rahmen (cafe/atelier/station). Die drei
+gewaehlten Bilder duerfen gleich oder verschieden sein — waehle das jeweils
+treffendste, erzwinge keine Abwechslung.
+
+Schreibe fuer jeden der drei Rahmen einen kurzen, altersgerechten Namen,
+eine Tagline und eine Beschreibung in ein bis zwei Saetzen, die zur
+{grade}. Klasse passen — einfache, verstaendliche Sprache, keine
+Fachbegriffe. Der Name darf das Interesse sinngemaess aufgreifen (mit
+korrekter Rechtschreibung und Grossschreibung, auch wenn die Eingabe
+Tippfehler oder Kleinschreibung enthielt) — haenge das Interesse NICHT
+einfach wortwoertlich als Praefix vor einen Rahmennamen (also nicht
+„{interest}: Treffpunkt"), sondern erfinde einen eigenen, zum jeweiligen
+Rahmen passenden Namen. Alle drei Namen sollen sich klar voneinander
+unterscheiden. Halte dich an die Wortgrenzen aus dem Schema."""

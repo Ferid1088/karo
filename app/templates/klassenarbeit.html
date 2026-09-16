@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Klassenarbeit – Karo{% endblock %}
+{% block title %}Klassenarbeit – {{ companion_name }}{% endblock %}
 {% block content %}
 {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
 {% if cfg.klassenarbeit_kind %}<a class="back-link" href="/lernen">← Lernen</a>{% endif %}<h1>Dein Plan für die Klassenarbeit</h1>
@@ -11,7 +11,7 @@
 
 <div class="card">
   <h3><span class="klein">Schritt 1</span><br>Themenblatt einlesen</h3>
-  <p class="hint">Foto oder Scan des Ankündigungsblatts hochladen — Karo liest
+  <p class="hint">Foto oder Scan des Ankündigungsblatts hochladen — {{ companion_name }} liest
   Themen und, falls lesbar, den Termin heraus und trägt beides unten ein.
   Geprüft und angelegt wird trotzdem erst von Hand.</p>
   <form method="post" action="/klassenarbeit/themenblatt" enctype="multipart/form-data"
@@ -26,7 +26,7 @@
   </form>
 
   {% if scan and scan.state == 'offen' %}
-  <div class="msg" style="margin-top:.8rem">Karo liest das Blatt gerade ein …
+  <div class="msg" style="margin-top:.8rem">{{ companion_name }} liest das Blatt gerade ein …
   <br><span class="hint">Diese Seite aktualisiert sich von selbst, sobald das
   Blatt gelesen ist{% if offen %} ({{ offen }} Vorgang läuft){% endif %}.</span></div>
   <script>karoAutoRefresh("/klassenarbeit/themenblatt/status?scan_id={{ scan.id }}", "{{ scan.state }}");</script>
@@ -88,7 +88,7 @@
   <p class="klein" style="margin-top:.7rem">{{ e.themen_liste | join(', ') or 'keine Themen angegeben' }}</p>
 
   {% if e.plan and e.plan.state == 'offen' %}
-  <div class="msg" style="margin:.7rem 0">Karo erstellt gerade den Lernplan …
+  <div class="msg" style="margin:.7rem 0">{{ companion_name }} erstellt gerade den Lernplan …
   <br><span class="hint">Diese Seite aktualisiert sich von selbst, sobald der
   Lernplan fertig ist{% if offen %} ({{ offen }} Vorgang läuft){% endif %}.</span></div>
   <script>karoAutoRefresh("/klassenarbeit/{{ e.id }}/plan/status", "{{ e.plan.state }}");</script>

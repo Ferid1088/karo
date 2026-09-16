@@ -9,6 +9,8 @@
 {% if offene_vorschlaege %}<a class="simple-list-link" href="/themen#themen-vorschlaege"><span><strong>{{ offene_vorschlaege }} Themen bestätigen</strong><small>Karo hat Themen auf den Schulblättern gefunden.</small></span><span aria-hidden="true">→</span></a>{% endif %}
 {% if offene_funde %}<a class="simple-list-link" href="/recherche"><span><strong>{{ offene_funde }} Internetquellen prüfen</strong><small>Sie entscheiden, was verwendet wird.</small></span><span aria-hidden="true">→</span></a>{% endif %}
 </div></section>{% endif %}
+{% include "woche/pilot_card.html" %}
+<section class="card"><h2>Meine Welt</h2>{% if begleiter %}<p>Der Begleiter Ihres Kindes heißt aktuell „{{ begleiter.name }}“.</p>{% else %}<p>Ihr Kind hat noch keinen eigenen Begleiter eingerichtet.</p>{% endif %}{% if begleiter_interesse %}<p>Interessiert sich gerade für: {{ begleiter_interesse.text }}</p>{% endif %}<a class="btn" href="/welten">Meine Welt ansehen</a></section>
 <div class="choice-grid parent-choices">
 {% if not cfg.schulblaetter_kind %}<a class="choice-card" href="/wissen"><h2>Schulblätter</h2><p>Fotos und PDFs hinzufügen und ansehen.</p></a>{% endif %}
 <a class="choice-card" href="/themen"><h2>Themen</h2><p>Themen bestätigen, benennen oder selbst anlegen.</p></a>

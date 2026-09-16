@@ -169,12 +169,12 @@ def test_source_buttons_and_exam_fields_match_endpoints(client, fake_llm, fake_c
     assert app_env.db.q1('SELECT exam_date FROM exam')['exam_date'] == '2099-01-01'
 
 
-def test_only_three_main_links_and_parent_features_remain(client, fake_llm, fake_cli):
+def test_child_navigation_includes_week_and_parent_features_remain(client, fake_llm, fake_cli):
     import re
     einrichten(client, fake_llm)
     page = client.get('/')
     nav = re.search(r'<nav class="simple-nav".*?</nav>', page.text, re.S).group()
-    assert nav.count('<a ') == 3
+    assert re.findall(r'href="([^"]+)"', nav) == ['/', '/lernen', '/woche', '/welten', '/lernstand']
     assert 'verbindung-popup-slot' not in page.text
     parent = client.get('/eltern').text
     for path in ('/wissen', '/themen', '/klassenarbeit', '/messung/fortschritt#ausfuehrlich', '/recherche', '/setup', '/protokoll', '/hilfe'):

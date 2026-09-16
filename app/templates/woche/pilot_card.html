@@ -1,0 +1,15 @@
+<section class="card"><h2>Meine Woche</h2>
+{% set p = woche.plan %}
+{% if p %}
+{% if p.goal %}<p><strong>Wochenziel:</strong> {{ p.goal }}</p>{% endif %}
+{% if p.routine %}<p><strong>Routine:</strong> {{ p.routine }}</p>{% endif %}
+{% if p.promise %}<p><strong>Elternzusage:</strong> {{ p.promise }}</p>{% endif %}
+{% if p.paused %}<p>Woche pausiert</p>{% endif %}
+{% if p.child_status == 'aendern' %}<p>Ihr Kind bittet um eine Änderung.</p>{% endif %}
+{% for activity in woche.positive %}<p>{{ 'Ein Einstieg' if activity == 'goal' else 'Ein Schritt zur Routine' }} als geschafft gemeldet.</p>{% endfor %}
+{% if p.achieved %}<p>Wochenziel als erreicht gemeldet · Selbstauskunft des Kindes.</p>{% endif %}
+{% if not woche.positive and not p.achieved %}<p>Noch keine Rückmeldung</p>{% endif %}
+{% if p.feeling %}<p>Gemeinsame Wochenrückmeldung: {{ {'gut':'Gut','mittel':'Ging so','schwierig':'War schwierig'}[p.feeling] }} · {{ {'lassen':'So lassen','leichter':'Leichter','anders':'Anders'}[p.wish] }}</p>{% endif %}
+{% else %}<p>Noch keine Wochenvereinbarung.</p>{% endif %}
+{% for h in woche.helps %}<p><strong>{{ 'Hilfe zugesagt' if h.status == 'zugesagt' else 'Hilfe angefragt' }}</strong> · Woche ab {{ h.week }}<br>{{ h.activity_text }}{% if h.message %}<br>{{ h.message }}{% endif %}{% if h.reply %}<br>Antwort: {{ h.reply }}{% endif %}{% if h.appointment %}<br>Termin: {{ h.appointment|replace('T',' · ') }}{% endif %}</p>{% endfor %}
+<a class="btn" href="/woche/eltern">Vereinbarung und Hilfe öffnen</a></section>

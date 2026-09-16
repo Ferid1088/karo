@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Meine Woche – Karo{% endblock %}
+{% block mainclass %}weekly{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/woche-pilot.css?v=1">
+<script src="/static/woche-pilot.js?v=1" defer></script>
+<h1>Meine Woche</h1>
+{% block weekly %}{% endblock %}
+{% endblock %}

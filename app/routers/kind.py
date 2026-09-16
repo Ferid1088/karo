@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from .. import quizzes, teaching
 from ..teaching import TeachingError
 from ..services import quiz_drafts, workflow
-from .shared import flash, zurueck
+from .shared import companion_name, flash, zurueck
 
 log = logging.getLogger("karo.kind")
 router = APIRouter()
@@ -136,7 +136,7 @@ def lernen_variante(request: Request, lesson_id: int, round_id: int,
     except TeachingError as exc:
         flash(request, str(exc), "err")
     else:
-        flash(request, "Karo erzeugt eine weitere Version — das dauert etwas.")
+        flash(request, f"{companion_name(request)} erzeugt eine weitere Version — das dauert etwas.")
     return zurueck(f"/lernen/{lesson_id}")
 
 

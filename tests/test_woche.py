@@ -1,537 +1,394 @@
-"""Tests für „Meine Woche" — den Begleiter.
-
-Geprüft wird nicht nur, dass die Wege funktionieren, sondern vor allem die
-Zusagen, die das Konzept dem Kind macht. Ein Test, der nur Statuscodes zählt,
-würde die eigentlichen Fehlerklassen dieses Moduls übersehen:
-
-  * irgendwo taucht doch ein „nicht erledigt" auf,
-  * die Verkleinerung läuft ohne Untergrenze weiter,
-  * die Eltern sehen mehr, als ihnen zusteht,
-  * ein Lob erscheint, für das es kein Ereignis gibt,
-  * der Begleiter fasst eine Karo-Tabelle an.
-"""
-
-from __future__ import annotations
-
-import sqlite3
+"""Acceptance tests for the replacement pilot (the old prototype contract is retired)."""
+from datetime import date, datetime, timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-
 from .conftest import csrf_from
-from .test_app import ALLE, TOKEN, einrichten
-
-
-# --------------------------------------------------------------------------
-# Helfer
-# --------------------------------------------------------------------------
-
-def anmelden(client, fake):
-    passwort = einrichten(client, fake, backend="abo")
-    seite = client.get("/login")
-    client.post("/login", data={"_csrf": csrf_from(seite.text),
-                                "password": passwort})
-    return passwort
-
-
-def csrf(client, pfad="/woche/einrichtung"):
-    return csrf_from(client.get(pfad).text)
-
-
-def woche_einrichten(client, faecher=("Mathematik", "Englisch"),
-                     wort="Jellycats", form="einfach", helfer="Mama"):
-    t = csrf(client)
-    r = client.post("/woche/einrichtung/faecher",
-                    data={"_csrf": t, "klasse": "7", "fach": list(faecher)})
-    assert r.status_code in (200, 303)
-    client.post("/woche/einrichtung/ding",
-                data={"_csrf": t, "wort": wort, "form": form})
-    client.post("/woche/einrichtung/helfer",
-                data={"_csrf": t, "name": helfer, "fester_tag": "2",
-                      "feste_zeit": "18:00", "fertig": "1"})
-
-
-def zyklus_starten(client, fokus="Mathearbeit"):
-    t = csrf(client, "/woche/plan")
-    r = client.post("/woche/start", data={"_csrf": t, "fokus": fokus},
-                    follow_redirects=False)
-    assert r.status_code == 303
-    return r
-
-
-def ersten_schritt_id(app_env):
-    zeile = app_env.db.q1("SELECT id FROM woche_schritt ORDER BY id LIMIT 1")
-    assert zeile is not None, "kein Schritt angelegt"
-    return zeile["id"]
+from .test_app import einrichten, session_cookie_faelschen
 
 
 @pytest.fixture
-def woche(client, fake_llm, fake_cli):
-    fake_llm.responses = dict(ALLE)
-    anmelden(client, fake_llm)
-    woche_einrichten(client)
-    return client
+def family(client, app_env, fake_llm, fake_cli, monkeypatch):
+    password = einrichten(client, fake_llm)
+    from app.woche import pilot, pilot_store
+    monkeypatch.setattr(pilot, 'today', lambda now=None: date(2026, 9, 15))
+    return client, app_env, pilot, pilot_store, password
 
 
-# --------------------------------------------------------------------------
-# Einrichtung
-# --------------------------------------------------------------------------
-
-def test_ohne_anmeldung_kein_zugang(client):
-    r = client.get("/woche", follow_redirects=False)
-    assert r.status_code == 303
-    assert r.headers["location"] in ("/setup", "/login")
-
-
-def test_einrichtung_in_drei_schritten(client, fake_llm, fake_cli, app_env):
-    anmelden(client, fake_llm)
-    r = client.get("/woche", follow_redirects=False)
-    assert r.headers["location"] == "/woche/einrichtung"
-
-    woche_einrichten(client)
-
-    assert len(app_env.db.q("SELECT * FROM woche_fach WHERE aktiv=1")) == 2
-    assert app_env.db.q1("SELECT * FROM woche_ding WHERE aktiv=1")["wort"] == "Jellycats"
-    assert app_env.db.q1("SELECT * FROM woche_helfer")["name"] == "Mama"
-    assert app_env.db.q1("SELECT * FROM woche_kind")["eingerichtet_am"]
+def role(family, value='child'):
+    client, env, *_ = family
+    session = {'auth': True, 'csrf': 'test-token'}
+    if value is not None:
+        session['role'] = value
+    cookie = session_cookie_faelschen(env, **session)
+    client.cookies.clear()
+    client.cookies.set('karo_session', cookie)
 
 
-def test_ding_wartet_auf_freigabe_blockiert_aber_nichts(woche, app_env):
-    """Bis die Eltern bestätigen, sagt die App die Form statt des Wortes."""
-    from app.woche import store
-
-    d = store.ding()
-    assert d["freigabe"] == "offen"
-    assert store.wort_oder_form(d) == "Einfach"      # die Form, nicht das Wort
-
-    seite = woche.get("/woche/plan")
-    assert seite.status_code == 200          # nichts ist blockiert
-
-    store.ding_freigeben(d["id"], True)
-    assert store.wort_oder_form(store.ding()) == "Jellycats"
+def post(family, path, data=None, expected=303):
+    client = family[0]
+    token = csrf_from(client.get('/woche').text)
+    response = client.post(path, data={'_csrf': token, **(data or {})}, follow_redirects=False)
+    assert response.status_code == expected, response.text[:1200]
+    return response
 
 
-# --------------------------------------------------------------------------
-# Der Kernweg
-# --------------------------------------------------------------------------
-
-def test_fokus_trifft_das_fach_trotz_wortstamm(woche, app_env):
-    """„Mathearbeit" muss Mathematik treffen — ein reines `in` tut das nicht."""
-    from app.woche import regeln, store
-
-    assert regeln.passt_zum_fokus("Mathematik", "Mathearbeit")
-    assert regeln.passt_zum_fokus("Englisch", "englisch vokabeltest")
-    assert not regeln.passt_zum_fokus("Biologie", "Mathearbeit")
-
-    zyklus_starten(woche, "Mathearbeit")
-    erster = app_env.db.q1(
-        "SELECT s.*, f.name AS fach FROM woche_schritt s "
-        "JOIN woche_fach f ON f.id=s.fach_id ORDER BY s.id LIMIT 1")
-    assert erster["fach"] == "Mathematik"
-    assert erster["anlass"] == "arbeit_nah"
+def create(family, **changes):
+    store = family[3]
+    role(family, 'parent')
+    existing = store.get()
+    values = {'week': '2026-09-14', 'version': existing['version'] if existing else 0,
+              'goal': 'Meinen Referatseinstieg sicher erzählen.', 'step': 'Öffne deine Notizen und lies den ersten Satz laut.',
+              'routine': '', 'promise': 'Ich höre dir zehn Minuten zu.', 'discussed': 'ja'}
+    values.update(changes)
+    post(family, '/woche/eltern/plan', values)
+    role(family)
+    return store.get()
 
 
-def test_zyklus_legt_angebot_an(woche, app_env):
-    zyklus_starten(woche)
-    schritte = app_env.db.q("SELECT * FROM woche_schritt")
-    assert 1 <= len(schritte) <= 3
-    for s in schritte:
-        assert s["einstieg"], "jeder Schritt braucht eine Einstiegshandlung"
+def activity(family, action, selected='goal', expected=303, **extra):
+    p = family[3].get()
+    return post(family, '/woche/aktivitaet', {'plan_id': p['id'], 'revision': p['revision'],
+                'day': str(family[2].today()), 'activity': selected, 'action': action, **extra}, expected)
 
 
-def test_einstieg_und_nein_ist_ein_vollwertiger_abschluss(woche, app_env):
-    zyklus_starten(woche)
-    sid = ersten_schritt_id(app_env)
-    t = csrf(woche, "/woche")
-
-    r = woche.post(f"/woche/schritt/{sid}/einstieg",
-                   data={"_csrf": t, "wert": "gemacht"}, follow_redirects=False)
-    assert r.headers["location"] == f"/woche/schritt/{sid}/weiter"
-
-    r = woche.post(f"/woche/schritt/{sid}/weiter",
-                   data={"_csrf": t, "wert": "nein"}, follow_redirects=False)
-    assert r.headers["location"] == "/woche"
-
-    seite = woche.get("/woche")
-    assert "Du hast angefangen" in seite.text
-
-    arten = [z["art"] for z in app_env.db.q("SELECT art FROM woche_ereignis")]
-    assert "einstieg" in arten and "weiter" in arten
+def status(family, action, expected=303, **extra):
+    p = family[3].get()
+    return post(family, '/woche/status', {'plan_id': p['id'], 'version': p['version'], 'action': action, **extra}, expected)
 
 
-def test_gut_und_okay_loesen_keine_rueckfrage_aus(woche, app_env):
-    zyklus_starten(woche)
-    sid = ersten_schritt_id(app_env)
-    t = csrf(woche, "/woche")
-    r = woche.post(f"/woche/schritt/{sid}/rueckmeldung",
-                   data={"_csrf": t, "wert": "okay"}, follow_redirects=False)
-    assert r.headers["location"] == "/woche"
+def test_parent_agreement_child_and_dashboard(family):
+    create(family)
+    assert 'Meinen Referatseinstieg' in family[0].get('/woche').text
+    status(family, 'change')
+    role(family, 'parent')
+    html = family[0].get('/eltern').text
+    assert 'Ihr Kind bittet um eine Änderung' in html and 'Noch keine Rückmeldung' in html
+    assert 'Meine Woche' in family[0].get('/').text
+    assert 'data-ui-area="parent"' in family[0].get('/woche/eltern').text
 
 
-def test_schwierig_fuehrt_zu_genau_einer_frage(woche, app_env):
-    zyklus_starten(woche)
-    sid = ersten_schritt_id(app_env)
-    t = csrf(woche, "/woche")
-
-    r = woche.post(f"/woche/schritt/{sid}/rueckmeldung",
-                   data={"_csrf": t, "wert": "schwierig"}, follow_redirects=False)
-    assert r.headers["location"] == f"/woche/schritt/{sid}/grund"
-
-    seite = woche.get(f"/woche/schritt/{sid}/grund")
-    assert "zu schwer" in seite.text and "keine Zeit" in seite.text
+@pytest.mark.parametrize('values', [dict(step='', promise=''), dict(goal='', step='', routine='An meinem Projekt arbeiten', days=['2','4'], promise=''), dict(goal='', step='')])
+def test_optional_components(family, values):
+    create(family, **values)
+    assert family[0].get('/woche').status_code == 200
 
 
-# --------------------------------------------------------------------------
-# Die Zusagen des Konzepts
-# --------------------------------------------------------------------------
-
-def test_verkleinern_hat_eine_untergrenze(woche, app_env):
-    """Höchstens zweimal kleiner, danach Strategiewechsel statt Schrumpfen."""
-    from app.woche import regeln, store
-
-    zyklus_starten(woche)
-    sid = ersten_schritt_id(app_env)
-    t = csrf(woche, "/woche")
-
-    for _ in range(3):
-        woche.post(f"/woche/schritt/{sid}/anpassung",
-                   data={"_csrf": t, "art": "kleiner", "wert": "annehmen"})
-
-    s = store.schritt(sid)
-    assert s["verkleinert"] <= regeln.VERKLEINERN_MAX
-    assert regeln.anpassen(s, "zu_schwer")["art"] == "strategie"
+@pytest.mark.parametrize('changes', [dict(goal='',step='',promise=''), dict(discussed=''), dict(goal='x'*161), dict(routine='Routine',days=['8']), dict(routine='Routine'), dict(promise_day='2',promise_time='25:01'),dict(step='Einstieg',goal='')])
+def test_invalid_agreements_are_not_saved(family, changes):
+    role(family, 'parent')
+    post(family, '/woche/eltern/plan', {'week':'2026-09-14','version':0,'goal':'Ziel','step':'Schritt','promise':'Zusage','discussed':'ja',**changes}, 400)
+    assert family[3].get() is None
 
 
-def test_nirgends_steht_nicht_erledigt(woche, app_env):
-    """Kein „offen", keine Quote — weder beim Kind noch bei den Eltern."""
-    zyklus_starten(woche)
-    from app.woche import store
-    for nr in (1, 2, 3):
-        store.zusage_setzen(nr)
-
-    verboten = ["nicht erledigt", "nicht geschafft", "offen:", "erledigt von",
-                "0 %", "Quote", "Rückstand"]
-    for pfad in ("/woche", "/woche/plan", "/woche/ueber-dich", "/woche/eltern",
-                 "/woche/hilfe", "/woche/stundenplan"):
-        text = woche.get(pfad).text
-        # Der Aufklapptext „Wie entsteht das?" und die Beruhigung auf dem
-        # Heute-Bildschirm benennen genau das, was NICHT gezeigt wird. Geprüft
-        # wird die Anzeige selbst, nicht die Erklärung darüber.
-        text = _ohne(text, "<details", "</details>")
-        text = _ohne(text, '<p class="leise">Das ist kein', "</p>")
-        for wort in verboten:
-            assert wort not in text, f"{wort!r} steht auf {pfad}"
+def test_get_does_not_create_plan_or_business_events(family):
+    tables = ('woche_plan', 'woche_feedback', 'woche_help')
+    before = {t: family[1].db.q(f'SELECT * FROM {t}') for t in tables}
+    for path in ('/woche','/woche/eltern','/eltern'):
+        assert family[0].get(path).status_code == 200
+    assert family[3].get() is None
+    assert {t: family[1].db.q(f'SELECT * FROM {t}') for t in tables} == before
 
 
-def _ohne(text: str, von: str, bis: str) -> str:
-    while von in text:
-        a = text.index(von)
-        e = text.index(bis, a) + len(bis) if bis in text[a:] else len(text)
-        text = text[:a] + text[e:]
-    return text
+def test_no_login_and_invalid_roles(family):
+    client = family[0]
+    client.cookies.clear()
+    for path in ('/woche','/woche/eltern'):
+        assert client.get(path, follow_redirects=False).headers['location'] == '/login'
+    for value in (None, '', 'unknown'):
+        role(family, value)
+        assert client.get('/woche/eltern', follow_redirects=False).headers['location'] == '/login'
+        role(family, value)
+        assert client.post('/woche/eltern/plan', data={'_csrf':'test-token'}, follow_redirects=False).headers['location'] == '/login'
 
 
-def test_rueckblick_lobt_nur_mit_ereignis(woche, app_env):
-    """Ohne Ereignis kein Lob — ein Kind erkennt unverdientes Lob sofort."""
-    from app.woche import regeln, store
+def test_child_cannot_manage_or_impersonate_parent(family):
+    create(family)
+    assert family[0].get('/woche/eltern').status_code == 403
+    post(family, '/woche/eltern/plan', {}, 403)
+    post(family, '/woche/eltern/hilfe/1', {'status':'erledigt','version':1}, 403)
+    assert family[0].get('/woche?child_id=2').status_code == 403
+    post(family, '/woche/status', {'child_id':2}, 403)
+    post(family, '/woche/status', {'plan_id':999, 'version':1,'action':'pause'}, 404)
+    post(family, '/woche/hilfe/999/zuruecknehmen', {'version':1}, 404)
+    role(family, 'parent')
+    post(family, '/woche/eltern/hilfe/999', {'version':1,'status':'zugesagt'}, 404)
+    assert family[0].get('/woche/eltern?copy=999').status_code == 404
 
-    zyklus_starten(woche)
-    z = store.zyklus()
-    assert regeln.rueckblick(z["id"]) == []
 
-    sid = ersten_schritt_id(app_env)
-    t = csrf(woche, "/woche")
+def test_start_success_duplicate_and_goal_correction(family):
+    create(family)
+    activity(family, 'start', expected=200)
+    assert not family[1].db.q('SELECT * FROM woche_feedback')
+    activity(family, 'done')
+    activity(family, 'done')
+    assert len(family[1].db.q('SELECT * FROM woche_feedback')) == 1
+    assert not family[3].get()['achieved']
+    status(family, 'achieved')
+    assert family[3].get()['achieved']
+    status(family, 'unachieved')
+    assert not family[3].get()['achieved']
+
+
+def test_skip_today_undo_and_no_parent_signal(family, monkeypatch):
+    create(family)
+    activity(family, 'skip')
+    assert 'Für heute ist hier nichts weiter vorgesehen' in family[0].get('/woche').text
+    assert 'Doch starten' in family[0].get('/woche').text
+    activity(family, 'undo')
+    assert 'Loslegen' in family[0].get('/woche').text
+    activity(family, 'skip')
+    monkeypatch.setattr(family[2], 'today', lambda: date(2026,9,16))
+    assert 'Loslegen' in family[0].get('/woche').text
+    role(family, 'parent')
+    html = family[0].get('/eltern').text
+    assert 'Noch keine Rückmeldung' in html and 'Heute nicht' not in html and 'ausgeblendet' not in html
+
+
+def test_routine_days_priority_and_no_catchup(family, monkeypatch):
+    create(family, routine='Zehn Minuten Projekt', days=['2','4'])
+    p = family[3].get()
+    assert family[2].next_action(p, set(), [])['activity'] == 'routine'
+    activity(family, 'done', selected='routine')
+    assert family[2].next_action(p, family[3].feedback(p), [])['activity'] == 'goal'
+    monkeypatch.setattr(family[2], 'today', lambda: date(2026,9,16))
+    activity(family, 'done', selected='routine', expected=400)
+    assert family[2].next_action(p, set(), [])['activity'] == 'goal'
+    monkeypatch.setattr(family[2], 'today', lambda: date(2026,9,17))
+    assert family[2].next_action(p, set(), [])['activity'] == 'routine'
+
+
+def test_difficulty_private_and_only_one_simplification(family):
+    create(family)
+    response = activity(family, 'reason', expected=200, reason='schwer', message='PRIVATER GRUND')
+    assert 'kleineren Einstieg einmal' in response.text
+    response = activity(family, 'reason', expected=200, reason='anfang')
+    assert 'kleineren Einstieg einmal' not in response.text
+    assert 'PRIVATER GRUND' not in '\n'.join(family[1].db.conn().iterdump())
+    role(family, 'parent')
+    assert 'PRIVATER GRUND' not in family[0].get('/eltern').text
+
+
+@pytest.mark.parametrize('reason', ['zeit','anders'])
+def test_other_difficulty_choices(family, reason):
+    create(family)
+    result = activity(family, 'reason', expected=303 if reason == 'zeit' else 200, reason=reason)
+    if reason == 'anders':
+        assert 'Für heute aufhören' in result.text
+    assert not family[1].db.q('SELECT * FROM woche_feedback')
+
+
+def test_help_lifecycle_and_duplicate(family):
+    create(family)
+    activity(family, 'help', expected=200)
+    assert not family[3].helps()
     for _ in range(2):
-        woche.post(f"/woche/schritt/{sid}/einstieg",
-                   data={"_csrf": t, "wert": "gemacht"})
-
-    saetze = regeln.rueckblick(z["id"])
-    assert any("angefangen" in s for s in saetze)
-    assert all("toll" not in s.lower() for s in saetze)
-
-
-def test_eltern_sehen_die_gruende_nicht(woche, app_env):
-    from app.woche import store
-
-    zyklus_starten(woche)
-    sid = ersten_schritt_id(app_env)
-    t = csrf(woche, "/woche")
-    woche.post(f"/woche/schritt/{sid}/rueckmeldung",
-               data={"_csrf": t, "wert": "schwierig"})
-    woche.post(f"/woche/schritt/{sid}/grund",
-               data={"_csrf": t, "wert": "keine_lust"})
-    for nr in (1, 2, 3):
-        store.zusage_setzen(nr)
-
-    text = woche.get("/woche/eltern").text
-    assert "keine Lust" not in text
-    assert "schwierig" not in text
-
-
-def test_eltern_muessen_erst_zusagen(woche):
-    seite = woche.get("/woche/eltern")
-    assert "Ich frage nicht nach" in seite.text
-    assert "Der Plan läuft" not in seite.text
-
-
-def test_hilferuf_setzt_den_elternzustand(woche, app_env):
-    from app.woche import regeln, store
-
-    zyklus_starten(woche)
-    t = csrf(woche, "/woche/hilfe")
-    h = store.helfer()[0]
-    woche.post("/woche/hilfe", data={"_csrf": t, "helfer_id": str(h["id"]),
-                                     "frage": "Bruchrechnen"})
-    assert regeln.eltern_zustand()["key"] == "gefragt"
-
-
-def test_pause_ist_eine_funktion_und_umkehrbar(woche, app_env):
-    from app.woche import regeln, store
-
-    t = csrf(woche, "/woche")
-    woche.post("/woche/pause", data={"_csrf": t, "wochen": "1"})
-    assert store.pause_aktiv() is not None
-    assert regeln.eltern_zustand()["key"] == "pause"
-    assert "Pause" in woche.get("/woche").text
-
-    woche.post("/woche/pause/ende", data={"_csrf": t})
-    assert store.pause_aktiv() is None
-
-
-def test_notfall_ist_ehrlich_und_kennt_die_schlafgrenze(woche):
-    from app.woche import regeln
-
-    frueh = regeln.notfall("Mathematik", 20, stunde=19)
-    assert frueh["schlaf"] is False
-    assert "nicht mehr komplett" in frueh["text"]
-    assert frueh["schritt"]["titel"]
-
-    spaet = regeln.notfall("Mathematik", 20, stunde=22)
-    assert spaet["schlaf"] is True
-    assert spaet["schritt"] is None
-
-
-def test_weglassen_ist_eine_entscheidung(woche, app_env):
-    from app.woche import store
-
-    f = store.faecher()[0]
-    t = csrf(woche, "/woche/plan")
-    woche.post("/woche/weglassen", data={"_csrf": t, "fach_id": str(f["id"])})
-    zeile = app_env.db.q1("SELECT * FROM woche_ereignis WHERE art='weglassen'")
-    assert zeile["wert"] == f["name"]
-
-
-def test_wissen_ist_sichtbar_und_loeschbar(woche, app_env):
-    from app.woche import regeln
-
-    regeln.wissen_sagen("ort", "🍳", "Du lernst am liebsten in der Küche.")
-    seite = woche.get("/woche/ueber-dich")
-    assert "in der Küche" in seite.text
-
-    zid = app_env.db.q1("SELECT id FROM woche_wissen WHERE schluessel='ort'")["id"]
-    t = csrf_from(seite.text)
-    woche.post(f"/woche/wissen/{zid}/aus", data={"_csrf": t})
-    assert "in der Küche" not in woche.get("/woche/ueber-dich").text
-
-
-def test_kind_wissen_wird_nicht_ueberschrieben(woche):
-    """Was das Kind korrigiert hat, gewinnt gegen jeden Zähler."""
-    from app.woche import regeln
-
-    regeln.wissen_sagen("ding", "🧸", "Mein Ding ist geheim.")
-    regeln.wissen_neu_berechnen()
-    zeilen = {z["schluessel"]: z["text"] for z in regeln.wissen_zeilen()}
-    assert zeilen["ding"] == "Mein Ding ist geheim."
-
-
-# --------------------------------------------------------------------------
-# Unabhängigkeit von Karo
-# --------------------------------------------------------------------------
-
-def test_ereignisse_sind_append_only(woche, app_env):
-    from app.woche import store
-
-    store.ereignis("einstieg", "gemacht")
-    with pytest.raises(sqlite3.IntegrityError if False else Exception):
-        with app_env.db.tx() as c:
-            c.execute("UPDATE woche_ereignis SET wert='nicht'")
-    with pytest.raises(Exception):
-        with app_env.db.tx() as c:
-            c.execute("DELETE FROM woche_ereignis")
-
-
-def test_begleiter_fasst_keine_karo_tabelle_an(woche, app_env):
-    """Der Begleiter läuft neben Karo, nicht in Karo."""
-    zyklus_starten(woche)
-    sid = ersten_schritt_id(app_env)
-    t = csrf(woche, "/woche")
-    woche.post(f"/woche/schritt/{sid}/einstieg", data={"_csrf": t, "wert": "gemacht"})
-
-    for tabelle in ("topic", "quiz", "answer_log", "lesson", "document",
-                    "kb_chunk"):
-        n = app_env.db.q1(f"SELECT COUNT(*) AS n FROM {tabelle}")["n"]
-        assert n == 0, f"{tabelle} wurde vom Begleiter berührt"
-
-
-def test_quelltext_importiert_keine_karo_lernlogik():
-    """Statische Zusicherung: kein Import aus Karos Lernteil."""
-    from pathlib import Path
-
-    import app.woche as paket
-
-    verboten = ("topics", "quizzes", "teaching", "kb", "llm", "research",
-                "pipeline", "exam_plan", "ingest", "prompts")
-    ordner = Path(paket.__file__).parent
-    for datei in ordner.glob("*.py"):
-        text = datei.read_text(encoding="utf-8")
-        for name in verboten:
-            assert f"from ..{name}" not in text, f"{datei.name} importiert {name}"
-            assert f"from .. import {name}" not in text, f"{datei.name}: {name}"
-
-
-def test_nur_die_bruecke_kennt_karo_tabellen():
-    """Karo-Tabellen dürfen ausschließlich in bruecke.py vorkommen.
-
-    Das ist die Zusicherung, die die Trennung trotz Integration hält: wer
-    anderswo `topic` oder `lesson` abfragt, bricht sie auf."""
-    from pathlib import Path
-
-    import app.woche as paket
-
-    karo_tabellen = ("FROM topic", "FROM lesson", "FROM exam", "FROM document",
-                     "FROM kb_chunk", "FROM answer_log", "JOIN topic",
-                     "JOIN lesson")
-    ordner = Path(paket.__file__).parent
-    for datei in ordner.glob("*.py"):
-        if datei.name == "bruecke.py":
-            continue
-        text = datei.read_text(encoding="utf-8")
-        for name in karo_tabellen:
-            assert name not in text, f"{datei.name} liest {name}"
-
-
-# --------------------------------------------------------------------------
-# Die Brücke zu Karo
-# --------------------------------------------------------------------------
-
-def test_bruecke_ist_standardmaessig_aus(woche):
-    from app.woche import bruecke, store
-
-    assert store.kind()["karo_bruecke"] == 0
-    assert bruecke.aktiv("Mathematik") is False
-    assert bruecke.luecken("Mathematik") == []
-    assert bruecke.naechste_arbeit("Mathematik") is None
-    assert bruecke.titelzusatz("Mathematik") == ""
-
-
-def test_bruecke_liest_luecke_und_termin(woche, app_env):
-    """Eingeschaltet macht sie den Schritt konkret — und nur dann."""
-    from app.woche import bruecke, regeln, store
-
-    heute = app_env.db.today()
-    with app_env.db.tx() as c:
-        c.execute("INSERT INTO topic (id, subject, code, label, state, created_at) "
-                  "VALUES (1,'Mathematik','BR.ADD','Brüche addieren','aktiv',?)",
-                  (heute,))
-        c.execute("INSERT INTO topic_flag (topic_id, flag, computed_at) "
-                  "VALUES (1,'rot',?)", (heute,))
-        c.execute("INSERT INTO exam (subject, exam_date, titel, themen, created_at) "
-                  "VALUES ('Mathematik', date('now','+3 day'), 'Mathearbeit', "
-                  "'[\"Brüche\"]', ?)", (heute,))
-
-    # Aus: nichts davon wirkt.
-    assert bruecke.titelzusatz("Mathematik") == ""
-
-    store.kind_setzen(karo_bruecke=1)
-    assert bruecke.titelzusatz("Mathematik") == "Brüche addieren"
-    assert bruecke.anlass("Mathematik") == "arbeit_nah"
-    assert "3 Tagen" in bruecke.hinweis("Mathematik")
-
-    # Und im Angebot steht jetzt der Name der Lücke.
-    zyklus_starten(woche, "Mathearbeit")
-    titel = [s["titel"] for s in store.schritte(store.zyklus()["id"])]
-    assert any("Brüche addieren" in t for t in titel), titel
-
-
-def test_bruecke_gilt_nur_fuer_karos_fach(woche, app_env):
-    """Karo deckt ein Fach ab. Für alle anderen bleibt der Begleiter allein."""
-    from app.woche import bruecke, store
-
-    store.kind_setzen(karo_bruecke=1)
-    assert bruecke.zustaendig("Mathematik") is True      # config.subject
-    assert bruecke.zustaendig("Englisch") is False
-    assert bruecke.luecken("Englisch") == []
-
-
-def test_bruecke_schreibt_nie_in_karo(woche, app_env):
-    from app.woche import bruecke, regeln, store
-
-    store.kind_setzen(karo_bruecke=1)
-    zyklus_starten(woche, "Mathearbeit")
-    regeln.notfall("Mathematik", 20, stunde=18)
-    bruecke.luecken("Mathematik")
-    bruecke.ankervorschlag("Mathematik")
-
-    for tabelle in ("topic", "topic_flag", "quiz", "answer_log", "lesson",
-                    "document"):
-        n = app_env.db.q1(f"SELECT COUNT(*) AS n FROM {tabelle}")["n"]
-        assert n == 0, f"{tabelle} wurde beschrieben"
-
-
-def test_bruecke_ueberlebt_leeres_karo(woche):
-    """Kein Thema, keine Arbeit, kein Blatt — der Begleiter läuft weiter."""
-    from app.woche import store
-
-    store.kind_setzen(karo_bruecke=1)
-    zyklus_starten(woche)
-    for pfad in ("/woche", "/woche/plan", "/woche/eltern", "/woche/notfall"):
-        assert woche.get(pfad).status_code == 200, pfad
-
-
-def test_alle_bildschirme_rendern(woche, app_env):
-    """Jede Seite einmal aufrufen — Templatefehler fallen sonst erst live auf."""
-    zyklus_starten(woche)
-    sid = ersten_schritt_id(app_env)
-    seiten = [
-        "/woche", "/woche/plan", "/woche/hilfe", "/woche/ueber-dich",
-        "/woche/stundenplan", "/woche/eltern", "/woche/einrichtung",
-        "/woche/notfall", "/woche/abschluss",
-        f"/woche/schritt/{sid}/weiter",
-        f"/woche/schritt/{sid}/form",
-        f"/woche/schritt/{sid}/rueckmeldung",
-        f"/woche/schritt/{sid}/grund",
-        f"/woche/schritt/{sid}/anpassung?grund=zu_schwer",
-        f"/woche/schritt/{sid}/karte",
-    ]
-    for pfad in seiten:
-        r = woche.get(pfad)
-        assert r.status_code == 200, f"{pfad}: {r.status_code}"
-        assert "<main" in r.text, pfad
-
-
-def test_notfall_zeigt_genau_eine_sache(woche, app_env):
-    from app.woche import store
-
-    f = store.faecher()[0]
-    t = csrf(woche, "/woche/notfall")
-    r = woche.post("/woche/notfall", data={"_csrf": t, "fach_id": str(f["id"]),
-                                           "was": "arbeit", "minuten": "20"})
-    assert r.status_code == 200
-    assert "zeig mir das Wichtigste" not in r.text      # Ergebnis, nicht Formular
-
-
-def test_jede_form_hat_eine_seite(woche, app_env):
-    from app.woche import store
-
-    for form in ("speedrun", "clip", "einfach"):
-        store.ding_setzen("Test", form)
-        zyklus_starten(woche, "Mathearbeit")
-        sid = app_env.db.q1("SELECT id FROM woche_schritt ORDER BY id DESC")["id"]
-        r = woche.get(f"/woche/schritt/{sid}/form")
-        assert r.status_code == 200, form
-        assert f'data-form="{form}"' in r.text
-
-
-def test_karo_laeuft_unveraendert_weiter(woche):
-    """Die Hauptanwendung darf von dem Modul nichts merken."""
-    for pfad in ("/", "/themen", "/wissen", "/lernstand"):
-        assert woche.get(pfad).status_code == 200
+        activity(family, 'send_help', kind='zusammen', share='ja', message='Bitte zuhören')
+    h = family[3].helps()[0]
+    assert len(family[3].helps()) == 1
+    assert family[2].next_action(family[3].get(),set(),[h])['kind'] == 'help'
+    role(family,'parent')
+    post(family, f"/woche/eltern/hilfe/{h['id']}", {'version':1,'status':'erledigt'}, 400)
+    post(family, f"/woche/eltern/hilfe/{h['id']}", {'version':1,'status':'zugesagt','reply':'Gern','appointment':'2026-09-17T18:00'})
+    assert family[3].helps()[0]['status'] == 'zugesagt'
+    role(family)
+    html = family[0].get('/woche').text
+    assert 'Gern' in html and '18:00' in html
+    role(family,'parent')
+    post(family, f"/woche/eltern/hilfe/{h['id']}", {'version':2,'status':'erledigt'})
+    role(family)
+    assert 'Hilfe erledigt' in family[0].get('/woche').text
+    activity(family, 'send_help', kind='sprechen', share='ja')
+    h = family[3].helps()[0]
+    post(family, f"/woche/hilfe/{h['id']}/zuruecknehmen", {'version':1})
+    assert family[3].helps()[0]['status'] == 'zurueckgenommen'
+
+
+def test_pause_overrides_help_keeps_promise(family):
+    create(family)
+    activity(family, 'send_help',kind='erklaeren',share='ja')
+    status(family,'pause')
+    assert family[2].next_action(family[3].get(),set(),family[3].helps()) is None
+    html = family[0].get('/woche').text
+    assert 'Ich höre dir' in html and 'Woche fortsetzen' in html
+    activity(family,'done',expected=400)
+    role(family,'parent')
+    status(family,'resume')
+    assert not family[3].get()['paused']
+
+
+def test_plan_edit_resets_confirmation_and_stale_form_conflicts(family):
+    p = create(family)
+    status(family,'agree')
+    create(family, routine='Projekt', days=['2'])
+    assert family[3].get()['child_status'] == 'offen'
+    role(family,'parent')
+    post(family,'/woche/eltern/plan',{'week':p['week'],'version':p['version'],'goal':'Stale','discussed':'ja'},409)
+    assert family[3].get()['goal'] != 'Stale'
+    assert len(family[1].db.q('SELECT * FROM woche_plan')) == 1
+    role(family)
+    post(family,'/woche/aktivitaet',{'plan_id':p['id'],'revision':p['revision'],'day':'2026-09-15','activity':'goal','action':'done'},409)
+
+
+def test_week_rollover_copy_only_content_and_old_help(family,monkeypatch):
+    p = create(family)
+    activity(family,'done')
+    activity(family,'send_help',kind='erklaeren',share='ja')
+    status(family,'agree')
+    role(family,'parent')
+    url = f"/woche/eltern?week=2026-09-21&copy={p['id']}"
+    assert 'Meinen Referatseinstieg' in family[0].get(url).text
+    assert family[3].get(date(2026,9,21)) is None  # draft GET does not write
+    values = {k:p[k] for k in ('goal','step','routine','promise','promise_day','promise_time')}
+    post(family,'/woche/eltern/plan',dict(values,week='2026-09-21',version=0,discussed='ja'))
+    future = family[3].get(date(2026,9,21))
+    assert future['child_status'] == 'offen' and not future['achieved'] and not family[3].helps(future['id'])
+    monkeypatch.setattr(family[2],'today',lambda:date(2026,9,21))
+    assert not family[3].feedback(future)
+    assert 'Woche ab 2026-09-14' in family[0].get('/eltern').text
+    h = family[3].helps()[0]
+    post(family,f"/woche/eltern/hilfe/{h['id']}",{'version':1,'status':'zugesagt'})
+
+
+def test_local_date_and_sunday_monday():
+    from app.woche.pilot import today, monday
+    assert today(datetime(2026,9,13,22,30,tzinfo=timezone.utc)) == date(2026,9,14)
+    assert monday(date(2026,9,13)) == date(2026,9,7)
+    assert monday(date(2026,9,14)) == date(2026,9,14)
+    assert today(datetime(2026,3,29,22,30,tzinfo=timezone.utc)) == date(2026,3,30)
+
+
+def test_migration_preserves_legacy_and_is_repeatable(family):
+    from app.woche import store as legacy
+    legacy.ensure()
+    legacy.kind_setzen(name='ALT',klasse=8)
+    c = family[1].db.conn()
+    before = c.execute('SELECT * FROM woche_kind').fetchall()
+    family[1].db.init(); family[1].db.init()
+    assert c.execute('SELECT * FROM woche_kind').fetchall() == before
+    assert family[3].get() is None
+    p = create(family)
+    family[1].db.init()
+    assert family[3].get()['id'] == p['id']
+
+
+def test_csrf_and_escaped_text_real_requests(family):
+    create(family,goal='<script>alert(1)</script>')
+    html = family[0].get('/woche').text
+    assert '&lt;script&gt;alert(1)&lt;/script&gt;' in html
+    assert '<script>alert(1)</script>' not in html
+    assert family[0].post('/woche/status',data={'action':'pause'}).status_code == 403
+    token = csrf_from(html)
+    assert family[0].post('/woche/status',data={'_csrf':token},headers={'origin':'https://evil.example','sec-fetch-site':'cross-site'}).status_code == 403
+    assert not family[3].get()['paused']
+
+
+def test_review_shared_not_inferred(family):
+    create(family)
+    status(family,'review',feeling='mittel',wish='leichter',together='ja')
+    role(family,'parent')
+    assert 'Gemeinsame Wochenrückmeldung: Ging so · Leichter' in family[0].get('/eltern').text
+
+
+def test_no_learning_writes_or_ai_calls(family,fake_llm):
+    db = family[1].db
+    tables = ('topic','quiz','lesson','answer_log','llm_call','job')
+    before = {t:[tuple(r) for r in db.q(f'SELECT * FROM {t}')] for t in tables}
+    calls = len(fake_llm.calls)
+    create(family)
+    activity(family,'done')
+    activity(family,'send_help',kind='sprechen',share='ja')
+    assert {t:[tuple(r) for r in db.q(f'SELECT * FROM {t}')] for t in tables} == before
+    assert len(fake_llm.calls) == calls
+
+
+def test_parallel_completions_and_help_are_unique(family):
+    p = create(family)
+    def write(_):
+        try:
+            with family[1].db.tx():
+                family[3].complete(p,'goal')
+                family[3].request_help(p,'goal','sprechen','')
+        finally:
+            family[1].db._discard_connection()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(write,range(4)))
+    assert len(family[1].db.q('SELECT * FROM woche_feedback')) == 1
+    assert len(family[3].helps()) == 1
+
+
+def test_double_plan_and_concurrent_create(family):
+    rules, store = family[2:4]
+    values = rules.agreement({'goal':'Ein eigenes Vorhaben','discussed':'ja'},[])
+    def save(_):
+        try:
+            store.save(date(2026,9,14), values, 0)
+            return 'saved'
+        except store.Conflict:
+            return 'conflict'
+        finally:
+            family[1].db._discard_connection()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(save,range(2)))
+    assert sorted(outcomes) == ['conflict','saved']
+    role(family,'parent')
+    post(family,'/woche/eltern/plan',dict(goal=values['goal'],week='2026-09-14',version=0,discussed='ja'),409)
+    assert len(family[1].db.q('SELECT * FROM woche_plan')) == 1
+
+
+def test_past_week_no_auto_plan_and_child_can_cancel_old_help(family,monkeypatch):
+    p = create(family)
+    activity(family,'send_help',kind='sprechen',share='ja')
+    h = family[3].helps()[0]
+    monkeypatch.setattr(family[2],'today',lambda:date(2026,9,21))
+    html = family[0].get('/woche').text
+    assert 'Was möchtest du diese Woche angehen?' in html
+    assert 'Hilfe aus früheren Wochen' in html
+    post(family,f"/woche/hilfe/{h['id']}/zuruecknehmen",{'version':1})
+    assert family[3].helps()[0]['status'] == 'zurueckgenommen'
+    role(family,'parent')
+    html = family[0].get('/woche/eltern').text
+    assert 'Vereinbarung der letzten Woche' in html
+    assert family[3].get() is None
+
+
+def test_help_stale_reply_cannot_overwrite(family):
+    create(family)
+    activity(family,'send_help',kind='sprechen',share='ja')
+    h = family[3].helps()[0]
+    role(family,'parent')
+    path = f"/woche/eltern/hilfe/{h['id']}"
+    post(family,path,{'version':1,'status':'zugesagt','reply':'Neue Antwort'})
+    post(family,path,{'version':1,'status':'zugesagt','reply':'Veraltet'},409)
+    assert family[3].helps()[0]['reply'] == 'Neue Antwort'
+    post(family,path,{'version':2,'status':'zugesagt','appointment':'2026-09-99T10:00'},400)
+
+
+@pytest.mark.parametrize('changes', [dict(kind='falsch',share='ja'),dict(kind='sprechen',share=''),dict(kind='sprechen',share='ja',message='x'*241)])
+def test_help_input_validation(family,changes):
+    create(family)
+    activity(family,'send_help',expected=400,**changes)
+    assert not family[3].helps()
+
+
+def test_retired_routes_are_not_active_and_parent_cannot_report_for_child(family):
+    create(family)
+    for path in ('/woche/einrichtung','/woche/notfall','/woche/stundenplan'):
+        assert family[0].get(path).status_code == 404
+    role(family,'parent')
+    activity(family,'done',expected=403)
+    status(family,'achieved',expected=403)
+    status(family,'agree',expected=403)
+
+
+def test_db_constraints_and_cascade_allow_data_correction(family):
+    import sqlite3
+    p = create(family)
+    with pytest.raises(sqlite3.IntegrityError):
+        family[1].db.conn().execute("UPDATE woche_plan SET child_status='invalid' WHERE id=?",(p['id'],))
+    activity(family,'done')
+    activity(family,'send_help',kind='sprechen',share='ja')
+    with family[1].db.tx() as c:
+        c.execute('DELETE FROM woche_plan WHERE id=?',(p['id'],))
+    assert not family[1].db.q('SELECT * FROM woche_feedback')
+    assert not family[3].helps()

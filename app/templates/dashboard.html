@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Heute – Karo{% endblock %}
+{% block title %}Heute – {{ companion_name }}{% endblock %}
 {% block content %}
 <div class="welcome"><p class="eyebrow">DEINE LERNZEIT</p><h1>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</h1><p class="sub">Was möchtest du heute lernen?</p></div>
 {% if naechstes %}
@@ -11,11 +11,13 @@
 {% elif hat_erfolge %}
 <section class="card"><h2>Für heute bist du fertig!</h2><p>Deine abgehakten Themen findest du unter „Erfolge“.</p><a class="btn" href="/lernstand">Meine Erfolge ansehen</a></section>
 {% else %}
-<section class="card next-step"><span class="step-number" aria-hidden="true">1</span><div><h2>Wir machen Karo startklar</h2>
+<section class="card next-step"><span class="step-number" aria-hidden="true">1</span><div><h2>Wir machen {{ companion_name }} startklar</h2>
 <p>{{ 'Füge dein erstes Schulblatt als Foto oder PDF hinzu.' if cfg.schulblaetter_kind else 'Hol einen Erwachsenen dazu. Gemeinsam fügt ihr dein erstes Schulblatt hinzu.' }}</p>
 {% if cfg.schulblaetter_kind or role == 'parent' %}<a class="btn" href="/wissen">Erstes Blatt hinzufügen</a>{% endif %}</div></section>
 {% endif %}
 <div class="choice-grid">
+<a class="choice-card" href="/welten"><span class="choice-kicker">DEINE INTERESSEN</span><h2>Meine Welt</h2><p>Ein Café, ein Atelier oder eine Forschungsstation? Du entscheidest, was zu dir passt.</p><span class="choice-arrow" aria-hidden="true">→</span></a>
+<a class="choice-card" href="/woche"><h2>Meine Woche</h2><p>Ein gemeinsamer Plan für dein eigenes Vorhaben.</p><span class="choice-arrow" aria-hidden="true">→</span></a>
 {% include "schulblaetter_link.html" %}
 <a class="choice-card" href="/lernen?tab=bearbeitung"><span class="choice-kicker">LERNEN</span><h2>Thema aussuchen</h2><p>Du entscheidest, was du übst.</p><span class="choice-arrow" aria-hidden="true">→</span></a>
 {% if cfg.klassenarbeit_kind %}<a class="choice-card" href="/klassenarbeit"><span class="choice-kicker">DEIN LERNPLAN</span><h2>Für die Klassenarbeit üben</h2><p>{% if exam %}Deine nächste Arbeit: {{ exam.exam_date[8:10] }}.{{ exam.exam_date[5:7] }}.{{ exam.exam_date[:4] }}{% else %}Schau nach, was als Nächstes dran ist.{% endif %}</p><span class="choice-arrow" aria-hidden="true">→</span></a>{% endif %}

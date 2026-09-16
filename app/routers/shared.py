@@ -27,7 +27,7 @@ templates = Jinja2Templates(directory=str(BASE / "templates"))
 try:
     ASSET_VERSION = str(max(
         (BASE / "static" / name).stat().st_mtime_ns
-        for name in ("karo.css", "simple.css", "simple.js", "drafts.js", "setup.js", "storage.js", "areas.css", "themes.js")
+        for name in ("karo.css", "simple.css", "simple.js", "drafts.js", "setup.js", "storage.js", "areas.css", "themes.js", "begleiter.js")
     ))
 except OSError:
     ASSET_VERSION = "0"
@@ -78,8 +78,30 @@ def render(request: Request, name: str, status_code: int = 200,
             and quiz.get("state") in ("beantwortet", "ausgewertet")):
         basis["adult_page"] = True
     basis["ui_area"] = "parent" if basis["adult_page"] else "child"
+    # Der Begleiter (Name/Foto) ersetzt "Karo" nur im Kind-Bereich — der
+    # Eltern-Bereich bleibt bewusst bei "Karo" und dem Original-Logo.
+    begleiter = None if basis["adult_page"] else _begleiter()
+    basis["companion_name"] = begleiter["name"] if begleiter else "Karo"
+    basis["companion_photo_url"] = (
+        f"/welten/foto/{begleiter['foto_pfad']}"
+        if begleiter and begleiter.get("foto_pfad") else None)
     return templates.TemplateResponse(request, name, basis,
                                       status_code=status_code)
+
+
+def _begleiter():
+    from ..welten import store as begleiter_store
+    return begleiter_store.current_companion()
+
+
+def companion_name(request: Request) -> str:
+    """Fuer Meldungen (flash), die ausserhalb von render() gebaut werden —
+    z.B. direkt vor einem redirect. Nur im Kind-Bereich ersetzt; sonst
+    "Karo", wie render() es auch fuer Eltern-Seiten haelt."""
+    if request.session.get("role") != "child":
+        return "Karo"
+    begleiter = _begleiter()
+    return begleiter["name"] if begleiter else "Karo"
 
 
 def flash(request: Request, text: str, art: str = "ok") -> None:

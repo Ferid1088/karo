@@ -5,6 +5,8 @@ from fastapi.responses import HTMLResponse
 from .. import config, db, jobs, kb, quizzes
 from ..services import exam, workflow
 from .shared import render
+from ..woche.pilot_store import parent_summary
+from ..welten.store import current_companion, current_interest
 
 router = APIRouter()
 
@@ -33,5 +35,7 @@ def eltern(request: Request):
     if config.load().antworten_pruefen_kind:
         reviews = []
     return render(request, 'eltern.html', reviews=reviews, schritte=schritte,
+                  woche=parent_summary(), begleiter=current_companion(),
+                  begleiter_interesse=current_interest(),
                   counts=jobs.counts(), kb_stat=kb.statistik(),
                   einig=quizzes.uebereinstimmung(), fehler=jobs.fehlgeschlagen())

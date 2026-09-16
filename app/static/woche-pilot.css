@@ -1,0 +1,14 @@
+.weekly {max-width: 820px; overflow-wrap: anywhere;}
+.weekly .weekly-next {border: 2px solid var(--accent, #7659bd);}
+.weekly label:not(.weekly-option) {display:block; margin-top:1rem; margin-bottom:.4rem;}
+.weekly textarea,.weekly select,.weekly input:not([type=checkbox]):not([type=radio]):not([type=hidden]) {width:100%;max-width:100%;min-width:0;box-sizing:border-box;}
+.weekly textarea {min-height:5rem;}
+.weekly .weekly-option {display:flex;align-items:center;gap:.6rem;min-height:44px;}
+.weekly .weekly-option input {flex:0 0 auto;width:1.2rem;height:1.2rem;}
+.weekly fieldset {min-width:0;margin:1rem 0;}
+.weekly .weekly-days {display:flex;flex-wrap:wrap;gap:0 1rem;}
+.weekly button {min-height:44px;white-space:normal;max-width:100%;}
+.weekly .actions {flex-wrap:wrap;}
+.weekly form + form,.weekly-help {margin-top:1.5rem;}
+.weekly :focus-visible {outline:3px solid var(--accent, #7659bd);outline-offset:3px;}
+@media(max-width:420px) {.weekly .actions>*{flex:1 1 100%;}.weekly .card{padding:1rem;}}
