@@ -46,6 +46,20 @@ def _lektion() -> dict:
             "erste_aufgabe": {"frage": "Kante 2 — wie viele?", "loesung": "8"},
             "benennung": "Das nennt man das Volumen.",
         },
+        "hilfe": {
+            phase: {"text": f"Andere Worte für {phase}: stell dir die Kiste "
+                            "vor, die du Schicht für Schicht füllst.",
+                    "visualisierung": BILD}
+            for phase in ("HOOK", "RULE", "WORKED_EXAMPLE", "GUIDED_TASK",
+                          "INDEPENDENT_TASK", "ADAPTATION")
+        },
+        "faq": [
+            {"frage": "Was ist eine Kante?",
+             "antwort": "Eine Kante ist eine der Linien, an denen zwei "
+                        "Flächen des Würfels zusammenstoßen."},
+            {"frage": "Wie tippe ich meine Antwort?",
+             "antwort": "Schreib nur die Zahl, ohne Einheit."},
+        ],
         "fehlertypen": [{
             "key": "kanten-addiert",
             "label": "Kantenlängen addiert statt multipliziert",
@@ -204,3 +218,25 @@ def test_das_schema_verlangt_dieselben_rollen_wie_die_pruefung(app_env):
                 ["properties"]["aufgaben"])
 
     assert tuple(aufgaben["required"]) == schemas.AUFGABEN_ROLLEN
+
+
+def test_das_schema_verlangt_dieselben_hilfephasen_wie_die_pruefung(app_env):
+    """Sonst erzeugt das Modell eine Lektion ohne Hilfe, und die Prüfung
+    verwirft sie — teuer und vermeidbar."""
+    from app import prompts
+    from app.adaptiv import schemas
+
+    hilfe = prompts.LEKTION_SCHEMA["properties"]["hilfe"]
+
+    assert tuple(hilfe["required"]) == schemas.HILFE_PHASEN
+    assert set(hilfe["properties"]) == set(schemas.HILFE_PHASEN)
+
+
+def test_der_auftrag_verlangt_hilfe_und_richtiges_rechnen(app_env):
+    from app import prompts
+
+    text = prompts.lektion_prompt(grade=6, subject="Mathematik", thema="X")
+
+    assert "Das habe ich nicht verstanden" in text
+    assert "faq" in text
+    assert "nachgerechnet" in text

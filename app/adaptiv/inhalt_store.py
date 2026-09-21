@@ -113,25 +113,30 @@ def aufgaben(fehlertyp_id: int, rolle: str | None = None) -> list[dict]:
 
 def hilfe_sichern(konzept_id: int, art: str, schluessel: str, text: str,
                   bilder: list | None = None, sortierung: int = 0,
-                  geprueft: bool = True) -> int:
+                  geprueft: bool = True,
+                  visualisierung: dict | None = None) -> int:
     bilder_json = json.dumps(bilder or [], ensure_ascii=False)
+    bild_json = (json.dumps(visualisierung, ensure_ascii=False)
+                 if visualisierung else None)
     with db.tx() as c:
         vorhanden = c.execute(
             "SELECT id FROM lern_hilfe WHERE konzept_id=? AND art=? AND schluessel=?",
             (konzept_id, art, schluessel)).fetchone()
         if vorhanden:
             c.execute(
-                """UPDATE lern_hilfe SET text=?, bilder=?, sortierung=?,
-                       geprueft_am=?, aktiv=1 WHERE id=?""",
-                (text, bilder_json, sortierung,
+                """UPDATE lern_hilfe SET text=?, bilder=?, visualisierung=?,
+                       sortierung=?, geprueft_am=?, aktiv=1 WHERE id=?""",
+                (text, bilder_json, bild_json, sortierung,
                  db.now() if geprueft else None, vorhanden["id"]))
             return vorhanden["id"]
         return c.execute(
             """INSERT INTO lern_hilfe (konzept_id, art, schluessel, text,
-                    bilder, sortierung, geprueft_am, created_at)
-               VALUES (?,?,?,?,?,?,?,?)""",
-            (konzept_id, art, schluessel, text, bilder_json, sortierung,
-             db.now() if geprueft else None, db.now())).lastrowid
+                    bilder, visualisierung, sortierung, geprueft_am,
+                    created_at)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (konzept_id, art, schluessel, text, bilder_json, bild_json,
+             sortierung, db.now() if geprueft else None,
+             db.now())).lastrowid
 
 
 def _hilfe_aufbereiten(row) -> dict | None:
@@ -139,7 +144,16 @@ def _hilfe_aufbereiten(row) -> dict | None:
     if eintrag is None:
         return None
     eintrag["bilder"] = _json(eintrag.get("bilder"), [])
+    eintrag["visualisierung"] = _json(eintrag.get("visualisierung"), None)
     return eintrag
+
+
+def hilfe_freigeben(konzept_id: int) -> None:
+    """§11: auch Hilfe wird erst nach der Freigabe ausgeliefert."""
+    with db.tx() as c:
+        c.execute("UPDATE lern_hilfe SET geprueft_am=? "
+                  "WHERE konzept_id=? AND geprueft_am IS NULL",
+                  (db.now(), konzept_id))
 
 
 def hilfe_fuer_phase(konzept_id: int, phase: str) -> dict | None:

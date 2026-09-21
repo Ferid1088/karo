@@ -20,7 +20,7 @@ from typing import Any
 # §3: Das Register führt die Komponenten, ihre Parameter und den Rückfall.
 # Diese Datei prüft nur noch den Lehrinhalt und reicht Darstellungen dorthin
 # weiter — es gibt genau eine Stelle, an der eine Auswahl gültig wird.
-from . import komponenten
+from . import komponenten, rechnen
 
 #: Sichere Rückfallkomponente, wenn eine Auswahl verworfen wird (§3, §15).
 FALLBACK_VISUALISIERUNG = {"component": komponenten.FALLBACK.id,
@@ -157,11 +157,35 @@ ROLLEN_MIT_FEHLERVORHERSAGE = ("gefuehrt", "selbststaendig")
 #: Rollen, die als Auswahl gestellt werden statt als Rechnung.
 ROLLEN_MIT_OPTIONEN = ("vorhersage", "transfer")
 
+#: „Das habe ich nicht verstanden" ist in jeder Phase ausser COMPLETE
+#: erreichbar (02 §5, B3). Erzeugt wird die Hilfe mit der Lektion — zur
+#: Laufzeit nachzuladen waere ein Modellaufruf im Moment der Ratlosigkeit.
+HILFE_PHASEN = ("HOOK", "RULE", "WORKED_EXAMPLE", "GUIDED_TASK",
+                "INDEPENDENT_TASK", "ADAPTATION")
+
+#: Felder, die eine WAHRE Aussage machen und deshalb nachgerechnet werden.
+#: Bewusst NICHT dabei: `beschreibung`, `haken`, `typischer_fehler` und die
+#: bekannten falschen Antworten — die beschreiben eine Fehlvorstellung.
+#: „1/2 + 1/3 = 2/5" gehoert dort hin und ist als Rechnung natuerlich falsch.
+_NACHZURECHNEN = ("regel", "erkenntnis", "aufloesung")
+
+
+def _nachrechnen(text: Any, pfad: str) -> None:
+    if rechnen.stimmt(text) is False:
+        raise InhaltUngueltig(
+            f"„{pfad}“ enthält eine Rechnung, die nachgerechnet nicht "
+            f"aufgeht: {str(text)[:80]}")
+
 
 def _aufgabe_pruefen(daten: Any, rolle: str) -> dict:
     if not isinstance(daten, dict):
         raise InhaltUngueltig(f"Aufgabe „{rolle}“ fehlt.")
     sauber = {f: _text(daten, f, f"{rolle}.{f}") for f in AUFGABE_FELDER}
+    _nachrechnen(sauber["frage"], f"{rolle}.frage")
+    if rechnen.loesung_stimmt(sauber["frage"], sauber["loesung"]) is False:
+        raise InhaltUngueltig(
+            f"„{rolle}“ hat eine Lösung, die nachgerechnet nicht zur Frage "
+            f"passt: {sauber['frage']} → {sauber['loesung']}")
 
     if rolle in ROLLEN_MIT_FEHLERVORHERSAGE:
         fehler = _text(daten, "typischer_fehler", f"{rolle}.typischer_fehler")
@@ -185,6 +209,9 @@ def _aufgabe_pruefen(daten: Any, rolle: str) -> dict:
         werte = daten.get(feld)
         if isinstance(werte, list):
             sauber[feld] = [str(w).strip() for w in werte if str(w).strip()]
+    for schritt in sauber.get("schritte", []):
+        _nachrechnen(schritt, f"{rolle}.schritte")
+    _nachrechnen(sauber.get("aufloesung"), f"{rolle}.aufloesung")
     return sauber
 
 
@@ -205,6 +232,9 @@ def _fehlertyp_pruefen(daten: Any, nr: int) -> dict:
     sauber["antworten"] = [str(a).strip() for a in antworten if str(a).strip()]
 
     sauber["erklaerung"] = pruefe_inhalt(daten.get("erklaerung"))
+    for feld in _NACHZURECHNEN:
+        _nachrechnen(sauber["erklaerung"].get(feld),
+                     f"fehlertyp[{nr}].erklaerung.{feld}")
     sauber["visualisierung"] = pruefe_visualisierung(daten.get("visualisierung"))
     alternativ = daten.get("visualisierung_alternativ")
     if alternativ is not None:
@@ -257,8 +287,40 @@ def pruefe_lektion(daten: Any) -> dict:
         raise InhaltUngueltig(
             f"Fehlertyp doppelt vergeben: {', '.join(sorted(doppelt))}.")
 
+    hilfe = daten.get("hilfe")
+    if not isinstance(hilfe, dict):
+        raise InhaltUngueltig(
+            "„hilfe“ fehlt. „Das habe ich nicht verstanden“ ist in jeder "
+            "Phase erreichbar; ohne Eintrag ginge der Knopf ins Leere.")
+    sauber_hilfe = {}
+    for phase in HILFE_PHASEN:
+        eintrag = hilfe.get(phase)
+        if not isinstance(eintrag, dict):
+            raise InhaltUngueltig(f"„hilfe.{phase}“ fehlt.")
+        gesaeubert = {"text": _text(eintrag, "text", f"hilfe.{phase}.text")}
+        _nachrechnen(gesaeubert["text"], f"hilfe.{phase}.text")
+        bild = eintrag.get("visualisierung")
+        if bild is not None:
+            gesaeubert["visualisierung"] = pruefe_visualisierung(bild)
+        sauber_hilfe[phase] = gesaeubert
+
+    faq = daten.get("faq")
+    sauber_faq = []
+    for i, eintrag in enumerate(faq if isinstance(faq, list) else []):
+        if not isinstance(eintrag, dict):
+            continue
+        sauber_faq.append({
+            "frage": _text(eintrag, "frage", f"faq[{i}].frage"),
+            "antwort": _text(eintrag, "antwort", f"faq[{i}].antwort"),
+        })
+    if len(sauber_faq) < 2:
+        raise InhaltUngueltig(
+            "„faq“ braucht mindestens zwei Einträge — „Ich habe eine andere "
+            "Frage“ ist sonst eine leere Tür.")
+
     erstkontakt = daten.get("erstkontakt")
-    sauber = {"konzept": sauber_konzept, "fehlertypen": geprueft}
+    sauber = {"konzept": sauber_konzept, "fehlertypen": geprueft,
+              "hilfe": sauber_hilfe, "faq": sauber_faq}
     if isinstance(erstkontakt, dict):
         sauber["erstkontakt"] = {
             "anker": _text(erstkontakt, "anker", "erstkontakt.anker"),

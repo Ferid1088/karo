@@ -215,7 +215,11 @@
 <details class="card disclosure">
   <summary>Das habe ich nicht verstanden</summary>
   <p>{{ h.erklaer_mehr.text }}</p>
+  {#- Bruchstreifen im Pilotkapitel, sonst eine Komponente aus dem
+      Register (§3): eine erzeugte Lektion ueber Volumen hat keine
+      Streifen, aber sehr wohl ein Bild. -#}
   {% for bild in h.erklaer_mehr.bilder %}{{ streifen(bild[1], bild[2], bild[0]) }}{% endfor %}
+  {% if h.erklaer_mehr.visualisierung %}{{ komponente(h.erklaer_mehr.visualisierung) }}{% endif %}
 </details>
 {% endif %}
 {% if h.faq %}

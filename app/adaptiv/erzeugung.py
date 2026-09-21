@@ -77,6 +77,15 @@ def speichern(rohdaten: dict, fach: str = "mathematik") -> int:
         for rolle, aufgabe in fehler["aufgaben"].items():
             _aufgabe_schreiben(fehlertyp_id, rolle, aufgabe)
 
+    for phase, hilfe in lektion["hilfe"].items():
+        inhalt_store.hilfe_sichern(
+            konzept_id, inhalt_store.HILFE_PHASE, phase, hilfe["text"],
+            visualisierung=hilfe.get("visualisierung"), geprueft=False)
+    for i, eintrag in enumerate(lektion["faq"]):
+        inhalt_store.hilfe_sichern(
+            konzept_id, inhalt_store.HILFE_FAQ, eintrag["frage"],
+            eintrag["antwort"], sortierung=i, geprueft=False)
+
     erstkontakt = lektion.get("erstkontakt")
     if erstkontakt and not store.erstkontakt(konzept_id):
         store.erstkontakt_anlegen(
@@ -94,5 +103,6 @@ def _freigeben(konzept_id: int, fehlertyp_ids: list) -> None:
         for erklaerung in store.erklaerungen(fehlertyp_id):
             store.erklaerung_freigeben(erklaerung["id"])
         inhalt_store.aufgaben_freigeben(fehlertyp_id)
+    inhalt_store.hilfe_freigeben(konzept_id)
     store.erstkontakt_freigeben(konzept_id)
     store.konzept_freigeben(konzept_id)

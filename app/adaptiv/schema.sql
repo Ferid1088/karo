@@ -117,6 +117,9 @@ CREATE TABLE IF NOT EXISTS lern_hilfe (
   schluessel   TEXT NOT NULL,
   text         TEXT NOT NULL,
   bilder       TEXT NOT NULL DEFAULT '[]',
+  -- Bilder der Hilfe gehen denselben Weg wie alle anderen (§3). `bilder`
+  -- bleibt fuer die Bruchstreifen des Pilotkapitels.
+  visualisierung TEXT,
   sortierung   INTEGER NOT NULL DEFAULT 0,
   geprueft_am  TEXT,
   aktiv        INTEGER NOT NULL DEFAULT 1,

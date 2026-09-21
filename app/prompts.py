@@ -945,6 +945,12 @@ def _aufgabe_schema(mit_fehler: bool = False, mit_optionen: bool = False) -> dic
 
 #: Was ein Modell zu einer Darstellung sagen darf: Auswahl und Parameter.
 #: Mehr nicht — geprüft wird gegen das Register in `adaptiv/komponenten.py`.
+#: Muss mit `adaptiv/schemas.HILFE_PHASEN` übereinstimmen — ein Test hält
+#: beide zusammen. Hier dupliziert, weil `prompts.py` nicht von der
+#: adaptiven Schicht abhängen soll.
+ADAPTIV_HILFE_PHASEN = ("HOOK", "RULE", "WORKED_EXAMPLE", "GUIDED_TASK",
+                        "INDEPENDENT_TASK", "ADAPTATION")
+
 VISUALISIERUNG_SCHEMA_PLATZ = {
     "type": "object",
     "properties": {
@@ -1049,8 +1055,36 @@ LEKTION_SCHEMA = {
                              "erklaerung", "visualisierung", "aufgaben"],
             },
         },
+        "hilfe": {
+            "type": "object",
+            "description": "Zweite Erklärung pro Phase: andere Worte als "
+                           "auf dem Schirm, auf Übungsschirmen nie die Lösung",
+            "properties": {
+                phase: {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string"},
+                        "visualisierung": VISUALISIERUNG_SCHEMA_PLATZ,
+                    },
+                    "required": ["text", "visualisierung"],
+                }
+                for phase in ADAPTIV_HILFE_PHASEN
+            },
+            "required": list(ADAPTIV_HILFE_PHASEN),
+        },
+        "faq": {
+            "type": "array", "minItems": 2, "maxItems": 5,
+            "description": "Kurze Antworten auf das, was Kinder bei "
+                           "diesem Konzept wirklich fragen",
+            "items": {
+                "type": "object",
+                "properties": {"frage": {"type": "string"},
+                               "antwort": {"type": "string"}},
+                "required": ["frage", "antwort"],
+            },
+        },
     },
-    "required": ["konzept", "erstkontakt", "fehlertypen"],
+    "required": ["konzept", "erstkontakt", "fehlertypen", "hilfe", "faq"],
 }
 
 
@@ -1104,4 +1138,18 @@ GenericStepFlow.
 Jede Fehlvorstellung braucht alle fünf Aufgaben: vorhersage, beispiel,
 gefuehrt, selbststaendig, transfer. Fehlt eine, bricht die Lektion mittendrin
 ab. Die Zahlen im Beispiel müssen sich von denen der geführten Aufgabe
-unterscheiden, sonst schreibt das Kind nur ab."""
+unterscheiden, sonst schreibt das Kind nur ab.
+
+Zu „hilfe": Das Kind kann in jeder Phase „Das habe ich nicht verstanden"
+drücken. Schreib dafür pro Phase eine zweite Erklärung — ANDERE Worte als
+auf dem Schirm, denn einen Satz zu wiederholen, den jemand nicht verstanden
+hat, hilft nicht. Auf Übungsschirmen erklärst du die Aufgabe, nennst aber
+nie die Lösung.
+
+Zu „faq": zwei bis fünf kurze Antworten auf das, was Kinder bei diesem
+Konzept wirklich fragen.
+
+Alles, was du rechnest, wird nachgerechnet. Eine Gleichung, die nicht
+aufgeht, führt dazu, dass die ganze Lektion verworfen wird — prüfe jede
+Zahl, bevor du sie hinschreibst. Ausgenommen sind die Felder, die einen
+Denkfehler BESCHREIBEN: dort gehört die falsche Rechnung hin."""

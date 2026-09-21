@@ -33,6 +33,7 @@ _NACHGETRAGENE_SPALTEN = [
     ("lern_fehlertyp", "geprueft_am", "TEXT"),
     ("lern_aufgabe", "quelle", "TEXT NOT NULL DEFAULT 'kuratiert'"),
     ("lern_aufgabe", "geprueft_am", "TEXT"),
+    ("lern_hilfe", "visualisierung", "TEXT"),
     ("lern_erklaerung", "visualisierung_alternativ", "TEXT"),
     ("lern_aufgabe", "typischer_fehler", "TEXT"),
     ("lern_aufgabe", "antwort_art", "TEXT NOT NULL DEFAULT 'bruch'"),
