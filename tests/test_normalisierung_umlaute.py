@@ -94,3 +94,29 @@ def test_ein_fremdes_thema_trifft_weiterhin_nicht(client, fake_llm, fake_cli,
 
     assert lektionen.fuer_thema("Photosynthese") is None
     assert lektionen.fuer_thema("Wurzeln ziehen") is None
+
+
+# --------------------------------------------------------------------------
+# Themen sind keine Brüche
+# --------------------------------------------------------------------------
+
+def test_themen_normalisierung_macht_aus_doppelpunkt_keinen_bruchstrich(
+        app_env):
+    """`normalisiere()` ist für Antworten gebaut: „2:5" ist dort dasselbe wie
+    „2/5". Ein Themenname ist keine Antwort — „Würfel: Volumen" würde sonst zu
+    „wuerfel/volumen" und träfe kein Stichwort mehr."""
+    from app.adaptiv.normalisierung import normalisiere, normalisiere_thema
+
+    assert normalisiere("2:5") == "2/5"          # unverändert für Antworten
+    assert normalisiere_thema("Würfel: Volumen") == "wuerfel volumen"
+    assert normalisiere_thema("Dreiseitiges Prisma: Volumen") == \
+        "dreiseitiges prisma volumen"
+    assert normalisiere_thema("Brüche addieren und subtrahieren") == \
+        "brueche addieren und subtrahieren"
+
+
+def test_themen_normalisierung_behaelt_die_umlautregel(app_env):
+    from app.adaptiv.normalisierung import normalisiere_thema
+
+    assert normalisiere_thema("Zähler und Nenner") == "zaehler und nenner"
+    assert normalisiere_thema("  Brüche   kürzen ") == "brueche kuerzen"

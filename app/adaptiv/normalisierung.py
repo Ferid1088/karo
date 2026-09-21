@@ -13,29 +13,46 @@ import unicodedata
 
 _MEHRFACH_LEER = re.compile(r"\s+")
 _ERLAUBT = re.compile(r"[^a-z0-9/.,+\-= ]")
+_ERLAUBT_THEMA = re.compile(r"[^a-z0-9 ]")
 
 
 def normalisiere(text: str | None) -> str:
     """Schreibweise vereinheitlichen, Bedeutung nicht verändern."""
     if not text:
         return ""
-    # Reihenfolge ist hier der ganze Punkt. NFKD zerlegt „ü" in „u" + Trema;
-    # danach findet `.replace("ü", "ue")` nichts mehr, und das Trema fiel als
-    # unerlaubtes Zeichen auf ein Leerzeichen zurueck — aus „Brüche" wurde
-    # „bru che". Also: erst zusammensetzen (NFC), dann ersetzen.
-    wert = unicodedata.normalize("NFC", str(text)).lower()
-    wert = (wert.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
-                .replace("ß", "ss"))
-    # Erst jetzt zerlegen. Was an Zeichen uebrig bleibt — Akzente aus anderen
-    # Sprachen — faellt weg, statt das Wort zu zerschneiden.
-    wert = "".join(z for z in unicodedata.normalize("NFKD", wert)
-                   if not unicodedata.combining(z))
+    wert = _grundform(text)
     wert = wert.replace(":", "/").replace("÷", "/")
     wert = _ERLAUBT.sub(" ", wert)
     wert = wert.replace(",", ".")
     # "2 / 5" → "2/5", aber "1/2 + 1/3" behält seine Teile.
     wert = re.sub(r"\s*/\s*", "/", wert)
     wert = re.sub(r"\s*([+\-=])\s*", r" \1 ", wert)
+    return _MEHRFACH_LEER.sub(" ", wert).strip()
+
+
+def _grundform(text: str) -> str:
+    """Kleinschreibung und ausgeschriebene Umlaute — die Stufe, die beide
+    Normalisierungen teilen."""
+    wert = unicodedata.normalize("NFC", str(text)).lower()
+    wert = (wert.replace("\u00e4", "ae").replace("\u00f6", "oe")
+                .replace("\u00fc", "ue").replace("\u00df", "ss"))
+    return "".join(z for z in unicodedata.normalize("NFKD", wert)
+                   if not unicodedata.combining(z))
+
+
+def normalisiere_thema(text: str | None) -> str:
+    """Themennamen vergleichbar machen — nicht dasselbe wie eine Antwort.
+
+    `normalisiere()` ist auf Brueche geeicht: dort ist „2:5" dieselbe Zahl
+    wie „2/5", und der Doppelpunkt wird zum Bruchstrich. Ein Themenname ist
+    keine Rechnung. „Wuerfel: Volumen" wuerde sonst zu „wuerfel/volumen"
+    und traefe kein Stichwort mehr.
+
+    Hier zaehlen nur Buchstaben, Ziffern und Wortgrenzen.
+    """
+    if not text:
+        return ""
+    wert = _ERLAUBT_THEMA.sub(" ", _grundform(text))
     return _MEHRFACH_LEER.sub(" ", wert).strip()
 
 
