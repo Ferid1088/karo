@@ -19,9 +19,17 @@ def normalisiere(text: str | None) -> str:
     """Schreibweise vereinheitlichen, Bedeutung nicht verändern."""
     if not text:
         return ""
-    wert = unicodedata.normalize("NFKD", str(text)).lower()
+    # Reihenfolge ist hier der ganze Punkt. NFKD zerlegt „ü" in „u" + Trema;
+    # danach findet `.replace("ü", "ue")` nichts mehr, und das Trema fiel als
+    # unerlaubtes Zeichen auf ein Leerzeichen zurueck — aus „Brüche" wurde
+    # „bru che". Also: erst zusammensetzen (NFC), dann ersetzen.
+    wert = unicodedata.normalize("NFC", str(text)).lower()
     wert = (wert.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
                 .replace("ß", "ss"))
+    # Erst jetzt zerlegen. Was an Zeichen uebrig bleibt — Akzente aus anderen
+    # Sprachen — faellt weg, statt das Wort zu zerschneiden.
+    wert = "".join(z for z in unicodedata.normalize("NFKD", wert)
+                   if not unicodedata.combining(z))
     wert = wert.replace(":", "/").replace("÷", "/")
     wert = _ERLAUBT.sub(" ", wert)
     wert = wert.replace(",", ".")
