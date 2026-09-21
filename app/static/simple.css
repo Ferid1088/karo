@@ -52,6 +52,20 @@ a.choice-card:hover { border-color: var(--ink); background: var(--surface-2); }
 .simple-list-link + .simple-list-link { border-top: 1px solid var(--border); }
 .simple-list-link small { display: block; color: var(--muted); margin-top: .2rem; }
 .simple-list-link.card { padding: 1.3rem; }
+/* Eine Listenzeile, die ein Formular abschickt. Ohne diese Regel gewinnt die
+   Knopf-Grundregel aus karo.css mit ihrer Handlungsfarbe, waehrend
+   `.simple-list-link` die Schrift dunkel laesst — dunkel auf dunkel. Die
+   Zeile soll aussehen wie ihre Nachbarn, nicht wie ein Knopf. */
+button.simple-list-link {
+  width: 100%; text-align: left; font: inherit; cursor: pointer;
+  background: transparent; color: var(--text); border: 0; border-radius: 0;
+  box-shadow: none;
+}
+/* Jede Zeile steckt in einem eigenen <form>, ist also keine direkte
+   Nachbarin der vorigen — die Trennlinie haengt deshalb am Formular. */
+.simple-list form + form button.simple-list-link { border-top: 1px solid var(--border); }
+button.simple-list-link:hover { background: var(--surface-2); transform: none; }
+button.simple-list-link:active { transform: none; box-shadow: none; }
 .quiet-note { color: var(--muted); font-size: .95rem; padding: .7rem 0; }
 .child-status { display: inline-flex; padding: .3rem .65rem; border-radius: 9px; background: var(--surface-2); color: var(--text); font-size: .82rem; font-weight: 650; border-left: 4px solid var(--border-firm); }
 .child-status.gruen { border-left-color: var(--ok); }

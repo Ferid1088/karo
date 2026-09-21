@@ -126,3 +126,27 @@ def test_der_knopf_traegt_die_handlungsfarbe(client, fake_llm, fake_cli,
     seite = client.get("/lernen?tab=neu").text
 
     assert '<button type="submit" class="btn">Mit Karo üben' in seite
+
+
+def test_die_lektionszeile_traegt_keine_eigene_gestaltung(client, fake_llm,
+                                                          fake_cli, app_env):
+    """„Das geht schon" ist ein <button>, sieht aber wie eine Listenzeile aus.
+
+    Ohne eigene Regel gewinnt die Knopf-Grundregel mit ihrer vollen
+    Handlungsfarbe, während `.simple-list-link` die Schrift dunkel lässt —
+    dunkelviolett auf violett, also unlesbar. Die Gestalt gehört ins
+    Stylesheet, nicht in ein `style`-Attribut, das genau das verdeckt.
+    """
+    from .test_app import kind_modus_aktivieren
+    _themen(client, fake_llm, app_env, "Würfel: Volumen")
+    kind_modus_aktivieren(client)
+
+    seite = client.get("/lernen/adaptiv").text
+    zeile = seite[seite.index("Das geht schon"):]
+    zeile = zeile[:zeile.index("</section>")]
+
+    assert 'class="simple-list-link"' in zeile
+    assert "style=" not in zeile
+
+    css = client.get("/static/simple.css").text
+    assert "button.simple-list-link" in css

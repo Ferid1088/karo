@@ -20,7 +20,7 @@
   {% for lektion in lektionen %}
     <form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}
       <input type="hidden" name="thema" value="{{ lektion.konzept_key }}">
-      <button type="submit" class="simple-list-link" style="width:100%;text-align:left">
+      <button type="submit" class="simple-list-link">
         <span><strong>{{ lektion.label }}</strong><small>{{ lektion.fach|capitalize }}</small></span>
       </button>
     </form>
