@@ -91,14 +91,29 @@ def test_gefuehrte_aufgabe_zeigt_ihre_brueche_sofort(client, fake_llm,
 
 def test_selbststaendige_aufgabe_zeigt_kein_bild(client, fake_llm, fake_cli,
                                                  app_env):
-    """B1: Ohne Bild — genau das ist die Prüfung."""
+    """B1: Ohne Bild — genau das ist die Prüfung.
+
+    Die Phase hat zwei Schirme (Rechnung, dann Transfer). B1 gilt für die
+    Phase, also für beide — sonst könnte jemand dem Transfer ein Bild geben,
+    ohne dass eine Prüfung anschlägt.
+    """
+    from app.adaptiv import sitzung as zustand
+
     token = _kind(client, fake_llm, app_env)
     _bis_zur_gefuehrten_aufgabe(client, token)
-    seite = _post(client, token, "aufgabe", antwort="3/4")
 
-    assert "2/3 + 1/6" in seite.text
-    haupt = seite.text.split("Das habe ich nicht verstanden")[0]
-    assert 'class="strip"' not in haupt
+    rechnung = _post(client, token, "aufgabe", antwort="3/4")
+    assert "2/3 + 1/6" in rechnung.text
+
+    transfer = _post(client, token, "aufgabe", antwort="5/6")
+    assert "Was ist größer" in transfer.text
+    assert _phase(app_env)["phase"] == zustand.INDEPENDENT_TASK
+
+    for schirm in (rechnung, transfer):
+        haupt = schirm.text.split("Das habe ich nicht verstanden")[0]
+        assert 'class="strip"' not in haupt
+        assert 'class="numberline"' not in haupt
+        assert 'class="area"' not in haupt
 
 
 def test_adaptation_zeigt_eine_andere_darstellung(client, fake_llm, fake_cli,
