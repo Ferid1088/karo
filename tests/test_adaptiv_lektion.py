@@ -509,14 +509,19 @@ def test_unbekanntes_thema_startet_nicht_heimlich_die_bruchlektion(
 
 def test_passendes_thema_startet_die_richtige_lernreihe(client, fake_llm,
                                                         fake_cli, app_env):
-    """„Bruchrechnung“ findet die Bruchlektion — ohne Modell, per Stichwort."""
+    """„Brüche addieren“ findet die Bruchlektion — ohne Modell, per Stichwort.
+
+    Frueher stand hier „Bruchrechnung“. Das ist ein Themenwort und traf
+    damit auch „Brüche kürzen“ oder „Zähler und Nenner“; die Stichworte
+    benennen jetzt das Konzept (siehe `lektionen.STICHWORTE`).
+    """
     einrichten(client, fake_llm)
     app_env.config.update(adaptive_learning_enabled=True)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get(PFAD).text)
 
     seite = client.post(f"{PFAD}/start",
-                        data={"_csrf": token, "thema": "Bruchrechnung"})
+                        data={"_csrf": token, "thema": "Brüche addieren"})
 
     assert "Pizza" in seite.text
     sitzung = app_env.db.q1("SELECT * FROM lern_sitzung ORDER BY id DESC LIMIT 1")
@@ -530,8 +535,8 @@ def test_das_eingetippte_thema_wird_festgehalten(client, fake_llm, fake_cli,
     app_env.config.update(adaptive_learning_enabled=True)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get(PFAD).text)
-    client.post(f"{PFAD}/start", data={"_csrf": token, "thema": "Bruchrechnung"})
+    client.post(f"{PFAD}/start", data={"_csrf": token, "thema": "Brüche addieren"})
 
     eingabe = app_env.db.q1("SELECT * FROM lern_eingabe ORDER BY id DESC LIMIT 1")
-    assert eingabe["thema_text"] == "Bruchrechnung"
+    assert eingabe["thema_text"] == "Brüche addieren"
     assert eingabe["art"] == "manuell"

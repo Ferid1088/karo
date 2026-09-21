@@ -84,12 +84,10 @@ def test_ein_fremdes_thema_trifft_weiterhin_nicht(client, fake_llm, fake_cli,
     """Die Reparatur darf die Ehrlichkeit aus `lektionen.py` nicht aufweichen:
     was es nicht gibt, wird weiter gesagt.
 
-    Offen und bewusst nicht hier entschieden: mit richtiger Normalisierung
-    trifft das Stichwort „brueche" jetzt auch „Brüche kürzen",
-    „Brüche vergleichen" und die übrigen Bruchthemen — die alle etwas
-    anderes sind als „ungleichnamig addieren". Das ist eine
-    Lektionsinhalts-Entscheidung (00_MASTER_PROMPT.md) und gehört in
-    STICHWORTE, nicht in die Normalisierung.
+    Welche Bruchthemen die Additionslektion treffen dürfen, entscheidet
+    `lektionen.STICHWORTE` — geprüft in `test_lektionen_zuordnung.py`,
+    nicht hier. Diese Datei hält nur fest, dass die Normalisierung nichts
+    aufweicht.
     """
     from app.adaptiv import lektionen
     einrichten(client, fake_llm)

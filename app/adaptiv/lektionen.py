@@ -18,11 +18,15 @@ from .normalisierung import normalisiere
 #: Jede Lektion ist ein Modul mit FACH/THEMA/KONZEPT und `saeen()`.
 MODULE = (inhalte_brueche,)
 
-#: Wonach ein Kind suchen könnte, damit „Brüche“ auch „Bruchrechnung“ findet.
+#: Stichworte benennen das **Konzept**, nicht das Thema.
+#:
+#: Vorher standen hier „brueche“, „bruch“ und „nenner“. Das sind Themenworte,
+#: und ein Themenwort trifft jedes Unterthema: „Brüche kürzen“ und „Zähler und
+#: Nenner“ landeten in einer Lektion über das Addieren. Ein Fehlertyp ist die
+#: Einheit des Inhalts (01_ARCHITECTURE.md §2) — die Stichworte müssen genauso
+#: eng sein wie die Lektion, die sie aufschließen.
 STICHWORTE = {
-    inhalte_brueche.KONZEPT: ("brueche", "bruch", "bruchrechnung",
-                              "brueche addieren", "bruecheaddieren",
-                              "ungleichnamig", "nenner"),
+    inhalte_brueche.KONZEPT: ("ungleichnamig", "brueche addieren"),
 }
 
 
