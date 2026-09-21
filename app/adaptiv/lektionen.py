@@ -67,3 +67,49 @@ def fuer_thema(thema_text: str | None) -> dict | None:
         if _trifft(gesucht, lektion):
             return lektion
     return None
+
+
+#: Wörter, die in fast jedem deutschen Themennamen stehen. Sie stiften keine
+#: Verwandtschaft: „Volumen bei VERSCHIEDENEN Maßeinheiten" und „Brüche mit
+#: VERSCHIEDENEN Nennern addieren" haben nichts miteinander zu tun.
+_FUELLWOERTER = frozenset({
+    "und", "oder", "mit", "bei", "von", "der", "die", "das", "den", "dem",
+    "ein", "eine", "einen", "einem", "im", "in", "zu", "zum", "zur", "auf",
+    "fuer", "aus", "als", "am", "ist", "sind", "verschiedenen", "verschiedene",
+    "verschiedener", "eines", "einer", "ganzen", "ganze",
+})
+
+
+def _sinnwoerter(text: str | None) -> set:
+    """Die Wörter eines Themennamens, die etwas bedeuten."""
+    return {w for w in normalisiere_thema(text).split()
+            if len(w) > 2 and w not in _FUELLWOERTER}
+
+
+def empfehlungen(thema_text: str | None, hoechstens: int = 3) -> list[dict]:
+    """Verfasste Lektionen, die zum gefragten Thema gehören.
+
+    Ein Vorschlag ist nur dann einer, wenn er mit der Frage zu tun hat.
+    Vorher listete die Auswahlseite den gesamten Katalog — bei „Würfel:
+    Volumen" also die Bruchlektion. Lieber gar kein Vorschlag als ein
+    unpassender (§19: Fehlvorstellungen zählen mehr als Themenetiketten,
+    und ein Etikett ohne Bezug zählt gar nichts).
+
+    Bewusst ein Wortabgleich und keine Rangfolge nach Voraussetzungen: eine
+    echte Voraussetzungskette gehört in den Katalog und nicht in eine
+    Heuristik. Solange sie fehlt, ist „gemeinsames Stichwort" das Ehrlichste,
+    was sich ohne Erfindung sagen lässt.
+    """
+    gesucht = _sinnwoerter(thema_text)
+    if not gesucht:
+        return []
+    bewertet = []
+    for lektion in verfuegbar():
+        woerter = _sinnwoerter(lektion["label"])
+        for wort in lektion.get("stichworte") or ():
+            woerter |= _sinnwoerter(wort)
+        gemeinsam = gesucht & woerter
+        if gemeinsam:
+            bewertet.append((len(gemeinsam), lektion["label"], lektion))
+    bewertet.sort(key=lambda t: (-t[0], t[1]))
+    return [lektion for _, _, lektion in bewertet[:hoechstens]]

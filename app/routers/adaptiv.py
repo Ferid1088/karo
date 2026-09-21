@@ -43,9 +43,17 @@ def _laufende(request: Request) -> dict | None:
 
 
 def _auswahl(request: Request, thema: str = "", nichts_gefunden: bool = False):
-    """Welche Lektionen es gibt — und ehrlich, was es noch nicht gibt."""
+    """Was es gibt — und ehrlich, was es noch nicht gibt.
+
+    Nach einem vergeblichen Thema zeigt die Seite nur noch Lektionen, die
+    damit zu tun haben. Der ganze Katalog waere hier kein Vorschlag,
+    sondern ein Inhaltsverzeichnis. Ohne Thema (der Einstieg) steht
+    weiterhin alles zur Wahl.
+    """
+    vorschlaege = (lektionen.empfehlungen(thema) if nichts_gefunden
+                   else lektionen.verfuegbar())
     return render(request, "adaptiv_auswahl.html",
-                  lektionen=lektionen.verfuegbar(), thema=thema,
+                  lektionen=vorschlaege, thema=thema,
                   nichts_gefunden=nichts_gefunden)
 
 

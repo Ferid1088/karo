@@ -14,6 +14,7 @@
 </section>
 {% endif %}
 
+{% if lektionen %}
 <section class="card">
   <h2>Das geht schon</h2>
   <div class="simple-list">
@@ -24,11 +25,10 @@
         <span><strong>{{ lektion.label }}</strong><small>{{ lektion.fach|capitalize }}</small></span>
       </button>
     </form>
-  {% else %}
-    <p class="empty">Gerade ist keine Lernreihe eingerichtet.</p>
   {% endfor %}
   </div>
 </section>
+{% endif %}
 
 <section class="card">
   <h2>Etwas anderes?</h2>

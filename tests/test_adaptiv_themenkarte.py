@@ -64,7 +64,9 @@ def test_ohne_lernreihe_sagt_das_die_naechste_seite(client, fake_llm,
     hinweis = hinweis[:hinweis.index("</section>")]
     assert "von Hand" not in hinweis
     assert "geprüft" not in hinweis
-    assert "Brüche mit verschiedenen Nennern addieren" in seite.text
+    # Und nichts Unpassendes: die Bruchlektion hat mit Volumen nichts zu tun
+    # (siehe test_empfehlungen.py).
+    assert "Brüche mit verschiedenen Nennern addieren" not in seite.text
     # Vor allem: keine Sitzung, keine untergeschobene Bruchlektion.
     assert app_env.db.q("SELECT * FROM lern_sitzung") == []
 
