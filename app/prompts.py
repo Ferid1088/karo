@@ -733,11 +733,6 @@ PLAN_SCHEMA = {
                     "inhalt": {"type": "string"},
                     "minuten": {"type": "integer"},
                     "topic_code": {"type": ["string", "null"]},
-                    "diagnose_fragen": {"type": "array", "maxItems": 5,
-                        "items": {"type": "string"}},
-                    "erklaerung": {"type": "string"},
-                    "neue_fragen": {"type": "array", "maxItems": 5,
-                        "items": {"type": "string"}},
                 },
                 "required": ["tag", "inhalt", "minuten", "topic_code"],
             },
@@ -765,11 +760,10 @@ Aktueller Stand:
 
 Erstelle einen realistischen Lernplan. Randbedingungen:
 - höchstens 30 Minuten Übung pro Tag, an manchen Tagen bewusst null
-- plane für jeden Lerntag eine eigene Lernreihe: zuerst fünf kurze
-    Diagnosefragen, damit das Kind nichts übt, was es bereits sicher kann;
-    danach eine Erklärung nur für erkannte Lücken und anschließend fünf neue
-    Fragen zur Kontrolle
-- schreibe diagnose_fragen, erklaerung und neue_fragen in jeden Lerntag
+- der Plan sagt nur, WANN welches Thema geübt wird. Diagnosefragen,
+    Erklärungen und Kontrollfragen gehören nicht hierher: die entstehen im
+    Lernweg selbst, wo eine Antwort auch ausgewertet wird und in den
+    Lernstand einfließt
 - Themen mit Flagge „rot“ zuerst, danach „gelb“
 - Themen mit Flagge „gruen“ bekommen höchstens eine kurze Wiederholung
 - reserviere den letzten Lerntag ausschließlich für Wiederholung und

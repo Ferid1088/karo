@@ -112,18 +112,11 @@
           <tr>
             <td><strong>{{ tag.tag }}</strong></td>
             <td>
+              {# Der Plan sagt, WANN geübt wird. Fragen stehen bewusst nicht
+                 hier: eine Frage ohne Antwortfeld wird nicht ausgewertet,
+                 landet in keinem Lernstand und sieht trotzdem nach Diagnose
+                 aus. Diagnose passiert im Lernweg, wo sie zählt. #}
               <strong>{{ tag.inhalt }}</strong>
-              {% if tag.erklaerung %}<p class="klein">Erklärung: {{ tag.erklaerung }}</p>{% endif %}
-              {% if tag.diagnose_fragen %}
-              <details class="plan-fragen"><summary>5 Diagnosefragen</summary>
-                <ol>{% for frage in tag.diagnose_fragen %}<li>{{ frage }}</li>{% endfor %}</ol>
-              </details>
-              {% endif %}
-              {% if tag.neue_fragen %}
-              <details class="plan-fragen"><summary>5 neue Kontrollfragen</summary>
-                <ol>{% for frage in tag.neue_fragen %}<li>{{ frage }}</li>{% endfor %}</ol>
-              </details>
-              {% endif %}
             </td>
             <td class="plan-material-cell" data-plan-material>
               {% if tag.topic_id %}
