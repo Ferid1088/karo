@@ -15,9 +15,40 @@ from .. import db
 CHILD_KEY = "installation"      # wie in welten/woche: eine Installation, ein Kind
 
 
+#: Spalten, die nach der ersten Fassung von `schema.sql` dazukamen.
+#:
+#: `CREATE TABLE IF NOT EXISTS` legt sie in einer bestehenden Datenbank nicht
+#: an — dieselbe Falle, die `app/db.py` mit `_ADDED_COLUMNS` abfängt. Die
+#: Liste steht hier und nicht dort, weil §10 verlangt, dass SQL der
+#: adaptiven Tabellen ausschließlich in dieser Datei lebt.
+#:
+#: Die Deklaration muss der in `schema.sql` entsprechen.
+_NACHGETRAGENE_SPALTEN = [
+    ("lern_erklaerung", "visualisierung_alternativ", "TEXT"),
+    ("lern_aufgabe", "typischer_fehler", "TEXT"),
+    ("lern_aufgabe", "antwort_art", "TEXT NOT NULL DEFAULT 'bruch'"),
+    ("lern_aufgabe", "optionen", "TEXT NOT NULL DEFAULT '[]'"),
+    ("lern_aufgabe", "aufloesung", "TEXT"),
+]
+
+
 def init() -> None:
-    db.conn().executescript(
+    c = db.conn()
+    c.executescript(
         Path(__file__).with_name("schema.sql").read_text(encoding="utf-8"))
+    _spalten_nachziehen(c)
+
+
+def _spalten_nachziehen(c) -> None:
+    """Bringt eine ältere Datenbank auf den Stand von `schema.sql`.
+
+    Idempotent: was schon da ist, bleibt unberührt. Eine frisch angelegte
+    Datenbank hat alle Spalten bereits und läuft hier nur durch.
+    """
+    for tabelle, spalte, deklaration in _NACHGETRAGENE_SPALTEN:
+        vorhanden = {r["name"] for r in c.execute(f"PRAGMA table_info({tabelle})")}
+        if vorhanden and spalte not in vorhanden:
+            c.execute(f"ALTER TABLE {tabelle} ADD COLUMN {spalte} {deklaration}")
 
 
 def _zeile(row) -> dict | None:
