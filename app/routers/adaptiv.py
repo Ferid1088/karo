@@ -10,7 +10,8 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 
 from .. import config, topics
-from ..adaptiv import lektionen, sitzung as zustand, store, unterricht
+from ..adaptiv import (erzeugung, lektionen, sitzung as zustand,
+                       store, unterricht)
 from .shared import render, zurueck
 
 router = APIRouter(prefix="/lernen/adaptiv", tags=["adaptiv"])
@@ -80,6 +81,11 @@ def _geprueftes_thema(topic_id: str) -> int | None:
     return thema["id"] if thema and thema["state"] == topics.AKTIV else None
 
 
+def _wartet(request: Request, thema: str):
+    """§15: Das Kind sieht, dass Karo arbeitet — kein Spinner ohne Worte."""
+    return render(request, "adaptiv_wartet.html", thema=thema)
+
+
 @router.post("/start", response_class=HTMLResponse)
 def start_thema(request: Request, thema: str = Form(""),
                 topic_id: str = Form("")):
@@ -87,9 +93,36 @@ def start_thema(request: Request, thema: str = Form(""),
         return zurueck("/lernen")
     lektion = lektionen.fuer_thema(thema)
     if lektion is None:
-        return _auswahl(request, thema=thema, nichts_gefunden=bool(thema.strip()))
+        gefragt = bool(thema.strip())
+        # §6: Katalog zuerst. Erst wenn dort nichts steht, schreibt Modell A
+        # eine Lektion — im Hintergrund, und genau einmal pro Thema.
+        if gefragt and getattr(config.load_safe(),
+                               "llm_error_creation_enabled", False):
+            erzeugung.anfordern(thema)
+            return _wartet(request, thema)
+        return _auswahl(request, thema=thema, nichts_gefunden=gefragt)
     return _zeige(request, unterricht.starte(
         lektion["konzept_id"], thema, _geprueftes_thema(topic_id)))
+
+
+@router.get("/status")
+def erzeugung_status(request: Request, thema: str = ""):
+    """Womit die Warteseite fragt, ob es losgehen kann."""
+    if _aus():
+        return {"fertig": False, "laeuft": False}
+    fertig = lektionen.fuer_thema(thema) is not None
+    return {"fertig": fertig, "laeuft": erzeugung.laeuft(thema),
+            "thema": thema}
+
+
+@router.get("/wartet", response_class=HTMLResponse)
+def wartet(request: Request, thema: str = ""):
+    """Damit ein Neuladen der Warteseite nicht ins Leere führt (A6)."""
+    if _aus():
+        return zurueck("/lernen")
+    if lektionen.fuer_thema(thema):
+        return _auswahl(request, thema=thema)
+    return _wartet(request, thema)
 
 
 @router.post("/neu", response_class=HTMLResponse)

@@ -106,3 +106,64 @@ def _freigeben(konzept_id: int, fehlertyp_ids: list) -> None:
     inhalt_store.hilfe_freigeben(konzept_id)
     store.erstkontakt_freigeben(konzept_id)
     store.konzept_freigeben(konzept_id)
+
+
+# --------------------------------------------------------------------------
+# Auf Anfrage erzeugen (§5 Modell A, §6 Tier 3, §15 Latenz)
+# --------------------------------------------------------------------------
+
+def auftrag_schluessel(thema: str) -> str:
+    """Ein Thema, ein Auftrag. Zweimal klicken erzeugt nicht zweimal."""
+    return f"lektion:{normalisiere(thema)}"
+
+
+def anfordern(thema: str) -> int | None:
+    """Reiht die Erzeugung ein. Gibt None zurück, wenn schon eine läuft."""
+    from .. import jobs
+    return jobs.enqueue("lektion_erzeugen", {"thema": thema},
+                        dedup_key=auftrag_schluessel(thema))
+
+
+def laeuft(thema: str) -> bool:
+    from .. import db
+    return bool(db.q1(
+        "SELECT 1 FROM job WHERE dedup_key=? AND state IN ('wartend','laeuft')",
+        auftrag_schluessel(thema)))
+
+
+def _handler_anmelden():
+    """Erst beim Import von `jobs` registrieren — sonst zieht diese Datei
+    die halbe Anwendung in die adaptive Schicht, nur um geladen zu werden."""
+    from .. import config, jobs, pii, prompts
+    from ..llm.client import ClaudeClient
+
+    @jobs.handler("lektion_erzeugen")
+    def job_lektion_erzeugen(payload: dict) -> dict:
+        """Der erste echte Modellaufruf des adaptiven Lernens.
+
+        Im Hintergrund, nicht im Klick des Kindes: eine Lektion zu schreiben
+        dauert, und §15 verlangt, dass niemand vor einem Spinner sitzt.
+
+        Schlägt die Prüfung fehl, wirft `speichern()` — der Auftrag landet
+        auf „fehler", und es bleibt nichts Halbes zurück. Lieber keine
+        Lektion als eine falsche.
+        """
+        thema = str(payload.get("thema") or "").strip()
+        if not thema:
+            return {"uebersprungen": "kein Thema"}
+        cfg = config.load()
+        ergebnis = ClaudeClient.from_config(cfg).complete(
+            purpose="lektion_erzeugen",
+            prompt=prompts.lektion_prompt(
+                cfg.learner_grade, cfg.subject,
+                pii.scrub(thema, cfg.learner_name)),
+            schema=prompts.LEKTION_SCHEMA,
+            system=prompts.SYSTEM,
+        )
+        konzept_id = speichern(ergebnis.data)
+        return {"konzept_id": konzept_id, "thema": thema}
+
+    return job_lektion_erzeugen
+
+
+job_lektion_erzeugen = _handler_anmelden()

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ thema }} – {{ companion_name }}{% endblock %}
+{% block content %}
+<div style="max-width:36rem;margin:0 auto">
+<a class="back-link" href="/lernen">← Zurück</a>
+<h1>{{ companion_name }} bereitet das gerade vor</h1>
+
+<section class="card" data-wartet data-thema="{{ thema }}">
+  <p>Zu „{{ thema }}“ gibt es noch keine Lernreihe. {{ companion_name }}
+     schreibt gerade eine.</p>
+  <p class="hint">Das dauert einen Moment. Du kannst hier warten — die Seite
+     geht von selbst weiter — oder später noch einmal schauen.</p>
+  <p class="hint" data-meldung role="status" aria-live="polite">Wird vorbereitet …</p>
+</section>
+
+<section class="card">
+  <h2>Solange etwas anderes?</h2>
+  <a class="btn ghost" href="/lernen">Zu deinen Themen</a>
+</section>
+</div>
+
+<script>
+(function () {
+  var karte = document.querySelector('[data-wartet]');
+  if (!karte) return;
+  var thema = karte.getAttribute('data-thema');
+  var meldung = karte.querySelector('[data-meldung]');
+  var versuche = 0;
+  function schau() {
+    versuche += 1;
+    fetch('/lernen/adaptiv/status?thema=' + encodeURIComponent(thema))
+      .then(function (a) { return a.json(); })
+      .then(function (stand) {
+        if (stand.fertig) { window.location.href = '/lernen/adaptiv'; return; }
+        if (!stand.laeuft) {
+          meldung.textContent = 'Das hat diesmal nicht geklappt. '
+            + 'Probier es später noch einmal oder wähle ein anderes Thema.';
+          return;
+        }
+        if (versuche < 60) setTimeout(schau, 2000);
+        else meldung.textContent = 'Das dauert heute ungewöhnlich lange. '
+          + 'Schau später noch einmal vorbei.';
+      })
+      .catch(function () { if (versuche < 60) setTimeout(schau, 4000); });
+  }
+  setTimeout(schau, 1500);
+})();
+</script>
+{% endblock %}

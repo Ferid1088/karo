@@ -153,6 +153,8 @@ SCHEMA_KEYS = {
     frozenset({"ok"}): "verify_ping",
     frozenset({"erreichbar", "inhalt"}): "research_fetch",
     frozenset({"ideen"}): "welten_ideas",
+    frozenset({"konzept", "erstkontakt", "fehlertypen", "hilfe",
+               "faq"}): "lektion",
 }
 
 
