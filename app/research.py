@@ -124,6 +124,21 @@ def client() -> ClaudeClient:
 # Prüfung eines Treffers
 # --------------------------------------------------------------------------
 
+def _deckt(host: str, domain: str) -> bool:
+    """Deckt ein freigegebener Eintrag diesen Rechnernamen ab?
+
+    Ein Eintrag benennt eine Seite, nicht genau einen Rechnernamen: Serlos
+    deutsche Seite IST `de.serlo.org`. Bei exaktem Vergleich wäre der
+    Eintrag „serlo.org" für die Seite nutzlos, die er benennt.
+
+    Die Grenze ist der Punkt und nicht das Wortende. Ein blosses
+    `endswith("serlo.org")` träfe auch `evil-serlo.org` — eine fremde
+    Domain, die sich nur ähnlich schreibt. Hier entscheidet sich, was ein
+    Kind zu sehen bekommt; die Grenze muss halten.
+    """
+    return host == domain or host.endswith("." + domain)
+
+
 def quelle_erlaubt(url: str) -> tuple[bool, str]:
     """(erlaubt, Kanalname) — die einzige Stelle, die über Zulassung entscheidet."""
     try:
@@ -134,7 +149,7 @@ def quelle_erlaubt(url: str) -> tuple[bool, str]:
         return False, ""
     host = host.removeprefix("www.")
     for erlaubt, name in erlaubte_quellen().items():
-        if host == erlaubt.removeprefix("www."):
+        if _deckt(host, erlaubt.removeprefix("www.")):
             return True, name
     return False, ""
 

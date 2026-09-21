@@ -2079,6 +2079,37 @@ def test_quelle_erlaubt_prueft_wirklich():
     assert research.youtube_kanal_erlaubt("Brüche – Lehrerschmidt", None)
 
 
+def test_freigegebene_domain_gilt_auch_fuer_ihre_unterdomains():
+    """Ein Eintrag „serlo.org" meint die Seite, nicht genau einen Rechnernamen.
+
+    Serlos deutsche Seite IST `de.serlo.org`. Bei exaktem Vergleich wäre der
+    Eintrag für die Seite nutzlos, die er benennt.
+    """
+    from app import research
+
+    for url in ("https://serlo.org/mathe",
+                "https://de.serlo.org/mathe",
+                "https://www.serlo.org/mathe",
+                "https://content.api.serlo.org/x"):
+        assert research.quelle_erlaubt(url)[0], url
+
+
+def test_eine_aehnlich_aussehende_domain_kommt_nicht_durch():
+    """Die Grenze ist der Punkt, nicht das Wortende.
+
+    `endswith("serlo.org")` träfe auch `evil-serlo.org` — eine fremde
+    Domain, die sich nur ähnlich schreibt. Die Freigabe ist eine
+    Zugangsentscheidung für ein Kind; sie muss an der Punktgrenze enden.
+    """
+    from app import research
+
+    for url in ("https://evil-serlo.org/x",
+                "https://notserlo.org/x",
+                "https://serlo.org.angreifer.example/x",
+                "https://xserlo.org/x"):
+        assert not research.quelle_erlaubt(url)[0], url
+
+
 # ==========================================================================
 # Datenschutz
 # ==========================================================================
