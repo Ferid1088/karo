@@ -96,6 +96,26 @@ def aufgabe(request: Request, antwort: str = Form("")):
     return _zeige(request, unterricht.aufgabe_beantwortet(sitzung, antwort))
 
 
+@router.post("/vorhersage", response_class=HTMLResponse)
+def vorhersage(request: Request, antwort: str = Form("")):
+    if _aus():
+        return zurueck("/lernen")
+    sitzung = _laufende(request)
+    if sitzung is None:
+        return zurueck("/lernen/adaptiv")
+    return _zeige(request, unterricht.vorhersage_beantwortet(sitzung, antwort))
+
+
+@router.post("/transfer", response_class=HTMLResponse)
+def transfer(request: Request, antwort: str = Form("")):
+    if _aus():
+        return zurueck("/lernen")
+    sitzung = _laufende(request)
+    if sitzung is None:
+        return zurueck("/lernen/adaptiv")
+    return _zeige(request, unterricht.transfer_beantwortet(sitzung, antwort))
+
+
 @router.post("/tipp", response_class=HTMLResponse)
 def tipp(request: Request):
     if _aus():

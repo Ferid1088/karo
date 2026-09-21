@@ -111,6 +111,14 @@ BILD_REGEL = {"component": "FractionStrip",
               "parameters": {"a": [1, 2], "b": [1, 3], "gemeinsam": 6},
               "animation": "cut_then_slide"}
 
+#: B1: Was in der Adaptation gezeigt wird, MUSS eine andere Komponente sein.
+#: Denselben Streifen noch einmal zu zeigen wiederholt genau das, was eben
+#: nicht geholfen hat.
+BILD_ADAPTATION = {"component": "NumberLine",
+                   "parameters": {"schritte": 4, "marken": [[2, 4], [1, 4]],
+                                  "bis": [3, 4]},
+                   "animation": "none"}
+
 # 02 §3: das vorgerechnete Beispiel MUSS andere Zahlen haben als die geführte
 # Aufgabe, sonst schreibt das Kind nur ab (B1).
 BEISPIEL = {
@@ -144,6 +152,34 @@ GEFUEHRT = {
     "visualisierung": {"component": "FractionStrip",
                        "parameters": {"a": [1, 2], "b": [1, 4], "gemeinsam": 4},
                        "animation": "none"},
+}
+
+# HOOK: das Kind sagt ZUERST voraus, wie sich sein eigenes Ergebnis zu 1/2
+# verhält, und sieht danach, dass die Voraussage nicht aufgehen kann. Die
+# Einsicht entsteht damit im Kind, statt ihm mitgeteilt zu werden (§19:
+# „The child discovers the contradiction before receiving the rule“).
+VORHERSAGE = {
+    "frage": "Bevor wir rechnen: Du hattest schon 1/2 und bekommst noch 1/3 "
+             "dazu. Muss das Ergebnis größer oder kleiner sein als 1/2?",
+    "optionen": [["groesser", "Größer als 1/2"], ["kleiner", "Kleiner als 1/2"],
+                 ["gleich", "Genau 1/2"]],
+    "loesung": "groesser",
+    "aufloesung": "Genau — wer etwas dazubekommt, hat danach mehr. Dein "
+                  "Ergebnis war aber kleiner als 1/2. Da stimmt also etwas "
+                  "noch nicht.",
+    "visualisierung": {"component": "FractionStrip",
+                       "parameters": {"a": [1, 2], "b": [1, 3]},
+                       "animation": "none"},
+}
+
+# Transfer: kein Rechnen, sondern dieselbe Einsicht an einer anderen Struktur
+# — deshalb gehört er ans Ende der selbstständigen Phase und nicht in den HOOK.
+TRANSFER = {
+    "frage": "Ohne zu rechnen: Was ist größer?",
+    "optionen": [["A", "A: 1/2"], ["B", "B: 1/2 + 1/5"]],
+    "loesung": "B",
+    "aufloesung": "Richtig — zu 1/2 kommt etwas dazu, also muss B größer sein. "
+                  "Das gilt, egal welche Zahlen unten stehen.",
 }
 
 # B1: die selbstständige Aufgabe zeigt bewusst KEIN Bild — sie prüft, ob es
@@ -259,8 +295,10 @@ def saeen() -> int:
         inhalt = schemas.pruefe_inhalt(ERKLAERUNGEN[fehler["key"]])
         bild, _ = schemas.visualisierung_oder_fallback(BILD_REGEL)
         if not store.beste_erklaerung(fehlertyp_id, KLASSE):
+            alternativ, _ = schemas.visualisierung_oder_fallback(BILD_ADAPTATION)
             store.erklaerung_anlegen(
                 fehlertyp_id, KLASSE, inhalt, visualisierung=bild,
+                visualisierung_alternativ=alternativ,
                 schwierigkeit=fehler["schwierigkeit"], geprueft=True)
 
         inhalt_store.aufgabe_sichern(
@@ -276,6 +314,15 @@ def saeen() -> int:
             fehlertyp_id, inhalt_store.SELBSTSTAENDIG, SELBSTSTAENDIG["frage"],
             SELBSTSTAENDIG["loesung"], tipps=SELBSTSTAENDIG["tipps"],
             typischer_fehler=fehler["fehler_selbststaendig"])
+        inhalt_store.aufgabe_sichern(
+            fehlertyp_id, inhalt_store.VORHERSAGE, VORHERSAGE["frage"],
+            VORHERSAGE["loesung"], antwort_art=inhalt_store.AUSWAHL,
+            optionen=VORHERSAGE["optionen"], aufloesung=VORHERSAGE["aufloesung"],
+            visualisierung=VORHERSAGE["visualisierung"])
+        inhalt_store.aufgabe_sichern(
+            fehlertyp_id, inhalt_store.TRANSFER, TRANSFER["frage"],
+            TRANSFER["loesung"], antwort_art=inhalt_store.AUSWAHL,
+            optionen=TRANSFER["optionen"], aufloesung=TRANSFER["aufloesung"])
 
     if not store.erstkontakt(konzept_id):
         store.erstkontakt_anlegen(

@@ -132,7 +132,19 @@ def bildschirm(sitzung: dict) -> dict:
     fehlertyp_id = sitzung["fehlertyp_id"]
 
     if phase == zustand.HOOK:
+        vorhersage = inhalt_store.aufgabe(fehlertyp_id, inhalt_store.VORHERSAGE)
+        if not daten.get("vorhergesagt"):
+            # §19: Das Kind sagt voraus, BEVOR es eine Erklärung bekommt.
+            return {"art": "vorhersage", "phase": phase, "inhalt": inhalt,
+                    "aufgabe": vorhersage,
+                    "bild": (vorhersage or {}).get("visualisierung"),
+                    "hilfe": _hilfe(konzept_id, phase)}
         return {"art": "haken", "phase": phase, "inhalt": inhalt,
+                "aufgabe": vorhersage,
+                "vorhersage": daten.get("vorhergesagt"),
+                # Der Widerspruch wird sichtbar, nicht nur behauptet.
+                "bild": (vorhersage or {}).get("visualisierung"),
+                "eigene_antwort": sitzung.get("letzte_antwort"),
                 "hilfe": _hilfe(konzept_id, phase)}
 
     if phase == zustand.RULE:
@@ -143,6 +155,14 @@ def bildschirm(sitzung: dict) -> dict:
     if phase == zustand.WORKED_EXAMPLE:
         return {"art": "beispiel", "phase": phase,
                 "aufgabe": inhalt_store.aufgabe(fehlertyp_id, inhalt_store.BEISPIEL),
+                "hilfe": _hilfe(konzept_id, phase)}
+
+    if phase == zustand.INDEPENDENT_TASK and daten.get("gerechnet"):
+        # Transfer: dieselbe Einsicht an einer anderen Struktur, ohne Rechnen.
+        return {"art": "transfer", "phase": phase,
+                "aufgabe": inhalt_store.aufgabe(fehlertyp_id,
+                                                inhalt_store.TRANSFER),
+                "fehlerhinweis": daten.get("fehlerhinweis"),
                 "hilfe": _hilfe(konzept_id, phase)}
 
     if phase in (zustand.GUIDED_TASK, zustand.INDEPENDENT_TASK):
@@ -160,8 +180,9 @@ def bildschirm(sitzung: dict) -> dict:
                 "hilfe": _hilfe(konzept_id, phase)}
 
     if phase == zustand.ADAPTATION:
-        return {"art": "anders", "phase": phase,
-                "inhalt": inhalt,
+        return {"art": "anders", "phase": phase, "inhalt": inhalt,
+                # B1: andere Darstellung, nicht derselbe Streifen noch einmal.
+                "bild": (erklaerung or {}).get("visualisierung_alternativ"),
                 "hilfe": _hilfe(konzept_id, phase)}
 
     return {"art": "geschafft", "phase": phase, "hilfe": _hilfe(konzept_id, None)}
@@ -236,6 +257,34 @@ def weiter(sitzung: dict) -> dict:
     return zustand.wechsle_phase(sitzung["id"], naechste)
 
 
+def vorhersage_beantwortet(sitzung: dict, antwort: str) -> dict:
+    """Die Vorhersage wird nicht benotet — sie macht den Widerspruch sichtbar."""
+    store.ereignis_schreiben(sitzung["id"], "Vorhersage abgegeben",
+                             nutzdaten={"wahl": antwort})
+    return _merke(sitzung["id"], sitzung, vorhergesagt=antwort or "unbekannt")
+
+
+def transfer_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
+    """Derselbe Gedanke an einer anderen Struktur — ohne Rechnen."""
+    aufgabe = inhalt_store.aufgabe(sitzung["fehlertyp_id"],
+                                   inhalt_store.TRANSFER)
+    if aufgabe is None:
+        return zustand.wechsle_phase(sitzung["id"], zustand.COMPLETE)
+
+    if (antwort or "").strip() == aufgabe["loesung"]:
+        ergebnis = zustand.antwort_richtig(sitzung["id"], antwort, cfg=cfg)
+        if ergebnis["zustand"] == zustand.MASTERED:
+            return ergebnis
+        return zustand.wechsle_phase(sitzung["id"], zustand.COMPLETE)
+
+    ergebnis = zustand.runde_gescheitert(sitzung["id"], antwort, cfg=cfg)
+    if ergebnis["zustand"] == zustand.ESCALATED:
+        return ergebnis
+    return _merke(sitzung["id"], ergebnis,
+                  fehlerhinweis="Überleg noch einmal: Etwas dazubekommen kann "
+                                "nie weniger werden.")
+
+
 def tipp(sitzung: dict) -> dict:
     """Stufenweise mehr verraten — die Hilfe selbst verrät nie die Lösung."""
     daten = _daten(sitzung)
@@ -260,14 +309,18 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
                                     "Schreib es zum Beispiel so: 3/4")
 
     if ist_richtig(antwort, aufgabe["loesung"]):
-        ergebnis = zustand.antwort_richtig(sitzung["id"], antwort, cfg=cfg)
+        # Die Rechnung allein beendet die selbstständige Phase nicht — der
+        # Transfer danach gehört dazu.
+        ergebnis = zustand.antwort_richtig(
+            sitzung["id"], antwort, cfg=cfg,
+            darf_abschliessen=phase != zustand.INDEPENDENT_TASK)
         if ergebnis["zustand"] == zustand.MASTERED:
             return ergebnis
         ergebnis = _merke(sitzung["id"], ergebnis, tipp_stufe=0,
                           fehlerhinweis=None)
         if phase == zustand.GUIDED_TASK:
             return zustand.wechsle_phase(sitzung["id"], zustand.INDEPENDENT_TASK)
-        return zustand.wechsle_phase(sitzung["id"], zustand.COMPLETE)
+        return _merke(sitzung["id"], ergebnis, gerechnet=True)
 
     # Falsch: Runde zählen (A5 — das eskaliert notfalls selbst).
     ergebnis = zustand.runde_gescheitert(sitzung["id"], antwort, cfg=cfg)

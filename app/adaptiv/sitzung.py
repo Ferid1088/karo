@@ -188,9 +188,14 @@ def eskalieren(sitzung_id: int) -> dict:
     return ergebnis
 
 
-def antwort_richtig(sitzung_id: int, antwort: str | None = None,
-                    cfg=None) -> dict:
-    """Richtige Antwort verbuchen — Beherrschung erst ab der Schwelle (A8)."""
+def antwort_richtig(sitzung_id: int, antwort: str | None = None, cfg=None,
+                    darf_abschliessen: bool = True) -> dict:
+    """Richtige Antwort verbuchen — Beherrschung erst ab der Schwelle (A8).
+
+    `darf_abschliessen=False` bucht den Erfolg, beendet die Lektion aber
+    nicht: die Rechnung allein schließt die selbstständige Phase noch nicht
+    ab, der Transfer danach gehört dazu.
+    """
     sitzung = store.sitzung(sitzung_id)
     if sitzung is None:
         raise UebergangVerboten(f"Sitzung {sitzung_id} gibt es nicht.")
@@ -213,7 +218,7 @@ def antwort_richtig(sitzung_id: int, antwort: str | None = None,
         stand = store.fortschritt(sitzung["konzept_id"], sitzung["fehlertyp_id"])
         erfolge = (stand or {}).get("erfolge", 0)
 
-    if beherrscht(erfolge, cfg):
+    if beherrscht(erfolge, cfg) and darf_abschliessen:
         if sitzung["konzept_id"]:
             store.fortschritt_buchen(sitzung["konzept_id"],
                                      sitzung["fehlertyp_id"], mastery="sicher")

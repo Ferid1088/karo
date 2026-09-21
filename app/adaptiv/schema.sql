@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS lern_erklaerung (
   version        INTEGER NOT NULL DEFAULT 1,
   inhalt         TEXT NOT NULL,
   visualisierung TEXT,
+  -- B1: die Adaptation muss eine ANDERE Darstellung zeigen, nicht dieselbe
+  -- noch einmal — sonst wiederholt Karo genau das, was schon nicht geholfen hat.
+  visualisierung_alternativ TEXT,
   aufgabe        TEXT,
   schwierigkeit  INTEGER NOT NULL DEFAULT 1,
   quelle         TEXT NOT NULL DEFAULT 'kuratiert',
@@ -80,6 +83,10 @@ CREATE TABLE IF NOT EXISTS lern_aufgabe (
   -- Fehlertyps taugt dafür nicht: sie ist auf die Diagnoseaufgabe geeicht,
   -- und "2/6" bedeutet bei 1/2+1/4 etwas anderes als bei 1/2+1/3.
   typischer_fehler TEXT,
+  -- Nicht jede Aufgabe ist ein Bruch: Vorhersage und Transfer sind Auswahlen.
+  antwort_art    TEXT NOT NULL DEFAULT 'bruch',
+  optionen       TEXT NOT NULL DEFAULT '[]',
+  aufloesung     TEXT,
   tipps          TEXT NOT NULL DEFAULT '[]',
   schritte       TEXT NOT NULL DEFAULT '[]',
   visualisierung TEXT,

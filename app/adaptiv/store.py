@@ -119,8 +119,8 @@ def fehlertyp_fuer_muster(konzept_id: int, muster: str) -> dict | None:
 def erklaerung_anlegen(fehlertyp_id: int, klasse: int, inhalt: dict,
                        visualisierung: dict | None = None,
                        aufgabe: dict | None = None, schwierigkeit: int = 1,
-                       quelle: str = "kuratiert",
-                       geprueft: bool = False) -> int:
+                       quelle: str = "kuratiert", geprueft: bool = False,
+                       visualisierung_alternativ: dict | None = None) -> int:
     jetzt = db.now()
     with db.tx() as c:
         letzte = c.execute(
@@ -130,12 +130,14 @@ def erklaerung_anlegen(fehlertyp_id: int, klasse: int, inhalt: dict,
         return c.execute(
             """INSERT INTO lern_erklaerung
                    (fehlertyp_id, klasse, version, inhalt, visualisierung,
-                    aufgabe, schwierigkeit, quelle, geprueft_am, created_at,
-                    updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    visualisierung_alternativ, aufgabe, schwierigkeit, quelle,
+                    geprueft_am, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (fehlertyp_id, klasse, version,
              json.dumps(inhalt, ensure_ascii=False),
              json.dumps(visualisierung, ensure_ascii=False) if visualisierung else None,
+             json.dumps(visualisierung_alternativ, ensure_ascii=False)
+             if visualisierung_alternativ else None,
              json.dumps(aufgabe, ensure_ascii=False) if aufgabe else None,
              schwierigkeit, quelle, jetzt if geprueft else None, jetzt,
              jetzt)).lastrowid
@@ -162,6 +164,8 @@ def _erklaerung_aufbereiten(row) -> dict | None:
         return None
     eintrag["inhalt"] = _json(eintrag.get("inhalt"), {})
     eintrag["visualisierung"] = _json(eintrag.get("visualisierung"), None)
+    eintrag["visualisierung_alternativ"] = _json(
+        eintrag.get("visualisierung_alternativ"), None)
     eintrag["aufgabe"] = _json(eintrag.get("aufgabe"), None)
     ausgeliefert = eintrag.get("ausgeliefert") or 0
     eintrag["erfolgsquote"] = (

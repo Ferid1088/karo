@@ -15,6 +15,13 @@ from .store import _json, _zeile          # eine Aufbereitung, nicht zwei
 BEISPIEL = "beispiel"
 GEFUEHRT = "gefuehrt"
 SELBSTSTAENDIG = "selbststaendig"
+#: Vorhersage im HOOK und Transfer am Ende der selbststaendigen Phase —
+#: beides Auswahlfragen, keine Rechnungen.
+VORHERSAGE = "vorhersage"
+TRANSFER = "transfer"
+
+BRUCH = "bruch"
+AUSWAHL = "auswahl"
 
 # Arten gespeicherter Hilfe (02 §5/§6)
 HILFE_PHASE = "phase"
@@ -26,6 +33,7 @@ def _aufgabe_aufbereiten(row) -> dict | None:
     if eintrag is None:
         return None
     eintrag["tipps"] = _json(eintrag.get("tipps"), [])
+    eintrag["optionen"] = _json(eintrag.get("optionen"), [])
     eintrag["schritte"] = _json(eintrag.get("schritte"), [])
     eintrag["visualisierung"] = _json(eintrag.get("visualisierung"), None)
     return eintrag
@@ -35,9 +43,12 @@ def aufgabe_sichern(fehlertyp_id: int, rolle: str, frage: str, loesung: str,
                     tipps: list | None = None, schritte: list | None = None,
                     visualisierung: dict | None = None,
                     schwierigkeit: int = 1, position: int = 0,
-                    typischer_fehler: str | None = None) -> int:
+                    typischer_fehler: str | None = None,
+                    antwort_art: str = BRUCH, optionen: list | None = None,
+                    aufloesung: str | None = None) -> int:
     """Idempotent über (fehlertyp, rolle, position) — erneutes Säen ändert nur."""
-    werte = (json.dumps(tipps or [], ensure_ascii=False),
+    werte = (antwort_art, json.dumps(optionen or [], ensure_ascii=False),
+             aufloesung, json.dumps(tipps or [], ensure_ascii=False),
              json.dumps(schritte or [], ensure_ascii=False),
              json.dumps(visualisierung, ensure_ascii=False) if visualisierung else None)
     with db.tx() as c:
@@ -47,16 +58,18 @@ def aufgabe_sichern(fehlertyp_id: int, rolle: str, frage: str, loesung: str,
         if vorhanden:
             c.execute(
                 """UPDATE lern_aufgabe SET frage=?, loesung=?, typischer_fehler=?,
-                       tipps=?, schritte=?, visualisierung=?, schwierigkeit=?,
+                       antwort_art=?, optionen=?, aufloesung=?, tipps=?,
+                       schritte=?, visualisierung=?, schwierigkeit=?,
                        aktiv=1 WHERE id=?""",
                 (frage, loesung, typischer_fehler, *werte, schwierigkeit,
                  vorhanden["id"]))
             return vorhanden["id"]
         return c.execute(
             """INSERT INTO lern_aufgabe (fehlertyp_id, rolle, position, frage,
-                    loesung, typischer_fehler, tipps, schritte, visualisierung,
+                    loesung, typischer_fehler, antwort_art, optionen,
+                    aufloesung, tipps, schritte, visualisierung,
                     schwierigkeit, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (fehlertyp_id, rolle, position, frage, loesung, typischer_fehler,
              *werte, schwierigkeit, db.now())).lastrowid
 

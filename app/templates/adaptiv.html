@@ -10,6 +10,12 @@
 .adaptiv .piece{flex:1 1 0;height:2rem;border:2px solid var(--border,#8877aa);border-radius:.35rem}
 .adaptiv .piece.filled{background:var(--accent,#7c5cff)}
 .adaptiv .bild-text{margin:.75rem 0 0}
+.adaptiv .numberline{position:relative;height:.4rem;width:20rem;max-width:100%;
+  background:var(--border,#8877aa);border-radius:.2rem;margin:2rem 0 2.5rem}
+.adaptiv .numberline .mark{position:absolute;top:-.55rem;width:3px;height:1.5rem;
+  background:var(--accent,#7c5cff);border-radius:2px}
+.adaptiv .numberline .mark span{position:absolute;top:1.7rem;left:50%;
+  transform:translateX(-50%);font-size:.8rem;white-space:nowrap}
 .adaptiv form{margin:.75rem 0}
 </style>
 
@@ -30,6 +36,13 @@
 {% set a = cfg.parameters.get('a') %}{% set b = cfg.parameters.get('b') %}
 {% if a %}{{ streifen(a[0], a[1], a[0] ~ '/' ~ a[1]) }}{% endif %}
 {% if b %}{{ streifen(b[0], b[1], b[0] ~ '/' ~ b[1]) }}{% endif %}
+{% elif cfg and cfg.component == 'NumberLine' %}
+{% set marken = cfg.parameters.get('marken', []) %}
+<div class="numberline" role="img" aria-label="Zahlenstrahl mit {{ marken|length }} Marken">
+{%- for m in marken %}{% if m[1] %}
+<div class="mark" style="left:{{ (100 * m[0] / m[1])|round(1) }}%"><span>{{ m[0] }}/{{ m[1] }}</span></div>
+{% endif %}{% endfor -%}
+</div>
 {% endif %}
 {%- endmacro %}
 
@@ -58,12 +71,42 @@
   </form>
 </section>
 
-{% elif schirm.art == 'haken' %}
+{% elif schirm.art == 'vorhersage' %}
 <section class="card">
   <p>{{ schirm.inhalt.get('haken', '') }}</p>
-  <p>{{ schirm.inhalt.get('erkenntnis', '') }}</p>
+  {{ komponente(schirm.bild) }}
+  <p><strong>{{ schirm.aufgabe.frage }}</strong></p>
+  <form method="post" action="/lernen/adaptiv/vorhersage">{{ csrf_input() }}
+    <div class="actions">
+      {% for wert, beschriftung in schirm.aufgabe.optionen %}
+      <button type="submit" name="antwort" value="{{ wert }}">{{ beschriftung }}</button>
+      {% endfor %}
+    </div>
+  </form>
+</section>
+
+{% elif schirm.art == 'haken' %}
+<section class="card">
+  <p>{{ schirm.aufgabe.aufloesung if schirm.vorhersage == schirm.aufgabe.loesung
+        else schirm.inhalt.get('erkenntnis', '') }}</p>
+  {% if schirm.eigene_antwort %}
+  <p>Deine Antwort war {{ schirm.eigene_antwort }}.</p>
+  {% endif %}
+  {{ komponente(schirm.bild) }}
   <form method="post" action="/lernen/adaptiv/weiter">{{ csrf_input() }}
     <button type="submit">Weiter</button>
+  </form>
+</section>
+
+{% elif schirm.art == 'transfer' %}
+<section class="card">
+  <p><strong>{{ schirm.aufgabe.frage }}</strong></p>
+  <form method="post" action="/lernen/adaptiv/transfer">{{ csrf_input() }}
+    <div class="actions">
+      {% for wert, beschriftung in schirm.aufgabe.optionen %}
+      <button type="submit" name="antwort" value="{{ wert }}">{{ beschriftung }}</button>
+      {% endfor %}
+    </div>
   </form>
 </section>
 
@@ -108,7 +151,7 @@
 {% elif schirm.art == 'anders' %}
 <section class="card">
   <p>Schauen wir es sonst einmal anders an.</p>
-  <p>{{ schirm.inhalt.get('bild', {}).get('zeigt', '') }}</p>
+  {{ komponente(schirm.bild) }}
   <p>{{ schirm.inhalt.get('bild', {}).get('bleibt_gleich', '') }}</p>
   <form method="post" action="/lernen/adaptiv/weiter">{{ csrf_input() }}
     <button type="submit">Nochmal probieren</button>
