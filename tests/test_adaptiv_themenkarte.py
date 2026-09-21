@@ -58,6 +58,12 @@ def test_ohne_lernreihe_sagt_das_die_naechste_seite(client, fake_llm,
 
     assert "noch keine Lernreihe" in seite.text
     assert "Würfel: Volumen" in seite.text
+    # Kein Werkstattbericht auf dem Kinderschirm: wie eine Lernreihe
+    # entsteht, beantwortet keine Frage, die das Kind gerade hat.
+    hinweis = seite.text[seite.text.index("noch keine Lernreihe"):]
+    hinweis = hinweis[:hinweis.index("</section>")]
+    assert "von Hand" not in hinweis
+    assert "geprüft" not in hinweis
     assert "Brüche mit verschiedenen Nennern addieren" in seite.text
     # Vor allem: keine Sitzung, keine untergeschobene Bruchlektion.
     assert app_env.db.q("SELECT * FROM lern_sitzung") == []
