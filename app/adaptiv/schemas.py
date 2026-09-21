@@ -17,15 +17,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
-# §3: Startbesetzung. Der echte Komponenten-Registry mit Renderern kommt in
-# Meilenstein 3 — die Auswahl wird aber schon jetzt streng geprüft, damit
-# niemals eine unbekannte Id in einem Datensatz landet.
-KOMPONENTEN = ("FractionStrip", "NumberLine", "AreaModel", "Balance",
-               "GenericStepFlow")
+# §3: Das Register führt die Komponenten, ihre Parameter und den Rückfall.
+# Diese Datei prüft nur noch den Lehrinhalt und reicht Darstellungen dorthin
+# weiter — es gibt genau eine Stelle, an der eine Auswahl gültig wird.
+from . import komponenten
 
 #: Sichere Rückfallkomponente, wenn eine Auswahl verworfen wird (§3, §15).
-FALLBACK_VISUALISIERUNG = {"component": "GenericStepFlow", "parameters": {},
-                           "animation": "none"}
+FALLBACK_VISUALISIERUNG = {"component": komponenten.FALLBACK.id,
+                           "parameters": {}, "animation": "none"}
 
 INHALT_FELDER = ("haken", "erkenntnis", "regel")
 BILD_FELDER = ("zeigt", "bewegt", "bleibt_gleich")
@@ -107,9 +106,8 @@ def schwachstellen(inhalt: dict) -> list[str]:
     return mangel
 
 
-def pruefe_visualisierung(daten: Any,
-                          erlaubt: tuple[str, ...] = KOMPONENTEN) -> dict:
-    """Prüft eine Komponentenauswahl (§3).
+def pruefe_visualisierung(daten: Any) -> dict:
+    """Prüft eine Komponentenauswahl gegen das Register (§3).
 
     Erlaubt ist ausschließlich: Komponenten-Id, Parameter, Animationsmodus.
     Unbekannte Id oder unpassende Parameter → `InhaltUngueltig`; der Aufrufer
@@ -119,21 +117,10 @@ def pruefe_visualisierung(daten: Any,
         raise InhaltUngueltig("Visualisierung ist kein Objekt.")
     if enthaelt_markup(daten):
         raise InhaltUngueltig("Visualisierung enthält Markup oder Skript (A1).")
-
-    komponente = daten.get("component")
-    if komponente not in erlaubt:
-        raise InhaltUngueltig(f"Unbekannte Komponente: {komponente!r}")
-
-    parameter = daten.get("parameters", {})
-    if not isinstance(parameter, dict):
-        raise InhaltUngueltig("„parameters“ ist kein Objekt.")
-
-    animation = daten.get("animation", "none")
-    if not isinstance(animation, str) or not animation:
-        raise InhaltUngueltig("„animation“ ist ungültig.")
-
-    return {"component": komponente, "parameters": parameter,
-            "animation": animation}
+    try:
+        return komponenten.pruefe_auswahl(daten)
+    except komponenten.ParameterUngueltig as exc:
+        raise InhaltUngueltig(str(exc)) from None
 
 
 def visualisierung_oder_fallback(daten: Any) -> tuple[dict, str | None]:

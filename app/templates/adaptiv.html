@@ -16,6 +16,12 @@
   background:var(--accent,#7c5cff);border-radius:2px}
 .adaptiv .numberline .mark span{position:absolute;top:1.7rem;left:50%;
   transform:translateX(-50%);font-size:.8rem;white-space:nowrap}
+.adaptiv .area{display:grid;gap:.2rem;width:20rem;max-width:100%;margin:.5rem 0}
+.adaptiv .area i{padding-top:100%;border:2px solid var(--border,#8877aa);border-radius:.25rem}
+.adaptiv .area i.filled{background:var(--accent,#7c5cff)}
+.adaptiv .balance{display:flex;align-items:flex-end;gap:1rem;margin:.5rem 0}
+.adaptiv .balance .pan{flex:1 1 0;text-align:center;border-top:3px solid var(--accent,#7c5cff);padding-top:.4rem}
+.adaptiv .stepflow{margin:.5rem 0;padding-left:1.2rem}
 .adaptiv form{margin:.75rem 0}
 </style>
 
@@ -36,6 +42,30 @@
 {% set a = cfg.parameters.get('a') %}{% set b = cfg.parameters.get('b') %}
 {% if a %}{{ streifen(a[0], a[1], a[0] ~ '/' ~ a[1]) }}{% endif %}
 {% if b %}{{ streifen(b[0], b[1], b[0] ~ '/' ~ b[1]) }}{% endif %}
+{% elif cfg and cfg.component == 'AreaModel' %}
+{% set spalten = cfg.parameters.get('spalten', 1) %}
+{% set zeilen = cfg.parameters.get('zeilen', 1) %}
+{% set markiert = cfg.parameters.get('markiert', 0) %}
+<div class="area" role="img" aria-label="{{ markiert }} von {{ spalten * zeilen }} Feldern"
+     style="grid-template-columns:repeat({{ spalten }}, 1fr)">
+{%- for i in range(spalten * zeilen) %}<i class="{{ 'filled' if i < markiert }}"></i>{% endfor -%}
+</div>
+
+{% elif cfg and cfg.component == 'Balance' %}
+{% set l = cfg.parameters.get('links') %}{% set r = cfg.parameters.get('rechts') %}
+<div class="balance" role="img" aria-label="Waage: links {{ l[0] }}/{{ l[1] }}, rechts {{ r[0] }}/{{ r[1] }}">
+  <div class="pan">{{ l[0] }}/{{ l[1] }}</div>
+  <div class="pan">{{ r[0] }}/{{ r[1] }}</div>
+</div>
+
+{% elif cfg and cfg.component == 'GenericStepFlow' %}
+{% set schritte = cfg.parameters.get('schritte', []) %}
+{% if schritte %}
+<ol class="stepflow" role="img" aria-label="{{ schritte|length }} Schritte">
+{%- for schritt in schritte %}<li>{{ schritt }}</li>{% endfor -%}
+</ol>
+{% endif %}
+
 {% elif cfg and cfg.component == 'NumberLine' %}
 {% set marken = cfg.parameters.get('marken', []) %}
 <div class="numberline" role="img" aria-label="Zahlenstrahl mit {{ marken|length }} Marken">
