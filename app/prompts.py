@@ -12,6 +12,7 @@ Zwei Regeln gelten fuer jeden Prompt in dieser Datei:
 from __future__ import annotations
 
 import datetime as _dt
+import json
 
 from .domain import ErrorType, Flag, Stufe
 
@@ -897,3 +898,210 @@ einfach wortwoertlich als Praefix vor einen Rahmennamen (also nicht
 „{interest}: Treffpunkt"), sondern erfinde einen eigenen, zum jeweiligen
 Rahmen passenden Namen. Alle drei Namen sollen sich klar voneinander
 unterscheiden. Halte dich an die Wortgrenzen aus dem Schema."""
+
+
+# ==========================================================================
+# Adaptives Lernen: eine ganze Lektion vorschlagen (§5 Modell A, §6 Tier 3)
+# ==========================================================================
+#
+# Tier 3 in §6 schreibt EINE Erklärung für EINEN unbekannten Fehler. Hier
+# entsteht eine ganze Lektion aus einem Themennamen — es gibt noch kein
+# Fehlersignal, nur die Frage eines Kindes.
+#
+# Geprüft wird das Ergebnis in `app/adaptiv/schemas.py::pruefe_lektion`.
+# Beide müssen dieselben Rollen verlangen, sonst erzeugt das Modell brav
+# etwas, das die Prüfung anschließend verwirft.
+
+def _aufgabe_schema(mit_fehler: bool = False, mit_optionen: bool = False) -> dict:
+    eigenschaften = {
+        "frage": {"type": "string"},
+        "loesung": {"type": "string"},
+        "tipps": {"type": "array", "maxItems": 3, "items": {"type": "string"},
+                  "description": "Hinweise, die zum Denken führen, nicht zur "
+                                 "Lösung"},
+    }
+    pflicht = ["frage", "loesung"]
+    if mit_fehler:
+        eigenschaften["typischer_fehler"] = {
+            "type": "string",
+            "description": "Was GENAU diese Fehlvorstellung bei GENAU dieser "
+                           "Aufgabe ergibt. Nicht die Lösung. Daran erkennt "
+                           "Karo später dieselbe Fehlvorstellung wieder.",
+        }
+        pflicht.append("typischer_fehler")
+    if mit_optionen:
+        eigenschaften["optionen"] = {
+            "type": "array", "minItems": 2, "maxItems": 4,
+            "items": {"type": "string"},
+            "description": "Die Auswahl. Die Lösung muss darunter stehen.",
+        }
+        eigenschaften["aufloesung"] = {
+            "type": "string",
+            "description": "Ein Satz, warum die richtige Auswahl stimmt",
+        }
+        pflicht += ["optionen", "aufloesung"]
+    return {"type": "object", "properties": eigenschaften, "required": pflicht}
+
+
+#: Was ein Modell zu einer Darstellung sagen darf: Auswahl und Parameter.
+#: Mehr nicht — geprüft wird gegen das Register in `adaptiv/komponenten.py`.
+VISUALISIERUNG_SCHEMA_PLATZ = {
+    "type": "object",
+    "properties": {
+        "component": {"type": "string",
+                      "description": "Eine Id aus der Liste im Auftrag"},
+        "parameters": {"type": "object",
+                       "description": "Genau die Parameter dieser Komponente"},
+        "animation": {"type": "string"},
+    },
+    "required": ["component", "parameters", "animation"],
+}
+
+
+LEKTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "konzept": {
+            "type": "object",
+            "properties": {
+                "konzept_key": {"type": "string",
+                                "description": "kurz, klein, mit Bindestrich"},
+                "thema_key": {"type": "string",
+                              "description": "das Gebiet, z. B. geometrie"},
+                "label": {"type": "string"},
+                "klasse_von": {"type": "integer"},
+                "klasse_bis": {"type": "integer"},
+                "stichworte": {
+                    "type": "array", "maxItems": 6, "items": {"type": "string"},
+                    "description": "Wonach ein Kind suchen könnte. Sie "
+                                   "benennen DIESES Konzept, nicht das ganze "
+                                   "Gebiet: „brueche“ träfe auch das Kürzen.",
+                },
+            },
+            "required": ["konzept_key", "thema_key", "label", "klasse_von",
+                         "klasse_bis", "stichworte"],
+        },
+        "erstkontakt": {
+            "type": "object",
+            "properties": {
+                "anker": {"type": "string",
+                          "description": "Eine Alltagsfrage, die das Kind "
+                                         "schon beantworten kann"},
+                "erste_aufgabe": _aufgabe_schema(),
+                "benennung": {"type": "string",
+                              "description": "Der Fachbegriff — zuletzt"},
+            },
+            "required": ["anker", "erste_aufgabe", "benennung"],
+        },
+        "fehlertypen": {
+            "type": "array", "minItems": 2, "maxItems": 4,
+            "description": "Die Fehlvorstellungen, die Kinder bei diesem "
+                           "Konzept wirklich haben — nicht Themen.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string"},
+                    "label": {"type": "string"},
+                    "beschreibung": {"type": "string"},
+                    "antworten": {
+                        "type": "array", "minItems": 1, "maxItems": 6,
+                        "items": {"type": "string"},
+                        "description": "Falsche Antworten, an denen genau "
+                                       "diese Fehlvorstellung zu erkennen ist",
+                    },
+                    "erklaerung": {
+                        "type": "object",
+                        "properties": {
+                            "haken": {"type": "string"},
+                            "erkenntnis": {"type": "string"},
+                            "regel": {"type": "string"},
+                            "bild": {
+                                "type": "object",
+                                "properties": {
+                                    "zeigt": {"type": "string"},
+                                    "bewegt": {"type": "string"},
+                                    "bleibt_gleich": {"type": "string"},
+                                },
+                                "required": ["zeigt", "bewegt",
+                                             "bleibt_gleich"],
+                            },
+                            "aufgabe": _aufgabe_schema(),
+                        },
+                        "required": ["haken", "erkenntnis", "regel", "bild",
+                                     "aufgabe"],
+                    },
+                    "visualisierung": VISUALISIERUNG_SCHEMA_PLATZ,
+                    "visualisierung_alternativ": VISUALISIERUNG_SCHEMA_PLATZ,
+                    "aufgaben": {
+                        "type": "object",
+                        "properties": {
+                            "vorhersage": _aufgabe_schema(mit_optionen=True),
+                            "beispiel": _aufgabe_schema(),
+                            "gefuehrt": _aufgabe_schema(mit_fehler=True),
+                            "selbststaendig": _aufgabe_schema(mit_fehler=True),
+                            "transfer": _aufgabe_schema(mit_optionen=True),
+                        },
+                        "required": ["vorhersage", "beispiel", "gefuehrt",
+                                     "selbststaendig", "transfer"],
+                    },
+                },
+                "required": ["key", "label", "beschreibung", "antworten",
+                             "erklaerung", "visualisierung", "aufgaben"],
+            },
+        },
+    },
+    "required": ["konzept", "erstkontakt", "fehlertypen"],
+}
+
+
+def lektion_prompt(grade: int, subject: str, thema: str) -> str:
+    """Der Auftrag an Modell A: eine ganze Lektion zu einem Themennamen.
+
+    Das Register wird als Metadaten mitgegeben — Bezeichnung, Zweck,
+    Parameter, erlaubte Animationen. Niemals der Renderer: ein Modell soll
+    gar nicht erst erfahren, wie gezeichnet wird, damit es nicht versucht,
+    es selbst zu tun (§3).
+    """
+    from .adaptiv import komponenten
+
+    register = json.dumps(komponenten.fuer_modell(), ensure_ascii=False,
+                          indent=2)
+    return f"""Du entwirfst eine Lernreihe für ein Kind der Klasse {grade} im Fach {subject}.
+
+Thema: {thema}
+
+Es gibt noch kein Fehlersignal — niemand hat etwas falsch gerechnet. Du
+entwirfst die Lektion, mit der Karo herausfindet, wo das Kind steht.
+
+So wird unterrichtet:
+- Eine Lektion behandelt GENAU EIN Konzept. Ist „{thema}" größer als ein
+  Konzept, nimm das erste, das ein Kind dafür braucht.
+- Die Einheit des Inhalts ist die Fehlvorstellung, nicht das Thema. Nenne
+  zwei bis vier Fehlvorstellungen, die Kinder bei diesem Konzept WIRKLICH
+  haben, und zu jeder die falschen Antworten, an denen man sie erkennt.
+- Zu „typischer_fehler" bei den Aufgaben: schreib auf, was GENAU diese
+  Fehlvorstellung bei GENAU dieser Aufgabe ergibt. Nicht die Lösung. Daran
+  erkennt Karo später dieselbe Fehlvorstellung wieder — ist das Feld falsch,
+  erkennt Karo beim nächsten Kind nichts.
+- Jede Erklärung: ein Haken, der an die eigene Antwort anknüpft; eine
+  Erkenntnis, die das Kind selbst zieht; eine Regel als Handlung. Kein „das
+  ist falsch". Kein Lob, keine Emojis, keine Fachwörter vor dem Bild.
+- Das Bild beschreibst du in Worten: was zu sehen ist, was sich bewegt, was
+  gleich bleibt. Was gleich bleibt, ist das Wichtigste.
+
+Darstellungen wählst du aus, du erfindest sie nicht. Erlaubt ist
+ausschließlich eine dieser Komponenten mit genau ihren Parametern:
+
+{register}
+
+Gib niemals HTML, SVG, JavaScript, CSS oder Zeichenanweisungen aus — weder
+im Text noch in den Parametern. Passt keine Komponente, nimm
+GenericStepFlow.
+
+„visualisierung_alternativ" muss eine ANDERE Komponente sein als
+„visualisierung": sie wird gezeigt, wenn die erste nicht geholfen hat.
+
+Jede Fehlvorstellung braucht alle fünf Aufgaben: vorhersage, beispiel,
+gefuehrt, selbststaendig, transfer. Fehlt eine, bricht die Lektion mittendrin
+ab. Die Zahlen im Beispiel müssen sich von denen der geführten Aufgabe
+unterscheiden, sonst schreibt das Kind nur ab."""

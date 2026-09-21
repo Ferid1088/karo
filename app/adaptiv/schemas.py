@@ -129,3 +129,142 @@ def visualisierung_oder_fallback(daten: Any) -> tuple[dict, str | None]:
         return pruefe_visualisierung(daten), None
     except InhaltUngueltig as exc:
         return dict(FALLBACK_VISUALISIERUNG), str(exc)
+
+
+# --------------------------------------------------------------------------
+# Eine ganze Lektion, von Modell A vorgeschlagen (§5, §6 Tier 3)
+# --------------------------------------------------------------------------
+#
+# Tier 3 in §6 erzeugt EINE Erklärung für EINEN unbekannten Fehler — Konzept
+# und Fehler sind da schon bekannt, das Kind hat ein Signal geliefert. Hier
+# entsteht eine ganze Lektion aus einem Themennamen: Konzept, Fehlertypen,
+# Erklärungen, Bilder und alle Aufgaben.
+#
+# Deshalb ist die Prüfung strenger als bei einer einzelnen Erklärung. Der
+# teuerste Fehler wäre Halbfertiges, das vollständig aussieht:
+# `unterricht.bildschirm()` liest überall `(aufgabe or {})` und stürzt gerade
+# NICHT ab — ein Kind liefe bis Phase vier und stünde vor einem leeren
+# Schirm. Vollständigkeit ist hier ein Schemafehler.
+
+#: Die fünf Rollen, die `unterricht.py` pro Fehlertyp liest.
+AUFGABEN_ROLLEN = ("vorhersage", "beispiel", "gefuehrt", "selbststaendig",
+                   "transfer")
+
+#: Rollen, die eine Fehlvorhersage brauchen: an ihnen erkennt Tier 1 dieselbe
+#: Fehlvorstellung wieder (`typischer_fehler` in `inhalte_brueche.py`).
+ROLLEN_MIT_FEHLERVORHERSAGE = ("gefuehrt", "selbststaendig")
+
+#: Rollen, die als Auswahl gestellt werden statt als Rechnung.
+ROLLEN_MIT_OPTIONEN = ("vorhersage", "transfer")
+
+
+def _aufgabe_pruefen(daten: Any, rolle: str) -> dict:
+    if not isinstance(daten, dict):
+        raise InhaltUngueltig(f"Aufgabe „{rolle}“ fehlt.")
+    sauber = {f: _text(daten, f, f"{rolle}.{f}") for f in AUFGABE_FELDER}
+
+    if rolle in ROLLEN_MIT_FEHLERVORHERSAGE:
+        fehler = _text(daten, "typischer_fehler", f"{rolle}.typischer_fehler")
+        if fehler.strip() == sauber["loesung"].strip():
+            raise InhaltUngueltig(
+                f"„{rolle}.typischer_fehler“ ist gleich der Lösung — damit "
+                "würde eine richtige Antwort als Fehler eingeordnet.")
+        sauber["typischer_fehler"] = fehler
+
+    if rolle in ROLLEN_MIT_OPTIONEN:
+        optionen = daten.get("optionen")
+        if not isinstance(optionen, list) or len(optionen) < 2:
+            raise InhaltUngueltig(f"„{rolle}.optionen“ braucht zwei Auswahlen.")
+        sauber["optionen"] = [str(o).strip() for o in optionen if str(o).strip()]
+        if sauber["loesung"] not in sauber["optionen"]:
+            raise InhaltUngueltig(
+                f"„{rolle}.loesung“ steht nicht unter den Optionen.")
+        sauber["aufloesung"] = _text(daten, "aufloesung", f"{rolle}.aufloesung")
+
+    for feld in ("tipps", "schritte"):
+        werte = daten.get(feld)
+        if isinstance(werte, list):
+            sauber[feld] = [str(w).strip() for w in werte if str(w).strip()]
+    return sauber
+
+
+def _fehlertyp_pruefen(daten: Any, nr: int) -> dict:
+    if not isinstance(daten, dict):
+        raise InhaltUngueltig(f"Fehlertyp {nr} ist kein Objekt.")
+    sauber = {f: _text(daten, f, f"fehlertyp[{nr}].{f}")
+              for f in ("key", "label")}
+    sauber["beschreibung"] = str(daten.get("beschreibung") or "").strip()
+
+    antworten = daten.get("antworten")
+    if not isinstance(antworten, list) or not any(
+            str(a).strip() for a in antworten):
+        raise InhaltUngueltig(
+            f"„fehlertyp[{nr}].antworten“ fehlt. Ohne eine erkennbare falsche "
+            "Antwort trifft Tier 1 nie, und der Eintrag schlägt bei keinem "
+            "Kind je an.")
+    sauber["antworten"] = [str(a).strip() for a in antworten if str(a).strip()]
+
+    sauber["erklaerung"] = pruefe_inhalt(daten.get("erklaerung"))
+    sauber["visualisierung"] = pruefe_visualisierung(daten.get("visualisierung"))
+    alternativ = daten.get("visualisierung_alternativ")
+    if alternativ is not None:
+        geprueft = pruefe_visualisierung(alternativ)
+        # B1: die Adaptation muss eine ANDERE Darstellung zeigen.
+        if geprueft["component"] == sauber["visualisierung"]["component"]:
+            raise InhaltUngueltig(
+                f"„fehlertyp[{nr}].visualisierung_alternativ“ nimmt dieselbe "
+                "Komponente — die Adaptation soll eine andere Darstellung "
+                "zeigen, nicht dieselbe noch einmal.")
+        sauber["visualisierung_alternativ"] = geprueft
+
+    aufgaben = daten.get("aufgaben")
+    if not isinstance(aufgaben, dict):
+        raise InhaltUngueltig(f"„fehlertyp[{nr}].aufgaben“ fehlt.")
+    sauber["aufgaben"] = {rolle: _aufgabe_pruefen(aufgaben.get(rolle), rolle)
+                          for rolle in AUFGABEN_ROLLEN}
+    return sauber
+
+
+def pruefe_lektion(daten: Any) -> dict:
+    """Prüft eine vorgeschlagene Lektion vollständig und gibt sie gesäubert
+    zurück. Wirft `InhaltUngueltig`, sobald irgendetwas fehlt oder nicht
+    zum Register passt — der Aufrufer speichert dann nichts.
+    """
+    if not isinstance(daten, dict):
+        raise InhaltUngueltig("Lektion ist kein Objekt.")
+    if enthaelt_markup(daten):
+        raise InhaltUngueltig("Lektion enthält Markup oder Skript (A1).")
+
+    konzept = daten.get("konzept")
+    if not isinstance(konzept, dict):
+        raise InhaltUngueltig("„konzept“ fehlt.")
+    sauber_konzept = {f: _text(konzept, f, f"konzept.{f}")
+                      for f in ("konzept_key", "thema_key", "label")}
+    sauber_konzept["klasse_von"] = int(konzept.get("klasse_von") or 1)
+    sauber_konzept["klasse_bis"] = int(konzept.get("klasse_bis") or 13)
+    stichworte = konzept.get("stichworte")
+    sauber_konzept["stichworte"] = [
+        str(w).strip() for w in (stichworte or []) if str(w).strip()]
+
+    fehlertypen = daten.get("fehlertypen")
+    if not isinstance(fehlertypen, list) or not fehlertypen:
+        raise InhaltUngueltig("„fehlertypen“ fehlt — ein Fehlertyp ist die "
+                              "Einheit des Inhalts (§2).")
+    geprueft = [_fehlertyp_pruefen(f, i) for i, f in enumerate(fehlertypen)]
+    schluessel = [f["key"] for f in geprueft]
+    doppelt = {k for k in schluessel if schluessel.count(k) > 1}
+    if doppelt:
+        raise InhaltUngueltig(
+            f"Fehlertyp doppelt vergeben: {', '.join(sorted(doppelt))}.")
+
+    erstkontakt = daten.get("erstkontakt")
+    sauber = {"konzept": sauber_konzept, "fehlertypen": geprueft}
+    if isinstance(erstkontakt, dict):
+        sauber["erstkontakt"] = {
+            "anker": _text(erstkontakt, "anker", "erstkontakt.anker"),
+            "erste_aufgabe": _aufgabe_pruefen(
+                erstkontakt.get("erste_aufgabe"), "erstkontakt.erste_aufgabe"),
+            "benennung": _text(erstkontakt, "benennung",
+                               "erstkontakt.benennung"),
+        }
+    return sauber
