@@ -29,6 +29,7 @@ def _bis_zur_gefuehrten_aufgabe(client, token, diagnose="2/5"):
     Beispiel → geführte Aufgabe."""
     _post(client, token, "anker", antwort="die Hälfte")
     seite = _post(client, token, "diagnose", antwort=diagnose)
+    seite = _post(client, token, "vorhersage", antwort="groesser")
     seite = _post(client, token, "weiter")          # HOOK  → RULE
     seite = _post(client, token, "weiter")          # RULE  → WORKED_EXAMPLE
     return _post(client, token, "weiter")           # → GUIDED_TASK
@@ -53,6 +54,7 @@ def test_reihenfolge_regel_beispiel_gefuehrte_aufgabe(client, fake_llm,
     _post(client, token, "anker", antwort="die Hälfte")
     _post(client, token, "diagnose", antwort="2/5")
     assert _phase(app_env)["phase"] == zustand.HOOK
+    _post(client, token, "vorhersage", antwort="groesser")
 
     _post(client, token, "weiter")
     assert _phase(app_env)["phase"] == zustand.RULE
@@ -109,7 +111,11 @@ def test_adaptation_zeigt_eine_andere_darstellung(client, fake_llm, fake_cli,
     seite = _post(client, token, "aufgabe", antwort="2/6")   # dieselbe Fehlvorstellung
 
     assert _phase(app_env)["phase"] == zustand.ADAPTATION
-    assert "anders" in seite.text
+
+    # Nicht derselbe Streifen noch einmal, sondern eine andere Komponente.
+    haupt = seite.text.split("Das habe ich nicht verstanden")[0]
+    assert 'class="numberline"' in haupt
+    assert 'class="strip"' not in haupt
 
 
 # --------------------------------------------------------------------------
@@ -192,20 +198,71 @@ def test_jede_phase_ausser_complete_hat_erklaer_mehr(client, fake_llm,
 
 def test_erklaer_mehr_wiederholt_nicht_den_bildschirmtext(client, fake_llm,
                                                           fake_cli, app_env):
-    """B3: Denselben Satz noch einmal zu lesen hilft niemandem."""
-    from app.adaptiv import inhalt_store, inhalte_brueche
+    """B3: Denselben Satz noch einmal zu lesen hilft niemandem — geprüft für
+    JEDE Phase, nicht nur für zwei."""
+    from app.adaptiv import inhalt_store, inhalte_brueche, sitzung as zustand
 
     einrichten(client, fake_llm)
     konzept_id = inhalte_brueche.saeen()
 
-    erklaerung = inhalte_brueche.ERKLAERUNGEN["zaehler-und-nenner-addiert"]
+    e = inhalte_brueche.ERKLAERUNGEN["zaehler-und-nenner-addiert"]
+    beispiel = " ".join(s["text"] for s in inhalte_brueche.BEISPIEL["schritte"])
     bildschirmtext = {
-        "HOOK": erklaerung["haken"] + erklaerung["erkenntnis"],
-        "RULE": erklaerung["regel"],
+        zustand.HOOK: " ".join([e["haken"], e["erkenntnis"],
+                                inhalte_brueche.VORHERSAGE["frage"],
+                                inhalte_brueche.VORHERSAGE["aufloesung"]]),
+        zustand.RULE: " ".join([e["regel"], e["bild"]["bleibt_gleich"]]),
+        zustand.WORKED_EXAMPLE: beispiel,
+        zustand.GUIDED_TASK: " ".join(
+            [inhalte_brueche.GEFUEHRT["frage"]] + inhalte_brueche.GEFUEHRT["tipps"]),
+        zustand.INDEPENDENT_TASK: " ".join(
+            [inhalte_brueche.SELBSTSTAENDIG["frage"],
+             inhalte_brueche.TRANSFER["frage"]]
+            + inhalte_brueche.SELBSTSTAENDIG["tipps"]),
+        zustand.ADAPTATION: " ".join([e["bild"]["zeigt"],
+                                      e["bild"]["bleibt_gleich"]]),
     }
+    # Jede Phase außer COMPLETE ist abgedeckt.
+    assert set(bildschirmtext) == set(zustand.PHASEN) - {zustand.COMPLETE}
+
     for phase, text in bildschirmtext.items():
         hilfe = inhalt_store.hilfe_fuer_phase(konzept_id, phase)["text"]
-        assert hilfe not in text and text not in hilfe
+        assert hilfe not in text, phase
+        assert text not in hilfe, phase
+
+
+# --------------------------------------------------------------------------
+# A7 — Privatsphäre
+# --------------------------------------------------------------------------
+
+def test_kein_anbieteraufruf_und_keine_kinderantwort_im_protokoll(
+        client, fake_llm, fake_cli, app_env, caplog):
+    """A7, soweit hier anwendbar.
+
+    Es gibt in dieser Lektion keinen Anbieteraufruf, also auch nichts zu
+    schwärzen — der Rest von A7 (Schwärzen vor dem Aufruf, Audit-Eintrag)
+    wird erst prüfbar, wenn Tier 3 in Meilenstein 4 wirklich ein Modell ruft.
+    Was hier schon gilt: die Rohantwort des Kindes gehört nicht ins
+    Anwendungsprotokoll. In der Datenbank steht sie bewusst — ohne sie gäbe
+    es keinen Lernverlauf.
+    """
+    import logging
+
+    token = _kind(client, fake_llm, app_env)
+    fake_llm.calls.clear()
+    with caplog.at_level(logging.DEBUG):
+        _bis_zur_gefuehrten_aufgabe(client, token, diagnose="2/5")
+        _post(client, token, "aufgabe", antwort="2/6")
+
+    assert fake_llm.calls == []
+    protokoll = " ".join(eintrag.getMessage() for eintrag in caplog.records)
+    for rohantwort in ("2/5", "2/6", "die Hälfte"):
+        assert rohantwort not in protokoll
+
+    # In der Sitzung selbst ist sie erhalten, sonst wäre kein Verlauf möglich.
+    assert app_env.db.q1(
+        "SELECT letzte_antwort FROM lern_sitzung ORDER BY id DESC LIMIT 1"
+    )["letzte_antwort"]
 
 
 def test_erklaer_mehr_verraet_die_loesung_nicht(client, fake_llm, fake_cli,
@@ -231,6 +288,7 @@ def test_hilfe_ist_in_jeder_phase_erreichbar(client, fake_llm, fake_cli,
     for seite in (client.get(PFAD),
                   _post(client, token, "anker", antwort="die Hälfte"),
                   _post(client, token, "diagnose", antwort="2/5"),
+                  _post(client, token, "vorhersage", antwort="groesser"),
                   _post(client, token, "weiter"),
                   _post(client, token, "weiter"),
                   _post(client, token, "weiter")):
@@ -272,7 +330,18 @@ def test_bekannte_falsche_antwort_fuehrt_zur_katalogerklaerung(
 
     seite = _post(client, token, "diagnose", antwort="2/5")
 
-    assert "kleiner als das halbe Stück" in seite.text
+    # HOOK fragt ZUERST nach einer Vorhersage — und zeigt dabei die beiden
+    # Brüche (02 §1: visual support „the two fractions“).
+    haupt = seite.text.split("Das habe ich nicht verstanden")[0]
+    assert "größer oder kleiner" in haupt
+    assert 'class="strip"' in haupt
+    assert "kleiner als das halbe Stück" not in haupt
+
+    # Erst nach der Vorhersage wird der Widerspruch sichtbar.
+    seite = _post(client, token, "vorhersage", antwort="groesser")
+    assert "wer etwas dazubekommt, hat danach mehr" in seite.text.lower()
+    assert "2/5" in seite.text
+
     sitzung = app_env.db.q1("SELECT * FROM lern_sitzung ORDER BY id DESC LIMIT 1")
     fehlertyp = app_env.db.q1("SELECT * FROM lern_fehlertyp WHERE id=?",
                               sitzung["fehlertyp_id"])
@@ -292,13 +361,18 @@ def test_richtige_antworten_fuehren_zu_beherrschung(client, fake_llm, fake_cli,
     _post(client, token, "aufgabe", antwort="3/4")
     assert _phase(app_env)["zustand"] == zustand.TEACHING
 
+    # Die Rechnung allein schließt die Lektion NICHT ab — der Transfer fehlt.
     seite = _post(client, token, "aufgabe", antwort="5/6")
+    assert _phase(app_env)["zustand"] == zustand.TEACHING
+    assert "Was ist größer" in seite.text
+
+    seite = _post(client, token, "transfer", antwort="B")
     assert _phase(app_env)["zustand"] == zustand.MASTERED
     assert "verstanden" in seite.text
 
     fortschritt = app_env.db.q1("SELECT * FROM lern_fortschritt ORDER BY id DESC LIMIT 1")
     assert fortschritt["mastery"] == "sicher"
-    assert fortschritt["erfolge"] == 2
+    assert fortschritt["erfolge"] == 3
 
 
 def test_gekuerzte_antwort_zaehlt_als_richtig(client, fake_llm, fake_cli,
