@@ -8,7 +8,7 @@
 <a href="/lernen?tab=bearbeitung" {{ 'aria-current=page' if tab == 'bearbeitung' }}>In Bearbeitung <span>{{ gruppen.bearbeitung|length }}</span></a>
 <a href="/lernen?tab=neu" {{ 'aria-current=page' if tab == 'neu' }}>Neue Themen <span>{{ gruppen.neu|length }}</span></a>
 </nav>
-{% if role == 'child' %}<p><a class="btn ghost" href="/lernpilot">Lernpilot testen</a></p>{% endif %}
+{% if role == 'child' and cfg.adaptive_learning_enabled %}<p><a class="btn ghost" href="/lernen/adaptiv">Brüche üben mit Karo</a></p>{% endif %}
 {% if tab == 'klassenarbeit' %}
 <section aria-labelledby="klassenarbeit-heading">
 <h2 id="klassenarbeit-heading">Dein Plan für die Klassenarbeit</h2>

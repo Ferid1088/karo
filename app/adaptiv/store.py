@@ -176,15 +176,22 @@ def erklaerung(erklaerung_id: int) -> dict | None:
 
 def beste_erklaerung(fehlertyp_id: int, klasse: int,
                      hoechstens_schwierigkeit: int | None = None) -> dict | None:
-    """Ausgeliefert wird nur, was aktiv UND geprüft ist (§11)."""
+    """Ausgeliefert wird nur, was aktiv UND geprüft ist (§11).
+
+    Die Klassenstufe gehört zum Katalogschlüssel (§6), trifft aber nicht immer
+    exakt: eine Lektion für Klasse 5–6 hilft einem Kind in Klasse 7 weiterhin.
+    Deshalb zuerst die genaue Stufe, sonst die nächstgelegene — degradieren
+    statt ausfallen (§15), und niemals ein leerer Bildschirm.
+    """
     sql = ["""SELECT * FROM lern_erklaerung
-               WHERE fehlertyp_id=? AND klasse=? AND aktiv=1
+               WHERE fehlertyp_id=? AND aktiv=1
                  AND archiviert_am IS NULL AND geprueft_am IS NOT NULL"""]
-    params: list = [fehlertyp_id, klasse]
+    params: list = [fehlertyp_id]
     if hoechstens_schwierigkeit is not None:
         sql.append("AND schwierigkeit <= ?")
         params.append(hoechstens_schwierigkeit)
-    sql.append("ORDER BY schwierigkeit DESC, version DESC LIMIT 1")
+    sql.append("ORDER BY ABS(klasse - ?), schwierigkeit DESC, version DESC LIMIT 1")
+    params.append(klasse)
     return _erklaerung_aufbereiten(db.q1(" ".join(sql), *params))
 
 

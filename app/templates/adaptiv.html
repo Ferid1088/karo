@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Lernen mit {{ companion_name }}{% endblock %}
+{% block content %}
+{% set h = schirm.hilfe %}
+<style>
+.adaptiv{max-width:36rem;margin:0 auto}
+/* B2: Jedes Ganze ist gleich breit. Mit fester Stückbreite wäre ein Drittel
+   breiter als eine Hälfte — das Bild widerspräche dem, was es zeigen soll. */
+.adaptiv .strip{display:flex;gap:.25rem;margin:.5rem 0;width:20rem;max-width:100%}
+.adaptiv .piece{flex:1 1 0;height:2rem;border:2px solid var(--border,#8877aa);border-radius:.35rem}
+.adaptiv .piece.filled{background:var(--accent,#7c5cff)}
+.adaptiv .bild-text{margin:.75rem 0 0}
+.adaptiv form{margin:.75rem 0}
+</style>
+
+{#- B2: die EINZIGE Stelle, an der ein Streifen entsteht. -#}
+{% macro streifen(gefuellt, gesamt, beschriftung='') -%}
+{% if gesamt and gesamt > 0 and gefuellt >= 0 and gefuellt <= gesamt %}
+{% if beschriftung %}<p class="bild-text">{{ beschriftung }}</p>{% endif %}
+<div class="strip" role="img" aria-label="{{ gefuellt }} von {{ gesamt }} gleich großen Stücken">
+{%- for i in range(gesamt) %}<div class="piece{{ ' filled' if i < gefuellt }}"></div>{% endfor -%}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{#- §3: gerendert wird eine ausgewählte Komponente mit geprüften Parametern,
+    niemals vom Modell geliefertes Markup. -#}
+{% macro komponente(cfg) -%}
+{% if cfg and cfg.component == 'FractionStrip' %}
+{% set a = cfg.parameters.get('a') %}{% set b = cfg.parameters.get('b') %}
+{% if a %}{{ streifen(a[0], a[1], a[0] ~ '/' ~ a[1]) }}{% endif %}
+{% if b %}{{ streifen(b[0], b[1], b[0] ~ '/' ~ b[1]) }}{% endif %}
+{% endif %}
+{%- endmacro %}
+
+<div class="adaptiv">
+<a class="back-link" href="/lernen">← Zurück</a>
+<h1>Brüche addieren</h1>
+
+{% if schirm.fehlerhinweis %}<p class="hint">{{ schirm.fehlerhinweis }}</p>{% endif %}
+
+{% if schirm.art == 'anker' %}
+<section class="card">
+  <p>{{ schirm.text }}</p>
+  <form method="post" action="/lernen/adaptiv/anker">{{ csrf_input() }}
+    <input type="text" name="antwort" placeholder="z. B. die Hälfte" autofocus>
+    <button type="submit">Weiter</button>
+  </form>
+</section>
+
+{% elif schirm.art == 'diagnose' %}
+<section class="card">
+  {% if schirm.hinweis %}<p>{{ schirm.hinweis }}</p>{% endif %}
+  <p><strong>{{ schirm.frage }}</strong></p>
+  <form method="post" action="/lernen/adaptiv/diagnose">{{ csrf_input() }}
+    <input type="text" name="antwort" placeholder="z. B. 5/6" autofocus>
+    <button type="submit">Prüfen</button>
+  </form>
+</section>
+
+{% elif schirm.art == 'haken' %}
+<section class="card">
+  <p>{{ schirm.inhalt.get('haken', '') }}</p>
+  <p>{{ schirm.inhalt.get('erkenntnis', '') }}</p>
+  <form method="post" action="/lernen/adaptiv/weiter">{{ csrf_input() }}
+    <button type="submit">Weiter</button>
+  </form>
+</section>
+
+{% elif schirm.art == 'regel' %}
+<section class="card">
+  <p>{{ schirm.inhalt.get('regel', '') }}</p>
+  {{ komponente(schirm.bild) }}
+  <p>{{ schirm.inhalt.get('bild', {}).get('bleibt_gleich', '') }}</p>
+  <form method="post" action="/lernen/adaptiv/weiter">{{ csrf_input() }}
+    <button type="submit">Zeig mir ein Beispiel</button>
+  </form>
+</section>
+
+{% elif schirm.art == 'beispiel' %}
+<section class="card">
+  <p><strong>{{ schirm.aufgabe.frage }}</strong></p>
+  {% for schritt in schirm.aufgabe.schritte %}
+  <p>{{ schritt.text }}</p>
+  {% if schritt.bild %}{{ streifen(schritt.bild[0], schritt.bild[1]) }}{% endif %}
+  {% endfor %}
+  <form method="post" action="/lernen/adaptiv/weiter">{{ csrf_input() }}
+    <button type="submit">Jetzt versuche ich es selbst</button>
+  </form>
+</section>
+
+{% elif schirm.art == 'aufgabe' %}
+<section class="card">
+  <p><strong>{{ schirm.aufgabe.frage }}</strong></p>
+  {{ komponente(schirm.bild) }}
+  <form method="post" action="/lernen/adaptiv/aufgabe">{{ csrf_input() }}
+    <input type="text" name="antwort" placeholder="Antwort" autofocus>
+    <button type="submit">Prüfen</button>
+  </form>
+  {% if schirm.tipp_offen %}
+  <form method="post" action="/lernen/adaptiv/tipp">{{ csrf_input() }}
+    <button type="submit" class="ghost">Tipp</button>
+  </form>
+  {% endif %}
+  {% for hinweis in schirm.tipps %}<p class="hint">{{ hinweis }}</p>{% endfor %}
+</section>
+
+{% elif schirm.art == 'anders' %}
+<section class="card">
+  <p>Schauen wir es sonst einmal anders an.</p>
+  <p>{{ schirm.inhalt.get('bild', {}).get('zeigt', '') }}</p>
+  <p>{{ schirm.inhalt.get('bild', {}).get('bleibt_gleich', '') }}</p>
+  <form method="post" action="/lernen/adaptiv/weiter">{{ csrf_input() }}
+    <button type="submit">Nochmal probieren</button>
+  </form>
+</section>
+
+{% elif schirm.art == 'eskaliert' %}
+<section class="card">
+  <p>Das war jetzt ein paar Mal knifflig — das liegt nicht an dir.</p>
+  <p>Diese Aufgabe schaut ihr euch am besten zu zweit an. Karo hat sich
+     gemerkt, worum es ging.</p>
+  <div class="actions">
+    <a class="btn" href="/lernen">Etwas anderes lernen</a>
+  </div>
+</section>
+
+{% else %}
+<section class="card">
+  <p>Du hast es verstanden: Brüche lassen sich erst zusammenzählen, wenn die
+     Stücke gleich groß sind.</p>
+  <div class="actions">
+    <form method="post" action="/lernen/adaptiv/neu">{{ csrf_input() }}<button type="submit">Noch einmal</button></form>
+    <a class="btn ghost" href="/lernen">Zurück</a>
+  </div>
+</section>
+{% endif %}
+
+{#- 02 §5/§6: in jeder Phase außer COMPLETE erreichbar, ändert nichts. -#}
+{% if schirm.art not in ('geschafft',) %}
+{% if h.erklaer_mehr %}
+<details class="card disclosure">
+  <summary>Das habe ich nicht verstanden</summary>
+  <p>{{ h.erklaer_mehr.text }}</p>
+  {% for bild in h.erklaer_mehr.bilder %}{{ streifen(bild[1], bild[2], bild[0]) }}{% endfor %}
+</details>
+{% endif %}
+{% if h.faq %}
+<details class="card disclosure">
+  <summary>Ich habe eine andere Frage</summary>
+  {% for eintrag in h.faq %}
+  <p><strong>{{ eintrag.schluessel }}</strong><br>{{ eintrag.text }}</p>
+  {% for bild in eintrag.bilder %}{{ streifen(bild[1], bild[2], bild[0]) }}{% endfor %}
+  {% endfor %}
+</details>
+{% endif %}
+{% endif %}
+</div>
+{% endblock %}

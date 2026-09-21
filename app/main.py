@@ -26,8 +26,8 @@ from starlette.status import HTTP_303_SEE_OTHER
 
 from . import config, db, jobs, security
 from .config import ConfigUnreadable
-from .routers import (auth, eltern, kind, admin, dashboard, lernzyklus,
-                      learning_pilot, vorbereitung, messung)
+from .routers import (adaptiv, auth, eltern, kind, admin, dashboard,
+                      lernzyklus, vorbereitung, messung)
 from .woche import router as woche
 from .welten import router as welten
 
@@ -57,9 +57,8 @@ VALID_ROLES = frozenset({"parent", "child"})
 # Kinder duerfen ausschliesslich ihren eigenen Lernbereich verwenden — das
 # wird hier zentral erzwungen, nicht nur durch ausgeblendete Menuepunkte.
 CHILD_ALLOWED_EXACT = frozenset({"/", "/hilfe", "/lernstand"})
-CHILD_ALLOWED_PREFIXES = ("/lernen", "/lernzyklus", "/lernpilot", "/quiz",
-                          "/material", "/klassenarbeit/material", "/woche",
-                          "/welten")
+CHILD_ALLOWED_PREFIXES = ("/lernen", "/lernzyklus", "/quiz", "/material",
+                          "/klassenarbeit/material", "/woche", "/welten")
 
 # Die Freigabe bleibt Elternsache, bis Eltern sie in den Einstellungen
 # ausdruecklich auch fuer das Kind aktivieren. Gilt fuer beide Routenfamilien.
@@ -118,7 +117,7 @@ app = FastAPI(title="Karo", lifespan=lifespan,
 app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(lernzyklus.router)
-app.include_router(learning_pilot.router)
+app.include_router(adaptiv.router)
 app.include_router(eltern.router)
 app.include_router(kind.router)
 app.include_router(admin.router)

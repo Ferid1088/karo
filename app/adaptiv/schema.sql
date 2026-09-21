@@ -66,6 +66,46 @@ CREATE TABLE IF NOT EXISTS lern_erklaerung (
 CREATE INDEX IF NOT EXISTS idx_lern_erklaerung_key
   ON lern_erklaerung(fehlertyp_id, klasse, aktiv, archiviert_am);
 
+-- … → PracticeTask (§2). Eigene Zeilen statt eines Felds in der Erklärung:
+-- eine Aufgabe wird pro Rolle gebraucht (vorgerechnet, geführt, selbstständig)
+-- und muss andere Zahlen haben als das Beispiel (03_INVARIANTS.md B1).
+CREATE TABLE IF NOT EXISTS lern_aufgabe (
+  id             INTEGER PRIMARY KEY,
+  fehlertyp_id   INTEGER NOT NULL REFERENCES lern_fehlertyp(id),
+  rolle          TEXT NOT NULL,
+  position       INTEGER NOT NULL DEFAULT 0,
+  frage          TEXT NOT NULL,
+  loesung        TEXT NOT NULL,
+  -- Was DIESER Fehlertyp bei DIESER Aufgabe produziert. Die Aliasliste des
+  -- Fehlertyps taugt dafür nicht: sie ist auf die Diagnoseaufgabe geeicht,
+  -- und "2/6" bedeutet bei 1/2+1/4 etwas anderes als bei 1/2+1/3.
+  typischer_fehler TEXT,
+  tipps          TEXT NOT NULL DEFAULT '[]',
+  schritte       TEXT NOT NULL DEFAULT '[]',
+  visualisierung TEXT,
+  schwierigkeit  INTEGER NOT NULL DEFAULT 1,
+  aktiv          INTEGER NOT NULL DEFAULT 1,
+  created_at     TEXT NOT NULL,
+  UNIQUE (fehlertyp_id, rolle, position)
+);
+
+-- Laufzeithilfe ist ein Nachschlagen (§11, 02 §5/§6): „Das habe ich nicht
+-- verstanden“ je Phase und die feste FAQ. Gespeichert wie jeder andere
+-- Inhalt, inklusive Prüfgatter — damit kein Kind Ungeprüftes zu sehen bekommt.
+CREATE TABLE IF NOT EXISTS lern_hilfe (
+  id           INTEGER PRIMARY KEY,
+  konzept_id   INTEGER NOT NULL REFERENCES lern_konzept(id),
+  art          TEXT NOT NULL,
+  schluessel   TEXT NOT NULL,
+  text         TEXT NOT NULL,
+  bilder       TEXT NOT NULL DEFAULT '[]',
+  sortierung   INTEGER NOT NULL DEFAULT 0,
+  geprueft_am  TEXT,
+  aktiv        INTEGER NOT NULL DEFAULT 1,
+  created_at   TEXT NOT NULL,
+  UNIQUE (konzept_id, art, schluessel)
+);
+
 -- Erstkontakt ohne Fehlersignal (§11): einmal erzeugt, für jedes Kind gleich.
 CREATE TABLE IF NOT EXISTS lern_erstkontakt (
   id             INTEGER PRIMARY KEY,

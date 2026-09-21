@@ -1,0 +1,106 @@
+"""Routen des adaptiven Lernens — dünne HTTP-Schicht über `app/adaptiv`.
+
+Der Zustand liegt in der Datenbank, nicht in der Session: der Browser schickt
+nur Antworten, nie eine Phase. Alles hier hängt am Schalter
+`adaptive_learning_enabled` (§16) und nutzt die bestehende Anmeldung,
+CSRF-Prüfung und Kinderrolle unverändert.
+"""
+
+from fastapi import APIRouter, Form, Request
+from fastapi.responses import HTMLResponse
+
+from .. import config
+from ..adaptiv import inhalte_brueche, sitzung as zustand, store, unterricht
+from .shared import render, zurueck
+
+router = APIRouter(prefix="/lernen/adaptiv", tags=["adaptiv"])
+
+
+def _aus() -> bool:
+    return not getattr(config.load_safe(), "adaptive_learning_enabled", False)
+
+
+def _konzept_id() -> int:
+    """Die Pilotlektion ist beim ersten Aufruf da — Säen ist idempotent."""
+    vorhanden = store.konzept_nach_key(inhalte_brueche.FACH,
+                                       inhalte_brueche.THEMA,
+                                       inhalte_brueche.KONZEPT)
+    if vorhanden and store.erstkontakt(vorhanden["id"]):
+        return vorhanden["id"]
+    return inhalte_brueche.saeen()
+
+
+def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
+    return render(request, "adaptiv.html", sitzung=sitzung,
+                  schirm=unterricht.bildschirm(sitzung))
+
+
+def _laufende(request: Request) -> dict | None:
+    sitzung = zustand.laufende()
+    return sitzung
+
+
+@router.get("", response_class=HTMLResponse)
+def start(request: Request):
+    if _aus():
+        return zurueck("/lernen")
+    return _zeige(request, unterricht.laufende_oder_neue(_konzept_id()))
+
+
+@router.post("/neu", response_class=HTMLResponse)
+def neu(request: Request):
+    if _aus():
+        return zurueck("/lernen")
+    return _zeige(request, unterricht.neu_starten(_konzept_id()))
+
+
+@router.post("/anker", response_class=HTMLResponse)
+def anker(request: Request, antwort: str = Form("")):
+    if _aus():
+        return zurueck("/lernen")
+    sitzung = _laufende(request)
+    if sitzung is None:
+        return zurueck("/lernen/adaptiv")
+    return _zeige(request, unterricht.anker_beantwortet(sitzung, antwort))
+
+
+@router.post("/diagnose", response_class=HTMLResponse)
+def diagnose(request: Request, antwort: str = Form("")):
+    if _aus():
+        return zurueck("/lernen")
+    sitzung = _laufende(request)
+    if sitzung is None:
+        return zurueck("/lernen/adaptiv")
+    return _zeige(request, unterricht.diagnose_beantwortet(sitzung, antwort))
+
+
+@router.post("/weiter", response_class=HTMLResponse)
+def weiter(request: Request):
+    if _aus():
+        return zurueck("/lernen")
+    sitzung = _laufende(request)
+    if sitzung is None:
+        return zurueck("/lernen/adaptiv")
+    if sitzung["phase"] == zustand.ADAPTATION:
+        return _zeige(request, unterricht.weiter_nach_adaptation(sitzung))
+    return _zeige(request, unterricht.weiter(sitzung))
+
+
+@router.post("/aufgabe", response_class=HTMLResponse)
+def aufgabe(request: Request, antwort: str = Form("")):
+    if _aus():
+        return zurueck("/lernen")
+    sitzung = _laufende(request)
+    if sitzung is None:
+        return zurueck("/lernen/adaptiv")
+    return _zeige(request, unterricht.aufgabe_beantwortet(sitzung, antwort))
+
+
+@router.post("/tipp", response_class=HTMLResponse)
+def tipp(request: Request):
+    if _aus():
+        return zurueck("/lernen")
+    sitzung = _laufende(request)
+    if sitzung is None:
+        return zurueck("/lernen/adaptiv")
+    return _zeige(request, unterricht.tipp(sitzung))
