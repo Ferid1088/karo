@@ -41,6 +41,11 @@ def groups(themen: list[dict]) -> dict:
         "SELECT l.topic_id FROM lesson l JOIN lesson_round r ON r.lesson_id=l.id "
         "WHERE r.state='gelernt' UNION SELECT topic_id FROM quiz "
         "WHERE state IN ('beantwortet', 'ausgewertet', 'freigegeben')")}
+    # Und der adaptive Loop: wer eine Sitzung zu einem Thema begonnen hat,
+    # bearbeitet es — unabhaengig davon, ob je ein Quiz lief. Die Abfrage
+    # liegt in `adaptiv/store.py`, damit SQL der `lern_`-Tabellen dort bleibt.
+    from ..adaptiv import store as adaptiv_store
+    started |= set(adaptiv_store.themen_mit_sitzung())
     result = {'neu': [], 'bearbeitung': [], 'gelernt': []}
     for topic in themen:
         key = ('gelernt' if topic.get('learned_at') else 'bearbeitung'

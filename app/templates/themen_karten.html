@@ -18,6 +18,7 @@
 <form method="post" action="/lernen/adaptiv/start" class="adaptiv-start">
   {{ csrf_input() }}
   <input type="hidden" name="thema" value="{{ t.label }}">
+  <input type="hidden" name="topic_id" value="{{ t.id }}">
   <button type="submit" class="btn">Mit Karo üben →</button>
 </form>
 {% endif %}

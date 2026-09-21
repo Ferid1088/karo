@@ -136,6 +136,10 @@ CREATE TABLE IF NOT EXISTS lern_eingabe (
   fach         TEXT,
   thema_text   TEXT,
   konzept_id   INTEGER REFERENCES lern_konzept(id),
+  -- Die einzige Stelle, an der ein lokales Thema und ein geteiltes Konzept
+  -- zusammenkommen: hier hat DIESES Kind auf DIESE Themenkarte getippt.
+  -- Die Inhaltstabellen bleiben bewusst frei davon (siehe Kopf der Datei).
+  topic_id     INTEGER,
   document_id  INTEGER,
   aufgaben     TEXT NOT NULL DEFAULT '[]',
   konfidenz    REAL,

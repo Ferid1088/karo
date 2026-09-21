@@ -58,11 +58,17 @@ def ist_richtig(antwort: str | None, loesung: str) -> bool:
 # Sitzung beginnen und fortsetzen
 # --------------------------------------------------------------------------
 
-def starte(konzept_id: int, thema_text: str = "") -> dict:
-    """Manuell eingetipptes Thema → normalisierte Eingabe → Diagnose (§13)."""
+def starte(konzept_id: int, thema_text: str = "",
+           topic_id: int | None = None) -> dict:
+    """Manuell eingetipptes Thema → normalisierte Eingabe → Diagnose (§13).
+
+    `topic_id` ist gesetzt, wenn der Einstieg von einer Themenkarte kam —
+    daran erkennt die Lernuebersicht spaeter, woran gerade gearbeitet wird.
+    """
     eingabe_id = store.eingabe_anlegen("manuell", fach="Mathematik",
                                        thema_text=thema_text or None,
-                                       konzept_id=konzept_id)
+                                       konzept_id=konzept_id,
+                                       topic_id=topic_id)
     s = zustand.starten(eingabe_id=eingabe_id, konzept_id=konzept_id)
     s = zustand.wechsle(s["id"], zustand.MATERIAL_ANALYZED, "Thema erkannt")
     s = zustand.wechsle(s["id"], zustand.DIAGNOSING, "Diagnose beginnt")

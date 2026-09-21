@@ -24,6 +24,7 @@ CHILD_KEY = "installation"      # wie in welten/woche: eine Installation, ein Ki
 #:
 #: Die Deklaration muss der in `schema.sql` entsprechen.
 _NACHGETRAGENE_SPALTEN = [
+    ("lern_eingabe", "topic_id", "INTEGER"),
     ("lern_erklaerung", "visualisierung_alternativ", "TEXT"),
     ("lern_aufgabe", "typischer_fehler", "TEXT"),
     ("lern_aufgabe", "antwort_art", "TEXT NOT NULL DEFAULT 'bruch'"),
@@ -290,6 +291,7 @@ def erstkontakt(konzept_id: int) -> dict | None:
 def eingabe_anlegen(art: str, fach: str | None = None,
                     thema_text: str | None = None,
                     konzept_id: int | None = None,
+                    topic_id: int | None = None,
                     document_id: int | None = None,
                     aufgaben: list | None = None,
                     konfidenz: float | None = None,
@@ -297,11 +299,30 @@ def eingabe_anlegen(art: str, fach: str | None = None,
     with db.tx() as c:
         return c.execute(
             """INSERT INTO lern_eingabe (child_key, art, fach, thema_text,
-                    konzept_id, document_id, aufgaben, konfidenz, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
-            (child_key, art, fach, thema_text, konzept_id, document_id,
-             json.dumps(aufgaben or [], ensure_ascii=False), konfidenz,
-             db.now())).lastrowid
+                    konzept_id, topic_id, document_id, aufgaben, konfidenz,
+                    created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (child_key, art, fach, thema_text, konzept_id, topic_id,
+             document_id, json.dumps(aufgaben or [], ensure_ascii=False),
+             konfidenz, db.now())).lastrowid
+
+
+def themen_mit_sitzung(child_key: str = CHILD_KEY) -> dict:
+    """Themen-ID → ob dazu gerade eine Sitzung offen ist.
+
+    Die einzige Abfrage, die beide Welten verbindet, und sie liegt hier,
+    weil §10 alles SQL der `lern_`-Tabellen in dieser Datei hält. Die
+    Lernuebersicht bekommt nur einfache Typen zurück, kein `sqlite3.Row`.
+    """
+    zeilen = db.q(
+        """SELECT e.topic_id AS topic_id, s.zustand AS zustand
+             FROM lern_sitzung s JOIN lern_eingabe e ON e.id = s.eingabe_id
+            WHERE s.child_key = ? AND e.topic_id IS NOT NULL""", child_key)
+    ergebnis: dict = {}
+    for zeile in zeilen:
+        offen = zeile["zustand"] not in ("MASTERED", "ESCALATED")
+        ergebnis[zeile["topic_id"]] = ergebnis.get(zeile["topic_id"], False) or offen
+    return ergebnis
 
 
 def eingabe(eingabe_id: int) -> dict | None:

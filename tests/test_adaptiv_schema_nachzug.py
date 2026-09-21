@@ -50,3 +50,16 @@ def test_die_lektion_laesst_sich_danach_wieder_saeen(client, fake_llm,
     lektionen.saee_alle()
 
     assert lektionen.fuer_thema("Brüche addieren") is not None
+
+
+def test_topic_id_wird_in_bestehender_datenbank_nachgezogen(
+        client, fake_llm, fake_cli, app_env):
+    """`lern_eingabe.topic_id` kam nach dem ersten Schema dazu."""
+    from app.adaptiv import store
+    with app_env.db.tx() as c:
+        c.execute("ALTER TABLE lern_eingabe DROP COLUMN topic_id")
+    assert "topic_id" not in _spalten(app_env, "lern_eingabe")
+
+    store.init()
+
+    assert "topic_id" in _spalten(app_env, "lern_eingabe")

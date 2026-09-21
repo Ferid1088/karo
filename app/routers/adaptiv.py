@@ -9,7 +9,7 @@ CSRF-Prüfung und Kinderrolle unverändert.
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 
-from .. import config
+from .. import config, topics
 from ..adaptiv import lektionen, sitzung as zustand, store, unterricht
 from .shared import render, zurueck
 
@@ -60,14 +60,28 @@ def start(request: Request):
     return _auswahl(request)
 
 
+def _geprueftes_thema(topic_id: str) -> int | None:
+    """Die Themen-ID kommt aus dem Formular und wird deshalb nachgeschlagen.
+
+    Nur ein aktives Thema zaehlt; alles andere wird stillschweigend zu
+    „keine Themen-ID" — die Sitzung selbst haengt am Konzept, nicht daran.
+    """
+    if not topic_id.isdigit():
+        return None
+    thema = topics.get(int(topic_id))
+    return thema["id"] if thema and thema["state"] == topics.AKTIV else None
+
+
 @router.post("/start", response_class=HTMLResponse)
-def start_thema(request: Request, thema: str = Form("")):
+def start_thema(request: Request, thema: str = Form(""),
+                topic_id: str = Form("")):
     if _aus():
         return zurueck("/lernen")
     lektion = lektionen.fuer_thema(thema)
     if lektion is None:
         return _auswahl(request, thema=thema, nichts_gefunden=bool(thema.strip()))
-    return _zeige(request, unterricht.starte(lektion["konzept_id"], thema))
+    return _zeige(request, unterricht.starte(
+        lektion["konzept_id"], thema, _geprueftes_thema(topic_id)))
 
 
 @router.post("/neu", response_class=HTMLResponse)
