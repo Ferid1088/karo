@@ -24,6 +24,7 @@
 <details class="card disclosure"><summary>{{ d.themenname or d.source_name }} <span class="klein">· {{ doc_labels.get(d.state, d.state) }}</span></summary>
 <p>{{ d.source_name }} · {{ d.captured_on or d.created_at[:10] }}</p>
 {% if doc_hints.get(d.state) %}<p>{{ doc_hints[d.state] }}</p>{% endif %}
+{% if d.note %}<p class="hint">{{ d.note }}</p>{% endif %}
 <a class="btn ghost" href="/wissen/{{ d.id }}">Blatt ansehen</a>
 <details class="disclosure"><summary>Angaben zur Datei</summary><dl><dt>Typ</dt><dd>{{ d.doc_type or 'Noch nicht erkannt' }}</dd><dt>Erkannte Abschnitte</dt><dd>{{ d.abschnitte or 0 }}</dd><dt>Speicherort</dt><dd><code>{{ d.stored_path }}</code></dd></dl></details>
 </details>

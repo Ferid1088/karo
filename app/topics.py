@@ -60,12 +60,18 @@ def job_topic_propose(payload: dict) -> None:
         bekannt_rows = [dict(r) for r in c.execute("SELECT code, label FROM topic")]
         bekannt = {r["code"] for r in bekannt_rows}
         bekannte_labels = [r["label"] for r in bekannt_rows]
+        uebersprungen = []
         for roh in ergebnis.data.get("themen") or []:
             code = normalize_code(roh.get("code") or roh.get("label") or "")
             label = (roh.get("label") or "").strip()
-            if not code or not label or code in bekannt:
+            if not code or not label:
                 continue
-            if ist_duplikat(label, bekannte_labels):
+            if code in bekannt:
+                uebersprungen.append(label)
+                continue
+            aehnlich = naechstes_duplikat(label, bekannte_labels)
+            if aehnlich:
+                uebersprungen.append(f"{label} (ähnlich zu „{aehnlich}“)")
                 continue
             bekannt.add(code)
             bekannte_labels.append(label)
@@ -76,6 +82,15 @@ def job_topic_propose(payload: dict) -> None:
                 (cfg.subject, code, label[:200],
                  (roh.get("beschreibung") or "")[:500] or None,
                  VORSCHLAG, doc_id, _sortwert(roh), db.now()))
+
+        if uebersprungen:
+            bisher = c.execute(
+                "SELECT note FROM document WHERE id = ?", (doc_id,)).fetchone()
+            notiz = (bisher["note"] + " · " if bisher and bisher["note"] else "")
+            notiz += "Bereits vorhandenes Thema erkannt, nichts Neues angelegt: "
+            notiz += "; ".join(uebersprungen)
+            c.execute("UPDATE document SET note = ? WHERE id = ?",
+                      (notiz[:500], doc_id))
 
 
 def _sortwert(roh: dict) -> int:
@@ -107,21 +122,29 @@ def _vergleichstext(label: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", text)
 
 
-def ist_duplikat(label: str, vorhandene_labels: list[str]) -> bool:
-    """True, wenn `label` einem der `vorhandene_labels` zum Verwechseln
-    aehnlich ist — auch wenn der Themencode (der 1:1 aus der Schreibweise
-    kommt) sich unterscheidet. Ohne diesen Abgleich landet dasselbe Thema
-    manchmal doppelt in der Datenbank, einmal z. B. als 'Multiplikation',
-    einmal als 'multiplication' aus einer anderssprachigen Quelle — beide
-    aktiv, aber mit unabhaengigem Gelernt-Status, sodass dasselbe Thema
-    gleichzeitig unter 'Lernen' und 'Erfolge' auftaucht."""
+def naechstes_duplikat(label: str, vorhandene_labels: list[str]) -> str | None:
+    """Gibt das erste Label aus `vorhandene_labels` zurueck, dem `label` zum
+    Verwechseln aehnlich ist — auch wenn der Themencode (der 1:1 aus der
+    Schreibweise kommt) sich unterscheidet. Ohne diesen Abgleich landet
+    dasselbe Thema manchmal doppelt in der Datenbank, einmal z. B. als
+    'Multiplikation', einmal als 'multiplication' aus einer anderssprachigen
+    Quelle — beide aktiv, aber mit unabhaengigem Gelernt-Status, sodass
+    dasselbe Thema gleichzeitig unter 'Lernen' und 'Erfolge' auftaucht.
+    None, wenn kein Treffer gefunden wurde — Aufrufer nutzen den Rueckgabewert
+    auch, um dem Menschen zu sagen, WELCHES Thema den Konflikt ausgeloest hat,
+    statt ein Thema kommentarlos verschwinden zu lassen."""
     ziel = _vergleichstext(label)
     if not ziel:
-        return False
-    return any(
-        difflib.SequenceMatcher(None, ziel, _vergleichstext(vorhanden)).ratio()
-        >= DUPLIKAT_SCHWELLE
-        for vorhanden in vorhandene_labels)
+        return None
+    for vorhanden in vorhandene_labels:
+        if (difflib.SequenceMatcher(None, ziel, _vergleichstext(vorhanden)).ratio()
+                >= DUPLIKAT_SCHWELLE):
+            return vorhanden
+    return None
+
+
+def ist_duplikat(label: str, vorhandene_labels: list[str]) -> bool:
+    return naechstes_duplikat(label, vorhandene_labels) is not None
 
 
 # --------------------------------------------------------------------------

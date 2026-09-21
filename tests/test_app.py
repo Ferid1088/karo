@@ -829,9 +829,24 @@ def test_abgelehnte_themen_kommen_nicht_wieder(client, fake_llm, fake_cli,
         daten[f"aktion_{i}"] = "abgelehnt"
     client.post("/themen/entscheiden", data=daten)
 
-    blatt_einlesen(client, fake_llm, app_env, name="blatt2.jpg")
+    # Andere Bildgroesse als blatt.jpg, damit die sha256-Dedup beim Einlesen
+    # nicht schon vor jeder Verarbeitung zuschlaegt — es geht hier um die
+    # Themen-Dedup, nicht die Datei-Dedup.
+    eingang = app_env.drive / "01_Eingang"
+    eingang.mkdir(parents=True, exist_ok=True)
+    make_jpeg(eingang / "blatt2.jpg", size=(800, 1000))
+    token = csrf_from(client.get("/wissen").text)
+    client.post("/wissen/einlesen", data={"_csrf": token})
+    run_jobs(app_env, fake_llm)
+
     assert app_env.db.q1("SELECT COUNT(*) AS n FROM topic "
                          "WHERE state='vorschlag'")["n"] == 0
+
+    # Dass nichts Neues entstand, ist kein stiller Fehlschlag — das Blatt
+    # sagt, welches vorhandene Thema den Konflikt ausgeloest hat.
+    doc2 = app_env.db.q1("SELECT * FROM document ORDER BY id DESC LIMIT 1")
+    assert "Bereits vorhandenes Thema erkannt" in doc2["note"]
+    assert doc2["note"] in client.get("/wissen").text
 
 
 # ==========================================================================
