@@ -18,6 +18,11 @@ THEMA = "brueche"
 KONZEPT = "ungleichnamig-addieren"
 KLASSE = 6
 
+#: Wonach ein Kind suchen koennte. Sie benennen das KONZEPT, nicht das Thema:
+#: „brueche" oder „nenner" traefe auch „Brueche kuerzen", und das ist eine
+#: andere Fehlvorstellung (01_ARCHITECTURE.md §2).
+STICHWORTE = ("ungleichnamig", "brueche addieren")
+
 # Zielfehlvorstellung und ihre Nachbarn. Mehrere Fehlertypen sind der Punkt:
 # dasselbe Thema, verschiedene Ursachen, verschiedene Erklärungen (A4).
 FEHLERTYPEN = (
@@ -283,11 +288,13 @@ def saeen() -> int:
     ist von Menschen geschrieben, nicht von einem Modell erzeugt (§11).
     """
     konzept_id = store.konzept_sichern(
-        FACH, THEMA, KONZEPT, "Brüche mit verschiedenen Nennern addieren", 5, 6)
+        FACH, THEMA, KONZEPT, "Brüche mit verschiedenen Nennern addieren", 5, 6,
+        stichworte=STICHWORTE, geprueft=True)
 
     for fehler in FEHLERTYPEN:
         fehlertyp_id = store.fehlertyp_sichern(
-            konzept_id, fehler["key"], fehler["label"], fehler["beschreibung"])
+            konzept_id, fehler["key"], fehler["label"], fehler["beschreibung"],
+            geprueft=True)
         for antwort in fehler["antworten"]:
             fehlertyp_lernen(fehlertyp_id, antwort, quelle="kuratiert")
 

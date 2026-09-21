@@ -26,14 +26,20 @@ INHALT = {
 
 
 def _katalog(geprueft: bool = True, schwierigkeit: int = 2):
+    """Ein kuratierter Katalog. `geprueft` betrifft nur die Erklärung — an
+    ihr hängt der Test, dass Ungeprüftes nicht ausgeliefert wird. Konzept und
+    Fehlertyp sind hier immer geprüft: sie stehen für verfassten Inhalt."""
     from app.adaptiv import katalog, store
 
+    # Eigene Schluessel: die verfasste Bruchlektion steht seit dem Hochfahren
+    # im Katalog, und dieser Aufbau soll ihr nicht ins Gehege kommen
+    # (Versionszaehlung der Erklaerungen, Pruefzustand).
     konzept_id = store.konzept_sichern(
-        "mathematik", "brueche", "ungleichnamig-addieren",
-        "Brüche mit verschiedenen Nennern addieren", 5, 6)
+        "mathematik", "brueche-pruefstand", "ungleichnamig-addieren",
+        "Brüche mit verschiedenen Nennern addieren", 5, 6, geprueft=True)
     fehlertyp_id = store.fehlertyp_sichern(
         konzept_id, "zaehler-und-nenner-addiert",
-        "Zähler und Nenner getrennt addiert")
+        "Zähler und Nenner getrennt addiert", geprueft=True)
     katalog.fehlertyp_lernen(fehlertyp_id, "2/5", quelle="kuratiert")
     erklaerung_id = store.erklaerung_anlegen(
         fehlertyp_id, 6, INHALT,
@@ -110,7 +116,8 @@ def test_zwei_fehlvorstellungen_ergeben_zwei_erklaerungen(client, fake_llm,
     einrichten(client, fake_llm)
     konzept_id, erster, _ = _katalog()
     zweiter = store.fehlertyp_sichern(konzept_id, "nenner-multipliziert",
-                                      "Nenner einfach multipliziert")
+                                      "Nenner einfach multipliziert",
+                                      geprueft=True)
     katalog.fehlertyp_lernen(zweiter, "2/6")
     anderer_inhalt = {**INHALT, "regel": "Nimm den kleinsten gemeinsamen Nenner."}
     store.erklaerung_anlegen(zweiter, 6, anderer_inhalt, geprueft=True)

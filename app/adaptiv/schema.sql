@@ -14,6 +14,13 @@ CREATE TABLE IF NOT EXISTS lern_konzept (
   label         TEXT NOT NULL,
   klasse_von    INTEGER NOT NULL DEFAULT 1,
   klasse_bis    INTEGER NOT NULL DEFAULT 13,
+  -- Wonach ein Kind suchen koennte. Beim Konzept, nicht in einer
+  -- Tabelle daneben: eine erzeugte Lektion bringt ihre eigenen mit.
+  stichworte    TEXT NOT NULL DEFAULT '[]',
+  -- §11: ungeprueft erreicht kein Kind. Verfasst heisst geprueft.
+  quelle        TEXT NOT NULL DEFAULT 'kuratiert',
+  geprueft_am   TEXT,
+  aktiv         INTEGER NOT NULL DEFAULT 1,
   created_at    TEXT NOT NULL,
   UNIQUE (fach, thema_key, konzept_key)
 );
@@ -25,6 +32,8 @@ CREATE TABLE IF NOT EXISTS lern_fehlertyp (
   fehler_key    TEXT NOT NULL,
   label         TEXT NOT NULL,
   beschreibung  TEXT,
+  quelle        TEXT NOT NULL DEFAULT 'kuratiert',
+  geprueft_am   TEXT,
   aktiv         INTEGER NOT NULL DEFAULT 1,
   created_at    TEXT NOT NULL,
   UNIQUE (konzept_id, fehler_key)
@@ -91,6 +100,8 @@ CREATE TABLE IF NOT EXISTS lern_aufgabe (
   schritte       TEXT NOT NULL DEFAULT '[]',
   visualisierung TEXT,
   schwierigkeit  INTEGER NOT NULL DEFAULT 1,
+  quelle         TEXT NOT NULL DEFAULT 'kuratiert',
+  geprueft_am    TEXT,
   aktiv          INTEGER NOT NULL DEFAULT 1,
   created_at     TEXT NOT NULL,
   UNIQUE (fehlertyp_id, rolle, position)

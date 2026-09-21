@@ -112,6 +112,12 @@ def init() -> None:
     init_welten()
     from .adaptiv.store import init as init_adaptiv
     init_adaptiv()
+    # Verfasste Lektionen gehoeren beim Hochfahren in den Katalog, nicht beim
+    # ersten Klick: seit `/lernen` die adaptive Schicht nicht mehr anfasst,
+    # haenge der Katalog sonst davon ab, welche Seite zuerst besucht wird.
+    # Idempotent — `saeen()` legt an oder zieht nach.
+    from .adaptiv.lektionen import saee_alle
+    saee_alle()
     row = c.execute("SELECT MAX(version) AS v FROM schema_version").fetchone()
     if row is None or row["v"] is None or row["v"] < SCHEMA_VERSION:
         with tx() as migration:

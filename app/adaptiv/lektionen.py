@@ -13,21 +13,11 @@ ist, als so tun, als sei alles da.
 from __future__ import annotations
 
 from . import inhalte_brueche, store
-from .normalisierung import normalisiere
+from .normalisierung import normalisiere_thema
 
-#: Jede Lektion ist ein Modul mit FACH/THEMA/KONZEPT und `saeen()`.
+#: Verfasste Lektionen. Sie saeen ihren Inhalt in den Katalog — gefunden
+#: wird danach ueber den Katalog, nicht ueber diese Liste.
 MODULE = (inhalte_brueche,)
-
-#: Stichworte benennen das **Konzept**, nicht das Thema.
-#:
-#: Vorher standen hier „brueche“, „bruch“ und „nenner“. Das sind Themenworte,
-#: und ein Themenwort trifft jedes Unterthema: „Brüche kürzen“ und „Zähler und
-#: Nenner“ landeten in einer Lektion über das Addieren. Ein Fehlertyp ist die
-#: Einheit des Inhalts (01_ARCHITECTURE.md §2) — die Stichworte müssen genauso
-#: eng sein wie die Lektion, die sie aufschließen.
-STICHWORTE = {
-    inhalte_brueche.KONZEPT: ("ungleichnamig", "brueche addieren"),
-}
 
 
 def saee_alle() -> None:
@@ -37,24 +27,30 @@ def saee_alle() -> None:
 
 
 def verfuegbar() -> list[dict]:
-    """Die verfassten Lektionen, mit ihrer Konzept-Id."""
+    """Alle auslieferbaren Lektionen — aus dem Katalog, nicht aus `MODULE`.
+
+    `MODULE` sagt nur noch, was gesaet wird. Was es *gibt*, steht in
+    `lern_konzept`: sonst waere eine Lektion, die niemand als Python-Modul
+    geschrieben hat, grundsaetzlich unauffindbar.
+    """
     saee_alle()
-    lektionen = []
-    for modul in MODULE:
-        konzept = store.konzept_nach_key(modul.FACH, modul.THEMA, modul.KONZEPT)
-        if konzept:
-            lektionen.append({"konzept_id": konzept["id"],
-                              "label": konzept["label"],
-                              "fach": konzept["fach"],
-                              "konzept_key": konzept["konzept_key"]})
-    return lektionen
+    return [{"konzept_id": k["id"], "label": k["label"], "fach": k["fach"],
+             "konzept_key": k["konzept_key"], "stichworte": k["stichworte"]}
+            for k in store.konzepte_verfuegbar()]
 
 
 def _trifft(gesucht: str, lektion: dict) -> bool:
-    stichworte = STICHWORTE.get(lektion["konzept_key"], ())
-    if any(wort in gesucht or gesucht in wort for wort in stichworte):
-        return True
-    return gesucht in normalisiere(lektion["label"])
+    """Stichworte gehoeren zum Konzept, nicht in eine Tabelle daneben.
+
+    Sie benennen das **Konzept**, nicht das Thema: „brueche" oder „nenner"
+    traefe jedes Bruchthema und damit auch „Brueche kuerzen" — eine andere
+    Fehlvorstellung als das Addieren (01_ARCHITECTURE.md §2).
+    """
+    for wort in lektion.get("stichworte") or ():
+        muster = normalisiere_thema(wort)
+        if muster and (muster in gesucht or gesucht in muster):
+            return True
+    return gesucht in normalisiere_thema(lektion["label"])
 
 
 def fuer_thema(thema_text: str | None) -> dict | None:
@@ -64,7 +60,7 @@ def fuer_thema(thema_text: str | None) -> dict | None:
     Themen braucht die Zerlegung aus Meilenstein 4. Was hier nicht trifft,
     darf nicht heimlich in der Bruchlektion landen.
     """
-    gesucht = normalisiere(thema_text)
+    gesucht = normalisiere_thema(thema_text)
     if not gesucht:
         return None
     for lektion in verfuegbar():

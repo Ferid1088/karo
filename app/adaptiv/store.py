@@ -25,6 +25,14 @@ CHILD_KEY = "installation"      # wie in welten/woche: eine Installation, ein Ki
 #: Die Deklaration muss der in `schema.sql` entsprechen.
 _NACHGETRAGENE_SPALTEN = [
     ("lern_eingabe", "topic_id", "INTEGER"),
+    ("lern_konzept", "stichworte", "TEXT NOT NULL DEFAULT '[]'"),
+    ("lern_konzept", "quelle", "TEXT NOT NULL DEFAULT 'kuratiert'"),
+    ("lern_konzept", "geprueft_am", "TEXT"),
+    ("lern_konzept", "aktiv", "INTEGER NOT NULL DEFAULT 1"),
+    ("lern_fehlertyp", "quelle", "TEXT NOT NULL DEFAULT 'kuratiert'"),
+    ("lern_fehlertyp", "geprueft_am", "TEXT"),
+    ("lern_aufgabe", "quelle", "TEXT NOT NULL DEFAULT 'kuratiert'"),
+    ("lern_aufgabe", "geprueft_am", "TEXT"),
     ("lern_erklaerung", "visualisierung_alternativ", "TEXT"),
     ("lern_aufgabe", "typischer_fehler", "TEXT"),
     ("lern_aufgabe", "antwort_art", "TEXT NOT NULL DEFAULT 'bruch'"),
@@ -70,45 +78,103 @@ def _json(wert: str | None, standard):
 # --------------------------------------------------------------------------
 
 def konzept_sichern(fach: str, thema_key: str, konzept_key: str, label: str,
-                    klasse_von: int = 1, klasse_bis: int = 13) -> int:
+                    klasse_von: int = 1, klasse_bis: int = 13, *,
+                    stichworte=(), quelle: str = "kuratiert",
+                    geprueft: bool = False) -> int:
+    """Legt ein Konzept an oder bringt ein vorhandenes auf Stand.
+
+    Mehrfach aufrufbar: verfasste Lektionen saeen bei jedem Start. Ein
+    bestehender Eintrag behaelt seine Id; Stichworte und Pruefzustand werden
+    nachgezogen, damit eine Datenbank aus der Zeit vor diesen Spalten die
+    Lektion nicht verliert.
+    """
+    worte = json.dumps([str(w) for w in stichworte], ensure_ascii=False)
     with db.tx() as c:
         vorhanden = c.execute(
-            "SELECT id FROM lern_konzept WHERE fach=? AND thema_key=? AND konzept_key=?",
+            "SELECT id, geprueft_am FROM lern_konzept "
+            "WHERE fach=? AND thema_key=? AND konzept_key=?",
             (fach, thema_key, konzept_key)).fetchone()
         if vorhanden:
+            c.execute("UPDATE lern_konzept SET label=?, stichworte=? WHERE id=?",
+                      (label, worte, vorhanden["id"]))
+            if geprueft and not vorhanden["geprueft_am"]:
+                c.execute("UPDATE lern_konzept SET geprueft_am=? WHERE id=?",
+                          (db.now(), vorhanden["id"]))
             return vorhanden["id"]
         return c.execute(
             """INSERT INTO lern_konzept (fach, thema_key, konzept_key, label,
-                                         klasse_von, klasse_bis, created_at)
-               VALUES (?,?,?,?,?,?,?)""",
+                                         klasse_von, klasse_bis, stichworte,
+                                         quelle, geprueft_am, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (fach, thema_key, konzept_key, label, klasse_von, klasse_bis,
+             worte, quelle, db.now() if geprueft else None,
              db.now())).lastrowid
 
 
+def konzept_freigeben(konzept_id: int) -> None:
+    """§11: erst nach der Freigabe sieht ein Kind die Lektion."""
+    with db.tx() as c:
+        c.execute("UPDATE lern_konzept SET geprueft_am=? WHERE id=?",
+                  (db.now(), konzept_id))
+
+
+def konzepte_verfuegbar() -> list[dict]:
+    """Alle Lektionen, die ausgeliefert werden duerfen — aktiv und geprueft.
+
+    Die Quelle der Wahrheit fuer „was gibt es?". Frueher war das eine fest
+    verdrahtete Modulliste; damit war eine erzeugte Lektion unauffindbar.
+    """
+    return [_konzept_aufbereiten(r) for r in db.q(
+        """SELECT * FROM lern_konzept
+            WHERE aktiv=1 AND geprueft_am IS NOT NULL
+            ORDER BY fach, thema_key, konzept_key""")]
+
+
+def _konzept_aufbereiten(row) -> dict | None:
+    eintrag = _zeile(row)
+    if eintrag is not None:
+        eintrag["stichworte"] = _json(eintrag.get("stichworte"), [])
+    return eintrag
+
+
 def konzept(konzept_id: int) -> dict | None:
-    return _zeile(db.q1("SELECT * FROM lern_konzept WHERE id=?", konzept_id))
+    return _konzept_aufbereiten(
+        db.q1("SELECT * FROM lern_konzept WHERE id=?", konzept_id))
 
 
 def konzept_nach_key(fach: str, thema_key: str, konzept_key: str) -> dict | None:
-    return _zeile(db.q1(
+    return _konzept_aufbereiten(db.q1(
         "SELECT * FROM lern_konzept WHERE fach=? AND thema_key=? AND konzept_key=?",
         fach, thema_key, konzept_key))
 
 
 def fehlertyp_sichern(konzept_id: int, fehler_key: str, label: str,
-                      beschreibung: str = "") -> int:
+                      beschreibung: str = "", *, quelle: str = "kuratiert",
+                      geprueft: bool = False) -> int:
     with db.tx() as c:
         vorhanden = c.execute(
-            "SELECT id FROM lern_fehlertyp WHERE konzept_id=? AND fehler_key=?",
+            "SELECT id, geprueft_am FROM lern_fehlertyp "
+            "WHERE konzept_id=? AND fehler_key=?",
             (konzept_id, fehler_key)).fetchone()
         if vorhanden:
+            if geprueft and not vorhanden["geprueft_am"]:
+                c.execute("UPDATE lern_fehlertyp SET geprueft_am=? WHERE id=?",
+                          (db.now(), vorhanden["id"]))
             return vorhanden["id"]
         return c.execute(
             """INSERT INTO lern_fehlertyp (konzept_id, fehler_key, label,
-                                           beschreibung, created_at)
-               VALUES (?,?,?,?,?)""",
-            (konzept_id, fehler_key, label, beschreibung or None,
-             db.now())).lastrowid
+                                           beschreibung, quelle, geprueft_am,
+                                           created_at)
+               VALUES (?,?,?,?,?,?,?)""",
+            (konzept_id, fehler_key, label, beschreibung or None, quelle,
+             db.now() if geprueft else None, db.now())).lastrowid
+
+
+def fehlertyp_freigeben(fehlertyp_id: int) -> None:
+    """§11: eine ungepruefte Fehlvorstellung ordnet keine Antwort zu."""
+    with db.tx() as c:
+        c.execute("UPDATE lern_fehlertyp SET geprueft_am=? WHERE id=?",
+                  (db.now(), fehlertyp_id))
 
 
 def fehlertyp(fehlertyp_id: int) -> dict | None:
@@ -117,7 +183,8 @@ def fehlertyp(fehlertyp_id: int) -> dict | None:
 
 def fehlertypen(konzept_id: int) -> list[dict]:
     return [dict(r) for r in db.q(
-        "SELECT * FROM lern_fehlertyp WHERE konzept_id=? AND aktiv=1 ORDER BY id",
+        "SELECT * FROM lern_fehlertyp WHERE konzept_id=? AND aktiv=1 "
+        "AND geprueft_am IS NOT NULL ORDER BY id",
         konzept_id)]
 
 
@@ -141,6 +208,7 @@ def fehlertyp_fuer_muster(konzept_id: int, muster: str) -> dict | None:
         """SELECT f.* FROM lern_fehler_alias a
              JOIN lern_fehlertyp f ON f.id = a.fehlertyp_id
             WHERE a.muster = ? AND f.konzept_id = ? AND f.aktiv = 1
+              AND f.geprueft_am IS NOT NULL
             ORDER BY f.id LIMIT 1""", muster, konzept_id))
 
 

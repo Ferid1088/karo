@@ -45,7 +45,8 @@ def aufgabe_sichern(fehlertyp_id: int, rolle: str, frage: str, loesung: str,
                     schwierigkeit: int = 1, position: int = 0,
                     typischer_fehler: str | None = None,
                     antwort_art: str = BRUCH, optionen: list | None = None,
-                    aufloesung: str | None = None) -> int:
+                    aufloesung: str | None = None, *,
+                    quelle: str = "kuratiert", geprueft: bool = True) -> int:
     """Idempotent über (fehlertyp, rolle, position) — erneutes Säen ändert nur."""
     werte = (antwort_art, json.dumps(optionen or [], ensure_ascii=False),
              aufloesung, json.dumps(tipps or [], ensure_ascii=False),
@@ -53,7 +54,8 @@ def aufgabe_sichern(fehlertyp_id: int, rolle: str, frage: str, loesung: str,
              json.dumps(visualisierung, ensure_ascii=False) if visualisierung else None)
     with db.tx() as c:
         vorhanden = c.execute(
-            "SELECT id FROM lern_aufgabe WHERE fehlertyp_id=? AND rolle=? AND position=?",
+            "SELECT id, geprueft_am FROM lern_aufgabe "
+            "WHERE fehlertyp_id=? AND rolle=? AND position=?",
             (fehlertyp_id, rolle, position)).fetchone()
         if vorhanden:
             c.execute(
@@ -63,26 +65,32 @@ def aufgabe_sichern(fehlertyp_id: int, rolle: str, frage: str, loesung: str,
                        aktiv=1 WHERE id=?""",
                 (frage, loesung, typischer_fehler, *werte, schwierigkeit,
                  vorhanden["id"]))
+            if geprueft and not vorhanden["geprueft_am"]:
+                c.execute("UPDATE lern_aufgabe SET geprueft_am=? WHERE id=?",
+                          (db.now(), vorhanden["id"]))
             return vorhanden["id"]
         return c.execute(
             """INSERT INTO lern_aufgabe (fehlertyp_id, rolle, position, frage,
                     loesung, typischer_fehler, antwort_art, optionen,
                     aufloesung, tipps, schritte, visualisierung,
-                    schwierigkeit, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    schwierigkeit, quelle, geprueft_am, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (fehlertyp_id, rolle, position, frage, loesung, typischer_fehler,
-             *werte, schwierigkeit, db.now())).lastrowid
+             *werte, schwierigkeit, quelle,
+             db.now() if geprueft else None, db.now())).lastrowid
 
 
 def aufgabe(fehlertyp_id: int, rolle: str, position: int = 0) -> dict | None:
     return _aufgabe_aufbereiten(db.q1(
         """SELECT * FROM lern_aufgabe
-            WHERE fehlertyp_id=? AND rolle=? AND position=? AND aktiv=1""",
+            WHERE fehlertyp_id=? AND rolle=? AND position=? AND aktiv=1
+              AND geprueft_am IS NOT NULL""",
         fehlertyp_id, rolle, position))
 
 
 def aufgaben(fehlertyp_id: int, rolle: str | None = None) -> list[dict]:
-    sql = "SELECT * FROM lern_aufgabe WHERE fehlertyp_id=? AND aktiv=1"
+    sql = ("SELECT * FROM lern_aufgabe WHERE fehlertyp_id=? AND aktiv=1"
+           " AND geprueft_am IS NOT NULL")
     params: list = [fehlertyp_id]
     if rolle:
         sql += " AND rolle=?"
