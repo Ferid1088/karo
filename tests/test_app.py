@@ -459,7 +459,7 @@ def test_post_von_fremder_seite_wird_abgelehnt(client, fake_llm, fake_cli):
 # Rollen: Eltern vs. Kind
 # ==========================================================================
 
-def test_kind_modus_beschraenkt_auf_kindbereiche(client, fake_llm, fake_cli):
+def test_kind_modus_beschraenkt_auf_kindbereiche(client, fake_llm, fake_cli, alter_generator):
     einrichten(client, fake_llm)
     kind_modus_aktivieren(client)
 
@@ -517,7 +517,7 @@ def test_kind_kann_ein_quiz_nicht_selbst_freigeben(
 
 
 def test_eltern_koennen_alle_kind_routen_erreichen(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, fake_cli, app_env, alter_generator):
     """change.txt Abschnitt 12: "parent can access child routes" — die
     Rollensperre in _kind_erlaubt() greift nur fuer role=='child', eine
     Eltern-Session ist von ihr unberuehrt."""
@@ -1432,7 +1432,7 @@ def _bis_rot(client, fake_llm, app_env):
 
 
 def test_lernzyklus_erzeugt_material_mit_gegenpruefung(client, fake_llm,
-                                                       fake_cli, app_env):
+                                                       fake_cli, app_env, alter_generator):
     topic_id = _bis_rot(client, fake_llm, app_env)
 
     lernen_starten(client, app_env, topic_id, "html")
@@ -1457,7 +1457,7 @@ def test_lernzyklus_erzeugt_material_mit_gegenpruefung(client, fake_llm,
 
 
 def test_variante_mit_wunsch_durchlaeuft_dieselbe_gegenpruefung(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, fake_cli, app_env, alter_generator):
     """Eine angeforderte Variante zählt nicht als Runde, prüft aber genauso."""
     topic_id = _bis_rot(client, fake_llm, app_env)
     lernen_starten(client, app_env, topic_id, "html")
@@ -1489,7 +1489,7 @@ def test_variante_mit_wunsch_durchlaeuft_dieselbe_gegenpruefung(
 
 
 def test_variante_meldet_notebooklm_fehler_statt_stillem_ruckfall(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, fake_cli, app_env, alter_generator):
     """Eine Variante darf in einer anderen Ausgabeart erzeugt werden als die
     Runde selbst — z. B. einmalig ein Video statt Folien mit Stimme.
     NotebookLM ist im Test nicht installiert: die Variante muss das klar als
@@ -1523,7 +1523,7 @@ def test_variante_meldet_notebooklm_fehler_statt_stillem_ruckfall(
 
 
 def test_variante_mit_injektionsversuch_wird_bei_widerspruch_verworfen(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, fake_cli, app_env, alter_generator):
     """Ein Wunsch, der die Erklärung vom Schulmaterial abweichen ließe, landet
     nie beim Kind — die Gegenprüfung fängt das genauso ab wie bei einer
     normalen Runde."""
@@ -1551,7 +1551,7 @@ def test_variante_mit_injektionsversuch_wird_bei_widerspruch_verworfen(
 
 
 def test_widerspruch_zur_schule_wird_verworfen_nicht_gezeigt(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, fake_cli, app_env, alter_generator):
     """Der wichtigste Test des Lernzyklus.
 
     Ein Kind, das zwei Rechenwege gleichzeitig lernt, lernt keinen. Weicht die
@@ -1578,7 +1578,7 @@ def test_widerspruch_zur_schule_wird_verworfen_nicht_gezeigt(
 
 
 def test_ein_guter_tag_beendet_den_zyklus_noch_nicht(client, fake_llm,
-                                                     fake_cli, app_env):
+                                                     fake_cli, app_env, alter_generator):
     """Eine fehlerfreie Runde an einem Tag reicht nicht für Grün.
 
     Das ist Absicht und der wichtigste Punkt der Flaggenregel: ein Kind, das
@@ -1631,7 +1631,7 @@ def test_ein_guter_tag_beendet_den_zyklus_noch_nicht(client, fake_llm,
 
 
 def test_gruene_flagge_schliesst_die_lerneinheit_ab(client, fake_llm,
-                                                    fake_cli, app_env):
+                                                    fake_cli, app_env, alter_generator):
     """Sitzt das Thema, hört Karo auf — keine Erklärung auf Vorrat."""
     from app import teaching
 
@@ -1657,7 +1657,7 @@ def test_gruene_flagge_schliesst_die_lerneinheit_ab(client, fake_llm,
     assert danach["finished_at"]
 
 
-def test_obergrenze_beendet_den_zyklus(client, fake_llm, fake_cli, app_env):
+def test_obergrenze_beendet_den_zyklus(client, fake_llm, fake_cli, app_env, alter_generator):
     """Nach drei Runden hoert Karo auf — hier hilft ein Mensch mehr."""
     from app import teaching
 
@@ -1715,7 +1715,7 @@ def test_ohne_erklaermaterial_gibt_es_eine_klare_meldung(client, fake_llm,
 # ==========================================================================
 
 def test_mp4_faellt_auf_html_zurueck_wenn_werkzeuge_fehlen(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, fake_cli, app_env, alter_generator):
     """Ein fehlendes ffmpeg darf das Lernen nicht verhindern."""
     topic_id = _bis_rot(client, fake_llm, app_env)
     lernen_starten(client, app_env, topic_id, "mp4")
@@ -1731,7 +1731,7 @@ def test_mp4_faellt_auf_html_zurueck_wenn_werkzeuge_fehlen(
     assert client.get(f"/material/{runde['id']}").status_code == 200
 
 
-def test_mehr_zum_thema_behaelt_bisheriges_material_sichtbar(client, fake_llm, fake_cli, app_env):
+def test_mehr_zum_thema_behaelt_bisheriges_material_sichtbar(client, fake_llm, fake_cli, app_env, alter_generator):
     """„Mehr zum Thema“ legt intern eine neue Lerneinheit an (siehe
     kind.lernen_abbrechen) — ohne eine themenweite Materialliste würden die
     Folien/Videos der vorigen Lerneinheit aus der Oberfläche verschwinden,
@@ -1772,7 +1772,7 @@ def test_mehr_zum_thema_behaelt_bisheriges_material_sichtbar(client, fake_llm, f
     assert f"/material/{runde2['id']}" in seite.text
 
 
-def test_lernen_seite_aktualisiert_sich_ohne_manuellen_reload(client, fake_llm, fake_cli, app_env):
+def test_lernen_seite_aktualisiert_sich_ohne_manuellen_reload(client, fake_llm, fake_cli, app_env, alter_generator):
     """Solange eine Runde noch erzeugt wird, bettet die Seite karoAutoRefresh()
     ein und /lernen/{id}/status liefert eine Signatur, die sich ändert,
     sobald die Runde fertig ist — die Familie muss nicht mehr von Hand
@@ -1800,7 +1800,7 @@ def test_lernen_seite_aktualisiert_sich_ohne_manuellen_reload(client, fake_llm, 
     assert aufruf not in seite.text
 
 
-def test_notebooklm_fehler_zeigt_popup_statt_stillem_ruckfall(client, fake_llm, fake_cli, app_env):
+def test_notebooklm_fehler_zeigt_popup_statt_stillem_ruckfall(client, fake_llm, fake_cli, app_env, alter_generator):
     """Ein NotebookLM-Fehler darf nie unbemerkt zu einem anderen Format
     wechseln — die Familie hat NotebookLM ausgewählt und muss es erfahren,
     mit der Wahl, es erneut zu versuchen oder bewusst umzuschalten (siehe
@@ -1913,7 +1913,7 @@ def test_fundstellen_brauchen_freigabe(client, fake_llm, fake_cli, app_env):
 
 
 def test_ohne_eigenes_material_wird_freigegebene_quelle_zur_faktengrundlage(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, fake_cli, app_env, alter_generator):
     """Gibt es für ein Thema kein eigenes Material, darf eine freigegebene,
     inhaltlich geholte Internetquelle selbst zur Faktengrundlage werden —
     und erst dann lässt sich die Runde starten."""
@@ -1974,7 +1974,7 @@ def test_ohne_eigenes_material_wird_freigegebene_quelle_zur_faktengrundlage(
 
 
 def test_erklaeren_fragt_erst_nach_quellen_bevor_material_entsteht(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, fake_cli, app_env, alter_generator):
     """Karo fragt vor Runde 1, ob im Netz gesucht werden soll, zeigt nur die
     Referenz zur Freigabe, und benutzt einen freigegebenen Fund erst danach."""
     topic_id = _bis_rot(client, fake_llm, app_env)
@@ -2028,7 +2028,7 @@ def test_erklaeren_fragt_erst_nach_quellen_bevor_material_entsteht(
 
 
 def test_thema_mit_nur_aufgaben_weist_auf_fehlendes_material_hin(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, fake_cli, app_env, alter_generator):
     """Ein Thema, zu dem nur Aufgaben (keine Erklärung) eingelesen wurden,
     zeigt den „erklären“-Knopf trotzdem — der Weg über eine freigegebene
     Internetquelle ist jetzt eine echte Alternative — aber weist deutlich

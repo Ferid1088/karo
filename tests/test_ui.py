@@ -82,7 +82,7 @@ def test_upload_proposals_and_manual_topic_use_rendered_fields(client, fake_llm,
     assert app_env.db.q1("SELECT id FROM topic WHERE label='Dezimalzahlen'")
 
 
-def test_topic_and_lesson_ids_are_not_interchangeable(client, fake_llm, fake_cli, app_env):
+def test_topic_and_lesson_ids_are_not_interchangeable(client, fake_llm, fake_cli, app_env, alter_generator):
     from app import teaching, topics
     einrichten(client, fake_llm)
     topics.anlegen("Ein anderes Thema")
@@ -183,7 +183,7 @@ def test_child_navigation_includes_week_and_parent_features_remain(client, fake_
         assert 'class="tab-btn"' not in client.get(path).text
 
 
-def test_topic_start_immediately_builds_existing_material(client, fake_llm, fake_cli, app_env):
+def test_topic_start_immediately_builds_existing_material(client, fake_llm, fake_cli, app_env, alter_generator):
     from app import teaching
     from .test_app import _bis_rot
     topic_id = _bis_rot(client, fake_llm, app_env)

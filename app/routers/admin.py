@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from .. import config, db, security, teaching, topics
 from ..services import exam, learning_progress, measurement
 from ..services.exam import ExamError
-from .shared import render, flash, zurueck
+from .shared import alter_generator_aus, render, flash, zurueck
 
 log = logging.getLogger("karo.admin")
 router = APIRouter()
@@ -91,6 +91,10 @@ def klassenarbeit_plan_neu(request: Request, exam_id: int):
 @router.post("/klassenarbeit/{exam_id}/lerntag")
 def klassenarbeit_lerntag(request: Request, exam_id: int,
                           row_key: str = Form(...), ausgabe: str = Form("")):
+    # Lernmaterial zur Klassenarbeit entsteht im selben alten
+    # Erzeugungsweg (`exam_learning.starten()` → `teaching.starten()`).
+    if alter_generator_aus():
+        return zurueck("/lernen")
     as_json = "application/json" in request.headers.get("accept", "")
     try:
         material_id = exam.start_exam_learning_day(exam_id, row_key, ausgabe)
@@ -108,6 +112,8 @@ def klassenarbeit_lerntag(request: Request, exam_id: int,
 
 @router.get("/klassenarbeit/material/{material_id}", response_class=HTMLResponse)
 def klassenarbeit_material(request: Request, material_id: int):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     material = exam.get_exam_material(material_id)
     if material is None:
         raise HTTPException(404, "Lernmaterial nicht gefunden.")
@@ -122,6 +128,8 @@ def klassenarbeit_material(request: Request, material_id: int):
 
 @router.get("/klassenarbeit/material/{material_id}/status")
 def klassenarbeit_material_status(material_id: int):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     material = exam.get_exam_material(material_id)
     if material is None:
         raise HTTPException(404, "Lernmaterial nicht gefunden.")
@@ -131,6 +139,8 @@ def klassenarbeit_material_status(material_id: int):
 
 @router.post("/klassenarbeit/material/{material_id}/fragen")
 def klassenarbeit_material_fragen(request: Request, material_id: int):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     try:
         quiz_id = exam.request_exam_questions(material_id)
     except teaching.TeachingError as exc:

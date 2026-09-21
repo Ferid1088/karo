@@ -27,7 +27,7 @@ def test_exam_plan_moves_between_parent_and_child_sections(client, fake_llm, fak
 
 
 def test_child_can_create_use_and_update_exam_with_setting(
-        client, fake_llm, fake_cli, app_env, tmp_path):
+        client, fake_llm, fake_cli, app_env, tmp_path, alter_generator):
     from app import exam_plan
     topic_id = _bis_rot(client, fake_llm, app_env)
     topic = app_env.db.q1('SELECT * FROM topic WHERE id=?', topic_id)

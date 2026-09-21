@@ -21,6 +21,22 @@ from ..domain import (
 
 log = logging.getLogger("karo")
 
+
+def alter_generator_aus() -> bool:
+    """Ist der alte Erzeugungsweg (`teaching.py` → `media/`) abgeschaltet?
+
+    Er erzeugt pro Kind und Runde einen Foliensatz oder ein Video und
+    widerspricht damit §11 und §12. Bis der adaptive Loop ihn ersetzt,
+    bleibt der Code liegen — erreichbar ist er nur mit gesetztem Schalter.
+    Gleiches Muster wie `adaptive_learning_enabled` (§16).
+
+    Liegt in `shared`, weil zwei Router dieselbe Tür bewachen: `kind.py`
+    (`/themen/{id}/lernen`, `/lernen/{id}`, `/material/...`) und
+    `lernzyklus.py`.
+    """
+    return not getattr(config.load_safe(),
+                       "legacy_lesson_generation_enabled", False)
+
 BASE = Path(__file__).parent.parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 

@@ -5,7 +5,7 @@
 {% if erfolge %}<div class="choice-grid">
 {% for t in erfolge %}<section class="card progress-card"><span class="child-status gruen">Als gelernt abgehakt</span><h2>{{ t.label }}</h2>
 <p>{% if t.antworten %}{{ t.richtig }} von {{ t.antworten }} zuletzt bewerteten Antworten richtig.{% else %}Mit ein paar Fragen geht es los.{% endif %}</p>
-<a href="/lernzyklus/{{ t.id }}">Noch einmal ansehen →</a>
+{% if cfg.legacy_lesson_generation_enabled %}<a href="/lernzyklus/{{ t.id }}">Noch einmal ansehen →</a>{% endif %}
 {% with progress_topic=t %}{% include "gelernt_form.html" %}{% endwith %}
 </section>{% endfor %}
 </div>{% else %}<section class="card"><h2>Deine ersten Erfolge kommen noch</h2><p>Hake ein Thema unter „Lernen“ als gelernt ab. Dann erscheint es hier.</p><a class="btn" href="/lernen">Zum Lernen</a></section>{% endif %}

@@ -96,6 +96,14 @@ class Config:
     rule_fenster: int = 5
     rule_min_evidenz: int = 2
 
+    # --- Alter Erzeugungsweg ----------------------------------------------
+    # `/lernzyklus` → teaching.py → media/: erzeugt pro Kind und Runde ein
+    # Video bzw. einen Foliensatz. Das widerspricht §11 (offline erzeugen,
+    # deterministisch ausliefern) und §12 („niemals pro Kind erzeugen") und
+    # wird vom adaptiven Loop abgelöst. Bis dahin bleibt der Code liegen,
+    # aber unerreichbar: aus, wie jeder Schalter aus §16.
+    legacy_lesson_generation_enabled: bool = False
+
     # --- Adaptives Lernen -------------------------------------------------
     # Schalter aus 01_ARCHITECTURE.md §16: das neue System kann schrittweise
     # ausgeliefert werden, ohne die laufende App zu verändern. Alles aus.

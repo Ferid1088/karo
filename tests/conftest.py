@@ -267,6 +267,20 @@ def app_env(tmp_path, monkeypatch):
 
 
 @pytest.fixture
+def alter_generator(app_env):
+    """Schaltet den alten Erzeugungsweg (`/lernzyklus` → teaching.py →
+    media/) ein.
+
+    Er ist seit 01_ARCHITECTURE.md §16 standardmaessig aus, damit keine
+    Themenkarte am adaptiven Loop vorbei in die Video-Erzeugung fuehrt.
+    Geloescht ist er nicht — Tests, die genau ihn pruefen, holen ihn hier
+    zurueck.
+    """
+    app_env.config.update(legacy_lesson_generation_enabled=True)
+    return app_env
+
+
+@pytest.fixture
 def client(app_env):
     from fastapi.testclient import TestClient
 

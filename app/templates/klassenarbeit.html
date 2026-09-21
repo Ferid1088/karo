@@ -119,7 +119,11 @@
               <strong>{{ tag.inhalt }}</strong>
             </td>
             <td class="plan-material-cell" data-plan-material>
-              {% if tag.topic_id %}
+              {% if tag.topic_id and not cfg.legacy_lesson_generation_enabled %}
+              {# Der alte Erzeugungsweg ist abgeschaltet: derselbe Weg wie auf
+                 der Themenkarte, nur ueber `exam_learning.starten()`. Der Plan
+                 bleibt, das Erzeugen von Folien/Video/NotebookLM nicht. #}
+              {% elif tag.topic_id %}
               <form method="post" action="/klassenarbeit/{{ e.id }}/lerntag"
                     class="actions plan-start" target="_blank" rel="noopener" data-material-form>
                 {{ csrf_input() }}

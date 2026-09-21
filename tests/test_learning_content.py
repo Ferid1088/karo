@@ -6,7 +6,7 @@ from .test_ui import Forms
 
 
 def test_content_creation_moves_to_child_topic_after_first_check(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, fake_cli, app_env, alter_generator):
     from app import quizzes, teaching
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)

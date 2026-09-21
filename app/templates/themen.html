@@ -48,10 +48,10 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
       <tr class="thema-zeile flag-{{ t.flag }}">
         <td class="thema-zelle">
           <strong class="thema-name">{{ t.label }}</strong>
-          {% if t.offene_lesson %}
+          {% if t.offene_lesson and cfg.legacy_lesson_generation_enabled %}
           <a class="thema-fortsetzung" href="/lernen/{{ t.offene_lesson }}">
             Aktuelle Lerneinheit ansehen</a>
-          {% elif t.neues_material %}
+          {% elif t.neues_material and cfg.legacy_lesson_generation_enabled %}
           <a class="thema-fortsetzung" href="/material/{{ t.neues_material }}"
              target="_blank" rel="noopener">Neues Lernmaterial ansehen</a>
           {% endif %}
@@ -63,14 +63,16 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
         <td class="num fortschritt-zelle"><strong>{{ t.richtig }}/{{ t.antworten }}</strong>
           <span class="thema-meta">richtig beantwortet</span></td>
         <td>
-          {% if t.offene_lesson %}
+          {% if t.offene_lesson and cfg.legacy_lesson_generation_enabled %}
             <a class="btn" href="/lernen/{{ t.offene_lesson }}">Lerneinheit öffnen</a>
           {% else %}
           <div class="actions" style="gap:.4rem">
+            {% if cfg.legacy_lesson_generation_enabled %}
             {% if t.neues_material %}
             <a class="btn" href="/material/{{ t.neues_material }}" target="_blank" rel="noopener">Material ansehen</a>
             {% endif %}
             <a class="btn ghost" href="/lernzyklus/{{ t.id }}">Thema im Kindbereich öffnen</a>
+            {% endif %}
           </div>
           {% endif %}
         </td>

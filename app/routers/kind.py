@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from .. import quizzes, teaching
 from ..teaching import TeachingError
 from ..services import quiz_drafts, workflow
-from .shared import companion_name, flash, zurueck
+from .shared import alter_generator_aus, companion_name, flash, zurueck
 
 log = logging.getLogger("karo.kind")
 router = APIRouter()
@@ -74,6 +74,8 @@ async def quiz_freigabe(request: Request, quiz_id: int):
 
 @router.post("/themen/{topic_id}/lernen")
 def lernen_starten(request: Request, topic_id: int, ausgabe: str = Form("html")):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     try:
         lesson_id = teaching.starten(topic_id, ausgabe)
     except TeachingError as exc:
@@ -86,39 +88,53 @@ def lernen_starten(request: Request, topic_id: int, ausgabe: str = Form("html"))
 
 @router.get("/lernen/{lesson_id}", response_class=HTMLResponse)
 def lernen_seite(request: Request, lesson_id: int):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     return workflow.render_lernen_page(request, lesson_id)
 
 
 @router.get("/lernen/{lesson_id}/status")
 def lernen_status(lesson_id: int):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     return {"signatur": workflow.lernen_status_signatur(lesson_id)}
 
 
 @router.post("/lernen/{lesson_id}/fragen")
 def lernen_fragen(request: Request, lesson_id: int,
                   modus: str = Form("bildschirm")):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     return workflow.handle_lernen_fragen(request, lesson_id, modus)
 
 
 @router.post("/lernen/{lesson_id}/abbrechen")
 def lernen_abbrechen(request: Request, lesson_id: int,
                      prompt_wunsch: str = Form("mehr zum Thema")):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     return workflow.handle_lernen_abbrechen(request, lesson_id, prompt_wunsch)
 
 
 @router.post("/lernen/{lesson_id}/runde/weiter")
 def lernen_naechste_runde(request: Request, lesson_id: int):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     return workflow.handle_lernen_naechste_runde(request, lesson_id)
 
 
 @router.post("/lernen/{lesson_id}/forschen")
 def lernen_forschen(request: Request, lesson_id: int):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     return workflow.handle_lernen_forschen(request, lesson_id)
 
 
 @router.post("/lernen/{lesson_id}/ausgabe/erneut")
 def lernen_ausgabe_erneut(request: Request, lesson_id: int,
                           ausgabe: str = Form("")):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     try:
         teaching.ausgabe_erneut(lesson_id, ausgabe or None)
     except TeachingError as exc:
@@ -131,6 +147,8 @@ def lernen_ausgabe_erneut(request: Request, lesson_id: int,
 @router.post("/lernen/{lesson_id}/runde/{round_id}/variante")
 def lernen_variante(request: Request, lesson_id: int, round_id: int,
                     wunsch: str = Form(""), ausgabe: str = Form("")):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     try:
         teaching.variante_anfordern(round_id, wunsch, ausgabe or None)
     except TeachingError as exc:
@@ -142,20 +160,28 @@ def lernen_variante(request: Request, lesson_id: int, round_id: int,
 
 @router.get("/material/{round_id}", response_class=HTMLResponse)
 def material(round_id: int):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     return workflow.render_material(round_id)
 
 
 @router.get("/material/{round_id}/notebooklm-quelle", response_class=PlainTextResponse)
 def material_notebooklm_quelle(round_id: int):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     return workflow.render_material_notebooklm_quelle(round_id)
 
 
 @router.get("/material/variante/{variant_id}", response_class=HTMLResponse)
 def material_variante(variant_id: int):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     return workflow.render_material_variante(variant_id)
 
 
 @router.get("/material/variante/{variant_id}/notebooklm-quelle",
          response_class=PlainTextResponse)
 def material_variante_notebooklm_quelle(variant_id: int):
+    if alter_generator_aus():
+        return zurueck("/lernen")
     return workflow.render_material_variante_notebooklm_quelle(variant_id)

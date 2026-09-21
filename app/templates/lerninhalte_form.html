@@ -1,3 +1,4 @@
+{% if cfg.legacy_lesson_generation_enabled %}
 {% if content_topic.can_create_content %}
 <form method="post" action="/lernzyklus/{{ content_topic.id }}/start" class="content-creation-form">
   {{ csrf_input() }}
@@ -9,4 +10,5 @@
 </form>
 {% else %}
 <p class="hint">Nach deiner ersten Prüfung und der Bestätigung der Bewertungen kannst du hier Lerninhalte erstellen.</p>
+{% endif %}
 {% endif %}

@@ -4,9 +4,12 @@ from fastapi.responses import HTMLResponse
 
 from .. import config, db, security, teaching, topics
 from ..services import learning_content, learning_progress, topic_workflow, workflow
-from .shared import render, flash, zurueck
+from .shared import alter_generator_aus, render, flash, zurueck
 
 router = APIRouter(prefix="/lernzyklus", tags=["learning"])
+
+
+_aus = alter_generator_aus
 
 
 def _lesson_id(topic_id: int):
@@ -36,6 +39,8 @@ def lernzyklus_index(request: Request):
 
 @router.get("/{topic_id}", response_class=HTMLResponse)
 def lernzyklus_seite(request: Request, topic_id: int):
+    if _aus():
+        return zurueck("/lernen")
     canonical = topic_workflow.canonical_topic_id(topic_id)
     if canonical != topic_id:
         return zurueck(f'/lernzyklus/{canonical}')
@@ -75,6 +80,8 @@ def gelernt(request: Request, topic_id: int, gelernt: str = Form("")):
 
 @router.post("/{topic_id}/start")
 def lernzyklus_start(request: Request, topic_id: int, ausgabe: str = Form("")):
+    if _aus():
+        return zurueck("/lernen")
     if not learning_content.can_create(topic_id):
         flash(request, "Bitte zuerst die Themenprüfung abschließen und die Bewertungen bestätigen.", "warn")
         return zurueck(f"/lernzyklus/{topic_id}")
@@ -126,21 +133,29 @@ async def lernzyklus_quiz_freigabe(request: Request, topic_id: int, quiz_id: int
 
 @router.post("/{topic_id}/runde/weiter")
 def lernzyklus_runde_weiter(request: Request, topic_id: int):
+    if _aus():
+        return zurueck("/lernen")
     return workflow.handle_lernen_naechste_runde(request, _require_lesson(topic_id))
 
 
 @router.post("/{topic_id}/forschen")
 def lernzyklus_forschen(request: Request, topic_id: int):
+    if _aus():
+        return zurueck("/lernen")
     return workflow.handle_lernen_forschen(request, _require_lesson(topic_id))
 
 
 @router.post("/{topic_id}/abbrechen")
 def lernzyklus_abbrechen(request: Request, topic_id: int):
+    if _aus():
+        return zurueck("/lernen")
     return workflow.handle_lernen_abbrechen(request, _require_lesson(topic_id), "mehr zum Thema")
 
 
 @router.get("/{topic_id}/material/{round_id}", response_class=HTMLResponse)
 def lernzyklus_material(topic_id: int, round_id: int):
+    if _aus():
+        return zurueck("/lernen")
     row = db.q1("SELECT l.topic_id FROM lesson_round r JOIN lesson l ON l.id=r.lesson_id WHERE r.id=?", round_id)
     if not row or row["topic_id"] != topic_id:
         raise HTTPException(404, "Material nicht gefunden.")
