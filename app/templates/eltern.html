@@ -16,6 +16,7 @@
 <a class="choice-card" href="/themen"><h2>Themen</h2><p>Themen bestätigen, benennen oder selbst anlegen.</p></a>
 {% if not cfg.klassenarbeit_kind %}<a class="choice-card" href="/klassenarbeit"><h2>Klassenarbeit</h2><p>Themenblatt einlesen, Lernplan und Ergebnisse.</p></a>{% endif %}
 <a class="choice-card" href="/messung/fortschritt#ausfuehrlich"><h2>Lernstand &amp; Export</h2><p>Entwicklung, Antworten und die Tabelle für Drive.</p></a>
+{% if cfg.adaptive_learning_enabled %}<a class="choice-card" href="/eltern/lernfortschritt"><h2>Denkfehler &amp; Fortschritt</h2><p>Woran Ihr Kind gerade arbeitet und was schon sitzt.</p></a>{% endif %}
 <a class="choice-card" href="/recherche"><h2>Internetquellen</h2><p>Fundstellen prüfen und erlaubte Seiten verwalten.</p></a>
 <a class="choice-card" href="/setup"><h2>Einstellungen</h2><p>Was darf Ihr Kind? Lernmaterial, Passwörter und Verbindungen.</p></a>
 </div>

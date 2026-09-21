@@ -15,6 +15,18 @@ from .shared import render, zurueck
 
 router = APIRouter(prefix="/lernen/adaptiv", tags=["adaptiv"])
 
+#: Elternsicht. Eigener Router, weil `/eltern/...` nicht in
+#: CHILD_ALLOWED_PREFIXES steht und damit für Kinder gesperrt bleibt.
+eltern_router = APIRouter(prefix="/eltern/lernfortschritt", tags=["adaptiv"])
+
+#: §18: beobachtbare Lernsignale, in Worten statt in Kürzeln.
+STAND_LABELS = {
+    "offen": "noch offen",
+    "im_aufbau": "im Aufbau",
+    "sicher": "sitzt",
+    "braucht_mensch": "braucht Begleitung",
+}
+
 
 def _aus() -> bool:
     return not getattr(config.load_safe(), "adaptive_learning_enabled", False)
@@ -114,6 +126,17 @@ def transfer(request: Request, antwort: str = Form("")):
     if sitzung is None:
         return zurueck("/lernen/adaptiv")
     return _zeige(request, unterricht.transfer_beantwortet(sitzung, antwort))
+
+
+@eltern_router.get("", response_class=HTMLResponse)
+def eltern_lernfortschritt(request: Request):
+    """§18: Was das Kind versteht, wo es hakt — ohne Modellgedanken."""
+    if _aus():
+        return zurueck("/eltern")
+    eintraege = store.fortschritt_uebersicht()
+    return render(request, "adaptiv_eltern.html", eintraege=eintraege,
+                  nachher=[e for e in eintraege if e.get("braucht_mensch")],
+                  stand_labels=STAND_LABELS)
 
 
 @router.post("/tipp", response_class=HTMLResponse)

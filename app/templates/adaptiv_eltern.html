@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Lernfortschritt – {{ companion_name }}{% endblock %}
+{% block content %}
+{# Der Zurück-Link kommt für Elternseiten schon aus base.html. #}
+<h1>Was Ihr Kind gerade lernt</h1>
+<p class="sub">Beobachtete Lernsignale — welche Denkfehler auftauchten und was
+  davon inzwischen sitzt.</p>
+
+{% if nachher %}
+<section class="card">
+  <h2>Hier ist Begleitung sinnvoll</h2>
+  <p>Diese Punkte hat Karo mehrfach erfolglos erklärt und deshalb
+     zurückgestellt. Das ist keine Wertung — manche Dinge brauchen einen
+     Menschen.</p>
+  <div class="simple-list">
+  {% for eintrag in nachher %}
+    <div class="simple-list-link"><span>
+      <strong>{{ eintrag.konzept_label }}</strong>
+      <small>{{ eintrag.fehler_label or 'Noch kein einzelner Denkfehler benannt' }}
+        · {{ eintrag.versuche }} Versuche, davon {{ eintrag.wiederholungen }} Wiederholungen</small>
+    </span></div>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Überblick</h2>
+  {% if eintraege %}
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Thema</th><th>Denkfehler</th><th>Stand</th><th>Versuche</th><th>Zuletzt</th></tr></thead>
+    <tbody>
+    {% for eintrag in eintraege %}
+      <tr>
+        <td>{{ eintrag.konzept_label }}</td>
+        <td>{{ eintrag.fehler_label or '—' }}</td>
+        <td>{{ stand_labels.get(eintrag.mastery, eintrag.mastery) }}</td>
+        <td>{{ eintrag.erfolge }} von {{ eintrag.versuche }} richtig</td>
+        <td>{{ (eintrag.letzte_aktivitaet or '')[:10] }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">Noch keine Daten. Sobald Ihr Kind eine Lernrunde gemacht
+     hat, steht hier, woran es gerade arbeitet.</p>
+  {% endif %}
+</section>
+
+<details class="card disclosure">
+  <summary>Wie ist das zu lesen?</summary>
+  <p>Karo bewertet nicht die Aufgabe, sondern den Denkfehler dahinter. „Im
+     Aufbau“ heißt: einmal richtig, aber noch nicht sicher — eine richtige
+     Antwort allein zählt bewusst nicht als verstanden.</p>
+  <p>Was Sie hier sehen, sind beobachtete Antworten Ihres Kindes. Interne
+     Überlegungen von Modellen werden nicht angezeigt.</p>
+</details>
+{% endblock %}
