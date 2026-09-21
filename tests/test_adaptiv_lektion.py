@@ -17,7 +17,10 @@ def _kind(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     app_env.config.update(adaptive_learning_enabled=True)
     kind_modus_aktivieren(client)
-    return csrf_from(client.get(PFAD).text)
+    token = csrf_from(client.get(PFAD).text)
+    # Es gibt keinen stillen Einstieg mehr: erst die Lektion wählen.
+    client.post(f"{PFAD}/start", data={"_csrf": token, "thema": "brueche"})
+    return token
 
 
 def _post(client, token, weg, **daten):
@@ -463,3 +466,72 @@ def test_ohne_schalter_bleibt_alles_beim_alten(client, fake_llm, fake_cli,
     assert antwort.status_code == 303
     assert antwort.headers["location"] == "/lernen"
     assert app_env.db.q("SELECT * FROM lern_sitzung") == []
+
+
+# --------------------------------------------------------------------------
+# Was es noch nicht gibt, wird gesagt — nicht stillschweigend ersetzt
+# --------------------------------------------------------------------------
+
+def test_einstieg_zeigt_die_vorhandenen_lernreihen(client, fake_llm, fake_cli,
+                                                   app_env):
+    """Ohne Themenwahl startet nichts von selbst."""
+    einrichten(client, fake_llm)
+    app_env.config.update(adaptive_learning_enabled=True)
+    kind_modus_aktivieren(client)
+
+    seite = client.get(PFAD)
+    assert "Woran möchtest du arbeiten" in seite.text
+    assert "Brüche mit verschiedenen Nennern addieren" in seite.text
+    assert app_env.db.q("SELECT * FROM lern_sitzung") == []
+
+
+def test_unbekanntes_thema_startet_nicht_heimlich_die_bruchlektion(
+        client, fake_llm, fake_cli, app_env):
+    """Der eigentliche Punkt: Karo tut nicht so, als könnte es alles.
+
+    Vorher lieferte die Route immer die Bruchlektion, egal welches Thema
+    gemeint war. Das sah nach einem allgemeinen System aus und war keines.
+    """
+    einrichten(client, fake_llm)
+    app_env.config.update(adaptive_learning_enabled=True)
+    kind_modus_aktivieren(client)
+    token = csrf_from(client.get(PFAD).text)
+
+    seite = client.post(f"{PFAD}/start",
+                        data={"_csrf": token, "thema": "Photosynthese"})
+
+    assert "noch keine Lernreihe" in seite.text
+    assert "Photosynthese" in seite.text
+    # Vor allem: keine Sitzung, kein Anker, keine Brüche.
+    assert app_env.db.q("SELECT * FROM lern_sitzung") == []
+    assert "1/2 + 1/3" not in seite.text
+
+
+def test_passendes_thema_startet_die_richtige_lernreihe(client, fake_llm,
+                                                        fake_cli, app_env):
+    """„Bruchrechnung“ findet die Bruchlektion — ohne Modell, per Stichwort."""
+    einrichten(client, fake_llm)
+    app_env.config.update(adaptive_learning_enabled=True)
+    kind_modus_aktivieren(client)
+    token = csrf_from(client.get(PFAD).text)
+
+    seite = client.post(f"{PFAD}/start",
+                        data={"_csrf": token, "thema": "Bruchrechnung"})
+
+    assert "Pizza" in seite.text
+    sitzung = app_env.db.q1("SELECT * FROM lern_sitzung ORDER BY id DESC LIMIT 1")
+    assert sitzung["zustand"] == "DIAGNOSING"
+
+
+def test_das_eingetippte_thema_wird_festgehalten(client, fake_llm, fake_cli,
+                                                 app_env):
+    """§13: Die Eingabe ist der Anfang der Kette, nicht nur ein Klick."""
+    einrichten(client, fake_llm)
+    app_env.config.update(adaptive_learning_enabled=True)
+    kind_modus_aktivieren(client)
+    token = csrf_from(client.get(PFAD).text)
+    client.post(f"{PFAD}/start", data={"_csrf": token, "thema": "Bruchrechnung"})
+
+    eingabe = app_env.db.q1("SELECT * FROM lern_eingabe ORDER BY id DESC LIMIT 1")
+    assert eingabe["thema_text"] == "Bruchrechnung"
+    assert eingabe["art"] == "manuell"

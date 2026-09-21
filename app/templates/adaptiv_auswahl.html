@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Lernen mit {{ companion_name }}{% endblock %}
+{% block content %}
+<div style="max-width:36rem;margin:0 auto">
+<a class="back-link" href="/lernen">← Zurück</a>
+<h1>Woran möchtest du arbeiten?</h1>
+
+{% if nichts_gefunden %}
+<section class="card">
+  <p>Zu „{{ thema }}“ gibt es noch keine Lernreihe.</p>
+  <p>Karo kann bisher nur die Themen unten — jede Lernreihe wird von Hand
+     geschrieben und geprüft, bevor ein Kind sie zu sehen bekommt. Neue
+     kommen dazu.</p>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Das geht schon</h2>
+  <div class="simple-list">
+  {% for lektion in lektionen %}
+    <form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}
+      <input type="hidden" name="thema" value="{{ lektion.konzept_key }}">
+      <button type="submit" class="simple-list-link" style="width:100%;text-align:left">
+        <span><strong>{{ lektion.label }}</strong><small>{{ lektion.fach|capitalize }}</small></span>
+      </button>
+    </form>
+  {% else %}
+    <p class="empty">Gerade ist keine Lernreihe eingerichtet.</p>
+  {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>Etwas anderes?</h2>
+  <p>Schreib das Thema auf. Wenn es das noch nicht gibt, sagt Karo es dir —
+     statt dir etwas anderes unterzuschieben.</p>
+  <form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}
+    <input type="text" name="thema" placeholder="z. B. Brüche addieren"
+           value="{{ thema }}">
+    <button type="submit">Los</button>
+  </form>
+</section>
+</div>
+{% endblock %}

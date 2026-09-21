@@ -151,6 +151,7 @@ def test_gezeichnete_komponenten_sind_vorlesbar(client, fake_llm, fake_cli,
     app_env.config.update(adaptive_learning_enabled=True)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get("/lernen/adaptiv").text)
+    client.post("/lernen/adaptiv/start", data={"_csrf": token, "thema": "brueche"})
     client.post("/lernen/adaptiv/anker", data={"_csrf": token, "antwort": "x"})
     seite = client.post("/lernen/adaptiv/diagnose",
                         data={"_csrf": token, "antwort": "2/5"})
@@ -169,6 +170,7 @@ def _kind_lernt(client, fake_llm, app_env):
     app_env.config.update(adaptive_learning_enabled=True)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get("/lernen/adaptiv").text)
+    client.post("/lernen/adaptiv/start", data={"_csrf": token, "thema": "brueche"})
     for weg, daten in (("anker", {"antwort": "die Hälfte"}),
                        ("diagnose", {"antwort": "2/5"}),
                        ("vorhersage", {"antwort": "groesser"}),

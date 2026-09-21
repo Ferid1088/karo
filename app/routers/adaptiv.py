@@ -10,7 +10,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 
 from .. import config
-from ..adaptiv import inhalte_brueche, sitzung as zustand, store, unterricht
+from ..adaptiv import lektionen, sitzung as zustand, store, unterricht
 from .shared import render, zurueck
 
 router = APIRouter(prefix="/lernen/adaptiv", tags=["adaptiv"])
@@ -32,16 +32,6 @@ def _aus() -> bool:
     return not getattr(config.load_safe(), "adaptive_learning_enabled", False)
 
 
-def _konzept_id() -> int:
-    """Die Pilotlektion ist beim ersten Aufruf da — Säen ist idempotent."""
-    vorhanden = store.konzept_nach_key(inhalte_brueche.FACH,
-                                       inhalte_brueche.THEMA,
-                                       inhalte_brueche.KONZEPT)
-    if vorhanden and store.erstkontakt(vorhanden["id"]):
-        return vorhanden["id"]
-    return inhalte_brueche.saeen()
-
-
 def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
     return render(request, "adaptiv.html", sitzung=sitzung,
                   schirm=unterricht.bildschirm(sitzung))
@@ -52,18 +42,43 @@ def _laufende(request: Request) -> dict | None:
     return sitzung
 
 
+def _auswahl(request: Request, thema: str = "", nichts_gefunden: bool = False):
+    """Welche Lektionen es gibt — und ehrlich, was es noch nicht gibt."""
+    return render(request, "adaptiv_auswahl.html",
+                  lektionen=lektionen.verfuegbar(), thema=thema,
+                  nichts_gefunden=nichts_gefunden)
+
+
 @router.get("", response_class=HTMLResponse)
 def start(request: Request):
     if _aus():
         return zurueck("/lernen")
-    return _zeige(request, unterricht.laufende_oder_neue(_konzept_id()))
+    laufend = zustand.laufende()
+    if laufend:
+        return _zeige(request, laufend)
+    # Kein stilles Zurückfallen auf die eine vorhandene Lektion: erst wählen.
+    return _auswahl(request)
+
+
+@router.post("/start", response_class=HTMLResponse)
+def start_thema(request: Request, thema: str = Form("")):
+    if _aus():
+        return zurueck("/lernen")
+    lektion = lektionen.fuer_thema(thema)
+    if lektion is None:
+        return _auswahl(request, thema=thema, nichts_gefunden=bool(thema.strip()))
+    return _zeige(request, unterricht.starte(lektion["konzept_id"], thema))
 
 
 @router.post("/neu", response_class=HTMLResponse)
 def neu(request: Request):
     if _aus():
         return zurueck("/lernen")
-    return _zeige(request, unterricht.neu_starten(_konzept_id()))
+    laufend = zustand.laufende()
+    konzept_id = (laufend or {}).get("konzept_id")
+    if konzept_id is None:
+        return _auswahl(request)
+    return _zeige(request, unterricht.neu_starten(konzept_id))
 
 
 @router.post("/anker", response_class=HTMLResponse)
