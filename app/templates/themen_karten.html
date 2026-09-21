@@ -10,6 +10,17 @@
 {% elif t.learning_started_at or t.learning_status == 'bearbeitung' or t in gruppen.bearbeitung %}
 <a class="btn" href="/lernzyklus/{{ t.id }}">Weiterlernen →</a>
 {% else %}<form method="post" action="/lernzyklus/{{ t.id }}/beginnen">{{ csrf_input() }}<button type="submit">Thema anfangen →</button></form>{% endif %}
+{% if cfg.adaptive_learning_enabled %}
+{# Der Einstieg steht auf jeder Karte und ist immer anklickbar. Ob es zu
+   diesem Thema schon eine verfasste Lernreihe gibt, beantwortet die
+   naechste Seite — mit Namen des Themas und dem, was es stattdessen gibt
+   (adaptiv_auswahl.html). Untergeschoben wird nie etwas anderes. #}
+<form method="post" action="/lernen/adaptiv/start" class="adaptiv-start">
+  {{ csrf_input() }}
+  <input type="hidden" name="thema" value="{{ t.label }}">
+  <button type="submit" class="btn">Mit Karo üben →</button>
+</form>
+{% endif %}
 {% with content_topic=t %}{% include "lerninhalte_form.html" %}{% endwith %}
 {% with progress_topic=t %}{% include "gelernt_form.html" %}{% endwith %}
 </section>{% endfor %}

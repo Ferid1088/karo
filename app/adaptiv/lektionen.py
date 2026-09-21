@@ -50,6 +50,13 @@ def verfuegbar() -> list[dict]:
     return lektionen
 
 
+def _trifft(gesucht: str, lektion: dict) -> bool:
+    stichworte = STICHWORTE.get(lektion["konzept_key"], ())
+    if any(wort in gesucht or gesucht in wort for wort in stichworte):
+        return True
+    return gesucht in normalisiere(lektion["label"])
+
+
 def fuer_thema(thema_text: str | None) -> dict | None:
     """Die passende Lektion — oder None, und dann wird das auch gesagt.
 
@@ -61,9 +68,6 @@ def fuer_thema(thema_text: str | None) -> dict | None:
     if not gesucht:
         return None
     for lektion in verfuegbar():
-        stichworte = STICHWORTE.get(lektion["konzept_key"], ())
-        if any(wort in gesucht or gesucht in wort for wort in stichworte):
-            return lektion
-        if gesucht in normalisiere(lektion["label"]):
+        if _trifft(gesucht, lektion):
             return lektion
     return None
