@@ -96,6 +96,21 @@ class Config:
     rule_fenster: int = 5
     rule_min_evidenz: int = 2
 
+    # --- Adaptives Lernen -------------------------------------------------
+    # Schalter aus 01_ARCHITECTURE.md §16: das neue System kann schrittweise
+    # ausgeliefert werden, ohne die laufende App zu verändern. Alles aus.
+    adaptive_learning_enabled: bool = False
+    semantic_error_matching_enabled: bool = False
+    llm_error_creation_enabled: bool = False
+    content_experimentation_enabled: bool = False
+    worksheet_ai_analysis_enabled: bool = False
+
+    # Schwellen gehören in die Konfiguration, nicht als Zahl in den Code
+    # (A5: endliche Wiederholungen, A8: Beherrschung wird verdient).
+    adaptiv_max_lehrrunden: int = 3
+    adaptiv_mastery_treffer: int = 2
+    adaptiv_aehnlichkeit_schwelle: float = 0.82
+
     setup_complete: bool = False
 
     def __repr__(self) -> str:  # pragma: no cover

@@ -110,6 +110,8 @@ def init() -> None:
     init_woche()
     from .welten.store import init as init_welten
     init_welten()
+    from .adaptiv.store import init as init_adaptiv
+    init_adaptiv()
     row = c.execute("SELECT MAX(version) AS v FROM schema_version").fetchone()
     if row is None or row["v"] is None or row["v"] < SCHEMA_VERSION:
         with tx() as migration:
