@@ -342,6 +342,14 @@ def erstkontakt_anlegen(konzept_id: int, anker: str, erste_aufgabe: dict,
              db.now() if geprueft else None, db.now())).lastrowid
 
 
+def erstkontakt_freigeben(konzept_id: int) -> None:
+    """§11: der Erstkontakt ist das Erste, was ein Kind sieht."""
+    with db.tx() as c:
+        c.execute("UPDATE lern_erstkontakt SET geprueft_am=? "
+                  "WHERE konzept_id=? AND geprueft_am IS NULL",
+                  (db.now(), konzept_id))
+
+
 def erstkontakt(konzept_id: int) -> dict | None:
     eintrag = _zeile(db.q1(
         """SELECT * FROM lern_erstkontakt

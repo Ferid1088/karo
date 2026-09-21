@@ -88,6 +88,14 @@ def aufgabe(fehlertyp_id: int, rolle: str, position: int = 0) -> dict | None:
         fehlertyp_id, rolle, position))
 
 
+def aufgaben_freigeben(fehlertyp_id: int) -> None:
+    """§11: erst nach der Freigabe stellt Karo diese Aufgaben einem Kind."""
+    with db.tx() as c:
+        c.execute("UPDATE lern_aufgabe SET geprueft_am=? "
+                  "WHERE fehlertyp_id=? AND geprueft_am IS NULL",
+                  (db.now(), fehlertyp_id))
+
+
 def aufgaben(fehlertyp_id: int, rolle: str | None = None) -> list[dict]:
     sql = ("SELECT * FROM lern_aufgabe WHERE fehlertyp_id=? AND aktiv=1"
            " AND geprueft_am IS NOT NULL")
