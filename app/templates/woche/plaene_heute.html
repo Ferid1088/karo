@@ -1,0 +1,46 @@
+{% extends 'woche/plaene_base.html' %}
+{% block plans %}
+<section class="plans-hero plans-hero-grid">
+  <div class="mascot-copy"><img src="/static/karo-fox-wave.png" alt="Karo begrüßt dich"><div><h1>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</h1><p>Schön, dass du da bist. Hier ist dein Plan für heute.</p></div></div>
+  <article class="metric-card green"><span class="metric-icon">▥</span><div><b>Bis heute</b><strong>{{ overall.adherence }} %</strong><p>{{ overall.due_actual }} von {{ overall.due_planned }} Minuten</p></div></article>
+  <article class="metric-card blue"><span class="metric-icon">★</span><div><b>Gesamt</b><strong>{{ overall.progress }} %</strong><p>{{ overall.actual }} von {{ overall.planned }} Minuten</p></div></article>
+  <article class="motivation-card {{ motivation.tone }}"><img src="{{ motivation.fox }}" alt="Karo"><div><h2>{{ motivation.title }}</h2><p>{{ motivation.text }}</p></div></article>
+</section>
+
+<section class="plans-panel">
+  <header class="section-heading"><div><h2>Deine Aufgaben heute</h2><p>Hier siehst du, was heute auf deinem Plan steht.</p></div><time>{{ plan_day.strftime('%d.%m.%Y') }}</time></header>
+  {% if sessions %}<div class="session-list">
+  {% for item in sessions %}
+    <article class="session-row {{ 'done' if item.status in ['completed','made_up'] }}">
+      <span class="subject-icon">{{ item.statement[:1]|upper }}</span><h3>{{ item.statement }}</h3>
+      <span class="session-time"><b>{{ item.planned_minutes }} Minuten</b><small>geplant</small></span>
+      <span class="session-status">{% if item.status in ['completed','made_up'] %}✓ Erledigt{% else %}◷ Noch offen{% endif %}</span>
+      {% if item.status in ['completed','made_up'] %}<span><b>{{ item.actual_minutes }} Minuten</b><small>gemacht</small></span>
+      {% else %}<a class="plan-btn" href="/woche?abschluss={{ item.id }}">Starten <span aria-hidden="true">→</span></a>{% endif %}
+    </article>
+  {% endfor %}</div>
+  {% elif goals %}<div class="empty-inline"><h3>Heute steht keine Einheit an.</h3><p>Genieß die Pause – dein nächster Lerntag kommt bald.</p></div>
+  {% else %}<div class="empty-inline"><h3>Noch keine Ziele.</h3><p>Starte jetzt dein erstes Ziel.</p><a class="plan-btn" href="/woche/ziele/neu">+ Neues Ziel</a></div>{% endif %}
+  {% if missed %}<div class="missed-box"><div><b>Noch offen</b><p>Möchtest du eine frühere Einheit nachholen?</p></div><div><b>{{ missed[0].statement }}</b><span>{{ missed[0].planned_minutes }} Minuten</span></div><a class="plan-btn" href="/woche?abschluss={{ missed[0].id }}">Jetzt nachholen →</a></div>{% endif %}
+</section>
+<nav class="quick-actions" aria-label="Schnellaktionen"><a href="/woche/ziele">Ziel bearbeiten →</a><a href="/woche/woche">Woche ansehen →</a><a href="/woche/ziele/neu">+ Neues Ziel →</a></nav>
+
+{% if selected_session %}<div class="modal-backdrop" data-modal><section class="completion-modal" role="dialog" aria-modal="true" aria-labelledby="finish-title">
+  <a class="modal-close" href="/woche" aria-label="Schließen">×</a><img src="/static/karo-fox-cheer.png" alt="" class="modal-fox">
+  <h2 id="finish-title">Einheit abschließen</h2><p class="lead">Trag ein, wie lange du heute daran gearbeitet hast.</p>
+  <div class="selected-goal"><span class="subject-icon">{{ selected_session.statement[:1]|upper }}</span><div><b>{{ selected_session.statement }}</b><small>Geplant: {{ selected_session.planned_minutes }} Minuten</small></div></div>
+  <form method="post" action="/woche/sitzung/{{ selected_session.id }}/abschluss" data-completion-form>
+    {{ csrf_input() }}
+    <label for="actual"><b>Wie lange hast du heute wirklich daran gearbeitet?</b><small>Schiebe den Regler auf deine Zeit.</small></label>
+    <output class="range-value green" for="actual"><span data-actual-output>{{ selected_session.planned_minutes }}</span> Minuten</output>
+    <input id="actual" name="actual_minutes" type="range" min="0" max="60" step="1" value="{{ selected_session.actual_minutes if selected_session.actual_minutes is not none else selected_session.planned_minutes }}" data-range="actual">
+    <div class="range-labels"><span>0</span><span>60 Minuten</span></div>
+    <div class="live-result">Heute: <strong data-percent-output>100 %</strong><span>Jede Minute zählt.</span></div>
+    <label for="focus"><b>Wie konzentriert warst du?</b><small>Schiebe den Regler auf dein Gefühl.</small></label>
+    <output class="range-value blue" for="focus"><span data-focus-output>{{ selected_session.focus_percent if selected_session.focus_percent is not none else 80 }}</span> %</output>
+    <input id="focus" name="focus_percent" type="range" min="0" max="100" step="10" value="{{ selected_session.focus_percent if selected_session.focus_percent is not none else 80 }}" data-range="focus">
+    <div class="range-labels"><span>wenig</span><span>okay</span><span>sehr konzentriert</span></div>
+    <div class="modal-actions"><a class="outline-btn" href="/woche">Abbrechen</a><button class="plan-btn" type="submit">✓ Speichern</button></div>
+  </form>
+</section></div>{% endif %}
+{% endblock %}

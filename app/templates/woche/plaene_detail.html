@@ -1,0 +1,85 @@
+{% extends 'woche/plaene_base.html' %}
+{% block plans %}
+<a class="back-link" href="/woche/ziele">← Zurück zu meinen Zielen</a>
+
+<section class="goal-detail-top">
+  <header class="goal-detail-head">
+    <span class="subject-icon big">{{ goal.statement[:1]|upper }}</span>
+    <div>
+      <h1>{{ goal.statement }}</h1>
+      <p>{{ goal.total_sessions }} Einheiten · {{ goal.days_label }} · {{ goal.planned_minutes }} Minuten pro Einheit</p>
+    </div>
+    <div class="goal-state">
+      <span class="status-pill">✓ {{ {'active':'Aktiv','paused':'Pausiert','completed':'Abgeschlossen','archived':'Schatzkiste'}[goal.status] }}</span>
+      <small>{{ goal.start_date }} – {{ goal.end_date }}</small>
+    </div>
+  </header>
+  <article class="detail-motivation {{ motivation.tone }}">
+    <img src="{{ motivation.fox }}" alt="Karo reagiert auf deinen Fortschritt">
+    <div><h2>{{ motivation.title }}</h2><p>{{ motivation.text }}</p></div>
+  </article>
+</section>
+
+<section class="detail-metrics" aria-label="Kennzahlen für {{ goal.statement }}">
+  <article class="primary"><small>Bis heute <span>(Durchschnitt)</span></small><strong>{{ goal.adherence }} %</strong><div class="progress"><i style="width:{{ [goal.adherence,100]|min }}%"></i></div><p>{{ goal.due_actual }} von {{ goal.due_planned }} Min</p></article>
+  <article class="primary blue-stat"><small>Bis zum Ziel <span>(Durchschnitt)</span></small><strong>{{ goal.progress }} %</strong><div class="progress secondary"><i style="width:{{ [goal.progress,100]|min }}%"></i></div><p>{{ goal.actual }} von {{ goal.planned }} Min</p></article>
+  <article><small>Gesamt geplant</small><b>{{ goal.planned }} Min</b><p>{{ goal.total_sessions }} Einheiten</p></article>
+  <article><small>Gesamt gearbeitet</small><b>{{ goal.actual }} Min</b><p>gespeicherte Lernzeit</p></article>
+  <article><small>Fokuszeit</small><b>{{ goal.focused }} Min</b><p>{{ goal.focus }} % der Zeit</p></article>
+  <article><small>Ø Konzentration</small><b>{{ goal.focus }} %</b><p>{% if goal.actual %}zeitgewichtet{% else %}noch kein Wert{% endif %}</p></article>
+</section>
+
+<div class="detail-layout">
+  <section class="plans-panel detail-history">
+    <nav class="detail-tabs" data-plan-tabs aria-label="Zielauswertung">
+      <button class="active" type="button" data-tab="history">☷ <span>Verlauf</span></button>
+      <button type="button" data-tab="chart">▥ <span>Diagramm</span></button>
+      <button type="button" data-tab="calendar">▣ <span>Kalender</span></button>
+    </nav>
+
+    <div data-plan-panel="history" class="plan-tab-panel active">
+      <div class="history-table">
+        <div class="history-row head"><span>Datum</span><span>Geplant</span><span>Gemacht</span><span>Konzentration</span><span>Fortschritt</span><span>Status</span></div>
+        {% for item in goal.history|reverse %}
+        <div class="history-row">
+          <span>{{ item.scheduled_date }}</span>
+          <span>{{ item.planned_minutes }} Min</span>
+          <span>{{ (item.actual_minutes|string ~ ' Min') if item.actual_minutes is not none else '–' }}</span>
+          <span>{{ (item.focus_percent|string ~ ' %') if item.focus_percent is not none else '–' }}</span>
+          <strong class="{{ 'low' if (item.actual_minutes or 0) < item.planned_minutes else '' }}">{{ ((item.actual_minutes or 0) * 100 / item.planned_minutes)|round|int }} %</strong>
+          <span class="session-status {{ item.status }}">{{ {'planned':'Offen','completed':'Erledigt','missed':'Nachholen','made_up':'Nachgeholt','cancelled':'Entfallen'}[item.status] }}</span>
+        </div>
+        {% else %}<div class="empty-inline">Für dieses Ziel gibt es noch keine Einheiten.</div>{% endfor %}
+      </div>
+    </div>
+
+    <div data-plan-panel="chart" class="plan-tab-panel">
+      <h2>Geplant und gemacht</h2>
+      <div class="simple-chart">{% for item in goal.sessions %}<div><span>{{ item.scheduled_date[8:] }}.</span><i class="planned" style="height:{{ item.planned_minutes * 2 }}px"></i><i class="actual" style="height:{{ (item.actual_minutes or 0) * 2 }}px"></i><small>{{ item.focus_percent or 0 }}%</small></div>{% endfor %}</div>
+      <p class="chart-legend"><i></i> Geplant <i></i> Gemacht · Zahl = Konzentration</p>
+    </div>
+
+    <div data-plan-panel="calendar" class="plan-tab-panel">
+      <h2>Dein Lernkalender</h2>
+      <div class="calendar-grid">{% for item in goal.sessions %}<span class="{{ item.status }}"><b>{{ item.scheduled_date[8:] }}</b><small>{{ {'planned':'offen','completed':'erledigt','missed':'offen','made_up':'nachgeholt','cancelled':'entfallen'}[item.status] }}</small></span>{% endfor %}</div>
+    </div>
+  </section>
+
+  <aside class="detail-side">
+    <section class="detail-actions plans-panel">
+      <h2>Schnellaktionen</h2>
+      {% if goal.status != 'archived' %}
+      <details><summary>Ziel bearbeiten <span>→</span></summary><form method="post" action="/woche/ziele/{{ goal.id }}/bearbeiten">{{ csrf_input() }}<label>Zielsatz<textarea name="statement" maxlength="180" required>{{ goal.statement }}</textarea></label><label>Enddatum<input type="date" name="end_date" value="{{ goal.end_date }}" required></label><label>Minuten pro Einheit<input type="number" name="minutes" min="1" max="60" value="{{ goal.planned_minutes }}" required></label><fieldset><legend>Lerntage</legend><div class="weekday-picker compact">{% for number,label in weekday_labels.items() %}<label><input type="checkbox" name="weekdays" value="{{ number }}" {{ 'checked' if number|string in goal.weekdays.split(',') }}><span>{{ label }}</span></label>{% endfor %}</div></fieldset><button class="plan-btn">Speichern</button></form></details>
+      <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link" name="action" value="{{ 'resume' if goal.status == 'paused' else 'pause' }}">{{ '▶ Fortsetzen' if goal.status == 'paused' else 'Ⅱ Pausieren' }} <span>→</span></button></form>
+      {% if goal.status != 'completed' %}<form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link" name="action" value="complete">✓ Als erledigt markieren <span>→</span></button></form>{% endif %}
+      {% if goal.status == 'completed' or goal.progress >= 100 %}<form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link treasure" name="action" value="archive">▣ In die Schatzkiste <span>→</span></button></form>{% endif %}
+      <form method="post" action="/woche/ziele/{{ goal.id }}/aktion" onsubmit="return confirm('Ziel und Verlauf wirklich löschen?')">{{ csrf_input() }}<input type="hidden" name="confirm" value="yes"><button class="action-link danger" name="action" value="delete">Ziel löschen <span>→</span></button></form>
+      {% else %}
+      <p>Dieses Ziel ist als Erfolg sicher in deiner Schatzkiste.</p>
+      <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="plan-btn wide" name="action" value="repeat">Noch einmal als neues Ziel →</button></form>
+      {% endif %}
+    </section>
+    <section class="detail-encouragement {{ motivation.tone }}"><img src="/static/karo-fox-star.png" alt="Karo mit einem Stern"><div><h3>{{ motivation.title }}</h3><p>{{ motivation.text }}</p></div></section>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Ziele Plannen – {{ companion_name }}{% endblock %}
+{% block mainclass %}plans-page{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/plaene.css?v=2">
+<script src="/static/plaene.js?v=2" defer></script>
+<span hidden>{{ csrf_input() }}</span>
+<a class="skip-link" href="#plans-content">Zum Inhalt</a>
+<header class="plans-local-header">
+  <a class="plans-logo" href="/" title="Zurück zu Karo" aria-label="Zurück zur Karo-Startseite">Karo<span>.</span></a>
+  <nav class="plans-nav" aria-label="Ziele Plannen">
+    <a href="/woche" {{ 'aria-current=page' if path == '/woche' }}>Heute</a>
+    <a href="/woche/woche" {{ 'aria-current=page' if path == '/woche/woche' }}>Woche</a>
+    <a href="/woche/monat" {{ 'aria-current=page' if path == '/woche/monat' }}>Monat</a>
+    <a href="/woche/ziele" {{ 'aria-current=page' if path.startswith('/woche/ziele') }}>Ziele</a>
+    <a href="/woche/schatzkiste" {{ 'aria-current=page' if path == '/woche/schatzkiste' }}>Schatzkiste</a>
+  </nav>
+  <div class="plans-profile" aria-label="Angemeldet als {{ cfg.learner_name or 'Kind' }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+    <img src="/static/karo-fox-wave.png" alt=""><b>{{ cfg.learner_name or 'Kind' }}</b><span aria-hidden="true">⌄</span>
+  </div>
+</header>
+<div id="plans-content" class="plans-content">
+{% block plans %}{% endblock %}
+</div>
+{% endblock %}
