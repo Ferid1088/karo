@@ -25,6 +25,17 @@ from .normalisierung import normalisiere
 #: Herkunft dieser Einträge (§6: „creation source").
 QUELLE = "erzeugt"
 
+#: Eine ganze Lernreihe ist um ein Vielfaches länger als eine Fragerunde:
+#: zwei bis vier Fehlvorstellungen mit je fünf Aufgaben, dazu Hilfe für
+#: sechs Phasen und die FAQ. Mit der üblichen Vorgabe bricht die Antwort
+#: mittendrin ab, und die Prüfung verwirft sie als unvollständig.
+MAX_TOKENS = 32000
+
+#: Entsprechend länger darf der Aufruf dauern. Gemessen auf der
+#: Testinstallation: 240 bis 300 Sekunden — genau an der üblichen Grenze,
+#: weshalb jeder zweite Versuch als Zeitüberschreitung endete.
+TIMEOUT_SEKUNDEN = 900
+
 #: Welche Rolle als Auswahl gestellt wird statt als Rechnung.
 _ALS_AUSWAHL = {"vorhersage", "transfer"}
 
@@ -152,8 +163,13 @@ def _handler_anmelden():
         if not thema:
             return {"uebersprungen": "kein Thema"}
         cfg = config.load()
-        ergebnis = ClaudeClient.from_config(cfg).complete(
+        # §5: Modell A schreibt Didaktik und ist das starke Modell. Ohne
+        # ausdrückliche Wahl nähme `complete()` das kleine Textmodell —
+        # das schrieb Komponentenparameter, die die Prüfung verwarf.
+        ergebnis = ClaudeClient.from_config(cfg, TIMEOUT_SEKUNDEN).complete(
             purpose="lektion_erzeugen",
+            model=cfg.model_vision or None,
+            max_tokens=MAX_TOKENS,
             prompt=prompts.lektion_prompt(
                 cfg.learner_grade, cfg.subject,
                 pii.scrub(thema, cfg.learner_name)),

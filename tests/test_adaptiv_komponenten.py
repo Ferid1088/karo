@@ -216,3 +216,31 @@ def test_elternsicht_zeigt_keine_modellgedanken(client, fake_llm, fake_cli,
 
     for verraeterisch in ("prompt", "token", "temperature", "system:"):
         assert verraeterisch not in seite.text.lower()
+
+
+def test_die_modellsicht_erklaert_die_form_jedes_typs(app_env):
+    """Ein Modell kann „typ: bruch" nicht erraten.
+
+    Auf der Testinstallation scheiterte die Erzeugung reihenweise an
+    „„a" muss ein Bruch [Zähler, Nenner] mit Nenner > 0 sein" — das Register
+    verlangte eine Form, die es dem Modell nie mitgeteilt hatte. Der Fehler
+    lag nicht beim Modell.
+    """
+    from app.adaptiv import komponenten
+
+    sicht = {k["component"]: k for k in komponenten.fuer_modell()}
+
+    bruch = sicht["FractionStrip"]["parameter"]["a"]
+    assert bruch["form"] == "[Zähler, Nenner]"
+    assert bruch["beispiel"] == [1, 2]
+
+    liste = sicht["NumberLine"]["parameter"]["marken"]
+    assert liste["form"] == "Liste von [Zähler, Nenner]"
+    assert liste["beispiel"] == [[1, 2], [1, 3]]
+
+    ganz = sicht["AreaModel"]["parameter"]["zeilen"]
+    assert ganz["form"] == "ganze Zahl"
+
+    # Und der Renderer bleibt weiterhin unsichtbar (§3).
+    for eintrag in sicht.values():
+        assert "renderer" not in eintrag

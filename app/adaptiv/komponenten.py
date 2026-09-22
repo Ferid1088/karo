@@ -148,6 +148,21 @@ def ids() -> tuple[str, ...]:
     return tuple(_REGISTER)
 
 
+#: Wie ein Wert dieses Typs aussieht — in Worten und als Beispiel.
+#:
+#: Ohne das ist „typ: bruch" für ein Modell nicht zu erraten. Auf der
+#: Testinstallation scheiterte die Erzeugung reihenweise an „„a" muss ein
+#: Bruch [Zähler, Nenner] mit Nenner > 0 sein": das Register verlangte eine
+#: Form, die es dem Modell nie mitgeteilt hatte.
+FORM = {
+    BRUCH: ("[Zähler, Nenner]", [1, 2]),
+    GANZZAHL: ("ganze Zahl", 3),
+    TEXT: ("Text", "…"),
+    LISTE_BRUCH: ("Liste von [Zähler, Nenner]", [[1, 2], [1, 3]]),
+    LISTE_TEXT: ("Liste von Texten", ["erster Schritt", "zweiter Schritt"]),
+}
+
+
 def fuer_modell(fach: str = "", konzept_key: str = "") -> list[dict]:
     """Was das auswählende Modell sieht: Metadaten, niemals die Umsetzung.
 
@@ -158,11 +173,17 @@ def fuer_modell(fach: str = "", konzept_key: str = "") -> list[dict]:
         "component": k.id,
         "version": k.version,
         "zweck": k.zweck,
-        "parameter": {name: {s: w for s, w in regel.items() if s != "pflicht"}
-                      | {"pflicht": bool(regel.get("pflicht"))}
+        "parameter": {name: _parameter_fuer_modell(regel)
                       for name, regel in k.parameter.items()},
         "animationen": list(k.animationen),
     } for k in alle() if k.dient(fach, konzept_key)]
+
+
+def _parameter_fuer_modell(regel: dict) -> dict:
+    form, beispiel = FORM.get(regel.get("typ", TEXT), FORM[TEXT])
+    return ({s: w for s, w in regel.items() if s != "pflicht"}
+            | {"pflicht": bool(regel.get("pflicht")),
+               "form": form, "beispiel": beispiel})
 
 
 # --------------------------------------------------------------------------

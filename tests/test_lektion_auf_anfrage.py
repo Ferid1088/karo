@@ -136,3 +136,39 @@ def test_das_wartende_kind_bekommt_eine_auskunft(client, fake_llm, fake_cli,
 
     assert noch_nicht["fertig"] is False
     assert fertig["fertig"] is True
+
+
+# --------------------------------------------------------------------------
+# §5: Modell A ist das starke Modell
+# --------------------------------------------------------------------------
+
+def test_die_lektion_schreibt_das_starke_modell(client, fake_llm, fake_cli,
+                                                app_env):
+    """§5 trennt zwei Modelle: A schreibt Didaktik und ist stark, B waehlt
+    Komponenten und ist klein. Eine ganze Lernreihe ist Arbeit fuer A.
+
+    Ohne ausdrueckliche Wahl nimmt `complete()` das Textmodell — auf der
+    Testinstallation Haiku. Ergebnis: Aufrufe von vier Minuten, 40.000
+    Ausgabe-Token und Komponentenparameter, die die Pruefung verwarf.
+    """
+    token = _kind(client, fake_llm, app_env, erzeugen=True)
+    app_env.config.update(model_vision="sonnet-stark", model_text="haiku-klein")
+    _waehle(client, token)
+
+    run_jobs(app_env, fake_llm)
+
+    aufruf = next(a for a in fake_llm.calls
+                  if "lektion" in " ".join(a.get("argv") or []).lower()
+                  or a.get("model"))
+    argv = aufruf.get("argv") or []
+    assert "sonnet-stark" in argv, argv
+    assert "haiku-klein" not in argv
+
+
+def test_die_lektion_bekommt_mehr_luft_als_ein_quiz(app_env):
+    """Eine ganze Lernreihe ist um ein Vielfaches laenger als eine Fragerunde
+    — mit der Vorgabe von 8192 Token bricht die Antwort mittendrin ab."""
+    from app.adaptiv import erzeugung
+
+    assert erzeugung.MAX_TOKENS > 8192
+    assert erzeugung.TIMEOUT_SEKUNDEN > 300

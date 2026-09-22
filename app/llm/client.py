@@ -59,8 +59,8 @@ class ClaudeClient:
     # -- Aufbau -------------------------------------------------------------
 
     @classmethod
-    def from_config(cls, cfg) -> "ClaudeClient":
-        return cls(build_backend(cfg.llm_backend, cfg),
+    def from_config(cls, cfg, timeout: int | None = None) -> "ClaudeClient":
+        return cls(build_backend(cfg.llm_backend, cfg, timeout),
                    cfg.model_vision, cfg.model_text)
 
     @property
@@ -141,10 +141,14 @@ class ClaudeClient:
 # Backend-Auswahl
 # --------------------------------------------------------------------------
 
-def build_backend(art: str, cfg) -> Backend:
+def build_backend(art: str, cfg, timeout: int | None = None) -> Backend:
+    """`timeout` nur fuer Aufrufe, die laenger brauchen duerfen als der Rest —
+    eine ganze Lernreihe zu schreiben ist so einer."""
     if art == "abo":
         from .cli_backend import CliBackend
 
+        if timeout:
+            return CliBackend(cfg.claude_oauth_token, timeout=timeout)
         return CliBackend(cfg.claude_oauth_token)
     if art == "api":
         from .api_backend import ApiBackend
