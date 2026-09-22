@@ -125,8 +125,11 @@
 <div id="verbindung-popup-slot"></div>
 <script>
 (function () {
-  var LABELS = {claude: "Claude", notebooklm: "NotebookLM"};
-  var LINKS = {claude: "/setup#claude-verbindung", notebooklm: "/setup#notebooklm-verbindung"};
+  {# NotebookLM nur, solange der alte Erzeugungsweg erreichbar ist —
+     sonst stuende hier eine Verbindung, die nichts mehr bedient. #}
+  var LABELS = {claude: "Claude"{% if cfg.legacy_lesson_generation_enabled %}, notebooklm: "NotebookLM"{% endif %}};
+  var LINKS = {claude: "/setup#claude-verbindung"{% if cfg.legacy_lesson_generation_enabled %}, notebooklm: "/setup#notebooklm-verbindung"{% endif %}};
+  var VERBINDUNGEN = Object.keys(LABELS);
 
   function pillEl(name) { return document.getElementById("status-" + name); }
 
@@ -168,7 +171,7 @@
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (daten) {
         if (!daten) return;
-        ["claude", "notebooklm"].forEach(function (name) {
+        VERBINDUNGEN.forEach(function (name) {
           var eintrag = daten[name] || {};
           var ok = !!eintrag.ok;
           anwenden(name, ok);

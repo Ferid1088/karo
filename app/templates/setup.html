@@ -149,6 +149,9 @@ claude setup-token                         <span class="c-com"># Token wird ange
 </details>
 <details class="card setup-group settings-category" id="lernmaterial">
   <summary><span><strong>Lernmaterial und Lernen</strong><small>Format, Lernrunden und Internetquellen</small></span></summary>
+{# Format und MP4-Stimme gehoeren zum alten Erzeugungsweg. Ist er aus,
+   waere die Auswahl ein Versprechen ohne Deckung. #}
+{% if cfg.legacy_lesson_generation_enabled %}
 <div id="ausgabe" class="settings-subsection">
     <h3>Lernmaterial</h3>
     {% set nlm_zusatz = ' Die Anmeldung finden Sie unter „Verbindungen“.' %}
@@ -187,6 +190,7 @@ claude setup-token                         <span class="c-com"># Token wird ange
       });
     })();
   </script>
+{% endif %}
 <div id="lernverhalten" class="settings-subsection"><h3>Lerntempo und Quellen</h3><p class="hint">Nach der letzten Lernrunde bittet Karo um Unterstützung. Internetquellen bestätigen Sie vor der Verwendung.</p>    <div class="row">
       <div class="field" style="flex:0 0 190px">
         <label for="max_lernrunden">Lernrunden pro Thema </label>
@@ -318,8 +322,8 @@ claude setup-token                         <span class="c-com"># Token wird ange
   </div>
 </dialog>
 <details class="card setup-group settings-category" id="verbindungen" {{ 'open' if not claude_ok }}>
-  <summary><span><strong>Verbindungen</strong><small>Claude: {{ 'verbunden' if claude_ok else 'nicht verbunden' }} · NotebookLM: {{ 'verbunden' if nlm_ok else 'nicht verbunden' }}</small></span></summary>
-  <p class="hint">Claude erstellt die Lerninhalte. NotebookLM wird für das Format „NotebookLM“ benötigt. Verbindungen werden direkt gespeichert.</p>
+  <summary><span><strong>Verbindungen</strong><small>Claude: {{ 'verbunden' if claude_ok else 'nicht verbunden' }}{% if cfg.legacy_lesson_generation_enabled %} · NotebookLM: {{ 'verbunden' if nlm_ok else 'nicht verbunden' }}{% endif %}</small></span></summary>
+  <p class="hint">Claude erstellt die Lerninhalte.{% if cfg.legacy_lesson_generation_enabled %} NotebookLM wird für das Format „NotebookLM“ benötigt.{% endif %} Verbindungen werden direkt gespeichert.</p>
 <details class="disclosure settings-subsection" id="claude" {{ 'open' if not cfg.has_credentials }}><summary>Claude <span class="settings-inline-status">{{ 'Verbunden' if claude_ok else 'Nicht verbunden' }}</span></summary>
 <div class="card" id="claude-verbindung">
   <h3>Claude-Verbindung
@@ -404,6 +408,9 @@ claude setup-token                         <span class="c-com"># Token wird ange
 </div>
 {% endmacro %}
 
+{# Gehoert zum alten Erzeugungsweg: wer sich hier anmeldet,
+   waertete sonst vergeblich darauf, dass etwas passiert. #}
+{% if cfg.legacy_lesson_generation_enabled %}
 <details class="disclosure settings-subsection" id="notebooklm"><summary>NotebookLM <span class="settings-inline-status">{{ 'Verbunden' if nlm_ok else 'Nicht verbunden' }}</span></summary>
 <div class="card" id="notebooklm-verbindung">
   <h3>NotebookLM-Verbindung {{ hilfe(nlm_warnung) }}
@@ -504,6 +511,7 @@ claude setup-token                         <span class="c-com"># Token wird ange
   });
 </script>
 </details>
+{% endif %}
 
 <details class="disclosure"><summary>Verbindung zurücksetzen</summary>
 <form method="post" action="/setup/reset" style="margin-top:1rem"

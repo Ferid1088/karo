@@ -42,7 +42,14 @@ class SettingsValues(HTMLParser):
             self.active = False
 
 
-def test_settings_has_one_place_for_each_connection(client, fake_llm, fake_cli):
+def test_settings_has_one_place_for_each_connection(client, fake_llm, fake_cli,
+                                                    alter_generator):
+    """Jede Verbindung genau einmal — geprüft auf der vollständigen Seite.
+
+    Format und NotebookLM hängen am alten Erzeugungsweg; ist er aus, gibt es
+    sie gar nicht (siehe test_notebooklm_sichtbarkeit.py). Hier geht es um
+    Doppelungen, also wird eingeschaltet, was geprüft werden soll.
+    """
     einrichten(client, fake_llm)
     page = client.get('/setup')
     forms = Forms(page.text).forms
