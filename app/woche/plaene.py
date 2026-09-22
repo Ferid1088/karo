@@ -167,6 +167,48 @@ def _calendar_state(row: dict | None) -> tuple[str | None, str]:
     return "open", "Noch offen"
 
 
+# Datumsangaben erscheinen im Kinderbereich deutsch, also 22.09.2026.
+def date_label(value: str) -> str:
+    if not value:
+        return ""
+    return date.fromisoformat(str(value)).strftime("%d.%m.%Y")
+
+
+def period_label(start: str, end: str) -> str:
+    return " \u2013 ".join(part for part in (date_label(start), date_label(end)) if part)
+
+
+# Die sieben Tage der laufenden Woche fuer ein einzelnes Ziel. Jeder Lerntag
+# traegt, wie viel Prozent der geplanten Zeit an dem Tag geschafft wurde; die
+# Oberflaeche faerbt den Kreis danach ein.
+def goal_week(rows: list[dict], current: date) -> list[dict]:
+    start, _ = week_bounds(current)
+    by_date = {row["scheduled_date"]: row for row in rows}
+    days = []
+    for offset in range(7):
+        day = start + timedelta(days=offset)
+        row = by_date.get(str(day))
+        share = 0
+        if row is None or row["status"] == "cancelled":
+            state, label = "off", "Kein Lerntag"
+        elif row.get("actual_minutes") is None:
+            state = "missed" if row["status"] == "missed" else "planned"
+            label = "Nicht gemacht" if state == "missed" else (
+                "Heute dran" if day == current else "Noch offen")
+        else:
+            share = min(100, round(percent(int(row["actual_minutes"]),
+                                           int(row["planned_minutes"]))))
+            if share >= 100:
+                state, label = "done", "Geschafft"
+            elif share > 0:
+                state, label = "partial", f"Teilweise geschafft ({share} %)"
+            else:
+                state, label = "missed", "Nicht gemacht"
+        days.append({"date": day, "weekday": day.isoweekday(), "state": state,
+                     "percent": share, "today": day == current, "label": label})
+    return days
+
+
 def goal_calendar(rows: list[dict], selected: date) -> dict:
     """Vollstaendiges Monatsraster fuer genau ein Ziel."""
     selected = selected.replace(day=1)

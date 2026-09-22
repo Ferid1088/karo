@@ -8,6 +8,7 @@ from pathlib import Path
 from starlette.status import HTTP_303_SEE_OTHER
 
 from .. import config, security
+from ..woche import plaene
 from ..domain import (
     AUSGABE_HINTS,
     AUSGABE_LABELS,
@@ -39,6 +40,8 @@ def alter_generator_aus() -> bool:
 
 BASE = Path(__file__).parent.parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
+# Datumsangaben erscheinen in den Vorlagen deutsch: {{ wert|datum }}
+templates.env.filters["datum"] = plaene.date_label
 
 try:
     ASSET_VERSION = str(max(

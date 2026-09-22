@@ -1,5 +1,6 @@
 {% extends 'woche/plaene_base.html' %}
 {% block plans %}
+{% from 'woche/_goal_week.html' import goal_week_row %}
 <a class="back-link" href="/woche/ziele">← Zurück zu meinen Zielen</a>
 
 <div class="detail-top-row">
@@ -10,7 +11,8 @@
       {% if goal.status != 'archived' %}
       <details><summary>Ziel bearbeiten</summary><form method="post" action="/woche/ziele/{{ goal.id }}/bearbeiten">{{ csrf_input() }}<label>Zielsatz<textarea name="statement" maxlength="180" required>{{ goal.statement }}</textarea></label><label>Enddatum<input type="date" name="end_date" value="{{ goal.end_date }}" required></label><label>Minuten pro Einheit<input type="number" name="minutes" min="1" max="60" value="{{ goal.planned_minutes }}" required></label><fieldset><legend>Lerntage</legend><div class="weekday-picker compact">{% for number,label in weekday_labels.items() %}<label><input type="checkbox" name="weekdays" value="{{ number }}" {{ 'checked' if number|string in goal.weekdays.split(',') }}><span>{{ label }}</span></label>{% endfor %}</div></fieldset><button class="plan-btn">Speichern</button></form></details>
       <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link" name="action" value="{{ 'resume' if goal.status == 'paused' else 'pause' }}">{{ '▶ Fortsetzen' if goal.status == 'paused' else 'Ⅱ Pausieren' }}</button></form>
-      {% if goal.status != 'completed' %}<form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link" name="action" value="complete">✓ Als erledigt markieren</button></form>{% endif %}
+      <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link" name="action" value="complete"{{ ' disabled' if goal.status == 'completed' }}>✓ Als erledigt markieren</button></form>
+      <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link reactivate" name="action" value="restore"{{ ' disabled' if goal.status != 'completed' }} title="{{ 'Das Ziel läuft dann wieder.' if goal.status == 'completed' else 'Erst möglich, wenn das Ziel als erledigt markiert ist.' }}">↻ Ziel wieder aktivieren</button></form>
       {% if goal.status == 'completed' or goal.progress >= 100 %}<form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link treasure" name="action" value="archive">▣ In die Schatzkiste</button></form>{% endif %}
       <form method="post" action="/woche/ziele/{{ goal.id }}/aktion" data-delete-goal-form>{{ csrf_input() }}<input type="hidden" name="confirm" value="yes"><button class="action-link danger" name="action" value="delete">Ziel löschen</button></form>
       {% else %}
@@ -19,6 +21,7 @@
       <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="plan-btn wide" name="action" value="repeat">Noch einmal als neues Ziel</button></form>
       {% endif %}
   </div>
+  {{ goal_week_row(goal, weekday_labels, details=False) }}
 </section>
   <article class="detail-motivation {{ motivation.tone }}">
     <img src="{{ motivation.fox }}" alt="Karo reagiert auf deinen Fortschritt">
@@ -33,12 +36,10 @@
       <span class="subject-icon big">{{ goal.statement[:1]|upper }}</span>
       <div>
         <h1>{{ goal.statement }}</h1>
-        <p>{{ goal.total_sessions }} Einheiten · {{ goal.days_label }} · {{ goal.planned_minutes }} Minuten pro Einheit</p>
       </div>
     </div>
     <div class="goal-state">
-      <span class="status-pill">✓ {{ {'active':'Aktiv','paused':'Pausiert','completed':'Abgeschlossen','archived':'Schatzkiste'}[goal.status] }}</span>
-      <small>{{ goal.start_date }} – {{ goal.end_date }}</small>
+      <span class="status-pill{{ ' done' if goal.status in ('completed','archived') }}">✓ {{ {'active':'Aktiv','paused':'Pausiert','completed':'Abgeschlossen','archived':'Schatzkiste'}[goal.status] }}</span>
     </div>
   </header>
   <section class="detail-metrics" aria-label="Kennzahlen für {{ goal.statement }}" data-progress-set="ziel-{{ goal.id }}">
@@ -59,22 +60,32 @@
       <div class="history-table">
         <div class="history-row head"><span>Datum</span><span>Geplant</span><span>Gemacht</span><span class="focus-stat">Konzentration</span><span class="progress-stat">Fortschritt</span><span>Status</span></div>
         {% for item in goal.history|reverse %}
-        <div class="history-row">
-          <span>{{ item.scheduled_date }}</span>
+        {% set parts = entries.get(item.scheduled_date, []) %}
+        <div class="history-row{{ ' has-parts' if parts|length > 1 }}">
+          <span>{{ item.scheduled_date|datum }}</span>
           <span>{{ item.planned_minutes }} Min</span>
-          <span>{{ (item.actual_minutes|string ~ ' Min') if item.actual_minutes is not none else '–' }}</span>
+          <span>{{ (item.actual_minutes|string ~ ' Min') if item.actual_minutes is not none else '–' }}{% if parts|length > 1 %} <small>in {{ parts|length }} Abschnitten</small>{% endif %}</span>
           <span class="focus-stat">{{ (item.focus_percent|string ~ ' %') if item.focus_percent is not none else '–' }}</span>
           <strong class="progress-stat {{ 'low' if (item.actual_minutes or 0) < item.planned_minutes else '' }}">{{ ((item.actual_minutes or 0) * 100 / item.planned_minutes)|round|int }} %</strong>
           <span class="session-status {{ item.status }}">{{ {'planned':'Offen','completed':'Erledigt','missed':'Nachholen','made_up':'Nachgeholt','cancelled':'Entfallen'}[item.status] }}</span>
         </div>
+        {% if parts|length > 1 %}{% for part in parts %}
+        <div class="history-row part">
+          <span>{{ loop.index }}. Abschnitt</span>
+          <span>{{ part.completed_at[11:16] }} Uhr</span>
+          <span>{{ part.actual_minutes }} Min</span>
+          <span class="focus-stat">{{ part.focus_percent }} %</span>
+          <span></span><span></span>
+        </div>
+        {% endfor %}{% endif %}
         {% else %}<div class="empty-inline">Für dieses Ziel gibt es noch keine Einheiten.</div>{% endfor %}
       </div>
     </div>
 
     <div data-plan-panel="chart" class="plan-tab-panel">
       <h2>Geplant und gemacht</h2>
-      <div class="simple-chart">{% for item in goal.sessions %}<div><span>{{ item.scheduled_date[8:] }}.</span><i class="planned" style="height:{{ item.planned_minutes * 2 }}px"></i><i class="actual" style="height:{{ (item.actual_minutes or 0) * 2 }}px"></i><small class="focus-stat">{{ item.focus_percent or 0 }}%</small></div>{% endfor %}</div>
-      <p class="chart-legend"><i></i> Geplant <i></i> Gemacht · <span class="focus-stat">Zahl = Konzentration</span></p>
+      <div class="simple-chart">{% for item in goal.sessions %}<div><span>{{ item.scheduled_date[8:] }}.</span><i class="planned" style="height:{{ item.planned_minutes * 2 }}px"></i><i class="actual">{% for part in entries.get(item.scheduled_date, []) %}<b style="height:{{ part.actual_minutes * 2 }}px" title="{{ part.completed_at[11:16] }} Uhr: {{ part.actual_minutes }} Min"></b>{% endfor %}</i><small class="focus-stat">{{ item.focus_percent or 0 }}%</small></div>{% endfor %}</div>
+      <p class="chart-legend"><i></i> Geplant <i></i> Gemacht · <span class="focus-stat">Zahl = Konzentration</span> · Mehrere Abschnitte an einem Tag stehen übereinander.</p>
     </div>
 
     <div data-plan-panel="calendar" class="plan-tab-panel">

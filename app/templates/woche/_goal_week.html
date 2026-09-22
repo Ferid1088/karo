@@ -1,0 +1,16 @@
+{# Die Lernwoche eines Ziels: ein Kreis je Wochentag, daneben Umfang und Zeitraum.
+   Wird auf jeder Seite eingebunden, die ein Ziel zeigt. #}
+{% macro goal_week_row(goal, weekday_labels, compact=False, details=True) %}
+<div class="goal-week-row{{ ' compact' if compact }}">
+  {% if goal.week %}<ol class="goal-week" aria-label="Die Lernwoche für {{ goal.statement }}">
+    {% for day in goal.week %}
+    <li class="{{ day.state }}{{ ' heute' if day.today }}"><span>{{ weekday_labels[day.weekday] }}</span><i aria-hidden="true"{% if day.state == 'partial' %} style="--geschafft:{{ day.percent }}%"{% endif %}>{% if day.state == 'done' %}✓{% endif %}</i><small class="plan-sr-only">{{ weekday_labels[day.weekday] }}: {{ day.label }}</small></li>
+    {% endfor %}
+  </ol>{% endif %}
+  <div class="goal-week-facts">
+    <b>{{ goal.total_sessions }} Einheiten · {{ goal.planned_minutes }} Minuten pro Einheit</b>
+    <small>{{ goal.period }}</small>
+  </div>
+  {% if details %}<a class="goal-details" href="/woche/ziele/{{ goal.id }}">Details</a>{% endif %}
+</div>
+{% endmacro %}

@@ -259,6 +259,11 @@ async def parent_help(request: Request, help_id: int):
 # Meine Plaene: alle Kennzahlen kommen aus plaene.py, nicht aus den Templates.
 # ---------------------------------------------------------------------------
 
+# Kennzahlen zaehlen ueberall dieselben Ziele: alles ausser der Schatzkiste.
+# Sonst zeigt jede Seite eine andere Prozentzahl fuer dasselbe Kind.
+LAUFENDE_ZIELE = ("active", "paused", "completed")
+
+
 def _days(value: str) -> str:
     return " · ".join(plaene.WEEKDAY_LABELS[int(day)] for day in value.split(",") if day)
 
@@ -268,7 +273,8 @@ def _goal_view(item: dict, on: date) -> dict:
     stats = plaene.goal_statistics(rows, on)
     future = next((row for row in rows if row["scheduled_date"] >= str(on) and row["status"] == "planned"), None)
     return {**item, **stats, "days_label": _days(item["weekdays"]), "next": future,
-            "sessions": rows,
+            "sessions": rows, "week": plaene.goal_week(rows, on),
+            "period": plaene.period_label(item["start_date"], item["end_date"]),
             "history": [row for row in rows if row["scheduled_date"] <= str(on)],
             "total_sessions": len(rows)}
 
@@ -288,7 +294,7 @@ def _plans_render(request: Request, template: str, **context):
 def today_page(request: Request):
     current = plaene.today()
     plan_store.mark_missed(current)
-    active = plan_store.goals(("active",))
+    active = plan_store.goals(LAUFENDE_ZIELE)
     today_rows = [row for row in plan_store.sessions(start=current, end=current) if row["goal_status"] == "active"]
     missed = [row for row in plan_store.sessions(end=current - timedelta(days=1))
               if row["status"] == "missed" and row["goal_status"] == "active"]
@@ -301,6 +307,8 @@ def today_page(request: Request):
         except (ValueError, LookupError):
             raise HTTPException(404, "Diese Einheit ist nicht verfügbar.")
     overall = _overall(active, current)
+    weeks = {item["id"]: _goal_view(item, current) for item in active}
+    today_rows = [{**row, "goal": weeks.get(row["goal_id"])} for row in today_rows]
     return _plans_render(request, "woche/plaene_heute.html", goals=active,
                          sessions=today_rows, missed=missed, overall=overall,
                          motivation=plaene.motivation(overall),
@@ -314,10 +322,13 @@ def week_page(request: Request):
     plan_store.mark_missed(current)
     start, end = plaene.week_bounds(current)
     goal_rows = []
-    for item in plan_store.goals(("active", "paused")):
+    for item in plan_store.goals(LAUFENDE_ZIELE):
         rows = plan_store.sessions(item["id"], start, end)
+        all_sessions = plan_store.sessions(item["id"])
         goal_rows.append({**item, **plaene.goal_statistics(rows, current),
-                          "rows": rows})
+                          "rows": rows, "week": plaene.goal_week(all_sessions, current),
+                          "period": plaene.period_label(item["start_date"], item["end_date"]),
+                          "total_sessions": len(all_sessions)})
     all_rows = [row for item in goal_rows for row in item["rows"]]
     counts = {status: sum(row["status"] == status for row in all_rows)
               for status in ("completed", "planned", "missed", "made_up")}
@@ -349,10 +360,16 @@ def month_page(request: Request, month: str = ""):
     start, end = plaene.month_bounds(chosen)
     goal_rows = []
     month_rows = []
-    for item in plan_store.goals(("active", "paused", "completed")):
+    for item in plan_store.goals(LAUFENDE_ZIELE):
         rows = plan_store.sessions(item["id"], start, end)
         if rows:
-            goal_rows.append({**item, **plaene.goal_statistics(rows, current)})
+            # Die Kreisreihe zeigt immer die laufende Woche. Beim Blaettern in einen
+            # anderen Monat passt sie nicht zu den Zahlen daneben und bleibt deshalb leer.
+            goal_rows.append({**item, **plaene.goal_statistics(rows, current),
+                              "week": plaene.goal_week(plan_store.sessions(item["id"]), current)
+                                      if start <= current <= end else [],
+                              "period": plaene.period_label(item["start_date"], item["end_date"]),
+                              "total_sessions": len(plan_store.sessions(item["id"]))})
             month_rows.extend(rows)
     weeks, cursor = [], start
     while cursor <= end:
@@ -375,7 +392,7 @@ def month_page(request: Request, month: str = ""):
 def goals_page(request: Request):
     current = plaene.today()
     plan_store.mark_missed(current)
-    active = [_goal_view(item, current) for item in plan_store.goals(("active", "paused", "completed"))]
+    active = [_goal_view(item, current) for item in plan_store.goals(LAUFENDE_ZIELE)]
     overall = _overall(active, current)
     return _plans_render(request, "woche/plaene_ziele.html", goals=active, overall=overall,
                          motivation=plaene.motivation(overall))
@@ -504,9 +521,12 @@ def goal_detail(request: Request, goal_id: int, month: str = ""):
         calendar_view = plaene.goal_calendar(item["sessions"], selected)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from None
+    entries = {}
+    for row in plan_store.completions(goal_id):
+        entries.setdefault(row["scheduled_date"], []).append(row)
     return _plans_render(request, "woche/plaene_detail.html", goal=item,
                          motivation=plaene.motivation(item),
-                         goal_calendar=calendar_view)
+                         goal_calendar=calendar_view, entries=entries)
 
 
 @router.post('/ziele/{goal_id}/bearbeiten')

@@ -1,9 +1,25 @@
 {% extends 'woche/plaene_base.html' %}
 {% block plans %}
-<section class="week-head plans-panel"><div><h1>Diese Woche</h1><p>{{ start.strftime('%d.%m.') }} – {{ end.strftime('%d.%m.%Y') }}</p></div><ol class="week-timeline">
-{% for item in days %}<li class="{{ item.state }} {{ 'past' if item.date < plan_day else 'today' if item.date == plan_day }}"><span>{{ weekday_labels[item.date.isoweekday()] }}</span><i>{% if item.state == 'done' %}✓{% elif item.state == 'missed' %}!{% else %}{{ item.date.day }}{% endif %}</i><small>{{ item.date.day }}.</small></li>{% endfor %}</ol></section>
-<div class="week-layout"><section class="plans-panel"><div class="progress-hero" data-progress-set="woche"><div><h2>Wochenfortschritt <small>(Durchschnitt)</small></h2><div class="progress-trio"><span class="progress-stat"><small>Fortschritt</small><b>{{ summary.progress }} %</b></span><span class="adherence-stat"><small>Bis heute</small><b>{{ summary.adherence }} %</b></span><span class="focus-stat"><small>Konzentration</small><b>{{ summary.focus }} %</b></span></div><p>{{ motivation.text }}</p></div><img src="{{ motivation.fox }}" alt="Karo reagiert auf deinen Wochenfortschritt"></div>
-<div class="stats-table"><div class="stats-row stats-head"><span>Fach</span><span>Geplant</span><span>Gemacht</span><span class="progress-stat">Fortschritt</span><span class="adherence-stat">Bis heute</span><span class="focus-stat">Konzentration</span><span>Aktion</span></div>
-{% for item in goal_rows %}<article class="stats-row stats-data" data-progress-set="ziel-{{ item.id }}"><a class="stats-subject" href="/woche/ziele/{{ item.id }}"><b>{{ item.statement }}</b></a><span data-label="Geplant">{{ item.planned }} Min</span><span data-label="Gemacht">{{ item.actual }} Min</span><strong class="progress-stat" data-label="Fortschritt">{{ item.progress }} %</strong><strong class="adherence-stat" data-label="Bis heute">{{ item.adherence }} %</strong><span class="focus-stat" data-label="Konzentration">{{ item.focus }} %</span><form method="post" action="/woche/ziele/{{ item.id }}/start">{{ csrf_input() }}<button class="plan-btn compact-start" type="submit">Starten <span aria-hidden="true">→</span></button></form></article>{% else %}<div class="empty-inline">Noch keine Ziele für diese Woche.</div>{% endfor %}</div></section>
-<aside class="week-side"><section class="plans-panel mascot-card {{ motivation.tone }}"><img src="{{ motivation.fox }}" alt="Karo"><h2>{{ motivation.title }}</h2><p>{{ motivation.text }}</p></section><section class="plans-panel"><h2>Aufgaben diese Woche</h2><div class="count-grid"><span><b>{{ counts.completed + counts.made_up }}</b>Erledigt</span><span><b>{{ counts.planned }}</b>Offen</span><span><b>{{ counts.missed }}</b>Nachholen</span></div></section></aside></div>
+{% from 'woche/_goal_status.html' import goal_done_badge %}
+{% from 'woche/_goal_week.html' import goal_week_row %}
+<div class="today-layout"><aside class="today-side" data-progress-set="woche">
+  <div class="plans-panel mascot-copy today-greeting"><img src="/static/karo-fox-wave.png" alt="Karo begleitet deine Woche"><div><h1>Diese Woche</h1><p>{{ start.strftime('%d.%m.') }} – {{ end.strftime('%d.%m.%Y') }}</p></div></div>
+  <article class="metric-card green"><span class="metric-icon">▥</span><div><b>Bis heute</b><strong>{{ summary.adherence }} %</strong><p>{{ summary.due_actual }} von {{ summary.due_planned }} Minuten</p></div></article>
+  <article class="metric-card blue"><span class="metric-icon">★</span><div><b>Fortschritt</b><strong>{{ summary.progress }} %</strong><p>{{ summary.actual }} von {{ summary.planned }} Minuten</p></div></article>
+  <article class="metric-card focus"><span class="metric-icon">◎</span><div><b>Konzentration</b><strong>{{ summary.focus }} %</strong><p>{{ summary.focused }} fokussierte Minuten</p></div></article>
+  <article class="motivation-card {{ motivation.tone }}"><img src="{{ motivation.fox }}" alt="Karo"><div><h2>{{ motivation.title }}</h2><p>{{ motivation.text }}</p></div></article>
+</aside><div class="today-main">
+<section class="plans-panel week-head">
+  <header class="section-heading"><div><h2>Wochenfortschritt</h2><p>So lief jeder Tag dieser Woche.</p></div></header>
+  <ol class="week-timeline">
+  {% for item in days %}<li class="{{ item.state }} {{ 'past' if item.date < plan_day else 'today' if item.date == plan_day }}"><span>{{ weekday_labels[item.date.isoweekday()] }}</span><i>{% if item.state == 'done' %}✓{% elif item.state == 'missed' %}!{% else %}{{ item.date.day }}{% endif %}</i><small>{{ item.date.day }}.</small></li>{% endfor %}
+  </ol>
+  <div class="count-grid"><span><b>{{ counts.completed + counts.made_up }}</b>Erledigt</span><span><b>{{ counts.planned }}</b>Offen</span><span><b>{{ counts.missed }}</b>Nachholen</span></div>
+</section>
+<section class="plans-panel">
+  <header class="section-heading"><div><h2>Deine Ziele diese Woche</h2><p>Hier siehst du, wie du in jedem Ziel vorankommst.</p></div></header>
+  <div class="stats-table"><div class="stats-row stats-head"><span>Fach</span><span>Geplant</span><span>Gemacht</span><span class="progress-stat">Fortschritt</span><span class="adherence-stat">Bis heute</span><span class="focus-stat">Konzentration</span><span>Aktion</span></div>
+  {% for item in goal_rows %}<article class="stats-row stats-data" data-progress-set="ziel-{{ item.id }}"><a class="stats-subject" href="/woche/ziele/{{ item.id }}"><b>{{ item.statement }}</b></a>{{ goal_done_badge(item, csrf_input) }}<span data-label="Geplant">{{ item.planned }} Min</span><span data-label="Gemacht">{{ item.actual }} Min</span><strong class="progress-stat" data-label="Fortschritt">{{ item.progress }} %</strong><strong class="adherence-stat" data-label="Bis heute">{{ item.adherence }} %</strong><span class="focus-stat" data-label="Konzentration">{{ item.focus }} %</span><form method="post" action="/woche/ziele/{{ item.id }}/start">{{ csrf_input() }}<button class="plan-btn compact-start" type="submit">Starten <span aria-hidden="true">→</span></button></form>{{ goal_week_row(item, weekday_labels, compact=True) }}</article>{% else %}<div class="empty-inline">Noch keine Ziele für diese Woche.</div>{% endfor %}</div>
+</section>
+</div></div>
 {% endblock %}

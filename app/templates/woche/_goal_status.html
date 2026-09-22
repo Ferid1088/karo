@@ -1,0 +1,12 @@
+{# Ein abgeschlossenes Ziel: Hinweis neben dem Titel und die beiden Wege weiter –
+   in die Schatzkiste legen oder wieder aktivieren. Wird auf jeder Seite
+   eingebunden, die ein Ziel zeigt; bei laufenden Zielen bleibt sie leer. #}
+{% macro goal_done_badge(goal, csrf_input) %}
+{% if goal.status == 'completed' %}
+<div class="goal-done">
+  <span class="status-pill done">✓ Abgeschlossen</span>
+  <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link treasure" name="action" value="archive">▣ In die Schatzkiste</button></form>
+  <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="goal-reactivate" name="action" value="restore">↻ Ziel wieder aktivieren</button></form>
+</div>
+{% endif %}
+{% endmacro %}

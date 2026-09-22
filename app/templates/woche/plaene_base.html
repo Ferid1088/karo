@@ -2,8 +2,8 @@
 {% block title %}Ziele Plannen – {{ companion_name }}{% endblock %}
 {% block mainclass %}plans-page{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/plaene.css?v=36">
-<script src="/static/plaene.js?v=7" defer></script>
+<link rel="stylesheet" href="/static/plaene.css?v=53">
+<script src="/static/plaene.js?v=8" defer></script>
 <span hidden>{{ csrf_input() }}</span>
 <a class="skip-link" href="#plans-content">Zum Inhalt</a>
 <header class="plans-local-header">
@@ -15,6 +15,7 @@
     <a href="/woche/ziele" {{ 'aria-current=page' if path.startswith('/woche/ziele') }}>Ziele</a>
     <a href="/woche/schatzkiste" {{ 'aria-current=page' if path == '/woche/schatzkiste' }}>Schatzkiste</a>
   </nav>
+  <p class="plans-slogan">Kleine Schritte.<span>Große Erfolge!</span></p>
   <time class="plans-clock" datetime="{{ plan_day.isoformat() }}" data-plans-clock aria-label="Aktuelles Datum und Uhrzeit">
     <span data-clock-date>{{ plan_day.strftime('%d.%m.%Y') }}</span>
     <b data-clock-time>--:-- Uhr</b>

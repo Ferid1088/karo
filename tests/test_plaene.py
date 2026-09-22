@@ -92,8 +92,13 @@ def test_store_creates_completes_makes_up_and_keeps_history(app_env, monkeypatch
     store.complete(first["id"], 24, 95, datetime(2026, 9, 10, 12, tzinfo=timezone.utc))
     assert store.sessions(goal_id)[0]["status"] == "made_up"
     assert len(app_env.db.q("SELECT * FROM plan_completion")) == 1
-    store.complete(first["id"], 24, 95, datetime(2026, 9, 10, 12, tzinfo=timezone.utc))
-    assert len(app_env.db.q("SELECT * FROM plan_completion")) == 1
+    # Ein zweiter Lernabschnitt am selben Tag kommt dazu, er ersetzt den ersten nicht.
+    store.complete(first["id"], 6, 50, datetime(2026, 9, 10, 17, tzinfo=timezone.utc))
+    assert len(app_env.db.q("SELECT * FROM plan_completion")) == 2
+    again = store.sessions(goal_id)[0]
+    assert again["actual_minutes"] == 30
+    assert again["focus_percent"] == 86
+    assert again["entry_count"] == 2
     old_dates = [(row["scheduled_date"], row["planned_minutes"]) for row in store.sessions(goal_id) if row["scheduled_date"] < "2026-09-14"]
     store.update_future(goal_id, "Englisch sicher sprechen.", date(2026, 10, 4), 30, [2, 4], date(2026, 9, 14))
     after = store.sessions(goal_id)
@@ -246,7 +251,7 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
     assert started.headers["location"] == f"/woche?abschluss={item['id']}"
 
     page = client.get(started.headers["location"])
-    assert "Wie lange hast du heute wirklich" in page.text
+    assert "Wie lange hast du gerade daran gearbeitet" in page.text
     assert page.text.count("data-focus-mark=") == 11
     response = client.post(f"/woche/sitzung/{item['id']}/abschluss", data={
         "_csrf": csrf_from(page.text), "actual_minutes": "27", "focus_percent": "80"}, follow_redirects=False)
@@ -374,3 +379,193 @@ def test_goal_detail_actions_work_end_to_end(client, app_env, fake_llm, fake_cli
     response = post(f"/woche/ziele/{goal_id}/aktion", {"action": "repeat"})
     assert response.status_code == 303
     assert len(store.goals(("active",))) == 1
+
+
+def test_goal_week_grades_each_planned_day_by_what_was_achieved():
+    rows = [
+        {"scheduled_date": "2026-09-21", "planned_minutes": 20, "status": "completed", "actual_minutes": 20},
+        {"scheduled_date": "2026-09-22", "planned_minutes": 20, "status": "completed", "actual_minutes": 25},
+        {"scheduled_date": "2026-09-23", "planned_minutes": 20, "status": "made_up", "actual_minutes": 8},
+        {"scheduled_date": "2026-09-24", "planned_minutes": 20, "status": "completed", "actual_minutes": 0},
+        {"scheduled_date": "2026-09-25", "planned_minutes": 20, "status": "missed", "actual_minutes": None},
+    ]
+    days = plaene.goal_week(rows, date(2026, 9, 25))
+    assert [day["state"] for day in days] == [
+        "done", "done", "partial", "missed", "missed", "off", "off"]
+    assert [day["percent"] for day in days][:5] == [100, 100, 40, 0, 0]
+    assert days[2]["label"] == "Teilweise geschafft (40 %)"
+
+
+def test_goal_week_keeps_an_untouched_planned_day_green_and_marks_today():
+    rows = [
+        {"scheduled_date": "2026-09-24", "planned_minutes": 20, "status": "planned", "actual_minutes": None},
+        {"scheduled_date": "2026-09-25", "planned_minutes": 20, "status": "planned", "actual_minutes": None},
+    ]
+    days = plaene.goal_week(rows, date(2026, 9, 24))
+    assert days[3]["state"] == "planned" and days[3]["today"] is True
+    assert days[4]["state"] == "planned" and days[4]["today"] is False
+    assert days[3]["percent"] == 0
+    assert days[5]["state"] == "off" and days[5]["percent"] == 0
+
+
+def test_goal_week_marks_each_weekday_of_the_current_week():
+    rows = [
+        {"scheduled_date": "2026-09-21", "planned_minutes": 20, "status": "completed", "actual_minutes": 20},
+        {"scheduled_date": "2026-09-22", "planned_minutes": 20, "status": "made_up", "actual_minutes": 15},
+        {"scheduled_date": "2026-09-23", "planned_minutes": 20, "status": "missed", "actual_minutes": None},
+        {"scheduled_date": "2026-09-24", "planned_minutes": 20, "status": "planned", "actual_minutes": None},
+        {"scheduled_date": "2026-09-25", "planned_minutes": 20, "status": "cancelled", "actual_minutes": None},
+    ]
+    days = plaene.goal_week(rows, date(2026, 9, 24))
+    assert [day["weekday"] for day in days] == [1, 2, 3, 4, 5, 6, 7]
+    assert [day["state"] for day in days] == [
+        "done", "partial", "missed", "planned", "off", "off", "off"]
+    assert days[0]["date"] == date(2026, 9, 21)
+    assert days[3]["label"] == "Heute dran"
+
+
+def test_date_and_period_labels_use_german_notation():
+    assert plaene.date_label("2026-09-22") == "22.09.2026"
+    assert plaene.period_label("2026-09-22", "2026-10-30") == "22.09.2026 – 30.10.2026"
+    assert plaene.date_label("") == ""
+    assert plaene.period_label("2026-09-22", "") == "22.09.2026"
+
+
+def test_completed_goal_offers_treasure_chest_and_reactivation(client, app_env, fake_llm, fake_cli, monkeypatch):
+    from app.woche import plaene as current_rules, plaene_store as store
+    from .test_app import einrichten, session_cookie_faelschen
+
+    einrichten(client, fake_llm)
+    monkeypatch.setattr(current_rules, "today", lambda now=None: date(2026, 9, 22))
+    goal_id = store.create_goal("bio", date(2026, 9, 22), date(2026, 10, 19), 20, [1, 2, 3])
+    client.cookies.clear()
+    client.cookies.set("karo_session", session_cookie_faelschen(app_env, auth=True, role="child", csrf="test-token"))
+
+    detail = client.get(f"/woche/ziele/{goal_id}")
+    assert 'value="restore" disabled' in detail.text
+    assert 'value="complete" disabled' not in detail.text
+    assert "✓ Abgeschlossen" not in client.get("/woche/ziele").text
+
+    store.set_status(goal_id, "completed")
+    detail = client.get(f"/woche/ziele/{goal_id}")
+    assert 'value="restore" disabled' not in detail.text
+    assert 'value="complete" disabled' in detail.text
+
+    goals_page = client.get("/woche/ziele")
+    assert "✓ Abgeschlossen" in goals_page.text
+    assert 'value="archive"' in goals_page.text
+    assert "Ziel wieder aktivieren" in goals_page.text
+
+    client.post(f"/woche/ziele/{goal_id}/aktion",
+                data={"action": "restore", "_csrf": "test-token"},
+                headers={"x-csrf-token": "test-token"})
+    assert store.goal(goal_id)["status"] == "active"
+
+
+def test_two_sessions_on_the_same_day_are_both_kept(client, app_env, fake_llm, fake_cli, monkeypatch):
+    from app.woche import plaene as current_rules, plaene_store as store
+    from .test_app import einrichten
+
+    einrichten(client, fake_llm)
+    monkeypatch.setattr(current_rules, "today", lambda now=None: date(2026, 9, 22))
+    goal_id = store.create_goal("bio", date(2026, 9, 22), date(2026, 10, 19), 20, [1, 2, 3])
+
+    first = store.start_session(goal_id, date(2026, 9, 22))
+    store.complete(first, 20, 80)
+    second = store.start_session(goal_id, date(2026, 9, 22))
+    store.complete(second, 15, 60)
+
+    entries = [row for row in store.completions(goal_id) if row["scheduled_date"] == "2026-09-22"]
+    assert [row["actual_minutes"] for row in entries] == [20, 15]
+
+    day = [row for row in store.sessions(goal_id) if row["scheduled_date"] == "2026-09-22"]
+    assert len(day) == 1
+    assert day[0]["actual_minutes"] == 35
+    assert day[0]["focus_percent"] == 71
+
+
+def test_all_pages_show_the_same_hand_checked_numbers(client, app_env, fake_llm, fake_cli, monkeypatch):
+    """Ein Ziel, von Hand nachgerechnet, auf jeder Seite kontrolliert.
+
+    Mo 20 Min bei 80 %, Di 12+9+6 Min bei 70/90/50 %, Mi 0 Min, Do (heute) offen,
+    Fr geplant. Geplant gesamt 5 x 20 = 100 Min, davon bis Do 80 Min faellig.
+    Gemacht 20+27 = 47 Min. Fokuszeit 20*0,80 + 27*0,72 = 35,44 -> 35 Min.
+    """
+    from datetime import datetime, timezone
+    from app.woche import plaene as current_rules, plaene_store as store
+    from .test_app import einrichten, session_cookie_faelschen
+
+    einrichten(client, fake_llm)
+    monkeypatch.setattr(current_rules, "today", lambda now=None: date(2026, 9, 24))
+    goal_id = store.create_goal("bio", date(2026, 9, 21), date(2026, 9, 25), 20, [1, 2, 3, 4, 5])
+    rows = store.sessions(goal_id)
+    assert [row["scheduled_date"] for row in rows] == [
+        "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25"]
+    store.complete(rows[0]["id"], 20, 80, datetime(2026, 9, 21, 9, tzinfo=timezone.utc))
+    store.complete(rows[1]["id"], 12, 70, datetime(2026, 9, 22, 8, tzinfo=timezone.utc))
+    store.complete(rows[1]["id"], 9, 90, datetime(2026, 9, 22, 16, tzinfo=timezone.utc))
+    store.complete(rows[1]["id"], 6, 50, datetime(2026, 9, 22, 19, tzinfo=timezone.utc))
+    store.complete(rows[2]["id"], 0, 0, datetime(2026, 9, 23, 17, tzinfo=timezone.utc))
+
+    # Einheiten: Tagessumme und zeitgewichtete Konzentration.
+    day = {row["scheduled_date"]: row for row in store.sessions(goal_id)}
+    assert (day["2026-09-21"]["actual_minutes"], day["2026-09-21"]["focus_percent"]) == (20, 80)
+    assert (day["2026-09-22"]["actual_minutes"], day["2026-09-22"]["focus_percent"]) == (27, 72)
+    assert (day["2026-09-23"]["actual_minutes"], day["2026-09-23"]["focus_percent"]) == (0, 0)
+    assert day["2026-09-24"]["actual_minutes"] is None
+
+    stats = current_rules.goal_statistics(store.sessions(goal_id), date(2026, 9, 24))
+    assert stats["planned"] == 100 and stats["actual"] == 47
+    assert stats["due_planned"] == 80 and stats["due_actual"] == 47
+    assert stats["progress"] == 47          # 47 von 100
+    assert stats["adherence"] == 59         # 47 von 80
+    assert stats["focused"] == 35 and stats["focus"] == 75
+
+    week = current_rules.goal_week(store.sessions(goal_id), date(2026, 9, 24))
+    assert [row["state"] for row in week] == [
+        "done", "done", "missed", "planned", "planned", "off", "off"]
+    assert [row["percent"] for row in week][:3] == [100, 100, 0]
+
+    client.cookies.clear()
+    client.cookies.set("karo_session", session_cookie_faelschen(app_env, auth=True, role="child", csrf="test-token"))
+    detail = client.get(f"/woche/ziele/{goal_id}").text
+    assert "47 von 80 Min bis heute" in detail and "59 %" in detail
+    assert "47 von 100 Min insgesamt" in detail and "47 %" in detail
+    assert "35 von 47 Min fokussiert" in detail and "75 %" in detail
+    assert "27 Min <small>in 3 Abschnitten</small>" in detail
+    assert "135 %" in detail                # 27 von 20 Min an diesem Tag
+
+    for path in ("/woche/ziele", "/woche/woche", "/woche/monat"):
+        page = client.get(path).text
+        assert "47" in page and "59 %" in page, path
+
+
+def test_every_page_counts_the_same_goals(client, app_env, fake_llm, fake_cli, monkeypatch):
+    """Ein laufendes, ein pausiertes und ein abgeschlossenes Ziel: „Bis heute" muss
+    auf Heute, Woche, Monat und Ziele dieselbe Zahl sein."""
+    import re
+    from datetime import datetime, timezone
+    from app.woche import plaene as current_rules, plaene_store as store
+    from .test_app import einrichten, session_cookie_faelschen
+
+    einrichten(client, fake_llm)
+    monkeypatch.setattr(current_rules, "today", lambda now=None: date(2026, 9, 24))
+    for name, status in (("bio", "active"), ("kunst", "paused"), ("sport", "completed")):
+        goal_id = store.create_goal(name, date(2026, 9, 21), date(2026, 9, 25), 20, [1, 2, 3, 4, 5])
+        store.complete(store.sessions(goal_id)[0]["id"], 10, 80,
+                       datetime(2026, 9, 21, 9, tzinfo=timezone.utc))
+        if status != "active":
+            store.set_status(goal_id, status)
+
+    client.cookies.clear()
+    client.cookies.set("karo_session", session_cookie_faelschen(app_env, auth=True, role="child", csrf="test-token"))
+    seen = {}
+    for path in ("/woche", "/woche/ziele"):
+        page = client.get(path).text
+        block = page[page.index("Bis heute"):]
+        seen[path] = re.search(r"(\d+) %", block).group(1)
+    assert len(set(seen.values())) == 1, seen
+    # Pausieren und Abschliessen stornieren die Einheiten ab heute: sie zaehlen
+    # nicht mehr als geplant. Faellig sind 4x20 + 3x20 + 3x20 = 200 Min,
+    # geschafft 3x10 = 30 Min -> 15 %.
+    assert seen["/woche"] == "15"

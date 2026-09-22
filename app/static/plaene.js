@@ -26,8 +26,11 @@
       var out = document.querySelector('[data-actual-output]');
       var percent = document.querySelector('[data-percent-output]');
       var planned = Number(document.querySelector('.selected-goal small').textContent.match(/\d+/)[0]);
+      // Schon fruehere Abschnitte des Tages zaehlen mit, sonst springt die Anzeige zurueck.
+      var live = percent && percent.closest('.live-result');
+      var done = live ? Number(live.dataset.doneMinutes || 0) : 0;
       if (out) out.textContent = actual.value;
-      if (percent) percent.textContent = Math.round(Number(actual.value) / planned * 100) + ' %';
+      if (percent) percent.textContent = Math.round((done + Number(actual.value)) / planned * 100) + ' %';
     }
     if (focus) {
       var focusOut = document.querySelector('[data-focus-output]');

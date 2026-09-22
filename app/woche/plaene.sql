@@ -26,12 +26,13 @@ CREATE TABLE IF NOT EXISTS plan_session (
 
 CREATE TABLE IF NOT EXISTS plan_completion (
  id INTEGER PRIMARY KEY,
- planned_session_id INTEGER NOT NULL UNIQUE REFERENCES plan_session(id) ON DELETE CASCADE,
+ planned_session_id INTEGER NOT NULL REFERENCES plan_session(id) ON DELETE CASCADE,
  actual_minutes INTEGER NOT NULL CHECK(actual_minutes BETWEEN 0 AND 60),
  focus_percent INTEGER NOT NULL CHECK(focus_percent BETWEEN 0 AND 100),
  completed_at TEXT NOT NULL,
  is_makeup INTEGER NOT NULL DEFAULT 0 CHECK(is_makeup IN (0,1))
 );
 
+CREATE INDEX IF NOT EXISTS plan_completion_session ON plan_completion(planned_session_id);
 CREATE INDEX IF NOT EXISTS plan_session_date ON plan_session(scheduled_date, status);
 CREATE INDEX IF NOT EXISTS plan_session_goal ON plan_session(goal_id, scheduled_date);
