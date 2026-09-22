@@ -293,6 +293,7 @@ def today_page(request: Request):
     missed = [row for row in plan_store.sessions(end=current - timedelta(days=1))
               if row["status"] == "missed" and row["goal_status"] == "active"]
     selected = request.query_params.get("abschluss")
+    completion_notice = request.query_params.get("hinweis") == "kind"
     selected_session = None
     if selected:
         try:
@@ -303,7 +304,8 @@ def today_page(request: Request):
     return _plans_render(request, "woche/plaene_heute.html", goals=active,
                          sessions=today_rows, missed=missed, overall=overall,
                          motivation=plaene.motivation(overall),
-                         selected_session=selected_session)
+                         selected_session=selected_session,
+                         completion_notice=completion_notice)
 
 
 @router.get('/woche')
@@ -465,7 +467,7 @@ async def wizard_save(request: Request):
 @router.post('/sitzung/{session_id}/abschluss')
 async def finish_session(request: Request, session_id: int):
     if request.session.get("role") != "child":
-        raise HTTPException(403, "Diese Rückmeldung gehört dem Kind.")
+        return zurueck(f"/woche?abschluss={session_id}&hinweis=kind")
     data = await form(request)
     try:
         actual = number(data, "actual_minutes")

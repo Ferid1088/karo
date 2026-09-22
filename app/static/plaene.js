@@ -28,6 +28,33 @@
   });
   update();
 
+  var completionForm = document.querySelector('[data-completion-form][data-parent-feedback]');
+  var roleNotice = document.querySelector('[data-role-notice]');
+  if (completionForm && roleNotice) {
+    var roleNoticeButtons = roleNotice.querySelectorAll('[data-role-notice-close]');
+    var saveButton = completionForm.querySelector('button[type="submit"]');
+    function openRoleNotice() {
+      roleNotice.hidden = false;
+      roleNoticeButtons[0].focus();
+    }
+    function closeRoleNotice() {
+      roleNotice.hidden = true;
+      if (saveButton) saveButton.focus();
+    }
+    completionForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      openRoleNotice();
+    });
+    roleNoticeButtons.forEach(function (button) { button.addEventListener('click', closeRoleNotice); });
+    roleNotice.addEventListener('click', function (event) {
+      if (event.target === roleNotice) closeRoleNotice();
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !roleNotice.hidden) closeRoleNotice();
+    });
+    if (!roleNotice.hidden) roleNoticeButtons[0].focus();
+  }
+
   document.querySelectorAll('[data-plan-tabs]').forEach(function (tabs) {
     tabs.querySelectorAll('[data-tab]').forEach(function (button) {
       button.addEventListener('click', function () {

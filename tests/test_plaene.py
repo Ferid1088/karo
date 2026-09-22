@@ -141,6 +141,34 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
     assert completed["actual_minutes"] == 27 and completed["focus_percent"] == 80
 
 
+def test_parent_completion_stays_on_karo_page_with_role_notice(client, app_env, fake_llm, fake_cli, monkeypatch):
+    from app.woche import plaene as current_rules, plaene_store as store
+    from .conftest import csrf_from
+    from .test_app import einrichten, session_cookie_faelschen
+
+    einrichten(client, fake_llm)
+    monkeypatch.setattr(current_rules, "today", lambda now=None: date(2026, 9, 22))
+    goal_id = store.create_goal("Mathematik üben.", date(2026, 9, 22), date(2026, 9, 22), 20, [2])
+    item = store.sessions(goal_id)[0]
+    parent_cookie = session_cookie_faelschen(app_env, auth=True, role="parent", csrf="test-token")
+    client.cookies.clear(); client.cookies.set("karo_session", parent_cookie)
+
+    page = client.get(f"/woche?abschluss={item['id']}")
+    assert "data-parent-feedback" in page.text
+    response = client.post(f"/woche/sitzung/{item['id']}/abschluss", data={
+        "_csrf": csrf_from(page.text), "actual_minutes": "20", "focus_percent": "80",
+    }, follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/woche?abschluss={item['id']}&hinweis=kind"
+    assert store.session(item["id"])["actual_minutes"] is None
+
+    notice = client.get(response.headers["location"])
+    assert notice.status_code == 200
+    assert "Fast geschafft!" in notice.text
+    assert "Kind-Modus starten" in notice.text
+    assert "Diese Rückmeldung gehört dem Kind" not in notice.text
+
+
 def test_goal_wizard_creates_time_only_plan(client, app_env, fake_llm, fake_cli, monkeypatch):
     from app.woche import plaene as current_rules, plaene_store as store
     from .conftest import csrf_from
