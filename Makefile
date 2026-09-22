@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := hilfe
 .PHONY: hilfe pull up up-klein publish down logs test backup backup-alles restore shell stimme \
-        notebooklm-login
+        notebooklm-login dev dev-reload dev-stop dev-log dev-status
 
 VOLUME := karo_karo-data
 STAMP  := $(shell date +%Y%m%d-%H%M)
@@ -9,6 +9,17 @@ DOCKERHUB_REPO := farid1088/karo
 # Beide Overlay-Aufrufe (up, up-klein) bauen lokal aus dem Quellcode statt
 # das fertige Docker-Hub-Image zu ziehen — siehe docker-compose.build.yml.
 BUILD_COMPOSE := docker compose -f docker-compose.yml -f docker-compose.build.yml
+
+# --- Lokale Entwicklung, ohne Docker --------------------------------------
+# Laeuft gegen dieselben Daten wie der Container, aber mit dem Quellcode aus
+# diesem Verzeichnis. Die beiden KARO_*-Variablen sind der springende Punkt:
+# ohne sie sucht Karo die Datenbank unter /data und findet nichts.
+UVICORN   := ./karo-py310/bin/uvicorn
+DEV_PORT  ?= 8000
+DEV_HOME  ?= $(HOME)/karo-data
+DEV_DATA  ?= $(DEV_HOME)/data
+DEV_DRIVE ?= $(DEV_HOME)/drive
+DEV_LOG   ?= $(DEV_HOME)/karo-uvicorn.log
 
 hilfe:
 	@echo "make pull          fertiges Image von Docker Hub ziehen und starten (kein Build)"
@@ -20,6 +31,13 @@ hilfe:
 	@echo "make down          stoppen"
 	@echo "make logs          Protokoll mitlesen"
 	@echo "make test          Tests ausführen"
+	@echo ""
+	@echo "Lokal entwickeln (ohne Docker, Port $(DEV_PORT)):"
+	@echo "make dev           starten — ein Prozess, kein Neuladen bei Änderungen"
+	@echo "make dev-reload    starten mit --reload — zwei Prozesse, dafür bequem"
+	@echo "make dev-stop      stoppen"
+	@echo "make dev-log       Protokoll mitlesen"
+	@echo "make dev-status    läuft da was?"
 	@echo "make backup        Lerndaten sichern (OHNE Zugangsdaten)"
 	@echo "make backup-alles  alles sichern, inklusive API-Schlüssel"
 	@echo "make restore ARCHIV=sicherung/karo-....tar.gz"
@@ -147,3 +165,73 @@ restore:
 
 shell:
 	docker compose exec karo sh
+
+
+# --------------------------------------------------------------------------
+# Lokale Entwicklung
+# --------------------------------------------------------------------------
+#
+# `dev` startet bewusst OHNE --reload: ein Prozess auf einem Port, damit nie
+# unklar ist, welcher gerade antwortet. Dafuer braucht jede Aenderung an
+# Python, Templates oder CSS einen Neustart. Wer lieber bequem hat, nimmt
+# `dev-reload` — das laeuft als Aufseher plus Arbeiter, also zwei Prozesse
+# auf demselben Port.
+
+# Bewusst zwei ausgeschriebene Rezepte statt eines `define` mit `$(call)`:
+# dort kommt eine zusaetzliche Expansionsrunde dazwischen, und die Dollar-
+# Zeichen richtig zu stapeln ist niemandem zu erklaeren.
+
+dev: dev-stop
+	@KARO_DATA_DIR=$(DEV_DATA) KARO_DRIVE_DIR=$(DEV_DRIVE) \
+	  nohup $(UVICORN) app.main:app --host 127.0.0.1 --port $(DEV_PORT) \
+	  > $(DEV_LOG) 2>&1 & \
+	  for i in $$(seq 1 60); do \
+	    curl -sf --connect-timeout 1 -o /dev/null \
+	      http://127.0.0.1:$(DEV_PORT)/login && break; \
+	  done; \
+	  if [ -z "$$(lsof -ti:$(DEV_PORT))" ]; then \
+	    echo "Karo ist nicht hochgekommen. Letzte Zeilen aus $(DEV_LOG):"; \
+	    tail -15 $(DEV_LOG); exit 1; \
+	  fi; \
+	  echo "Karo läuft: http://127.0.0.1:$(DEV_PORT)   PID $$(lsof -ti:$(DEV_PORT) | tr '\n' ' ')"; \
+	  echo "Log:        $(DEV_LOG)"
+
+dev-reload: dev-stop
+	@KARO_DATA_DIR=$(DEV_DATA) KARO_DRIVE_DIR=$(DEV_DRIVE) \
+	  nohup $(UVICORN) app.main:app --host 127.0.0.1 --port $(DEV_PORT) --reload \
+	  > $(DEV_LOG) 2>&1 & \
+	  for i in $$(seq 1 60); do \
+	    curl -sf --connect-timeout 1 -o /dev/null \
+	      http://127.0.0.1:$(DEV_PORT)/login && break; \
+	  done; \
+	  if [ -z "$$(lsof -ti:$(DEV_PORT))" ]; then \
+	    echo "Karo ist nicht hochgekommen. Letzte Zeilen aus $(DEV_LOG):"; \
+	    tail -15 $(DEV_LOG); exit 1; \
+	  fi; \
+	  echo "Karo läuft mit --reload: http://127.0.0.1:$(DEV_PORT)"; \
+	  echo "PIDs:       $$(lsof -ti:$(DEV_PORT) | tr '\n' ' ')  (Aufseher + Arbeiter)"; \
+	  echo "Log:        $(DEV_LOG)"
+
+# Wartet, bis der Port wirklich frei ist. Ein --reload-Aufseher braucht dafuer
+# mehrere Sekunden, und wer zu frueh startet, bekommt „address in use" und
+# einen Server, der es gar nicht erst wird.
+dev-stop:
+	@lsof -ti:$(DEV_PORT) 2>/dev/null | xargs kill 2>/dev/null || true
+	@for i in $$(seq 1 50); do \
+	  lsof -ti:$(DEV_PORT) >/dev/null 2>&1 || break; \
+	  sleep 0.4; \
+	  lsof -ti:$(DEV_PORT) 2>/dev/null | xargs kill 2>/dev/null || true; \
+	done
+	@if lsof -ti:$(DEV_PORT) >/dev/null 2>&1; then \
+	  echo "Port $(DEV_PORT) ist immer noch belegt:"; \
+	  lsof -nP -iTCP:$(DEV_PORT) -sTCP:LISTEN; \
+	  exit 1; \
+	fi
+	@echo "Port $(DEV_PORT) ist frei."
+
+dev-log:
+	@tail -f $(DEV_LOG)
+
+dev-status:
+	@lsof -nP -iTCP:$(DEV_PORT) -sTCP:LISTEN 2>/dev/null \
+	  || echo "Auf Port $(DEV_PORT) läuft nichts."
