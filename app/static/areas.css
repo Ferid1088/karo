@@ -66,6 +66,9 @@
 [data-ui-area="child"] .area-label { color: var(--text); }
 [data-ui-area="child"] .simple-nav a { border-radius: 999px; font-weight: 700; }
 [data-ui-area="child"] .simple-nav a[aria-current] { background: var(--ink); color: #fff; }
+[data-ui-area="child"] .simple-nav a.plans-entry { gap: .45rem; padding-block: .35rem; padding-left: .45rem; color: #005c63; border: 1px solid #b9e5db; background: #e9fbf4; }
+[data-ui-area="child"] .simple-nav a.plans-entry:is(:hover,[aria-current]) { color: #fff; border-color: #007d70; background: linear-gradient(135deg,#00a783,#00656b); }
+[data-ui-area="child"] .simple-nav a.plans-entry img { width: 36px; height: 36px; padding: 2px; flex: 0 0 36px; object-fit: contain; border-radius: 50%; background: #fff; }
 [data-ui-area="child"] :is(.card,.choice-card) { border-radius: 24px; border-width: 2px; box-shadow: 0 4px 0 var(--border); }
 [data-ui-area="child"] .next-step { border-color: var(--border-firm); background: var(--surface); box-shadow: 0 5px 0 var(--border-firm); }
 [data-ui-area="child"] .step-number { border-radius: 18px; background: var(--ink); color: #fff; font-family: "Baloo 2", "Trebuchet MS", sans-serif; font-size: 1.8rem; }

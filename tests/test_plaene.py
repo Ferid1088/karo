@@ -112,6 +112,10 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
     child_cookie = session_cookie_faelschen(app_env, auth=True, role="child", csrf="test-token")
     client.cookies.clear()
     client.cookies.set("karo_session", child_cookie)
+    dashboard = client.get("/")
+    assert "Ziele planen" in dashboard.text
+    assert 'class="plans-entry"' in dashboard.text
+    assert '/static/karo-fox-wave.png' in dashboard.text
     for path, text in [
         ("/woche", "Deine Aufgaben heute"), ("/woche/woche", "Wochenfortschritt"),
         ("/woche/monat", "Monatsfortschritt"), ("/woche/ziele", "Alle Ziele"),

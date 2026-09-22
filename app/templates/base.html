@@ -63,7 +63,7 @@
     {% else %}
     <a href="/" {{ 'aria-current=page' if path == '/' }}>Heute</a>
     <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/klassenarbeit')) }}>Lernen</a>
-    <a href="/woche" {{ 'aria-current=page' if path.startswith('/woche') }}>Ziele Plannen</a>
+    <a class="plans-entry" href="/woche" {{ 'aria-current=page' if path.startswith('/woche') }}><img src="/static/karo-fox-wave.png" alt="" aria-hidden="true"><span>Ziele planen</span></a>
     <a href="/welten" {{ 'aria-current=page' if path.startswith('/welten') }}>Meine Welt</a>
     <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>
     {% endif %}
