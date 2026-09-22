@@ -383,7 +383,7 @@ def _wizard_values(request: Request) -> dict:
 
 def _wizard_summary(values: dict) -> dict | None:
     try:
-        start = plaene.today()
+        start = date.fromisoformat(values["start_date"])
         end = date.fromisoformat(values["end_date"]) if values["duration"] == "custom" else start + timedelta(days=int(values["duration"]) - 1)
         dates = plaene.schedule_dates(start, end, values["weekdays"])
         return {"start": start, "end": end, "count": len(dates),
@@ -414,13 +414,23 @@ async def wizard_save(request: Request):
                 raise ValueError("Bitte beschreibe dein Ziel in einem kurzen Satz.")
             values["statement"] = statement
         elif step == 2:
+            try:
+                start = date.fromisoformat(str(data.get("start_date", "")))
+            except ValueError:
+                raise ValueError("Bitte wähle ein gültiges Startdatum.") from None
+            if start < plaene.today():
+                raise ValueError("Das Startdatum darf nicht vor heute liegen.")
             duration = str(data.get("duration", ""))
             if duration not in ("7", "14", "28", "90", "custom"):
                 raise ValueError("Bitte wähle einen Zeitraum.")
+            values["start_date"] = str(start)
             values["duration"] = duration
             if duration == "custom":
-                end = date.fromisoformat(str(data.get("end_date", "")))
-                if end < plaene.today():
+                try:
+                    end = date.fromisoformat(str(data.get("end_date", "")))
+                except ValueError:
+                    raise ValueError("Bitte wähle ein gültiges Enddatum.") from None
+                if end < start:
                     raise ValueError("Das Enddatum liegt vor dem Start.")
                 values["end_date"] = str(end)
         elif step == 3:
@@ -431,10 +441,12 @@ async def wizard_save(request: Request):
                 raise ValueError("Bitte wähle 1 bis 60 Minuten.")
             values["minutes"] = minutes
         elif step == 5:
-            required = ("statement", "duration", "weekdays", "minutes")
+            required = ("statement", "start_date", "duration", "weekdays", "minutes")
             if any(key not in values for key in required):
                 raise ValueError("Der Plan ist noch nicht vollständig.")
-            start = plaene.today()
+            start = date.fromisoformat(values["start_date"])
+            if start < plaene.today():
+                raise ValueError("Das Startdatum darf nicht vor heute liegen.")
             end = date.fromisoformat(values["end_date"]) if values["duration"] == "custom" else start + timedelta(days=int(values["duration"]) - 1)
             goal_id = plan_store.create_goal(values["statement"], start, end, int(values["minutes"]), values["weekdays"])
             request.session.pop("plan_wizard", None)
@@ -492,7 +504,8 @@ async def goal_action(request: Request, goal_id: int):
     data = await form(request)
     action = str(data.get("action", ""))
     try:
-        mapping = {"pause": "paused", "resume": "active", "complete": "completed", "archive": "archived"}
+        mapping = {"pause": "paused", "resume": "active", "restore": "active",
+                   "complete": "completed", "archive": "archived"}
         if action in mapping:
             plan_store.set_status(goal_id, mapping[action])
         elif action == "delete" and data.get("confirm") == "yes":

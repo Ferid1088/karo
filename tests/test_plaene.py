@@ -133,6 +133,7 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
 
     page = client.get(f"/woche?abschluss={item['id']}")
     assert "Wie lange hast du heute wirklich" in page.text
+    assert page.text.count("data-focus-mark=") == 11
     response = client.post(f"/woche/sitzung/{item['id']}/abschluss", data={
         "_csrf": csrf_from(page.text), "actual_minutes": "27", "focus_percent": "80"}, follow_redirects=False)
     assert response.status_code == 303
@@ -151,7 +152,7 @@ def test_goal_wizard_creates_time_only_plan(client, app_env, fake_llm, fake_cli,
     client.cookies.clear(); client.cookies.set("karo_session", cookie)
     steps = [
         {"step": "1", "statement": "Ich möchte besser in Englisch werden."},
-        {"step": "2", "duration": "28"},
+        {"step": "2", "start_date": "2026-09-24", "duration": "28"},
         {"step": "3", "weekdays": ["1", "3", "5"]},
         {"step": "4", "minutes": "20"},
         {"step": "5"},
@@ -162,7 +163,25 @@ def test_goal_wizard_creates_time_only_plan(client, app_env, fake_llm, fake_cli,
         assert response.status_code == 303, response.text[:1000]
     created = store.goals()
     assert len(created) == 1 and created[0]["planned_minutes"] == 20
+    assert created[0]["start_date"] == "2026-09-24"
     assert len(store.sessions(created[0]["id"])) == 12
+
+
+def test_goal_wizard_rejects_start_date_before_today(client, app_env, fake_llm, fake_cli, monkeypatch):
+    from app.woche import plaene as current_rules
+    from .conftest import csrf_from
+    from .test_app import einrichten, session_cookie_faelschen
+
+    einrichten(client, fake_llm)
+    monkeypatch.setattr(current_rules, "today", lambda now=None: date(2026, 9, 22))
+    cookie = session_cookie_faelschen(app_env, auth=True, role="child", csrf="test-token")
+    client.cookies.clear(); client.cookies.set("karo_session", cookie)
+    page = client.get("/woche/ziele/neu?step=2")
+    response = client.post("/woche/ziele/neu", data={
+        "_csrf": csrf_from(page.text), "step": "2", "start_date": "2026-09-21", "duration": "28",
+    })
+    assert response.status_code == 400
+    assert "darf nicht vor heute liegen" in response.text
 
 
 def test_goal_detail_actions_work_end_to_end(client, app_env, fake_llm, fake_cli, monkeypatch):
@@ -197,6 +216,15 @@ def test_goal_detail_actions_work_end_to_end(client, app_env, fake_llm, fake_cli
     post(f"/woche/ziele/{goal_id}/aktion", {"action": "complete"})
     post(f"/woche/ziele/{goal_id}/aktion", {"action": "archive"})
     assert store.goal(goal_id)["status"] == "archived"
+    archived_page = client.get(f"/woche/ziele/{goal_id}")
+    assert "Bist du sicher?" in archived_page.text
+    assert "Zurück zu meinen Plänen" in archived_page.text
+    post(f"/woche/ziele/{goal_id}/aktion", {"action": "restore"})
+    restored = store.goal(goal_id)
+    assert restored["status"] == "active"
+    assert restored["archived_at"] is None and restored["completed_at"] is None
+    post(f"/woche/ziele/{goal_id}/aktion", {"action": "complete"})
+    post(f"/woche/ziele/{goal_id}/aktion", {"action": "archive"})
     response = post(f"/woche/ziele/{goal_id}/aktion", {"action": "repeat"})
     assert response.status_code == 303
     assert len(store.goals(("active",))) == 1

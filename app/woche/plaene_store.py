@@ -117,8 +117,11 @@ def set_status(goal_id: int, status: str) -> None:
         raise ValueError("Unbekannter Zielstatus.")
     old = goal(goal_id)
     now = db.now()
-    completed = now if status == "completed" and not old["completed_at"] else old["completed_at"]
+    completed = (now if status == "completed" and not old["completed_at"] else old["completed_at"])
     archived = now if status == "archived" else old["archived_at"]
+    if status == "active":
+        completed = None
+        archived = None
     current = plaene.today()
     with db.tx() as connection:
         connection.execute("UPDATE plan_goal SET status=?,completed_at=?,archived_at=?,updated_at=? WHERE id=?",
@@ -126,7 +129,7 @@ def set_status(goal_id: int, status: str) -> None:
         if status in ("paused", "completed"):
             connection.execute("UPDATE plan_session SET status='cancelled' WHERE goal_id=? AND scheduled_date>=? AND status='planned'",
                                (goal_id, str(current)))
-        elif status == "active" and old["status"] == "paused":
+        elif status == "active" and old["status"] in ("paused", "completed", "archived"):
             connection.execute("DELETE FROM plan_session WHERE goal_id=? AND scheduled_date>=? AND status='cancelled'",
                                (goal_id, str(current)))
             existing = {row[0] for row in connection.execute("SELECT scheduled_date FROM plan_session WHERE goal_id=?", (goal_id,))}

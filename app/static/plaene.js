@@ -12,9 +12,20 @@
     if (focus) {
       var focusOut = document.querySelector('[data-focus-output]');
       if (focusOut) focusOut.textContent = focus.value;
+      document.querySelectorAll('[data-focus-mark]').forEach(function (mark) {
+        mark.classList.toggle('active', Number(mark.dataset.focusMark) === Number(focus.value));
+        mark.setAttribute('aria-pressed', Number(mark.dataset.focusMark) === Number(focus.value) ? 'true' : 'false');
+      });
     }
   }
   [actual, focus].forEach(function (input) { if (input) input.addEventListener('input', update); });
+  document.querySelectorAll('[data-focus-mark]').forEach(function (mark) {
+    mark.addEventListener('click', function () {
+      if (!focus) return;
+      focus.value = mark.dataset.focusMark;
+      focus.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
   update();
 
   document.querySelectorAll('[data-plan-tabs]').forEach(function (tabs) {
@@ -31,10 +42,17 @@
   var durationForm = document.querySelector('[data-duration-form]');
   if (durationForm) {
     var custom = durationForm.querySelector('[data-custom-date]');
+    var startDate = durationForm.querySelector('[data-start-date]');
     function durationChanged() {
       var selected = durationForm.querySelector('[name="duration"]:checked');
       custom.hidden = !selected || selected.value !== 'custom';
       custom.querySelector('input').required = !custom.hidden;
+      if (startDate && startDate.value) {
+        custom.querySelector('input').min = startDate.value;
+        if (custom.querySelector('input').value && custom.querySelector('input').value < startDate.value) {
+          custom.querySelector('input').value = '';
+        }
+      }
     }
     durationForm.addEventListener('change', durationChanged); durationChanged();
   }
@@ -43,4 +61,33 @@
     var radios = document.querySelectorAll('input[name="minutes"]');
     var customRadio = radios[radios.length - 1]; customRadio.value = customMinutes.value; customRadio.checked = true;
   });
+
+  var deleteForm = document.querySelector('[data-delete-goal-form]');
+  var deleteDialog = document.querySelector('[data-delete-goal-dialog]');
+  if (deleteForm && deleteDialog) {
+    var deleteTrigger = deleteForm.querySelector('button[name="action"]');
+    var deleteCancel = deleteDialog.querySelector('[data-delete-cancel]');
+    var deleteConfirm = deleteDialog.querySelector('[data-delete-confirm]');
+    deleteForm.addEventListener('submit', function (event) {
+      if (deleteForm.dataset.confirmed === 'yes') return;
+      event.preventDefault();
+      deleteDialog.hidden = false;
+      deleteCancel.focus();
+    });
+    deleteCancel.addEventListener('click', function () {
+      deleteDialog.hidden = true;
+      deleteTrigger.focus();
+    });
+    deleteConfirm.addEventListener('click', function () {
+      deleteForm.dataset.confirmed = 'yes';
+      deleteDialog.hidden = true;
+      deleteForm.requestSubmit(deleteTrigger);
+    });
+    deleteDialog.addEventListener('click', function (event) {
+      if (event.target === deleteDialog) deleteCancel.click();
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !deleteDialog.hidden) deleteCancel.click();
+    });
+  }
 })();

@@ -73,13 +73,21 @@
       <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link" name="action" value="{{ 'resume' if goal.status == 'paused' else 'pause' }}">{{ '▶ Fortsetzen' if goal.status == 'paused' else 'Ⅱ Pausieren' }} <span>→</span></button></form>
       {% if goal.status != 'completed' %}<form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link" name="action" value="complete">✓ Als erledigt markieren <span>→</span></button></form>{% endif %}
       {% if goal.status == 'completed' or goal.progress >= 100 %}<form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link treasure" name="action" value="archive">▣ In die Schatzkiste <span>→</span></button></form>{% endif %}
-      <form method="post" action="/woche/ziele/{{ goal.id }}/aktion" onsubmit="return confirm('Ziel und Verlauf wirklich löschen?')">{{ csrf_input() }}<input type="hidden" name="confirm" value="yes"><button class="action-link danger" name="action" value="delete">Ziel löschen <span>→</span></button></form>
+      <form method="post" action="/woche/ziele/{{ goal.id }}/aktion" data-delete-goal-form>{{ csrf_input() }}<input type="hidden" name="confirm" value="yes"><button class="action-link danger" name="action" value="delete">Ziel löschen <span>→</span></button></form>
       {% else %}
       <p>Dieses Ziel ist als Erfolg sicher in deiner Schatzkiste.</p>
+      <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="outline-btn wide" name="action" value="restore">← Zurück zu meinen Plänen</button></form>
       <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="plan-btn wide" name="action" value="repeat">Noch einmal als neues Ziel →</button></form>
       {% endif %}
     </section>
     <section class="detail-encouragement {{ motivation.tone }}"><img src="/static/karo-fox-star.png" alt="Karo mit einem Stern"><div><h3>{{ motivation.title }}</h3><p>{{ motivation.text }}</p></div></section>
   </aside>
+</div>
+<div class="modal-backdrop fox-confirm-backdrop" hidden data-delete-goal-dialog>
+  <section class="fox-confirm" role="dialog" aria-modal="true" aria-labelledby="delete-goal-title" aria-describedby="delete-goal-text">
+    <img src="/static/karo-fox-wave.png" alt="Karo fragt nach">
+    <div><h2 id="delete-goal-title">Bist du sicher?</h2><p id="delete-goal-text">Wenn du dieses Ziel löschst, werden auch sein Verlauf und alle Lernzeiten gelöscht.</p></div>
+    <div class="fox-confirm-actions"><button class="outline-btn" type="button" data-delete-cancel>Nein, Ziel behalten</button><button class="danger-btn" type="button" data-delete-confirm>Ja, Ziel löschen</button></div>
+  </section>
 </div>
 {% endblock %}

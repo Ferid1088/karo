@@ -39,6 +39,11 @@
     <label for="focus"><b>Wie konzentriert warst du?</b><small>Schiebe den Regler auf dein Gefühl.</small></label>
     <output class="range-value blue" for="focus"><span data-focus-output>{{ selected_session.focus_percent if selected_session.focus_percent is not none else 80 }}</span> %</output>
     <input id="focus" name="focus_percent" type="range" min="0" max="100" step="10" value="{{ selected_session.focus_percent if selected_session.focus_percent is not none else 80 }}" data-range="focus">
+    <div class="focus-scale" aria-label="Konzentrationsstufen">
+      {% for value,emoji,label in [(0,'😴','gar nicht konzentriert'),(10,'😣','sehr schwer'),(20,'😟','kaum konzentriert'),(30,'🙁','wenig konzentriert'),(40,'😐','eher wenig'),(50,'🙂','okay'),(60,'😊','ganz gut'),(70,'😄','gut'),(80,'😁','sehr gut'),(90,'🤩','sehr konzentriert'),(100,'🎯','voll konzentriert')] %}
+      <button type="button" data-focus-mark="{{ value }}" aria-label="{{ value }} Prozent – {{ label }}"><span aria-hidden="true">{{ emoji }}</span><small>{{ value }}</small></button>
+      {% endfor %}
+    </div>
     <div class="range-labels"><span>wenig</span><span>okay</span><span>sehr konzentriert</span></div>
     <div class="modal-actions"><a class="outline-btn" href="/woche">Abbrechen</a><button class="plan-btn" type="submit">✓ Speichern</button></div>
   </form>
