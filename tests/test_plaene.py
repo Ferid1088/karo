@@ -68,6 +68,25 @@ def test_store_creates_completes_makes_up_and_keeps_history(app_env, monkeypatch
     assert all(row["planned_minutes"] == 30 for row in after if row["scheduled_date"] >= "2026-09-14")
 
 
+def test_start_session_is_available_for_any_goal_state(app_env, monkeypatch):
+    from app.woche import plaene as current_rules, plaene_store as store
+
+    current = date(2026, 9, 22)
+    monkeypatch.setattr(current_rules, "today", lambda now=None: current)
+    goal_id = store.create_goal("Mathematik üben.", date(2026, 9, 23), date(2026, 9, 30), 20, [3])
+    first = store.start_session(goal_id, current)
+    assert store.session(first)["scheduled_date"] == str(current)
+    assert store.start_session(goal_id, current) == first
+
+    store.complete(first, 20, 80)
+    store.set_status(goal_id, "completed")
+    store.set_status(goal_id, "archived")
+    reopened = store.start_session(goal_id, current)
+    assert reopened == first
+    assert store.goal(goal_id)["status"] == "active"
+    assert store.session(reopened)["actual_minutes"] == 20
+
+
 def test_archive_keeps_history_and_removes_from_active(app_env):
     from app.woche import plaene_store as store
     goal_id = store.create_goal("Jeden Tag ein bisschen lesen.", date(2026, 9, 1), date(2026, 9, 7), 10, [1])
@@ -130,8 +149,17 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
     assert 'href="/" title="Zurück zu Karo"' in goals_page.text
     assert "Heute kannst du anfangen!" in goals_page.text
     assert f'href="/woche/ziele/{goal_id}"' in goals_page.text
+    for path in ("/woche", "/woche/woche", "/woche/monat", "/woche/ziele", f"/woche/ziele/{goal_id}"):
+        assert f'action="/woche/ziele/{goal_id}/start"' in client.get(path).text
 
-    page = client.get(f"/woche?abschluss={item['id']}")
+    start_source = client.get("/woche/ziele")
+    started = client.post(f"/woche/ziele/{goal_id}/start", data={
+        "_csrf": csrf_from(start_source.text),
+    }, follow_redirects=False)
+    assert started.status_code == 303
+    assert started.headers["location"] == f"/woche?abschluss={item['id']}"
+
+    page = client.get(started.headers["location"])
     assert "Wie lange hast du heute wirklich" in page.text
     assert page.text.count("data-focus-mark=") == 11
     response = client.post(f"/woche/sitzung/{item['id']}/abschluss", data={

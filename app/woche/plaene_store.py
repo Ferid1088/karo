@@ -112,6 +112,29 @@ def complete(session_id: int, actual: int, focus: int, completed_at: datetime | 
         connection.execute("UPDATE plan_session SET status=? WHERE id=?", (status, session_id))
 
 
+def start_session(goal_id: int, on: date) -> int:
+    """Return the goal's session for ``on``, creating/reactivating it as needed."""
+    item = goal(goal_id)
+    if item["status"] != "active":
+        set_status(goal_id, "active")
+        item = goal(goal_id)
+    stamp = db.now()
+    with db.tx() as connection:
+        row = connection.execute(
+            "SELECT id,status FROM plan_session WHERE goal_id=? AND scheduled_date=?",
+            (goal_id, str(on)),
+        ).fetchone()
+        if row:
+            if row["status"] == "cancelled":
+                connection.execute("UPDATE plan_session SET status='planned' WHERE id=?", (row["id"],))
+            return int(row["id"])
+        cursor = connection.execute(
+            "INSERT INTO plan_session(goal_id,scheduled_date,planned_minutes,created_at) VALUES(?,?,?,?)",
+            (goal_id, str(on), item["planned_minutes"], stamp),
+        )
+        return int(cursor.lastrowid)
+
+
 def set_status(goal_id: int, status: str) -> None:
     if status not in ("active", "paused", "completed", "archived"):
         raise ValueError("Unbekannter Zielstatus.")

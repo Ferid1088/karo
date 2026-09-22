@@ -15,8 +15,7 @@
       <span class="subject-icon">{{ item.statement[:1]|upper }}</span><h3>{{ item.statement }}</h3>
       <span class="session-time"><b>{{ item.planned_minutes }} Minuten</b><small>geplant</small></span>
       <span class="session-status">{% if item.status in ['completed','made_up'] %}✓ Erledigt{% else %}◷ Noch offen{% endif %}</span>
-      {% if item.status in ['completed','made_up'] %}<span><b>{{ item.actual_minutes }} Minuten</b><small>gemacht</small></span>
-      {% else %}<a class="plan-btn" href="/woche?abschluss={{ item.id }}">Starten <span aria-hidden="true">→</span></a>{% endif %}
+      <div class="session-action">{% if item.status in ['completed','made_up'] %}<span><b>{{ item.actual_minutes }} Minuten</b><small>gemacht</small></span>{% endif %}<form method="post" action="/woche/ziele/{{ item.goal_id }}/start">{{ csrf_input() }}<button class="plan-btn compact-start" type="submit">Starten <span aria-hidden="true">→</span></button></form></div>
     </article>
   {% endfor %}</div>
   {% elif goals %}<div class="empty-inline"><h3>Heute steht keine Einheit an.</h3><p>Genieß die Pause – dein nächster Lerntag kommt bald.</p></div>

@@ -479,6 +479,17 @@ async def finish_session(request: Request, session_id: int):
         return zurueck(f"/woche?abschluss={session_id}")
 
 
+@router.post('/ziele/{goal_id}/start')
+async def start_goal(request: Request, goal_id: int):
+    await form(request)
+    try:
+        session_id = plan_store.start_session(goal_id, plaene.today())
+        return zurueck(f"/woche?abschluss={session_id}")
+    except (ValueError, LookupError) as exc:
+        flash(request, str(exc), "err")
+        return zurueck(f"/woche/ziele/{goal_id}")
+
+
 @router.get('/ziele/{goal_id}')
 def goal_detail(request: Request, goal_id: int):
     current = plaene.today()

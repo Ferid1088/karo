@@ -68,6 +68,7 @@
   <aside class="detail-side">
     <section class="detail-actions plans-panel">
       <h2>Schnellaktionen</h2>
+      <form method="post" action="/woche/ziele/{{ goal.id }}/start">{{ csrf_input() }}<button class="plan-btn wide" type="submit">Starten →</button></form>
       {% if goal.status != 'archived' %}
       <details><summary>Ziel bearbeiten <span>→</span></summary><form method="post" action="/woche/ziele/{{ goal.id }}/bearbeiten">{{ csrf_input() }}<label>Zielsatz<textarea name="statement" maxlength="180" required>{{ goal.statement }}</textarea></label><label>Enddatum<input type="date" name="end_date" value="{{ goal.end_date }}" required></label><label>Minuten pro Einheit<input type="number" name="minutes" min="1" max="60" value="{{ goal.planned_minutes }}" required></label><fieldset><legend>Lerntage</legend><div class="weekday-picker compact">{% for number,label in weekday_labels.items() %}<label><input type="checkbox" name="weekdays" value="{{ number }}" {{ 'checked' if number|string in goal.weekdays.split(',') }}><span>{{ label }}</span></label>{% endfor %}</div></fieldset><button class="plan-btn">Speichern</button></form></details>
       <form method="post" action="/woche/ziele/{{ goal.id }}/aktion">{{ csrf_input() }}<button class="action-link" name="action" value="{{ 'resume' if goal.status == 'paused' else 'pause' }}">{{ '▶ Fortsetzen' if goal.status == 'paused' else 'Ⅱ Pausieren' }} <span>→</span></button></form>
