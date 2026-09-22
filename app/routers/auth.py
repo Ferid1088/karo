@@ -4,16 +4,25 @@ import dataclasses
 import os
 import sqlite3
 
-from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from .. import config, connections, export, ingest, jobs, quizzes, security, materials, teaching
+from .. import config, connections, export, ingest, jobs, quizzes, security, materials, profile, teaching
 from ..config import ConfigUnreadable
 from ..domain import Ausgabe
 from ..llm import BACKENDS, ClaudeClient, ClaudeError, models_for
 from .shared import render, flash, zurueck
 
 router = APIRouter()
+
+
+@router.get("/profilbild")
+def profilbild():
+    path = profile.photo_path()
+    if not path.is_file():
+        return HTMLResponse("Profilbild nicht gefunden.", status_code=404)
+    return FileResponse(path, media_type="image/jpeg",
+                        headers={"Cache-Control": "private, max-age=86400"})
 
 
 @router.get("/setup/speicher/ordner")
@@ -214,7 +223,7 @@ def setup_credentials(request: Request, backend: str = Form("abo"),
 
 
 @router.post("/setup/finish")
-def setup_finish(request: Request, model_vision: str = Form(""),
+async def setup_finish(request: Request, model_vision: str = Form(""),
                  model_text: str = Form(""), header_crop: str = Form("8"),
                  default_ausgabe: str = Form("html"),
                  tts_stimme: str = Form(""),
@@ -225,6 +234,9 @@ def setup_finish(request: Request, model_vision: str = Form(""),
                  recherche: str = Form(""),
                  drive_unterordner: str = Form(""),
                  material_db_path: str | None = Form(None),
+                 learner_name: str | None = Form(None),
+                 learner_photo: UploadFile | str | None = File(None),
+                 learner_photo_remove: str = Form(""),
                  password: str = Form(""), password2: str = Form(""),
                  child_password: str = Form(""), child_password2: str = Form("")):
     cfg = config.load()
@@ -249,8 +261,10 @@ def setup_finish(request: Request, model_vision: str = Form(""),
     unterordner = "/".join(
         teil for teil in drive_unterordner.strip().strip("/\\").split("/")
         if teil not in ("", ".", ".."))
+    profilname = cfg.learner_name if learner_name is None else learner_name.strip()
     entwurf = dataclasses.replace(
         cfg,
+        learner_name=profilname,
         model_vision=model_vision if model_vision in gueltige else cfg.model_vision,
         model_text=model_text if model_text in gueltige else cfg.model_text,
         header_crop_percent=crop,
@@ -276,6 +290,11 @@ def setup_finish(request: Request, model_vision: str = Form(""),
     if not cfg.has_credentials:
         return zurueck("/setup")
 
+    if learner_name is not None and not profilname:
+        return zurueck_setup("Bitte geben Sie den Vornamen Ihres Kindes ein.")
+    if len(profilname) > 60:
+        return zurueck_setup("Der Vorname darf höchstens 60 Zeichen lang sein.")
+
     if erstmalig and not password:
         return zurueck_setup("Bitte vergeben Sie ein Passwort für diese Instanz.")
     if password:
@@ -291,7 +310,18 @@ def setup_finish(request: Request, model_vision: str = Form(""),
             return zurueck_setup(f"Das Kind-Passwort muss mindestens "
                            f"{security.MIN_PASSWORD_LENGTH} Zeichen haben.")
 
+    neues_profilbild = None
+    if learner_photo is not None and getattr(learner_photo, "filename", ""):
+        try:
+            data = await learner_photo.read(security.MAX_UPLOAD_BYTES + 1)
+            neues_profilbild = profile.prepare_photo(data)
+        except ValueError as exc:
+            return zurueck_setup(str(exc))
+        finally:
+            await learner_photo.close()
+
     aenderungen = {
+        "learner_name": entwurf.learner_name,
         "model_vision": entwurf.model_vision,
         "model_text": entwurf.model_text,
         "header_crop_percent": entwurf.header_crop_percent,
@@ -319,6 +349,14 @@ def setup_finish(request: Request, model_vision: str = Form(""),
         materials.einstellungen_speichern(aenderungen)
     except (ValueError, OSError, sqlite3.Error, teaching.TeachingError) as exc:
         return zurueck_setup(f"Materialdatenbank: {exc}")
+    try:
+        if neues_profilbild is not None:
+            profile.save_photo(neues_profilbild)
+        elif learner_photo_remove == "ja":
+            profile.remove_photo()
+    except OSError:
+        flash(request, "Die Einstellungen wurden gespeichert, aber das Profilbild konnte nicht geändert werden.", "warn")
+        return zurueck("/setup")
     if not erstmalig:
         quizzes.alle_flaggen_neu()
     ingest.ensure_folders()

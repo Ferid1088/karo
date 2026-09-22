@@ -8,6 +8,10 @@ from zoneinfo import ZoneInfo
 from .. import config
 
 WEEKDAY_LABELS = {1: "Mo", 2: "Di", 3: "Mi", 4: "Do", 5: "Fr", 6: "Sa", 7: "So"}
+MONTH_LABELS = (
+    "", "Januar", "Februar", "März", "April", "Mai", "Juni",
+    "Juli", "August", "September", "Oktober", "November", "Dezember",
+)
 
 
 def today(now: datetime | None = None) -> date:
@@ -117,6 +121,78 @@ def week_bounds(day: date) -> tuple[date, date]:
 
 def month_bounds(day: date) -> tuple[date, date]:
     return day.replace(day=1), day.replace(day=calendar.monthrange(day.year, day.month)[1])
+
+
+def shift_month(day: date, offset: int) -> date:
+    """Erster Tag des Monats ``offset`` Monate vor oder nach ``day``."""
+    total = day.year * 12 + day.month - 1 + offset
+    year, month_index = divmod(total, 12)
+    if not 1 <= year <= 9999:
+        raise ValueError("Dieser Monat ist nicht verfügbar.")
+    return date(year, month_index + 1, 1)
+
+
+def selected_goal_month(start: date, end: date, current: date,
+                        requested: str = "") -> date:
+    """Waehlt einen sinnvollen Monat fuer einen Zielkalender."""
+    if requested:
+        try:
+            selected = date.fromisoformat(requested + "-01")
+        except ValueError:
+            raise ValueError("Bitte einen gültigen Monat wählen.") from None
+        if selected.strftime("%Y-%m") != requested:
+            raise ValueError("Bitte einen gültigen Monat wählen.")
+        return selected
+    current = current.replace(day=1)
+    start = start.replace(day=1)
+    end = end.replace(day=1)
+    return start if current < start else end if current > end else current
+
+
+def _calendar_state(row: dict | None) -> tuple[str | None, str]:
+    if row is None:
+        return None, "Keine Lerneinheit geplant"
+    if row["status"] == "cancelled":
+        return "open", "Keine Planung"
+    actual = row.get("actual_minutes")
+    if actual is not None:
+        achieved = percent(int(actual), int(row["planned_minutes"]))
+        if achieved >= 100:
+            return "reached", f"Ziel erreicht ({round(achieved)} %)"
+        if achieved >= 50:
+            return "partial", f"Teilweise erreicht ({round(achieved)} %)"
+        return "not-reached", f"Nicht erreicht ({round(achieved)} %)"
+    if row["status"] == "missed":
+        return "not-reached", "Nicht erreicht"
+    return "open", "Noch offen"
+
+
+def goal_calendar(rows: list[dict], selected: date) -> dict:
+    """Vollstaendiges Monatsraster fuer genau ein Ziel."""
+    selected = selected.replace(day=1)
+    by_date = {str(row["scheduled_date"]): row for row in rows}
+    cells = []
+    weeks = calendar.Calendar(firstweekday=0).monthdatescalendar(
+        selected.year, selected.month)
+    for day in (value for week in weeks for value in week):
+        in_month = day.month == selected.month
+        row = by_date.get(str(day)) if in_month else None
+        state, state_label = _calendar_state(row)
+        cells.append({
+            "date": str(day),
+            "day": day.day,
+            "in_month": in_month,
+            "state": state,
+            "state_label": state_label,
+            "label": f"{day.day}. {MONTH_LABELS[day.month]} {day.year}: {state_label}",
+        })
+    return {
+        "month": selected.strftime("%Y-%m"),
+        "label": f"{MONTH_LABELS[selected.month]} {selected.year}",
+        "previous": shift_month(selected, -1).strftime("%Y-%m"),
+        "following": shift_month(selected, 1).strftime("%Y-%m"),
+        "cells": cells,
+    }
 
 
 def parse_weekdays(values) -> tuple[int, ...]:

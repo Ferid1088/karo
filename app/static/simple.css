@@ -167,6 +167,17 @@ main.settings-page { max-width: 880px; }
 .settings-page input:not([type=checkbox]):not([type=radio]), .settings-page select { width: 100%; }
 .settings-page input[type=number] { max-width: 9rem; }
 .settings-page .hint { font-size: .88rem; }
+.settings-profile-layout { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 1rem; align-items: start; }
+.settings-profile-photo { width: 48px; height: 48px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--border-firm); border-radius: 50%; background: var(--surface-2); color: var(--muted); }
+.settings-profile-photo img { width: 100%; height: 100%; object-fit: cover; }
+.settings-profile-photo svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.settings-profile-fields { display: grid; gap: 1rem; min-width: 0; }
+.settings-profile-fields input[type=file] { padding: .45rem; }
+.settings-remove-photo { display: flex; align-items: center; gap: .65rem; width: fit-content; font-size: .9rem; cursor: pointer; }
+.welcome-profile { display: flex; align-items: center; gap: 1.15rem; }
+.welcome-profile .sub { margin-bottom: 0; }
+.learner-photo { border-radius: 50%; object-fit: cover; flex: 0 0 auto; }
+.learner-photo-large { width: 88px; height: 88px; border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--border-firm); }
 .storage-field + .storage-field { margin-top: 1.1rem; }
 .storage-control { display: flex; align-items: center; gap: .65rem; }
 .storage-control input { flex: 1; min-width: 0; }
@@ -197,4 +208,6 @@ main.settings-page { max-width: 880px; }
   .settings-choice input { grid-row: 1 / 3; align-self: start; margin-top: .25rem; }
   .settings-destination { grid-column: 2; justify-self: start; margin-top: .25rem; }
   .settings-savebar { bottom: .5rem; gap: .5rem; }
+  .settings-profile-layout { grid-template-columns: 48px minmax(0, 1fr); gap: .8rem; }
+  .settings-profile-photo { width: 48px; height: 48px; }
 }

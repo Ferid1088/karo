@@ -316,7 +316,8 @@ def week_page(request: Request):
     goal_rows = []
     for item in plan_store.goals(("active", "paused")):
         rows = plan_store.sessions(item["id"], start, end)
-        goal_rows.append({**item, **plaene.aggregate(rows), "rows": rows})
+        goal_rows.append({**item, **plaene.goal_statistics(rows, current),
+                          "rows": rows})
     all_rows = [row for item in goal_rows for row in item["rows"]]
     counts = {status: sum(row["status"] == status for row in all_rows)
               for status in ("completed", "planned", "missed", "made_up")}
@@ -331,7 +332,7 @@ def week_page(request: Request):
         else:
             state = "open"
         days.append({"date": day, "state": state})
-    summary = plaene.aggregate(all_rows)
+    summary = plaene.goal_statistics(all_rows, current)
     return _plans_render(request, "woche/plaene_woche.html", start=start, end=end,
                          days=days, goal_rows=goal_rows, summary=summary, counts=counts,
                          motivation=plaene.motivation(summary))
@@ -351,18 +352,19 @@ def month_page(request: Request, month: str = ""):
     for item in plan_store.goals(("active", "paused", "completed")):
         rows = plan_store.sessions(item["id"], start, end)
         if rows:
-            goal_rows.append({**item, **plaene.aggregate(rows)})
+            goal_rows.append({**item, **plaene.goal_statistics(rows, current)})
             month_rows.extend(rows)
     weeks, cursor = [], start
     while cursor <= end:
         week_end = min(end, cursor + timedelta(days=6-cursor.weekday()))
         rows = [row for row in plan_store.sessions(start=cursor, end=week_end)
                 if row["goal_status"] in ("active", "paused", "completed")]
-        weeks.append({"start": cursor, "end": week_end, **plaene.aggregate(rows)})
+        weeks.append({"start": cursor, "end": week_end,
+                      **plaene.goal_statistics(rows, current)})
         cursor = week_end + timedelta(days=1)
     previous = (start - timedelta(days=1)).strftime("%Y-%m")
     following = (end + timedelta(days=1)).strftime("%Y-%m")
-    summary = plaene.aggregate(month_rows)
+    summary = plaene.goal_statistics(month_rows, current)
     return _plans_render(request, "woche/plaene_monat.html", chosen=chosen, start=start, end=end,
                          goal_rows=goal_rows, weeks=weeks, summary=summary,
                          motivation=plaene.motivation(summary),
@@ -491,12 +493,20 @@ async def start_goal(request: Request, goal_id: int):
 
 
 @router.get('/ziele/{goal_id}')
-def goal_detail(request: Request, goal_id: int):
+def goal_detail(request: Request, goal_id: int, month: str = ""):
     current = plaene.today()
     plan_store.mark_missed(current)
     item = _goal_view(plan_store.goal(goal_id), current)
+    try:
+        selected = plaene.selected_goal_month(
+            date.fromisoformat(item["start_date"]),
+            date.fromisoformat(item["end_date"]), current, month)
+        calendar_view = plaene.goal_calendar(item["sessions"], selected)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
     return _plans_render(request, "woche/plaene_detail.html", goal=item,
-                         motivation=plaene.motivation(item))
+                         motivation=plaene.motivation(item),
+                         goal_calendar=calendar_view)
 
 
 @router.post('/ziele/{goal_id}/bearbeiten')

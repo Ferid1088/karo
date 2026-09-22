@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Heute – {{ companion_name }}{% endblock %}
 {% block content %}
-<div class="welcome"><p class="eyebrow">DEINE LERNZEIT</p><h1>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</h1><p class="sub">Was möchtest du heute lernen?</p></div>
+<div class="welcome welcome-profile">{% if learner_photo_url %}<img src="{{ learner_photo_url }}" alt="" class="learner-photo learner-photo-large">{% endif %}<div><p class="eyebrow">DEINE LERNZEIT</p><h1>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</h1><p class="sub">Was möchtest du heute lernen?</p></div></div>
 {% if naechstes %}
 <section class="next-step card">
   <span class="step-number" aria-hidden="true">1</span>

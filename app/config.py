@@ -292,6 +292,11 @@ def begleiter_dir() -> Path:
     return _ensure(DATA_DIR / "begleiter")
 
 
+def profile_dir() -> Path:
+    """Lokales Profilbild des Kindes."""
+    return _ensure(DATA_DIR / "profil")
+
+
 def drive_root() -> Path:
     sub = load_safe().drive_subdir
     return DRIVE_DIR / sub if sub else DRIVE_DIR

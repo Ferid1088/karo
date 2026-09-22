@@ -1,12 +1,13 @@
 {% extends 'woche/plaene_base.html' %}
 {% block plans %}
-<section class="plans-hero plans-hero-grid">
-  <div class="mascot-copy"><img src="/static/karo-fox-wave.png" alt="Karo begrüßt dich"><div><h1>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</h1><p>Schön, dass du da bist. Hier ist dein Plan für heute.</p></div></div>
+<div class="today-layout"><aside class="today-side" data-progress-set="gesamt">
+  <div class="plans-panel mascot-copy today-greeting"><img src="/static/karo-fox-wave.png" alt="Karo begrüßt dich"><div><h1>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</h1><p>Schön, dass du da bist. Hier ist dein Plan für heute.</p></div></div>
   <article class="metric-card green"><span class="metric-icon">▥</span><div><b>Bis heute</b><strong>{{ overall.adherence }} %</strong><p>{{ overall.due_actual }} von {{ overall.due_planned }} Minuten</p></div></article>
-  <article class="metric-card blue"><span class="metric-icon">★</span><div><b>Gesamt</b><strong>{{ overall.progress }} %</strong><p>{{ overall.actual }} von {{ overall.planned }} Minuten</p></div></article>
+  <article class="metric-card blue"><span class="metric-icon">★</span><div><b>Fortschritt</b><strong>{{ overall.progress }} %</strong><p>{{ overall.actual }} von {{ overall.planned }} Minuten</p></div></article>
+  <article class="metric-card focus"><span class="metric-icon">◎</span><div><b>Konzentration</b><strong>{{ overall.focus }} %</strong><p>{{ overall.focused }} fokussierte Minuten</p></div></article>
   <article class="motivation-card {{ motivation.tone }}"><img src="{{ motivation.fox }}" alt="Karo"><div><h2>{{ motivation.title }}</h2><p>{{ motivation.text }}</p></div></article>
-</section>
-
+</aside><div class="today-main">
+<nav class="quick-actions" aria-label="Schnellaktionen"><a class="quick-new" href="/woche/ziele/neu">+ Neues Ziel →</a><a class="quick-edit" href="/woche/ziele">Ziel bearbeiten →</a></nav>
 <section class="plans-panel">
   <header class="section-heading"><div><h2>Deine Aufgaben heute</h2><p>Hier siehst du, was heute auf deinem Plan steht.</p></div><time>{{ plan_day.strftime('%d.%m.%Y') }}</time></header>
   {% if sessions %}<div class="session-list">
@@ -22,7 +23,7 @@
   {% else %}<div class="empty-inline"><h3>Noch keine Ziele.</h3><p>Starte jetzt dein erstes Ziel.</p><a class="plan-btn" href="/woche/ziele/neu">+ Neues Ziel</a></div>{% endif %}
   {% if missed %}<div class="missed-box"><div><b>Noch offen</b><p>Möchtest du eine frühere Einheit nachholen?</p></div><div><b>{{ missed[0].statement }}</b><span>{{ missed[0].planned_minutes }} Minuten</span></div><a class="plan-btn" href="/woche?abschluss={{ missed[0].id }}">Jetzt nachholen →</a></div>{% endif %}
 </section>
-<nav class="quick-actions" aria-label="Schnellaktionen"><a href="/woche/ziele">Ziel bearbeiten →</a><a href="/woche/woche">Woche ansehen →</a><a href="/woche/ziele/neu">+ Neues Ziel →</a></nav>
+</div></div>
 
 {% if selected_session %}<div class="modal-backdrop" data-modal><section class="completion-modal" role="dialog" aria-modal="true" aria-labelledby="finish-title">
   <a class="modal-close" href="/woche" aria-label="Schließen">×</a><img src="/static/karo-fox-cheer.png" alt="" class="modal-fox">
@@ -34,9 +35,9 @@
     <output class="range-value green" for="actual"><span data-actual-output>{{ selected_session.planned_minutes }}</span> Minuten</output>
     <input id="actual" name="actual_minutes" type="range" min="0" max="60" step="1" value="{{ selected_session.actual_minutes if selected_session.actual_minutes is not none else selected_session.planned_minutes }}" data-range="actual">
     <div class="range-labels"><span>0</span><span>60 Minuten</span></div>
-    <div class="live-result">Heute: <strong data-percent-output>100 %</strong><span>Jede Minute zählt.</span></div>
+    <div class="live-result">Heute: <strong data-percent-output>100 %</strong><span class="adherence-stat">Bis heute: {{ overall.adherence }} %</span></div>
     <label for="focus"><b>Wie konzentriert warst du?</b><small>Schiebe den Regler auf dein Gefühl.</small></label>
-    <output class="range-value blue" for="focus"><span data-focus-output>{{ selected_session.focus_percent if selected_session.focus_percent is not none else 80 }}</span> %</output>
+    <output class="range-value focus" for="focus"><span data-focus-output>{{ selected_session.focus_percent if selected_session.focus_percent is not none else 80 }}</span> %</output>
     <input id="focus" name="focus_percent" type="range" min="0" max="100" step="10" value="{{ selected_session.focus_percent if selected_session.focus_percent is not none else 80 }}" data-range="focus">
     <div class="focus-scale" aria-label="Konzentrationsstufen">
       {% for value,emoji,label in [(0,'😴','gar nicht konzentriert'),(10,'😣','sehr schwer'),(20,'😟','kaum konzentriert'),(30,'🙁','wenig konzentriert'),(40,'😐','eher wenig'),(50,'🙂','okay'),(60,'😊','ganz gut'),(70,'😄','gut'),(80,'😁','sehr gut'),(90,'🤩','sehr konzentriert'),(100,'🎯','voll konzentriert')] %}

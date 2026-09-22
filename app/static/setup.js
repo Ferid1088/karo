@@ -17,6 +17,7 @@
     const format = form.querySelector('[name="default_ausgabe"]');
     const button = document.querySelector('[data-settings-save]');
     const status = document.querySelector('[data-settings-status]');
+    const profileFile = form.querySelector('[data-profile-file]');
     const initial = new URLSearchParams(new FormData(form)).toString();
     let dirty = form.dataset.invalid === 'true';
     function update() {
@@ -24,7 +25,8 @@
         panel.hidden = panel.dataset.formatOptions !== format.value;
       });
       if (form.dataset.configured === 'true') {
-        dirty = new URLSearchParams(new FormData(form)).toString() !== initial;
+        dirty = new URLSearchParams(new FormData(form)).toString() !== initial ||
+          !!(profileFile && profileFile.files && profileFile.files.length);
         button.disabled = !dirty && form.dataset.invalid !== 'true';
         status.textContent = dirty ? 'Noch nicht gespeicherte Änderungen.' :
           (form.dataset.invalid === 'true' ? 'Bitte prüfen Sie die markierten Angaben.' : 'Alles gespeichert.');
@@ -48,6 +50,20 @@
       }
     }, true);
     update();
+
+    const profilePreview = form.querySelector('[data-profile-preview]');
+    if (profileFile && profilePreview) {
+      profileFile.addEventListener('change', () => {
+        const file = profileFile.files && profileFile.files[0];
+        if (!file) return;
+        const image = document.createElement('img');
+        const objectUrl = URL.createObjectURL(file);
+        image.src = objectUrl;
+        image.alt = 'Vorschau des neuen Profilbilds';
+        image.addEventListener('load', () => URL.revokeObjectURL(objectUrl), {once: true});
+        profilePreview.replaceChildren(image);
+      });
+    }
   }
 
   function openLinkedSection() {

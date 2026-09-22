@@ -56,7 +56,7 @@ VALID_ROLES = frozenset({"parent", "child"})
 
 # Kinder duerfen ausschliesslich ihren eigenen Lernbereich verwenden — das
 # wird hier zentral erzwungen, nicht nur durch ausgeblendete Menuepunkte.
-CHILD_ALLOWED_EXACT = frozenset({"/", "/hilfe", "/lernstand"})
+CHILD_ALLOWED_EXACT = frozenset({"/", "/hilfe", "/lernstand", "/profilbild"})
 CHILD_ALLOWED_PREFIXES = ("/lernen", "/lernzyklus", "/quiz", "/material",
                           "/klassenarbeit/material", "/woche", "/welten")
 

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 300" role="img" aria-labelledby="t d">
+  <title id="t">Karo der Fuchs</title><desc id="d">Ein freundlicher orangefarbener Fuchs hebt motivierend die Pfote.</desc>
+  <path fill="#dff8ef" d="M45 230c-24-50 4-105 49-111 12-65 90-88 134-48 59-8 100 57 66 106 15 59-58 94-106 65-51 31-120 22-143-12Z"/>
+  <path fill="#f2702a" d="M232 197c65-8 89 44 67 73-13-21-32-27-58-20Z"/>
+  <path fill="#ff914d" d="M146 89 98 49l8 79m91-37 45-48-7 86"/>
+  <path fill="#351d23" d="m111 69-8-9 4 43m119-34 10-11-3 43"/>
+  <ellipse cx="171" cy="141" rx="75" ry="65" fill="#ff914d"/>
+  <path fill="#fff1df" d="M111 150c13 0 29 8 42 22 10-16 25-25 43-25 19 0 34 10 44 29-18 27-41 38-69 35-34-3-52-22-60-61Z"/>
+  <ellipse cx="143" cy="132" rx="10" ry="14" fill="#1d2433"/><ellipse cx="205" cy="130" rx="10" ry="14" fill="#1d2433"/>
+  <circle cx="140" cy="127" r="3" fill="white"/><circle cx="202" cy="125" r="3" fill="white"/>
+  <path d="M163 154q10-8 20 0-2 12-10 12t-10-12Z" fill="#1d2433"/>
+  <path d="M151 171q22 22 45-2" fill="none" stroke="#1d2433" stroke-width="6" stroke-linecap="round"/>
+  <path fill="#05716f" d="M119 208c22-14 80-14 104 0l-2 76H117Z"/>
+  <path fill="#06585d" d="m164 207 12 0 7 77h-28Z"/>
+  <path d="M217 219q38-6 51-39" fill="none" stroke="#ff914d" stroke-width="22" stroke-linecap="round"/>
+  <path d="M265 180q8-13 14 0m-15 2q-5-14 4-15m-1 15q17-8 15 3" fill="none" stroke="#ff914d" stroke-width="8" stroke-linecap="round"/>
+  <path d="M116 221q-28 9-39 30" fill="none" stroke="#ff914d" stroke-width="20" stroke-linecap="round"/>
+  <path d="m287 83 17-25m-1 42 28-9m-45-29 2-28" fill="none" stroke="#ffc321" stroke-width="10" stroke-linecap="round"/>
+</svg>

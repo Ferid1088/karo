@@ -2,8 +2,8 @@
 {% block title %}Ziele Plannen – {{ companion_name }}{% endblock %}
 {% block mainclass %}plans-page{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/plaene.css?v=5">
-<script src="/static/plaene.js?v=4" defer></script>
+<link rel="stylesheet" href="/static/plaene.css?v=36">
+<script src="/static/plaene.js?v=7" defer></script>
 <span hidden>{{ csrf_input() }}</span>
 <a class="skip-link" href="#plans-content">Zum Inhalt</a>
 <header class="plans-local-header">
@@ -15,10 +15,14 @@
     <a href="/woche/ziele" {{ 'aria-current=page' if path.startswith('/woche/ziele') }}>Ziele</a>
     <a href="/woche/schatzkiste" {{ 'aria-current=page' if path == '/woche/schatzkiste' }}>Schatzkiste</a>
   </nav>
+  <time class="plans-clock" datetime="{{ plan_day.isoformat() }}" data-plans-clock aria-label="Aktuelles Datum und Uhrzeit">
+    <span data-clock-date>{{ plan_day.strftime('%d.%m.%Y') }}</span>
+    <b data-clock-time>--:-- Uhr</b>
+  </time>
   <div class="plans-profile" aria-label="Angemeldet als {{ cfg.learner_name or 'Kind' }}">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
-    <img src="/static/karo-fox-wave.png" alt=""><b>{{ cfg.learner_name or 'Kind' }}</b><span aria-hidden="true">⌄</span>
+    <img src="{{ learner_photo_url or '/static/karo-fox-wave.png' }}" alt=""><b>{{ cfg.learner_name or 'Kind' }}</b><span aria-hidden="true">⌄</span>
   </div>
 </header>
 <div id="plans-content" class="plans-content">

@@ -2,8 +2,8 @@
 from html.parser import HTMLParser
 import pytest
 
-from .conftest import csrf_from
-from .test_app import einrichten
+from .conftest import csrf_from, make_jpeg
+from .test_app import einrichten, kind_modus_aktivieren
 from .test_ui import Forms
 
 
@@ -128,6 +128,73 @@ def test_disconnected_claude_keeps_settings_available(client, fake_llm, fake_cli
     assert 'data-settings-form' in page.text
     assert 'action="/setup/credentials"' not in page.text
     assert 'action="/setup/claude/verbinden"' in page.text
+
+
+def test_child_profile_name_and_photo_are_saved_and_used(client, fake_llm, fake_cli,
+                                                         app_env, tmp_path):
+    from PIL import Image
+
+    einrichten(client, fake_llm)
+    source = make_jpeg(tmp_path / 'liebling.jpg', size=(800, 1200))
+    page = client.get('/setup')
+    data = SettingsValues(page.text).fields
+    data.pop('learner_photo', None)
+    data['learner_name'] = 'Lina'
+    response = client.post(
+        '/setup/finish', data=data,
+        files={'learner_photo': ('liebling.jpg', source.read_bytes(), 'image/jpeg')},
+        follow_redirects=False)
+
+    assert response.status_code == 303
+    assert app_env.config.load().learner_name == 'Lina'
+    image_path = app_env.data / 'profil' / 'kind.jpg'
+    assert image_path.is_file()
+    with Image.open(image_path) as image:
+        assert image.size == (512, 512)
+        assert image.format == 'JPEG'
+
+    kind_modus_aktivieren(client)
+    served = client.get('/profilbild')
+    assert served.status_code == 200
+    assert served.headers['content-type'] == 'image/jpeg'
+    home = client.get('/').text
+    assert 'Hallo Lina!' in home
+    assert '/profilbild?v=' in home
+    plans = client.get('/woche').text
+    assert 'Angemeldet als Lina' in plans
+    assert '/profilbild?v=' in plans
+
+
+def test_invalid_profile_photo_is_rejected_without_changing_name(client, fake_llm,
+                                                                 fake_cli, app_env):
+    einrichten(client, fake_llm)
+    page = client.get('/setup')
+    data = SettingsValues(page.text).fields
+    data.pop('learner_photo', None)
+    data['learner_name'] = 'Neuer Name'
+    response = client.post(
+        '/setup/finish', data=data,
+        files={'learner_photo': ('kein-bild.jpg', b'kein bild', 'image/jpeg')})
+
+    assert response.status_code == 400
+    assert 'kein lesbares Bild' in response.text
+    assert app_env.config.load().learner_name == 'Milena'
+    assert not (app_env.data / 'profil' / 'kind.jpg').exists()
+
+
+def test_profile_photo_can_be_removed(client, fake_llm, fake_cli, app_env, tmp_path):
+    einrichten(client, fake_llm)
+    from app import profile
+    profile.save_photo(profile.prepare_photo(make_jpeg(tmp_path / 'profil.jpg').read_bytes()))
+
+    page = client.get('/setup')
+    data = SettingsValues(page.text).fields
+    data['learner_photo_remove'] = 'ja'
+    response = client.post('/setup/finish', data=data, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert not profile.photo_path().exists()
+    assert client.get('/profilbild').status_code == 404
 
 
 CHILD_SETTINGS = ['antworten_pruefen_kind', 'schulblaetter_kind', 'klassenarbeit_kind']

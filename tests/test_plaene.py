@@ -32,6 +32,39 @@ def test_canonical_acceptance_calculation():
     assert result["focus"] == 88
 
 
+def test_goal_calendar_builds_month_grid_and_achievement_states():
+    rows = [
+        {"scheduled_date": "2026-09-02", "planned_minutes": 20,
+         "status": "completed", "actual_minutes": 20},
+        {"scheduled_date": "2026-09-08", "planned_minutes": 20,
+         "status": "completed", "actual_minutes": 10},
+        {"scheduled_date": "2026-09-15", "planned_minutes": 20,
+         "status": "completed", "actual_minutes": 5},
+        {"scheduled_date": "2026-09-22", "planned_minutes": 20,
+         "status": "planned", "actual_minutes": None},
+    ]
+    result = plaene.goal_calendar(rows, date(2026, 9, 1))
+    states = {cell["date"]: cell["state"] for cell in result["cells"]}
+
+    assert result["label"] == "September 2026"
+    assert result["previous"] == "2026-08"
+    assert result["following"] == "2026-10"
+    assert len(result["cells"]) == 35
+    assert states["2026-09-02"] == "reached"
+    assert states["2026-09-08"] == "partial"
+    assert states["2026-09-15"] == "not-reached"
+    assert states["2026-09-22"] == "open"
+
+
+def test_goal_calendar_defaults_to_month_inside_goal_range():
+    assert plaene.selected_goal_month(
+        date(2026, 9, 22), date(2026, 10, 19), date(2026, 8, 4)) == date(2026, 9, 1)
+    assert plaene.selected_goal_month(
+        date(2026, 9, 22), date(2026, 10, 19), date(2026, 11, 4)) == date(2026, 10, 1)
+    assert plaene.selected_goal_month(
+        date(2026, 9, 22), date(2026, 10, 19), date(2026, 9, 25), "2027-02") == date(2027, 2, 1)
+
+
 def test_motivation_is_honest_about_progress():
     waiting = plaene.motivation({"planned": 100, "actual": 0, "percent": 0})
     assert waiting["title"] == "Heute kannst du anfangen!"
@@ -135,6 +168,16 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
     assert "Ziele planen" in dashboard.text
     assert 'class="plans-entry"' in dashboard.text
     assert '/static/karo-fox-wave.png' in dashboard.text
+    today = client.get("/woche")
+    assert 'class="quick-edit"' in today.text
+    assert 'class="quick-new"' in today.text
+    assert 'class="quick-week"' not in today.text
+    assert 'class="today-layout"' in today.text
+    assert 'class="today-side"' in today.text
+    assert 'class="today-main"' in today.text
+    assert today.text.index('class="today-side"') < today.text.index('class="today-main"')
+    assert today.text.index('class="quick-new"') < today.text.index('class="quick-edit"')
+    assert today.text.index('class="quick-edit"') < today.text.index('class="plans-panel"', today.text.index('class="today-main"'))
     for path, text in [
         ("/woche", "Deine Aufgaben heute"), ("/woche/woche", "Wochenfortschritt"),
         ("/woche/monat", "Monatsfortschritt"), ("/woche/ziele", "Alle Ziele"),
@@ -145,10 +188,53 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
         assert response.status_code == 200, response.text[:1000]
         assert text in response.text
 
+    for path, marker in [
+        ("/woche", 'data-progress-set="gesamt"'),
+        ("/woche/woche", 'data-progress-set="woche"'),
+        ("/woche/monat", 'data-progress-set="monat"'),
+        ("/woche/ziele", 'data-progress-set="gesamt"'),
+        (f"/woche/ziele/{goal_id}", f'data-progress-set="ziel-{goal_id}"'),
+    ]:
+        progress_page = client.get(path)
+        assert marker in progress_page.text
+        assert all(label in progress_page.text
+                   for label in ("Fortschritt", "Bis heute", "Konzentration"))
+
+    week_page = client.get("/woche/woche")
+    assert 'class="stats-row stats-head"' in week_page.text
+    assert 'class="stats-row stats-data"' in week_page.text
+    assert 'data-label="Fortschritt"' in week_page.text
+    assert "Aktion" in week_page.text
+    assert "Heute ansehen" not in week_page.text
+
+    month_page = client.get("/woche/monat")
+    assert 'class="plans-panel month-progress"' in month_page.text
+    assert 'class="month-layout"' in month_page.text
+    assert 'class="month-sidebar-column"' in month_page.text
+    assert 'class="month-side"' in month_page.text
+    assert 'class="month-period-row"' in month_page.text
+    assert "month-motivation" in month_page.text
+    assert month_page.text.index('class="month-side"') < month_page.text.index('class="month-main"')
+    assert month_page.text.index("month-motivation") < month_page.text.index("month-progress")
+
     goals_page = client.get("/woche/ziele")
     assert 'href="/" title="Zurück zu Karo"' in goals_page.text
+    assert 'data-plans-clock' in goals_page.text
+    assert 'data-clock-date>22.09.2026<' in goals_page.text
+    assert 'data-clock-time>--:-- Uhr<' in goals_page.text
     assert "Heute kannst du anfangen!" in goals_page.text
     assert f'href="/woche/ziele/{goal_id}"' in goals_page.text
+    assert 'class="progress focus"' in goals_page.text
+    assert 'class="goal-progress focus-stat"' in goals_page.text
+    assert 'class="goal-progress progress-stat"' in goals_page.text
+    assert 'class="goal-progress adherence-stat"' in goals_page.text
+    detail = client.get(f"/woche/ziele/{goal_id}")
+    assert 'aria-label="Lernkalender September 2026"' in detail.text
+    assert 'data-calendar-state="open"' in detail.text
+    assert f'/woche/ziele/{goal_id}?month=2026-10#calendar' in detail.text
+    october = client.get(f"/woche/ziele/{goal_id}?month=2026-10")
+    assert 'aria-label="Lernkalender Oktober 2026"' in october.text
+    assert client.get(f"/woche/ziele/{goal_id}?month=ungueltig").status_code == 400
     for path in ("/woche", "/woche/woche", "/woche/monat", "/woche/ziele", f"/woche/ziele/{goal_id}"):
         assert f'action="/woche/ziele/{goal_id}/start"' in client.get(path).text
 
@@ -275,6 +361,10 @@ def test_goal_detail_actions_work_end_to_end(client, app_env, fake_llm, fake_cli
     archived_page = client.get(f"/woche/ziele/{goal_id}")
     assert "Bist du sicher?" in archived_page.text
     assert "Zurück zu meinen Plänen" in archived_page.text
+    treasure = client.get("/woche/schatzkiste")
+    assert f'data-progress-set="ziel-{goal_id}"' in treasure.text
+    assert all(label in treasure.text
+               for label in ("Fortschritt", "Bis heute", "Konzentration"))
     post(f"/woche/ziele/{goal_id}/aktion", {"action": "restore"})
     restored = store.goal(goal_id)
     assert restored["status"] == "active"

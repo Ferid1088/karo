@@ -1,4 +1,24 @@
 (function () {
+  var clock = document.querySelector('[data-plans-clock]');
+  if (clock) {
+    var clockDate = clock.querySelector('[data-clock-date]');
+    var clockTime = clock.querySelector('[data-clock-time]');
+    var dateFormatter = new Intl.DateTimeFormat('de-DE', {
+      weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+    var timeFormatter = new Intl.DateTimeFormat('de-DE', {
+      hour: '2-digit', minute: '2-digit'
+    });
+    function updateClock() {
+      var now = new Date();
+      clock.dateTime = now.toISOString();
+      clockDate.textContent = dateFormatter.format(now);
+      clockTime.textContent = timeFormatter.format(now) + ' Uhr';
+    }
+    updateClock();
+    window.setInterval(updateClock, 30000);
+  }
+
   var actual = document.querySelector('[data-range="actual"]');
   var focus = document.querySelector('[data-range="focus"]');
   function update() {
@@ -56,14 +76,30 @@
   }
 
   document.querySelectorAll('[data-plan-tabs]').forEach(function (tabs) {
-    tabs.querySelectorAll('[data-tab]').forEach(function (button) {
+    // Panels liegen im umschliessenden Bereich, damit mehrere Reiter-Gruppen sich nicht stoeren.
+    var scope = tabs.closest('[data-plan-tab-scope]') || document;
+    var buttons = tabs.querySelectorAll('[data-tab]');
+    function activate(name, updateHash) {
+      var selected = tabs.querySelector('[data-tab="' + name + '"]');
+      if (!selected) return false;
+      buttons.forEach(function (b) {
+        b.classList.toggle('active', b === selected);
+        b.setAttribute('aria-selected', b === selected ? 'true' : 'false');
+      });
+      scope.querySelectorAll('[data-plan-panel]').forEach(function (panel) {
+        panel.classList.toggle('active', panel.dataset.planPanel === name);
+      });
+      if (updateHash) history.replaceState(null, '', '#' + name);
+      return true;
+    }
+    buttons.forEach(function (button) {
       button.addEventListener('click', function () {
-        tabs.querySelectorAll('[data-tab]').forEach(function (b) { b.classList.toggle('active', b === button); });
-        document.querySelectorAll('[data-plan-panel]').forEach(function (panel) {
-          panel.classList.toggle('active', panel.dataset.planPanel === button.dataset.tab);
-        });
+        activate(button.dataset.tab, true);
       });
     });
+    if (!activate(location.hash.slice(1), false) && buttons.length) {
+      activate(buttons[0].dataset.tab, false);
+    }
   });
 
   var durationForm = document.querySelector('[data-duration-form]');

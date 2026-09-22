@@ -52,7 +52,7 @@ except OSError:
 def render(request: Request, name: str, status_code: int = 200,
            **ctx) -> HTMLResponse:
     """Rendert ein Template mit Kontext."""
-    from .. import db, topics, research
+    from .. import db, profile, topics, research
     cfg = config.load_safe()
     token = request.session.get("csrf")
     if not token:
@@ -83,6 +83,7 @@ def render(request: Request, name: str, status_code: int = 200,
         "child_flags": {"gruen": "Das kannst du gut", "gelb": "Du wirst sicherer", "rot": "Das üben wir zusammen", "weiss": "Noch nicht ausprobiert"},
         "offene_vorschlaege": topics.anzahl_vorschlaege(),
         "offene_funde": research.anzahl_vorschlaege(),
+        "learner_photo_url": profile.photo_url(),
     }
     basis.update(ctx)
     # The visible area follows the page, including shared pages enabled for children.

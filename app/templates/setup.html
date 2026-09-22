@@ -130,10 +130,44 @@ claude setup-token                         <span class="c-com"># Token wird ange
   <a href="#zugang">Passwörter</a><a href="#erweitert">Erweitert</a><a href="#verbindungen">Verbindungen</a>
 </nav>
 <form id="settings-form" data-settings-form data-configured="{{ 'true' if cfg.setup_complete else 'false' }}"{% if invalid %} data-invalid="true"{% endif %}
-      method="post" action="/setup/finish">
+      method="post" action="/setup/finish" enctype="multipart/form-data">
   {{ csrf_input() }}
 <details class="card setup-group settings-category" id="kind-bereich" open>
-  <summary><span><strong>Was darf mein Kind?</strong><small>Sie entscheiden, welche Aufgaben Ihr Kind selbst übernimmt.</small></span></summary>
+  <summary><span><strong>Kind-Profil und Freigaben</strong><small>Name, Bild und Aufgaben im Kinderbereich</small></span></summary>
+  <div class="settings-subsection settings-profile">
+    <h3>Kind-Profil</h3>
+    <p class="settings-explainer">Karo verwendet den Namen und das Bild nur lokal, zum Beispiel für die persönliche Begrüßung.</p>
+    <div class="settings-profile-layout">
+      <div class="settings-profile-photo" data-profile-preview>
+        {% if learner_photo_url %}
+        <img src="{{ learner_photo_url }}" alt="Aktuelles Profilbild von {{ cfg.learner_name or 'Ihrem Kind' }}">
+        {% else %}
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>
+        {% endif %}
+      </div>
+      <div class="settings-profile-fields">
+        <div class="field">
+          <label for="learner_name">Vorname des Kindes</label>
+          <input type="text" id="learner_name" name="learner_name" maxlength="60"
+                 value="{{ cfg.learner_name }}" autocomplete="off" required>
+        </div>
+        <div class="field">
+          <label for="learner_photo">Profilbild</label>
+          <input type="file" id="learner_photo" name="learner_photo"
+                 accept="image/*" data-profile-file>
+          <p class="hint">Ein Foto vom Kind, Lieblingsavatar oder Kuscheltier. Karo entfernt Metadaten und speichert das Bild nur auf diesem Gerät.</p>
+        </div>
+        {% if learner_photo_url %}
+        <label class="settings-remove-photo" for="learner_photo_remove">
+          <input type="checkbox" id="learner_photo_remove" name="learner_photo_remove" value="ja">
+          <span>Aktuelles Bild entfernen</span>
+        </label>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="settings-subsection">
+  <h3>Was darf mein Kind?</h3>
   <p class="settings-explainer">Häkchen gesetzt: im Kinderbereich. Ohne Häkchen: nur bei den Eltern. Jeder Bereich erscheint an einem Ort.</p>
   {% for name, title, description in [
     ('antworten_pruefen_kind', 'Antworten prüfen', 'Antworten ansehen und Bewertungen bestätigen.'),
@@ -146,6 +180,7 @@ claude setup-token                         <span class="c-com"># Token wird ange
     <span class="settings-destination" data-child-destination>{{ 'Beim Kind' if cfg[name] else 'Nur Eltern' }}</span>
   </label>
   {% endfor %}
+  </div>
 </details>
 <details class="card setup-group settings-category" id="lernmaterial">
   <summary><span><strong>Lernmaterial und Lernen</strong><small>Format, Lernrunden und Internetquellen</small></span></summary>
