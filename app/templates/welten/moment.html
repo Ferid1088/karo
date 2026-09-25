@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Heute festhalten – Meine Welt{% endblock %}
+{% block mainclass %}world-page{% endblock %}
+{% block content %}
+<a class="back-link" href="/welten">← Meine Welt</a>
+<p class="eyebrow">HEUTE FESTHALTEN</p>
+<h1>Was möchtest du von heute behalten?</h1>
+<p class="sub">Ein Wort, ein Bild oder eine kurze Aufnahme reicht. Es muss kein Tagebuchtext werden.</p>
+
+{% if moment %}
+<section class="card world-done-card">
+  <h2>✓ Für heute gespeichert</h2>
+  {% if moment.mood %}<p>{{ mood_labels[moment.mood] }}</p>{% endif %}
+  {% if moment.text %}<p>„{{ moment.text }}“</p>{% endif %}
+  <a class="btn" href="/welten/jahr">In Mein Jahr ansehen</a>
+</section>
+{% else %}
+<form method="post" action="/welten/festhalten" enctype="multipart/form-data" class="world-capture-form" data-world-recorder data-max-seconds="{{ usage.audio_seconds_left }}">
+  {{ csrf_input() }}
+
+  <fieldset class="world-moods">
+    <legend>Heute war … <span class="klein">(optional)</span></legend>
+    {% for value, label in mood_labels.items() %}
+      <label><input type="radio" name="mood" value="{{ value }}"><span>{{ label }}</span></label>
+    {% endfor %}
+  </fieldset>
+
+  <div class="field">
+    <label for="moment-text">Ein Gedanke <span class="klein">· optional · bis 1.500 Zeichen</span></label>
+    <textarea id="moment-text" name="text" maxlength="1500" rows="5" placeholder="Was möchtest du später noch wissen?"></textarea>
+  </div>
+
+  {% if world_settings.allow_photos %}
+  <div class="world-upload-block">
+    <div><strong>📷 Fotos</strong><small>Heute noch {{ usage.photos_left }} von 2 möglich. Bilder werden verkleinert und ohne Standort-Metadaten gespeichert.</small></div>
+    <input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple data-photo-input data-photo-max="{{ usage.photos_left }}">
+    <span class="klein" data-photo-status></span>
+  </div>
+  {% endif %}
+
+  {% if world_settings.allow_audio %}
+  <div class="world-upload-block">
+    <div><strong>🎙️ Audio</strong><small>Heute noch {{ usage.audio_seconds_left }} Sekunden. Keine Spracherkennung, keine KI.</small></div>
+    <input type="file" name="audio" hidden data-audio-input>
+    <input type="hidden" name="audio_duration" value="0" data-audio-duration>
+    <button type="button" class="ghost" data-record-button {{ 'disabled' if usage.audio_seconds_left <= 0 }}>Aufnahme starten</button>
+    <span class="world-record-time" data-record-time>00:00</span>
+    <audio controls hidden data-audio-preview></audio>
+    <p class="klein" data-record-status></p>
+  </div>
+  {% endif %}
+
+  <div class="world-form-actions">
+    <button type="submit">Diesen Moment speichern</button>
+    <a class="btn ghost" href="/welten">Heute nichts festhalten</a>
+  </div>
+</form>
+{% endif %}
+<script src="/static/meine-welt.js?v={{ asset_version }}" defer></script>
+{% endblock %}

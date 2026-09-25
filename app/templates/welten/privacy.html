@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Deine Daten – Meine Welt{% endblock %}
+{% block mainclass %}world-page world-reading-page{% endblock %}
+{% block content %}
+<a class="back-link" href="/welten">← Meine Welt</a>
+<p class="eyebrow">DEINE DATEN</p>
+<h1>Was passiert mit deinen Sachen?</h1>
+<p class="sub">Kurz gesagt: Deine Erinnerungen sollen deine Erinnerungen bleiben.</p>
+
+<section class="world-privacy-grid">
+  <article class="card"><span class="world-privacy-icon">🔒</span><h2>Privat</h2><p>Fotos und Aufnahmen liegen nicht in einem öffentlichen Ordner. Man muss in Karo angemeldet sein, um sie zu öffnen.</p></article>
+  <article class="card"><span class="world-privacy-icon">🤖🚫</span><h2>Keine KI</h2><p>Karo hört deine Aufnahme nicht ab, schreibt sie nicht mit und schickt sie nicht an ein KI-Modell.</p></article>
+  <article class="card"><span class="world-privacy-icon">📍🚫</span><h2>Keine Foto-Ortsdaten</h2><p>Ein hochgeladenes Foto wird neu gespeichert. Dabei werden versteckte Foto-Metadaten wie GPS-Informationen entfernt.</p></article>
+  <article class="card"><span class="world-privacy-icon">🗑️</span><h2>Löschbar</h2><p>Einträge können gelöscht werden. Ein Elternteil kann außerdem alle Daten aus Meine Welt exportieren oder vollständig entfernen.</p></article>
+</section>
+
+<section class="card">
+  <h2>Die Tagesgrenze</h2>
+  <p>Pro Tag können höchstens <strong>2 Fotos</strong> und insgesamt <strong>60 Sekunden Audio</strong> gespeichert werden. Es gibt keine Videos.</p>
+</section>
+
+<section class="card">
+  <h2>Zeitkapseln</h2>
+  <p>Vor ihrem Öffnungsdatum zeigt Karo nur Titel und Datum. Der eigentliche Text und die Medien werden vorher nicht an deinen Browser geschickt.</p>
+</section>
+{% endblock %}

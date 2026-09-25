@@ -6,12 +6,10 @@
   <meta name="referrer" content="same-origin">
   <title>{% block title %}{{ companion_name|default('Karo') }}{% endblock %}</title>
   <script src="/static/themes.js?v={{ asset_version|default('0') }}"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Comic+Neue:wght@400;700&display=swap">
   <link rel="stylesheet" href="/static/karo.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/simple.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/areas.css?v={{ asset_version|default('0') }}">
+  {% if world_page|default(false) %}<link rel="stylesheet" href="/static/meine-welt.css?v={{ asset_version|default('0') }}">{% endif %}
   <script src="/static/simple.js?v={{ asset_version|default('0') }}" defer></script>
   <script src="/static/drafts.js?v={{ asset_version|default('0') }}" defer></script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📐</text></svg>">

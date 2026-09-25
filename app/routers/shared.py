@@ -46,7 +46,7 @@ templates.env.filters["datum"] = plaene.date_label
 try:
     ASSET_VERSION = str(max(
         (BASE / "static" / name).stat().st_mtime_ns
-        for name in ("karo.css", "simple.css", "simple.js", "drafts.js", "setup.js", "storage.js", "areas.css", "themes.js", "begleiter.js")
+        for name in ("karo.css", "simple.css", "simple.js", "drafts.js", "setup.js", "storage.js", "areas.css", "themes.js", "begleiter.js", "meine-welt.css", "meine-welt.js")
     ))
 except OSError:
     ASSET_VERSION = "0"

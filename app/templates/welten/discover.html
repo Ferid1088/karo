@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }} – Meine Welt{% endblock %}
+{% block mainclass %}world-page world-reading-page{% endblock %}
+{% block content %}
+<a class="back-link" href="/welten">← Meine Welt</a>
+<div class="world-reading-head">
+  <span class="world-kicker">🌍 {{ article.category }}</span>
+  <h1>{{ article.title }}</h1>
+  <p class="sub">{{ article.teaser }}</p>
+</div>
+
+<article class="world-article">
+  <div class="world-article-visual" aria-hidden="true">
+    <div class="world-orbit"></div>
+    <span>?</span>
+  </div>
+  <div class="world-article-copy">
+    {% for paragraph in paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
+  </div>
+  <aside class="world-think-box">
+    <strong>💭 Denk mal nach</strong>
+    <p>{{ article.think }}</p>
+  </aside>
+</article>
+
+<div class="world-reading-actions">
+  <form method="post" action="/welten/entdecken/merken">
+    {{ csrf_input() }}
+    <input type="hidden" name="article_id" value="{{ article.id }}">
+    <button type="submit" class="{{ 'ghost' if saved else '' }}">{{ '✓ Gemerkt' if saved else '☆ Für mein Jahr merken' }}</button>
+  </form>
+  <a class="btn ghost" href="/welten">Fertig für heute</a>
+</div>
+
+<details class="world-source">
+  <summary>Woher wissen wir das?</summary>
+  <p>Redaktionelle Quelle: <a href="{{ article.source_url }}" target="_blank" rel="noopener noreferrer">{{ article.source_label }}</a></p>
+  <p class="klein">Karo ruft diese Quelle beim Lesen nicht live auf. Der Text wurde vorher kuratiert und ist Teil der App.</p>
+</details>
+{% endblock %}

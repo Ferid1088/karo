@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Meine Welt – Eltern{% endblock %}
+{% block mainclass %}settings-page{% endblock %}
+{% block content %}
+<a class="back-link" href="/welten">← Meine Welt</a>
+<p class="eyebrow">ELTERN-EINSTELLUNGEN</p>
+<h1>Meine Welt schützen</h1>
+<p class="sub">Persönliche Erinnerungen liegen getrennt vom Lernsystem. Es gibt keine KI-Auswertung, keine Spracherkennung und keine öffentlichen Medienlinks.</p>
+
+<section class="card">
+  <h2>Freigabe</h2>
+  <form method="post" action="/welten/eltern/freigabe">
+    {{ csrf_input() }}
+    <div class="field">
+      <label for="age-band">Altersstufe für redaktionelle Inhalte</label>
+      <select id="age-band" name="age_band">
+        {% for value in ['8-9','10-11','12-13','14-15'] %}<option value="{{ value }}" {{ 'selected' if world_settings.age_band == value }}>{{ value }} Jahre</option>{% endfor %}
+      </select>
+      <p class="hint">Wir speichern bewusst kein Geburtsdatum.</p>
+    </div>
+    <label class="settings-choice"><input type="checkbox" name="allow_photos" value="1" {{ 'checked' if world_settings.allow_photos }}><span><strong>Fotos erlauben</strong><small>maximal 2 pro Tag; serverseitig verkleinert und ohne EXIF-/GPS-Metadaten gespeichert.</small></span></label>
+    <label class="settings-choice"><input type="checkbox" name="allow_audio" value="1" {{ 'checked' if world_settings.allow_audio }}><span><strong>Audio erlauben</strong><small>insgesamt maximal 60 Sekunden pro Tag; keine Transkription und keine KI.</small></span></label>
+    <button type="submit">{{ 'Freigabe aktualisieren' if world_settings.enabled else 'Meine Welt freigeben' }}</button>
+  </form>
+  {% if world_settings.enabled %}
+  <form method="post" action="/welten/eltern/deaktivieren" class="section-space">
+    {{ csrf_input() }}<button type="submit" class="ghost">Für das Kind pausieren</button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Daten mitnehmen</h2>
+  <p>Exportiert Texte, Metadaten, Fotos und Audio als ZIP-Datei. Zeitkapseln sind im Elternexport enthalten.</p>
+  <a class="btn ghost" href="/welten/eltern/export.zip">Meine-Welt-Daten exportieren</a>
+</section>
+
+<section class="card danger-zone">
+  <h2>Alles aus Meine Welt löschen</h2>
+  <p>Entfernt persönliche Einträge, Medien, Zeitkapseln, gemerkte Entdeckungen und die Freigabe. Das Lernsystem bleibt unberührt.</p>
+  <form method="post" action="/welten/eltern/alles-loeschen" onsubmit="return confirm('Alle Meine-Welt-Daten wirklich endgültig löschen?');">
+    {{ csrf_input() }}
+    <div class="field"><label for="delete-confirm">Zur Bestätigung: ALLES LÖSCHEN</label><input id="delete-confirm" name="confirm" autocomplete="off"></div>
+    <button type="submit" class="danger-button">Endgültig löschen</button>
+  </form>
+</section>
+
+<p><a href="/welten/datenschutz">Kindgerechte Erklärung ansehen</a></p>
+{% endblock %}

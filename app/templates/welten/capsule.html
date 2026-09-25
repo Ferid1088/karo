@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ capsule.title }} – Zeitkapsel{% endblock %}
+{% block mainclass %}world-page{% endblock %}
+{% block content %}
+<a class="back-link" href="/welten/zeitkapseln">← Zeitkapseln</a>
+{% if locked %}
+<section class="world-lock-screen world-capsule-locked">
+  <div class="world-lock-icon">🔒</div>
+  <p class="eyebrow">GESCHLOSSEN</p>
+  <h1>{{ capsule.title }}</h1>
+  <p>Diese Zeitkapsel öffnet sich am <strong>{{ capsule.opens_on }}</strong>.</p>
+  <p class="quiet-note">Der Inhalt wird vorher nicht an den Browser ausgeliefert.</p>
+</section>
+{% else %}
+<section class="world-opened-capsule">
+  <span class="world-kicker">🎁 Nachricht von deinem früheren Ich</span>
+  <h1>{{ capsule.title }}</h1>
+  <p class="quiet-note">geschrieben {{ capsule.created_at[:10] }} · geöffnet ab {{ capsule.opens_on }}</p>
+  {% if capsule.text %}<div class="world-letter">{{ capsule.text }}</div>{% endif %}
+  <div class="world-media-strip world-media-large">
+    {% for m in capsule_media %}
+      {% if m.media_type == 'photo' %}<a href="/welten/media/{{ m.token }}" target="_blank" rel="noopener"><img src="/welten/media/{{ m.token }}?thumb=1" alt="Foto aus der Zeitkapsel"></a>
+      {% else %}<audio controls preload="none" src="/welten/media/{{ m.token }}"></audio>{% endif %}
+    {% endfor %}
+  </div>
+  <form method="post" action="/welten/zeitkapseln/{{ capsule.id }}/loeschen" onsubmit="return confirm('Diese Zeitkapsel wirklich löschen?');">
+    {{ csrf_input() }}<button type="submit" class="ghost">Zeitkapsel löschen</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

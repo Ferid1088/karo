@@ -262,6 +262,41 @@ app.add_middleware(
     session_cookie="karo_session",
     max_age=60 * 60 * 24 * 14,
     same_site="strict",
-    https_only=False,
+    https_only=os.environ.get("KARO_HTTPS_ONLY", "0") == "1",
 )
+class SecurityHeaders:
+    """Baseline browser hardening.
+
+    A strict CSP is added by the Meine-Welt renderer because legacy learning
+    pages still contain integrations that need a separate CSP migration.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        async def secured(message):
+            if message["type"] == "http.response.start":
+                existing = {k.lower() for k, _ in message.get("headers", [])}
+                headers = list(message.get("headers", []))
+                defaults = [
+                    (b"x-content-type-options", b"nosniff"),
+                    (b"x-frame-options", b"DENY"),
+                    (b"referrer-policy", b"no-referrer"),
+                    (b"permissions-policy",
+                     b"geolocation=(), camera=(self), microphone=(self), payment=(), usb=()"),
+                ]
+                for key, value in defaults:
+                    if key not in existing:
+                        headers.append((key, value))
+                if (os.environ.get("KARO_HTTPS_ONLY", "0") == "1"
+                        and b"strict-transport-security" not in existing):
+                    headers.append((b"strict-transport-security",
+                                    b"max-age=31536000; includeSubDomains"))
+                message["headers"] = headers
+            await send(message)
+        await self.app(scope, receive, secured)
+
+
+app.add_middleware(SecurityHeaders)
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")

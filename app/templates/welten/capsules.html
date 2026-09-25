@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Zeitkapseln – Meine Welt{% endblock %}
+{% block mainclass %}world-page{% endblock %}
+{% block content %}
+<a class="back-link" href="/welten">← Meine Welt</a>
+<p class="eyebrow">FÜR SPÄTER</p>
+<h1>Zeitkapseln</h1>
+<p class="sub">Schreibe, fotografiere oder sprich etwas für dein zukünftiges Ich. Nach dem Speichern bleibt der Inhalt bis zum Datum geschlossen.</p>
+
+<section class="world-capsule-create">
+  <div class="world-capsule-symbol">🔐</div>
+  <form method="post" action="/welten/zeitkapseln" enctype="multipart/form-data" data-world-recorder data-max-seconds="{{ usage.audio_seconds_left }}">
+    {{ csrf_input() }}
+    <h2>Neue Zeitkapsel</h2>
+    <div class="field"><label for="capsule-title">Titel</label><input id="capsule-title" name="title" maxlength="80" required placeholder="Zum Beispiel: Für mein nächstes Ich"></div>
+    <div class="field"><label for="capsule-text">Nachricht <span class="klein">· optional</span></label><textarea id="capsule-text" name="text" maxlength="1500" rows="4"></textarea></div>
+
+    <div class="world-capsule-media">
+      {% if world_settings.allow_photos %}
+      <label class="world-file-button">📷 Foto(s)
+        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple data-photo-input data-photo-max="{{ usage.photos_left }}">
+      </label>
+      <span class="klein" data-photo-status></span>
+      {% endif %}
+      {% if world_settings.allow_audio %}
+      <input type="file" name="audio" hidden data-audio-input>
+      <input type="hidden" name="audio_duration" value="0" data-audio-duration>
+      <button type="button" class="ghost" data-record-button {{ 'disabled' if usage.audio_seconds_left <= 0 }}>🎙️ Audio aufnehmen</button>
+      <span data-record-time>00:00</span>
+      <audio controls hidden data-audio-preview></audio>
+      <span class="klein" data-record-status></span>
+      {% endif %}
+    </div>
+
+    <div class="field">
+      <label for="opens-on">Öffnen am</label>
+      <input id="opens-on" name="opens_on" type="date" min="{{ today }}" required data-open-date-input>
+      <div class="world-date-shortcuts">
+        <button type="button" class="ghost" data-open-date="{{ month_date }}">in 1 Monat</button>
+        <button type="button" class="ghost" data-open-date="{{ year_date }}">in 1 Jahr</button>
+      </div>
+    </div>
+    <button type="submit">🔒 Zeitkapsel schließen</button>
+  </form>
+</section>
+
+<section class="world-capsule-list">
+  <h2>Geschlossen</h2>
+  <div class="world-capsule-grid">
+  {% for item in closed %}
+    <a class="world-capsule-card is-locked" href="/welten/zeitkapseln/{{ item.id }}">
+      <span>🔒</span><div><strong>{{ item.title }}</strong><small>öffnet {{ item.opens_on }} · noch {{ item.days_left }} Tage</small></div>
+    </a>
+  {% else %}
+    <p class="quiet-note">Noch keine geschlossene Zeitkapsel.</p>
+  {% endfor %}
+  </div>
+</section>
+
+<section class="world-capsule-list">
+  <h2>Bereit zum Öffnen</h2>
+  <div class="world-capsule-grid">
+  {% for item in opened %}
+    <a class="world-capsule-card is-open" href="/welten/zeitkapseln/{{ item.id }}">
+      <span>🎁</span><div><strong>{{ item.title }}</strong><small>seit {{ item.opens_on }} bereit</small></div>
+    </a>
+  {% else %}
+    <p class="quiet-note">Wenn ein Öffnungsdatum erreicht ist, erscheint die Kapsel hier.</p>
+  {% endfor %}
+  </div>
+</section>
+
+<div class="world-quota"><span>Heute noch: 📷 {{ usage.photos_left }} Foto(s)</span><span>🎙️ {{ usage.audio_seconds_left }} Sekunden Audio</span></div>
+<script src="/static/meine-welt.js?v={{ asset_version }}" defer></script>
+{% endblock %}
