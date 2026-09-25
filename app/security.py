@@ -14,6 +14,7 @@ import hmac
 import logging
 import re
 import secrets
+import sys
 from urllib.parse import urlsplit
 
 # --- Uploads ---------------------------------------------------------------
@@ -150,6 +151,16 @@ def configure_logging(level: str = "INFO") -> None:
     Deckt auch die Handler ab, die uvicorn ueber dictConfig anlegt, und wird
     beim Start nach dem Aufbau von uvicorn erneut aufgerufen.
     """
+    # Ohne dies faellt sys.stderr/-stdout unter nohup/cron auf die ASCII-
+    # Systemumgebung zurueck und jede Logzeile mit „…“ oder Umlaut crasht
+    # den Handler (UnicodeEncodeError). Muss ausserhalb von
+    # `if not root.handlers` laufen: hat vor dem ersten Aufruf schon eine
+    # Bibliothek per logging.warning() implizit basicConfig() ausgeloest,
+    # haette der Guard diesen Fix sonst stillschweigend uebersprungen.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+
     fmt = RedactingFormatter(LOG_FORMAT)
 
     root = logging.getLogger()
