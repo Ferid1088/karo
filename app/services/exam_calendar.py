@@ -191,6 +191,24 @@ def calendar(exam_id: int) -> list[dict]:
     return result
 
 
+def simulation_date(exam_id: int) -> str | None:
+    item = next((row for row in calendar(exam_id) if row["is_simulation"]), None)
+    return item["date"] if item else None
+
+
+def simulation_topics(exam_id: int) -> list[dict]:
+    exam = _exam(exam_id)
+    try:
+        names = json.loads(exam.get("themen") or "[]")
+    except json.JSONDecodeError:
+        names = []
+    return topics.passende(names, topics.liste(topics.AKTIV))
+
+
+def simulation_available(exam_id: int) -> bool:
+    return simulation_date(exam_id) == db.today()
+
+
 def today_task() -> dict | None:
     today = db.today()
     exams = [dict(row) for row in db.q(
