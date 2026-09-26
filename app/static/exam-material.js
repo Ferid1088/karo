@@ -60,8 +60,6 @@
           entry.dataset.materialId = String(material.id);
           entry.dataset.statusUrl = material.url + '/status';
           const link = document.createElement('a');
-          link.target = '_blank';
-          link.rel = 'noopener';
           const name = document.createElement('span');
           name.className = 'klein';
           entry.append(link, name);
@@ -69,7 +67,7 @@
         }
         update(entry, material);
         poll(entry);
-        message.textContent = 'Gestartet. Über den Link öffnest du das Material in einem neuen Tab.';
+        message.textContent = 'Gestartet. Öffne das Material, sobald es bereit ist.';
       } catch (error) {
         message.textContent = error.message || 'Die Verbindung ist unterbrochen. Bitte erneut versuchen.';
       } finally {
