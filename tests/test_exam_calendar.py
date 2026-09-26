@@ -8,6 +8,7 @@ from .test_app import einrichten, kind_modus_aktivieren
 
 def _exam_with_topic(app_env):
     from app import topics
+    app_env.db.init()
     topic_id = topics.anlegen("Brüche addieren")
     topic = topics.get(topic_id)
     with app_env.db.tx() as c:
