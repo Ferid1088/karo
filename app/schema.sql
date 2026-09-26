@@ -316,6 +316,17 @@ CREATE TABLE IF NOT EXISTS exam_plan (
     UNIQUE (exam_id)
 );
 
+-- Persönlicher Lernkalender zur Klassenarbeit. Der KI-Plan entscheidet,
+-- welche Themen wichtig sind; das Kind entscheidet Lerntage und Zeit.
+CREATE TABLE IF NOT EXISTS exam_schedule (
+    exam_id     INTEGER PRIMARY KEY REFERENCES exam(id) ON DELETE CASCADE,
+    weekdays    TEXT NOT NULL,
+    minutes     INTEGER NOT NULL CHECK(minutes BETWEEN 1 AND 60),
+    start_date  TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
 -- ==========================================================================
 -- 9. Protokoll jedes Modellaufrufs
 -- ==========================================================================
