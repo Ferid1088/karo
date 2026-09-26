@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ material.titel }} – Karo{% endblock %}
 {% block content %}
+<a class="back-link" href="/klassenarbeit">← Zur Klassenarbeit</a>
 <h1>{{ material.titel }}</h1>
-<p class="hint">Dein Klassenarbeit-Tab bleibt geöffnet. Hier lernst du und prüfst anschließend dein Verständnis.</p>
+<p class="sub">Lerne diesen Schritt. Danach prüfst du kurz, was jetzt sitzt.</p>
 {% if material.state == 'bereit' %}
   {% if material.mime == 'video/mp4' %}
   <video class="lernmaterial-video" controls preload="metadata" src="/material/{{ material.round_id }}">Dein Browser unterstützt dieses Video nicht.</video>
