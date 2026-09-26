@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
 from .. import config, db, jobs, kb, quizzes
-from ..services import exam, workflow
+from ..services import exam, exam_calendar, workflow
 from .shared import render
 from ..woche.pilot_store import parent_summary
 from ..welten.store import current_companion, current_interest
@@ -21,7 +21,8 @@ def dashboard(request: Request):
     naechstes = workflow.next_action_display(aktion)
     return render(request, 'dashboard.html', naechstes=naechstes, reviews=reviews,
                   hat_erfolge=bool(db.q1("SELECT id FROM topic WHERE state='aktiv' AND learned_at IS NOT NULL LIMIT 1")),
-                  themen=themen, kb_stat=kb.statistik(), exam=exam.get_next_exam())
+                  themen=themen, kb_stat=kb.statistik(), exam=exam.get_next_exam(),
+                  exam_today=exam_calendar.today_task())
 
 
 @router.get('/lernen', response_class=HTMLResponse)
