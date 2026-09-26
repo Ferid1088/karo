@@ -179,3 +179,52 @@ main.settings-page { max-width: 880px; }
   .settings-destination { grid-column: 2; justify-self: start; margin-top: .25rem; }
   .settings-savebar { bottom: .5rem; gap: .5rem; }
 }
+
+
+/* Focused child learning flow: one clear action, strong hierarchy, less dashboard chrome. */
+.today-hero { margin-bottom: 1.4rem; }
+.today-priority { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 1.2rem;
+  align-items: start; padding: 1.8rem; border: 2px solid var(--border-firm); }
+.today-priority h2 { font-size: clamp(1.45rem, 3vw, 1.85rem); margin: .25rem 0 .55rem; }
+.priority-mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 15px;
+  background: var(--ink); color: #fff; font-family: "Baloo 2", sans-serif; font-size: 1.35rem; font-weight: 700; }
+.exam-today { background: linear-gradient(135deg, var(--surface), var(--ink-soft)); }
+.task-meta { display: inline-block; margin: .1rem 0 .8rem; padding: .25rem .65rem; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border); font-size: .88rem; font-weight: 700; }
+.today-shortcuts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .75rem; margin: 1rem 0 1.6rem; }
+.shortcut-card { display: flex; align-items: center; gap: .8rem; min-height: 78px; padding: .9rem 1rem;
+  border: 1px solid var(--border); border-radius: 18px; background: var(--surface); color: var(--text); text-decoration: none; }
+.shortcut-card:hover { border-color: var(--ink); background: var(--surface-2); }
+.shortcut-card strong,.shortcut-card small { display: block; }
+.shortcut-card small { margin-top: .1rem; color: var(--muted); font-size: .82rem; }
+.shortcut-icon,.round-arrow { display: grid; place-items: center; flex: 0 0 auto; width: 38px; height: 38px;
+  border-radius: 50%; background: var(--ink-soft); font-weight: 800; }
+.learning-heading { max-width: 720px; margin-bottom: 1.8rem; }
+.learning-section { margin: 2rem 0; }
+.section-heading { display: flex; justify-content: space-between; align-items: end; gap: 1.5rem; margin-bottom: .9rem; }
+.section-heading h2 { margin: .15rem 0 0; }
+.section-heading > p { max-width: 38ch; margin: 0; color: var(--muted); font-size: .92rem; text-align: right; }
+.learning-now .card { padding-block: .55rem; }
+.own-topic { display: grid; grid-template-columns: minmax(0,.9fr) minmax(320px,1.1fr); gap: 2rem;
+  align-items: center; margin-top: 2.2rem; border-color: var(--border-firm); }
+.own-topic h2 { margin: .25rem 0 .45rem; font-size: 1.55rem; }
+.own-topic p { margin-bottom: 0; color: var(--muted); }
+.own-topic-form { display: grid; gap: .75rem; }
+.own-topic-form .field { margin: 0; }
+.optional { font-weight: 400; color: var(--muted); }
+.secondary-action { margin: 1rem 0 1.4rem; text-align: center; }
+.secondary-action a { display: inline-flex; min-height: 44px; align-items: center; color: var(--muted); }
+.safe-topics { border-style: dashed; box-shadow: none !important; }
+.safe-chip-list { display: flex; flex-wrap: wrap; gap: .45rem; }
+.safe-chip { padding: .35rem .65rem; border-radius: 999px; background: var(--surface-2);
+  color: var(--muted); font-size: .85rem; }
+.done-card { text-align: center; padding-block: 2rem; }
+
+@media (max-width: 760px) {
+  .today-shortcuts { grid-template-columns: 1fr; }
+  .today-priority { grid-template-columns: 40px minmax(0,1fr); padding: 1.2rem; gap: .8rem; }
+  .priority-mark { width: 40px; height: 40px; border-radius: 13px; }
+  .section-heading { display: block; }
+  .section-heading > p { margin-top: .35rem; text-align: left; }
+  .own-topic { grid-template-columns: 1fr; gap: 1rem; }
+}
