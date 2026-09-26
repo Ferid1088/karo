@@ -2,8 +2,8 @@
 {% block title %}Klassenarbeit – Karo{% endblock %}
 {% block content %}
 {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
-{% if cfg.klassenarbeit_kind %}<a class="back-link" href="/lernen">← Lernen</a>{% endif %}<h1>Dein Plan für die Klassenarbeit</h1>
-<p class="sub">Such dir einen Lerntag aus. Öffne dein Material und übe danach mit Fragen.</p>
+{% if cfg.klassenarbeit_kind %}<a class="back-link" href="/">← Heute</a>{% endif %}<h1>Klassenarbeit</h1>
+<p class="sub">Hier steht nur, was bis zur Arbeit noch zu tun ist. Der heutige Schritt erscheint zusätzlich unter „Heute“.</p>
 
 
 
