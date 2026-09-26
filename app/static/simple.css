@@ -228,3 +228,18 @@ main.settings-page { max-width: 880px; }
   .section-heading > p { margin-top: .35rem; text-align: left; }
   .own-topic { grid-template-columns: 1fr; gap: 1rem; }
 }
+
+/* Four child destinations remain usable on narrow screens without squeezing labels. */
+@media (max-width: 680px) {
+  [data-ui-area="child"] .simple-header .simple-nav {
+    overflow-x: auto;
+    justify-content: flex-start;
+    scrollbar-width: none;
+    padding-bottom: .15rem;
+  }
+  [data-ui-area="child"] .simple-header .simple-nav::-webkit-scrollbar { display: none; }
+  [data-ui-area="child"] .simple-header .simple-nav a {
+    flex: 0 0 auto;
+    padding-inline: .85rem;
+  }
+}
