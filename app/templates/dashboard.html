@@ -1,24 +1,80 @@
 {% extends "base.html" %}
 {% block title %}Heute – Karo{% endblock %}
 {% block content %}
-<div class="welcome"><p class="eyebrow">DEINE LERNZEIT</p><h1>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</h1><p class="sub">Was möchtest du heute lernen?</p></div>
-{% if naechstes %}
-<section class="next-step card">
-  <span class="step-number" aria-hidden="true">1</span>
-  <div><p class="eyebrow">DEIN NÄCHSTER SCHRITT</p><h2>{{ naechstes.titel }}</h2><p>{{ naechstes.text }}</p>
-  <a class="btn gross" href="{{ naechstes.url }}">{{ naechstes.button }} <span aria-hidden="true">→</span></a></div>
-</section>
-{% elif hat_erfolge %}
-<section class="card"><h2>Für heute bist du fertig!</h2><p>Deine abgehakten Themen findest du unter „Erfolge“.</p><a class="btn" href="/lernstand">Meine Erfolge ansehen</a></section>
-{% else %}
-<section class="card next-step"><span class="step-number" aria-hidden="true">1</span><div><h2>Wir machen Karo startklar</h2>
-<p>{{ 'Füge dein erstes Schulblatt als Foto oder PDF hinzu.' if cfg.schulblaetter_kind else 'Hol einen Erwachsenen dazu. Gemeinsam fügt ihr dein erstes Schulblatt hinzu.' }}</p>
-{% if cfg.schulblaetter_kind or role == 'parent' %}<a class="btn" href="/wissen">Erstes Blatt hinzufügen</a>{% endif %}</div></section>
-{% endif %}
-<div class="choice-grid">
-{% include "schulblaetter_link.html" %}
-<a class="choice-card" href="/lernen?tab=bearbeitung"><span class="choice-kicker">LERNEN</span><h2>Thema aussuchen</h2><p>Du entscheidest, was du übst.</p><span class="choice-arrow" aria-hidden="true">→</span></a>
-{% if cfg.klassenarbeit_kind %}<a class="choice-card" href="/klassenarbeit"><span class="choice-kicker">DEIN LERNPLAN</span><h2>Für die Klassenarbeit üben</h2><p>{% if exam %}Deine nächste Arbeit: {{ exam.exam_date[8:10] }}.{{ exam.exam_date[5:7] }}.{{ exam.exam_date[:4] }}{% else %}Schau nach, was als Nächstes dran ist.{% endif %}</p><span class="choice-arrow" aria-hidden="true">→</span></a>{% endif %}
+<div class="welcome today-hero">
+  <p class="eyebrow">HEUTE</p>
+  <h1>Was ist heute wirklich wichtig?</h1>
+  <p class="sub">Karo zeigt dir zuerst nur das, was du noch üben musst.</p>
 </div>
-{% if reviews and not cfg.antworten_pruefen_kind %}<p class="quiet-note">Ein Erwachsener schaut sich noch {{ reviews|length }} Fragerunde{{ 'n' if reviews|length != 1 }} an. {% if role == 'parent' %}<a href="/eltern">Gemeinsam ansehen</a>{% endif %}</p>{% endif %}
+
+{% if heute_pruefung %}
+{% set tag = heute_pruefung.tag %}
+<section class="card today-priority exam-today">
+  <div class="priority-mark" aria-hidden="true">★</div>
+  <div>
+    <p class="eyebrow">KLASSENARBEIT · HEUTE IM LERNPLAN</p>
+    <h2>{{ tag.inhalt }}</h2>
+    {% if tag.erklaerung %}<p>{{ tag.erklaerung }}</p>{% endif %}
+    {% if tag.minuten %}<p class="task-meta">ca. {{ tag.minuten }} Minuten</p>{% endif %}
+    {% if tag.topic_id %}
+    <form method="post" action="/klassenarbeit/{{ heute_pruefung.exam_id }}/lerntag" class="actions">
+      {{ csrf_input() }}
+      <input type="hidden" name="row_key" value="{{ tag.row_key }}">
+      <input type="hidden" name="ausgabe" value="{{ cfg.default_ausgabe }}">
+      <button type="submit" class="btn gross">Für die Klassenarbeit lernen →</button>
+      <a class="btn ghost" href="/klassenarbeit#exam-{{ heute_pruefung.exam_id }}">Plan ansehen</a>
+    </form>
+    {% else %}
+    <a class="btn gross" href="/klassenarbeit#exam-{{ heute_pruefung.exam_id }}">Heutigen Lernplan öffnen →</a>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if naechstes %}
+<section class="card today-priority">
+  <div class="priority-mark" aria-hidden="true">1</div>
+  <div>
+    <p class="eyebrow">{{ 'DANACH' if heute_pruefung else 'DEIN NÄCHSTER SCHRITT' }}</p>
+    <h2>{{ naechstes.titel }}</h2>
+    <p>{{ naechstes.text }}</p>
+    <a class="btn gross" href="{{ naechstes.url }}">{{ naechstes.button }} →</a>
+  </div>
+</section>
+{% elif not heute_pruefung and hat_erfolge %}
+<section class="card done-card">
+  <h2>Für heute ist nichts Dringendes offen.</h2>
+  <p>Was schon sitzt, bleibt aus deinem Lernfokus draußen.</p>
+  <a class="btn ghost" href="/lernstand">Meine Erfolge ansehen</a>
+</section>
+{% elif not heute_pruefung %}
+<section class="card">
+  <h2>Noch kein Lernschritt da</h2>
+  <p>Lege unter „Lernen“ ein Thema an oder füge Schulmaterial hinzu.</p>
+  <a class="btn" href="/lernen#eigenes-thema">Thema eingeben</a>
+</section>
+{% endif %}
+
+<section class="today-shortcuts" aria-label="Weitere Lernwege">
+  <a class="shortcut-card" href="/lernen">
+    <span class="shortcut-icon" aria-hidden="true">◎</span>
+    <span><strong>Lernen</strong><small>Lücken finden und schließen</small></span>
+  </a>
+  {% if cfg.klassenarbeit_kind %}
+  <a class="shortcut-card" href="/klassenarbeit">
+    <span class="shortcut-icon" aria-hidden="true">✓</span>
+    <span><strong>Klassenarbeit</strong><small>Plan und nächste Lerntage</small></span>
+  </a>
+  {% endif %}
+  {% if cfg.schulblaetter_kind %}
+  <a class="shortcut-card" href="/wissen">
+    <span class="shortcut-icon" aria-hidden="true">＋</span>
+    <span><strong>Schulblatt</strong><small>Foto oder PDF hinzufügen</small></span>
+  </a>
+  {% endif %}
+</section>
+
+{% if reviews and not cfg.antworten_pruefen_kind %}
+<p class="quiet-note">Ein Erwachsener schaut sich noch {{ reviews|length }} Fragerunde{{ 'n' if reviews|length != 1 }} an.</p>
+{% endif %}
 {% endblock %}
