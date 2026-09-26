@@ -384,6 +384,21 @@ def eingabe_anlegen(art: str, fach: str | None = None,
              konfidenz, db.now())).lastrowid
 
 
+def topic_mastery(topic_id: int, child_key: str = CHILD_KEY) -> str | None:
+    """Letzter beobachteter Lernzustand eines normalen Karo-Themas.
+
+    Damit kann z. B. der Klassenarbeitsplan beim selben Thema bleiben, bis
+    der adaptive Lernweg es wirklich als MASTERED abgeschlossen hat.
+    """
+    row = db.q1(
+        """SELECT s.zustand FROM lern_sitzung s
+             JOIN lern_eingabe e ON e.id=s.eingabe_id
+            WHERE s.child_key=? AND e.topic_id=?
+            ORDER BY s.id DESC LIMIT 1""",
+        child_key, topic_id)
+    return row["zustand"] if row else None
+
+
 def themen_mit_sitzung(child_key: str = CHILD_KEY) -> dict:
     """Themen-ID → ob dazu gerade eine Sitzung offen ist.
 
