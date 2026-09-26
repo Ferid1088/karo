@@ -62,7 +62,8 @@
     <a href="/setup" {{ 'aria-current=page' if path.startswith('/setup') }}>Einstellungen</a>
     {% else %}
     <a href="/" {{ 'aria-current=page' if path == '/' }}>Heute</a>
-    <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/klassenarbeit')) }}>Lernen</a>
+    <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz')) }}>Lernen</a>
+    {% if cfg.klassenarbeit_kind %}<a href="/klassenarbeit" {{ 'aria-current=page' if path.startswith('/klassenarbeit') }}>Klassenarbeit</a>{% endif %}
     <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>
     {% endif %}
   </nav>
