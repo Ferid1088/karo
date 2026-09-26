@@ -8,14 +8,18 @@
   <span class="step-number" aria-hidden="true">1</span>
   <div>
     <p class="eyebrow">HEUTE · KLASSENARBEIT</p>
-    <h2>{{ exam_today.inhalt }}</h2>
-    <p>{{ exam_today.minutes }} Minuten · Arbeit am {{ exam_today.exam_date_label }}</p>
-    <form method="post" action="/lernen/adaptiv/start">
-      {{ csrf_input() }}
-      <input type="hidden" name="thema" value="{{ exam_today.thema }}">
-      <input type="hidden" name="topic_id" value="{{ exam_today.topic_id or '' }}">
-      <button class="btn gross" type="submit">Heute lernen <span aria-hidden="true">→</span></button>
-    </form>
+    <h2>{{ 'Wiederholung + Prüfungssimulation' if exam_today.is_simulation else exam_today.inhalt }}</h2>
+    <p>{% if exam_today.minutes %}{{ exam_today.minutes }} Minuten · {% endif %}Arbeit am {{ exam_today.exam_date_label }}</p>
+    {% if exam_today.is_simulation %}
+      <a class="btn gross" href="/klassenarbeit/{{ exam_today.exam_id }}/simulation">Simulation starten <span aria-hidden="true">→</span></a>
+    {% else %}
+      <form method="post" action="/lernen/adaptiv/start">
+        {{ csrf_input() }}
+        <input type="hidden" name="thema" value="{{ exam_today.thema }}">
+        <input type="hidden" name="topic_id" value="{{ exam_today.topic_id or '' }}">
+        <button class="btn gross" type="submit">Heute lernen <span aria-hidden="true">→</span></button>
+      </form>
+    {% endif %}
     <p class="hint"><a href="/klassenarbeit#exam-{{ exam_today.exam_id }}">Lernkalender ansehen</a></p>
   </div>
 </section>
