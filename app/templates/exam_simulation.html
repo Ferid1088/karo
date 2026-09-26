@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Prüfungssimulation – {{ companion_name }}{% endblock %}
+{% block content %}
+<a class="back-link" href="/klassenarbeit#exam-{{ exam_id }}">← Zum Lernkalender</a>
+<div style="max-width:44rem;margin:0 auto">
+  <p class="eyebrow">HEUTE IST SIMULATION</p>
+  <h1>Wiederholung + Prüfungssimulation</h1>
+  <p class="sub">Die Fragen werden erst jetzt erstellt. Arbeite die angekündigten Themen nacheinander durch.</p>
+
+  {% if themen %}
+  <div class="simple-list">
+    {% for thema in themen %}
+    <form method="post" action="/klassenarbeit/{{ exam_id }}/simulation/{{ thema.id }}">
+      {{ csrf_input() }}
+      <button type="submit" class="simple-list-link">
+        <span><strong>{{ thema.label }}</strong><small>Prüfungsfragen starten</small></span>
+      </button>
+    </form>
+    {% endfor %}
+  </div>
+  {% else %}
+  <section class="card">
+    <h2>Noch keine passenden Themen freigegeben</h2>
+    <p>Bitte zuerst die Themen der Klassenarbeit in Karo freigeben.</p>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
