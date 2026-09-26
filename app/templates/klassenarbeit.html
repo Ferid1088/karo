@@ -2,6 +2,7 @@
 {% block title %}Klassenarbeit – Karo{% endblock %}
 {% block content %}
 {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
+{% set today_de = today[8:10] ~ '.' ~ today[5:7] ~ '.' ~ today[0:4] %}
 {% if cfg.klassenarbeit_kind %}<a class="back-link" href="/">← Heute</a>{% endif %}<h1>Klassenarbeit</h1>
 <p class="sub">Hier steht nur, was bis zur Arbeit noch zu tun ist. Der heutige Schritt erscheint zusätzlich unter „Heute“.</p>
 
@@ -100,69 +101,75 @@
     <button type="submit" class="ghost">Erneut versuchen</button>
   </form>
   {% elif e.plan and e.plan.state == 'bereit' %}
-  <details style="margin:.7rem 0" open>
-    <summary style="cursor:pointer"><strong>Lernplan</strong></summary>
-    {% if e.plan.einschaetzung %}<p class="hint" style="margin-top:.5rem">{{ e.plan.einschaetzung }}</p>{% endif %}
+  <section class="exam-plan" aria-label="Lernplan">
+    <div class="exam-plan-heading">
+      <div>
+        <p class="eyebrow">DEIN LERNPLAN</p>
+        <h3>Ein Lerntag nach dem anderen</h3>
+      </div>
+      {% if e.plan.einschaetzung %}<p>{{ e.plan.einschaetzung }}</p>{% endif %}
+    </div>
     {% if e.plan.tagesplan_liste %}
-    <div class="tablewrap" style="margin:.5rem 0">
-      <table>
-        <thead><tr><th>Tag</th><th>Thema und Lernreihe</th><th>Lernmaterial</th><th class="num">Minuten</th></tr></thead>
-        <tbody>
-          {% for tag in e.plan.tagesplan_liste %}
-          <tr>
-            <td><strong>{{ tag.tag }}</strong></td>
-            <td>
-              <strong>{{ tag.inhalt }}</strong>
-              {% if tag.erklaerung %}<p class="klein">Erklärung: {{ tag.erklaerung }}</p>{% endif %}
-              {% if tag.diagnose_fragen %}
-              <details class="plan-fragen"><summary>5 Diagnosefragen</summary>
-                <ol>{% for frage in tag.diagnose_fragen %}<li>{{ frage }}</li>{% endfor %}</ol>
-              </details>
-              {% endif %}
-              {% if tag.neue_fragen %}
-              <details class="plan-fragen"><summary>5 neue Kontrollfragen</summary>
-                <ol>{% for frage in tag.neue_fragen %}<li>{{ frage }}</li>{% endfor %}</ol>
-              </details>
-              {% endif %}
-            </td>
-            <td class="plan-material-cell" data-plan-material>
-              {% if tag.topic_id %}
-              <form method="post" action="/klassenarbeit/{{ e.id }}/lerntag"
-                    class="actions plan-start" target="_blank" rel="noopener" data-material-form>
-                {{ csrf_input() }}
-                <input type="hidden" name="row_key" value="{{ tag.row_key }}">
-                <select name="ausgabe" class="mini" aria-label="Ausgabeformat">
-                  {% for wert, label in ausgabe_labels.items() %}
-                  <option value="{{ wert }}" {{ 'selected' if cfg.default_ausgabe == wert }}>{{ label }}</option>
-                  {% endfor %}
-                </select>
-                <button type="submit" class="quiet">Neues Lernmaterial erstellen</button>
-              </form>
-              <p class="hint" data-material-message role="status" aria-live="polite"></p>
-              <div data-material-list>
-                {% for m in tag.materialien %}
-                <p data-material-id="{{ m.id }}" data-status-url="{{ m.url }}/status" data-state="{{ m.state }}">
-                  <a href="{{ m.url }}" target="_blank" rel="noopener">{{ m.meldung }}</a>
-                  <span class="klein">{{ m.titel }} · {{ ausgabe_labels.get(m.ausgabe, m.ausgabe) }}{% if m.ergebnis %} · {{ m.ergebnis }}{% endif %}</span>
-                </p>
-                {% endfor %}
-              </div>
-              {% elif tag.minuten %}
-              <p class="hint">Bitte das passende Thema unter „Themen“ freigeben, um Lernmaterial zu erstellen.</p>
-              {% endif %}
-            </td>
-            <td class="num">{{ tag.minuten }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="exam-day-list">
+      {% for tag in e.plan.tagesplan_liste %}
+      <article class="exam-day-card {{ 'is-today' if tag.tag == today_de }} {{ 'is-pause' if not tag.minuten }}">
+        <div class="exam-day-date">
+          <strong>{{ 'Heute' if tag.tag == today_de else tag.tag }}</strong>
+          {% if tag.minuten %}<span>{{ tag.minuten }} Min.</span>{% else %}<span>Pause</span>{% endif %}
+        </div>
+        <div class="exam-day-main">
+          <h4>{{ tag.inhalt }}</h4>
+          {% if tag.erklaerung %}<p>{{ tag.erklaerung }}</p>{% endif %}
+          {% if tag.diagnose_fragen or tag.neue_fragen %}
+          <details class="disclosure compact">
+            <summary>Was an diesem Tag geprüft wird</summary>
+            {% if tag.diagnose_fragen %}
+            <p class="eyebrow">ZUERST KURZ TESTEN</p>
+            <ol>{% for frage in tag.diagnose_fragen %}<li>{{ frage }}</li>{% endfor %}</ol>
+            {% endif %}
+            {% if tag.neue_fragen %}
+            <p class="eyebrow">DANACH KONTROLLIEREN</p>
+            <ol>{% for frage in tag.neue_fragen %}<li>{{ frage }}</li>{% endfor %}</ol>
+            {% endif %}
+          </details>
+          {% endif %}
+        </div>
+        <div class="exam-day-action" data-plan-material>
+          {% if tag.topic_id and tag.minuten %}
+          <form method="post" action="/klassenarbeit/{{ e.id }}/lerntag"
+                class="plan-start" data-material-form>
+            {{ csrf_input() }}
+            <input type="hidden" name="row_key" value="{{ tag.row_key }}">
+            <input type="hidden" name="ausgabe" value="{{ cfg.default_ausgabe }}">
+            <button type="submit">{{ 'Heute lernen →' if tag.tag == today_de else 'Lerntag starten →' }}</button>
+          </form>
+          <p class="hint" data-material-message role="status" aria-live="polite"></p>
+          <div class="exam-material-list" data-material-list>
+            {% for m in tag.materialien %}
+            <p data-material-id="{{ m.id }}" data-status-url="{{ m.url }}/status" data-state="{{ m.state }}">
+              <a href="{{ m.url }}">{{ m.meldung }}</a>
+              <span class="klein">{{ m.titel }} · {{ ausgabe_labels.get(m.ausgabe, m.ausgabe) }}{% if m.ergebnis %} · {{ m.ergebnis }}{% endif %}</span>
+            </p>
+            {% endfor %}
+          </div>
+          {% elif tag.minuten %}
+          <p class="hint">Das passende Thema muss noch bestätigt werden. Bitte einen Erwachsenen holen.</p>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
     </div>
     {% endif %}
-    <form method="post" action="/klassenarbeit/{{ e.id }}/plan/neu">
-      {{ csrf_input() }}
-      <button type="submit" class="quiet">Lernplan neu erstellen</button>
-    </form>
-  </details>
+    {% if role == 'parent' %}
+    <details class="disclosure compact">
+      <summary>Lernplan neu erstellen</summary>
+      <form method="post" action="/klassenarbeit/{{ e.id }}/plan/neu">
+        {{ csrf_input() }}
+        <button type="submit" class="quiet">Plan neu erstellen</button>
+      </form>
+    </details>
+    {% endif %}
+  </section>
   {% endif %}
 
   {% if e.kalibrierung.zeilen %}
