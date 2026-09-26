@@ -211,3 +211,99 @@ main.settings-page { max-width: 880px; }
   .settings-profile-layout { grid-template-columns: 48px minmax(0, 1fr); gap: .8rem; }
   .settings-profile-photo { width: 48px; height: 48px; }
 }
+
+
+/* Klassenarbeit: echter Tageskalender mit eigener Lernzeit je Datum. */
+.exam-calendar-weekdays,
+.exam-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: .45rem;
+}
+.exam-calendar-weekdays {
+  margin: 1rem 0 .35rem;
+  text-align: center;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.exam-calendar-day {
+  min-height: 132px;
+  padding: .65rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.exam-calendar-day.today {
+  border: 2px solid var(--ink);
+}
+.exam-calendar-day.learning {
+  background: var(--ink-soft);
+}
+.exam-calendar-day.exam {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--surface-2);
+}
+.exam-calendar-day header {
+  display: flex;
+  justify-content: space-between;
+  gap: .4rem;
+  align-items: baseline;
+  margin-bottom: .55rem;
+}
+.exam-calendar-day header small {
+  color: var(--muted);
+}
+.exam-calendar-day label {
+  display: block;
+  font-size: .75rem;
+  color: var(--muted);
+  margin-bottom: .25rem;
+}
+.exam-calendar-minute-input {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+}
+.exam-calendar-minute-input input {
+  width: 100%;
+  min-width: 0;
+  padding: .45rem;
+  text-align: center;
+  font-weight: 700;
+}
+.exam-calendar-minute-input span {
+  font-size: .75rem;
+  color: var(--muted);
+}
+.exam-calendar-topic {
+  display: block;
+  margin-top: .5rem;
+  line-height: 1.25;
+  color: var(--muted);
+}
+.exam-calendar-exam-label {
+  font-weight: 700;
+  line-height: 1.2;
+}
+.exam-calendar-exam-time {
+  font-size: 1.4rem;
+}
+.exam-calendar-save {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: end;
+  margin-top: 1rem;
+}
+.exam-calendar-save .hint {
+  margin: 0;
+}
+@media (max-width: 760px) {
+  .exam-calendar-weekdays { display: none; }
+  .exam-calendar-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .exam-calendar-empty { display: none; }
+  .exam-calendar-save { align-items: stretch; flex-direction: column; }
+}
