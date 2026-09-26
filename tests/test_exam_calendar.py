@@ -218,3 +218,25 @@ def test_exam_plan_stays_on_topic_until_adaptive_mastery(app_env, monkeypatch):
     after = exam_calendar.calendar(exam_id)
     normal = [item for item in after if item["is_learning_day"] and not item["is_simulation"]]
     assert normal and all(item["topic_id"] == second_id for item in normal)
+
+
+def test_empty_calendar_days_are_valid_and_mean_no_study(app_env, monkeypatch):
+    from app.services import exam_calendar
+
+    exam_id, _ = _exam_with_topic(app_env)
+    monkeypatch.setattr("app.db.today", lambda: "2026-09-27")
+
+    exam_calendar.save_days(exam_id, {
+        "2026-09-27": "",
+        "2026-09-28": "23",
+        "2026-09-29": "",
+        "2026-09-30": "29",
+        "2026-10-01": "",
+    })
+
+    saved = exam_calendar.get_days(exam_id)
+    assert saved["2026-09-27"] == 0
+    assert saved["2026-09-28"] == 23
+    assert saved["2026-09-29"] == 0
+    assert saved["2026-09-30"] == 29
+    assert saved["2026-10-01"] == 0
