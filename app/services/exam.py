@@ -132,6 +132,27 @@ def get_next_exam() -> dict | None:
     return dict(row) if row else None
 
 
+def get_today_learning_day() -> dict | None:
+    """Genau der Lerntag, der laut Klassenarbeitsplan heute dran ist."""
+    try:
+        heute = dt.date.fromisoformat(db.today()).strftime("%d.%m.%Y")
+    except ValueError:
+        return None
+    for row in db.q("SELECT * FROM exam WHERE exam_date >= ? ORDER BY exam_date, id",
+                    db.today()):
+        plan = exam_plan.holen_plan(row["id"])
+        if not plan or plan.get("state") != "bereit":
+            continue
+        for tag in plan.get("tagesplan_liste", []):
+            if str(tag.get("tag") or "").strip() == heute:
+                return {
+                    "exam_id": row["id"],
+                    "exam_date": row["exam_date"],
+                    "tag": tag,
+                }
+    return None
+
+
 def save_exam_results(exam_id: int, formular: FormData) -> int:
     """Schreibt die tatsaechlichen Ergebnisse — nur fuer Themen, die
     wirklich zu dieser Klassenarbeit gehoeren (siehe `prediction`), damit
