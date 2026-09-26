@@ -7,7 +7,7 @@
   <p class="sub">Karo zeigt dir zuerst nur das, was du noch üben musst.</p>
 </div>
 
-{% if heute_pruefung %}
+{% if heute_pruefung and cfg.klassenarbeit_kind %}
 {% set tag = heute_pruefung.tag %}
 <section class="card today-priority exam-today">
   <div class="priority-mark" aria-hidden="true">★</div>
@@ -35,19 +35,19 @@
 <section class="card today-priority">
   <div class="priority-mark" aria-hidden="true">1</div>
   <div>
-    <p class="eyebrow">{{ 'DANACH' if heute_pruefung else 'DEIN NÄCHSTER SCHRITT' }}</p>
+    <p class="eyebrow">{{ 'DANACH' if heute_pruefung and cfg.klassenarbeit_kind else 'DEIN NÄCHSTER SCHRITT' }}</p>
     <h2>{{ naechstes.titel }}</h2>
     <p>{{ naechstes.text }}</p>
     <a class="btn gross" href="{{ naechstes.url }}">{{ naechstes.button }} →</a>
   </div>
 </section>
-{% elif not heute_pruefung and hat_erfolge %}
+{% elif (not heute_pruefung or not cfg.klassenarbeit_kind) and hat_erfolge %}
 <section class="card done-card">
   <h2>Für heute ist nichts Dringendes offen.</h2>
   <p>Was schon sitzt, bleibt aus deinem Lernfokus draußen.</p>
   <a class="btn ghost" href="/lernstand">Meine Erfolge ansehen</a>
 </section>
-{% elif not heute_pruefung %}
+{% elif not heute_pruefung or not cfg.klassenarbeit_kind %}
 <section class="card">
   <h2>Noch kein Lernschritt da</h2>
   <p>Lege unter „Lernen“ ein Thema an oder füge Schulmaterial hinzu.</p>
