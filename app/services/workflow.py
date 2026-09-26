@@ -475,23 +475,32 @@ def offene_schritte():
 
 
 def render_lernen_uebersicht(request: Request):
-    """Die Lernuebersicht (/lernen) — auch der Einstiegspunkt fuer
-    /lernzyklus (Index), damit der Lernzyklus-Router nicht dashboard.py's
-    Routen-Funktion direkt aufrufen muss."""
+    """Kindliche Lernzentrale: Diagnose und Luecken vor bereits sicherem Stoff."""
     themen, schritte, reviews = offene_schritte()
     learning_content.add_creation_options(themen)
     grouped = learning_progress.groups(themen)
-    cfg = config.load()
-    tab = request.query_params.get('tab', 'bearbeitung')
-    if tab not in ('neu', 'bearbeitung', 'klassenarbeit') or (tab == 'klassenarbeit' and not cfg.klassenarbeit_kind):
-        tab = 'bearbeitung'
-    subtab = request.query_params.get('status', 'neu')
-    if subtab not in ('neu', 'bearbeitung'):
-        subtab = 'neu'
-    return render(request, 'lernen_start.html', themen=themen, schritte=schritte,
-                  gruppen=grouped, tab=tab, subtab=subtab,
-                  exam_gruppen=learning_progress.exam_groups(topics.liste(topics.AKTIV)) if cfg.klassenarbeit_kind else {},
-                  reviews=reviews, reviews_by_topic={q['topic_id']: q for q in reviews})
+    status = {t["id"]: key for key, rows in grouped.items() for t in rows}
+    fokus = [
+        t for t in themen
+        if t["flag"] in (Flag.ROT.value, Flag.GELB.value)
+        or status.get(t["id"]) == "bearbeitung"
+    ]
+    diagnose = [
+        t for t in themen
+        if t["flag"] == Flag.WEISS.value and status.get(t["id"]) == "neu"
+    ]
+    sicher = [t for t in topics.liste(topics.AKTIV) if t["flag"] == Flag.GRUEN.value]
+    return render(
+        request, "lernen_start.html",
+        themen=themen,
+        schritte=schritte,
+        fokus=fokus,
+        diagnose=diagnose,
+        sicher=sicher,
+        gruppen=grouped,
+        reviews=reviews,
+        reviews_by_topic={q["topic_id"]: q for q in reviews},
+    )
 
 
 def _schritt_kategorie(schritt: dict) -> str:
