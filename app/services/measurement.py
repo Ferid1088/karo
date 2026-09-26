@@ -14,6 +14,7 @@ dafuer, es gibt also nichts, was hier dupliziert werden koennte.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 from pathlib import Path
 
@@ -78,6 +79,10 @@ def render_klassenarbeit(request: Request):
         e["plan"] = exam_plan.holen_plan(e["id"])
         e["schedule"] = exam_calendar.get(e["id"])
         e["calendar"] = exam_calendar.calendar(e["id"])
+        e["calendar_leading_blanks"] = (
+            (dt.date.fromisoformat(e["calendar"][0]["date"]).isoweekday() - 1)
+            if e["calendar"] else 0
+        )
     return render(request, "klassenarbeit.html", zeilen=zeilen,
                   adult_page=not config.load().klassenarbeit_kind,
                   scan=exam_plan.offene_scan(), counts=jobs.counts(),
