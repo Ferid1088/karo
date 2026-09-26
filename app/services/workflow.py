@@ -53,8 +53,15 @@ def render_quiz_page(request: Request, quiz_id: int):
     topic = topics.get(quiz['topic_id'])
     if topic:
         learning_content.add_creation_options([topic])
+    exam_material = None
+    if quiz.get("lesson_id"):
+        exam_material = db.q1("SELECT id FROM exam_material WHERE lesson_id=?",
+                              quiz["lesson_id"])
+    back_url = (f"/klassenarbeit/material/{exam_material['id']}"
+                if exam_material else "/lernen")
+    back_label = "Zurück zur Klassenarbeit" if exam_material else "Zurück zum Lernen"
     return render(request, "quiz.html", quiz=quiz, counts=jobs.counts(),
-                  progress_topic=topic,
+                  progress_topic=topic, back_url=back_url, back_label=back_label,
                   signatur=_quiz_signatur(quiz_id))
 
 
@@ -597,8 +604,12 @@ def render_lernen_page(request: Request, lesson_id: int):
     hat_material = bool(
         kb.lehrmaterial(lesson["topic_id"], thema.get("label", ""), limit=1)
         or research.material_fuer(lesson["topic_id"]))
+    exam_material = db.q1("SELECT id FROM exam_material WHERE lesson_id=?", lesson_id)
+    back_url = (f"/klassenarbeit/material/{exam_material['id']}"
+                if exam_material else "/lernen")
+    back_label = "Zurück zur Klassenarbeit" if exam_material else "Alle Lernthemen"
     return render(request, "lernen.html", lesson=lesson, counts=jobs.counts(),
-                  progress_topic=thema,
+                  progress_topic=thema, back_url=back_url, back_label=back_label,
                   funde=research.freigegebene(lesson["topic_id"]),
                   vorschlaege=research.vorschlaege(lesson["topic_id"]),
                   recherche_erlaubt=config.load_safe().recherche_erlaubt,
