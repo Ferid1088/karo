@@ -2,91 +2,102 @@
 {% block title %}Meine Welt – Karo{% endblock %}
 {% block mainclass %}world-page{% endblock %}
 {% block content %}
-<div class="world-head">
-  <div>
+<section class="world-hero">
+  <img src="/static/world-hero.svg" alt="" aria-hidden="true">
+  <div class="world-hero-copy">
     <p class="eyebrow">MEINE WELT</p>
     <h1>Deine Welt. Dein Jahr.</h1>
-    <p class="sub">Entdecke eine Sache, denk kurz nach oder bewahre einen Moment von heute.</p>
+    <p>Entdecke etwas Neues, halte einen echten Moment fest und schau später wieder darauf zurück.</p>
   </div>
   <div class="world-privacy-note">🔒 Privat · ohne KI · ohne Werbung</div>
-</div>
+</section>
 
-<nav class="world-subnav" aria-label="Meine Welt">
+<nav class="world-subnav world-subnav-polished" aria-label="Meine Welt">
   <a href="/welten" aria-current="page">Heute</a>
   <a href="/welten/jahr">Mein Jahr</a>
   <a href="/welten/zeitkapseln">Zeitkapseln</a>
 </nav>
 
 {% if needs_approval and role == 'parent' %}
-<section class="world-parent-callout">
-  <strong>Elternfreigabe fehlt noch.</strong>
-  <span>Bevor das Kind persönliche Erinnerungen speichert, bitte die Einstellungen prüfen.</span>
+<section class="world-parent-callout world-parent-callout-polished">
+  <div><span class="world-parent-icon">🛡️</span></div>
+  <div class="world-parent-copy"><strong>Elternfreigabe fehlt noch</strong><span>Persönliche Erinnerungen bleiben bis zur Freigabe ausgeschaltet.</span></div>
   <a class="btn" href="/welten/eltern">Freigabe einrichten</a>
 </section>
 {% endif %}
 
 <section class="world-today">
-  <div class="world-section-heading">
+  <div class="world-section-heading world-section-heading-polished">
     <div><span class="world-sun">☀️</span><div><h2>Heute für dich</h2><p>Drei kleine Dinge. Du musst keines davon machen.</p></div></div>
   </div>
 
-  <div class="world-card-grid">
-    <article class="world-feature world-discover">
-      <span class="world-kicker">🌍 Entdecken</span>
-      <h3>{{ discovery.title }}</h3>
-      <p>{{ discovery.teaser }}</p>
-      <a class="btn world-btn" href="/welten/entdecken">Öffnen →</a>
+  <div class="world-card-grid world-card-grid-polished">
+    <article class="world-feature world-discover world-feature-polished">
+      <div class="world-feature-image"><img src="/static/world-bee.svg" alt="" aria-hidden="true"></div>
+      <div class="world-feature-body">
+        <span class="world-kicker">🌍 Entdecken</span>
+        <h3>{{ discovery.title }}</h3>
+        <p>{{ discovery.teaser }}</p>
+        <a class="btn world-btn" href="/welten/entdecken">Entdecken →</a>
+      </div>
     </article>
 
-    <article class="world-feature world-reflect">
-      <span class="world-kicker">💭 Nachdenken</span>
-      <h3>{{ reflection.question }}</h3>
-      {% if reflection_entry %}
-        <p class="world-saved">✓ Dein Gedanke ist für heute gespeichert.</p>
-        <p class="world-entry-preview">„{{ reflection_entry.text }}“</p>
-      {% elif world_settings.enabled or role == 'child' %}
-        <form method="post" action="/welten/nachdenken" class="world-inline-form">
-          {{ csrf_input() }}
-          <input type="hidden" name="prompt_id" value="{{ reflection.id }}">
-          <label class="sr-only" for="reflection-text">Deine Antwort</label>
-          <textarea id="reflection-text" name="text" maxlength="1000" rows="3" placeholder="Ein Satz reicht."></textarea>
-          <button type="submit">Speichern</button>
-        </form>
-      {% else %}
-        <p>Nach der Elternfreigabe kannst du hier Gedanken festhalten.</p>
-      {% endif %}
+    <article class="world-feature world-reflect world-feature-polished">
+      <div class="world-feature-image"><img src="/static/world-thought.svg" alt="" aria-hidden="true"></div>
+      <div class="world-feature-body">
+        <span class="world-kicker">💭 Nachdenken</span>
+        <h3>{{ reflection.question }}</h3>
+        {% if reflection_entry %}
+          <p class="world-saved">✓ Dein Gedanke ist für heute gespeichert.</p>
+          <p class="world-entry-preview">„{{ reflection_entry.text }}“</p>
+        {% elif world_settings.enabled or role == 'child' %}
+          <form method="post" action="/welten/nachdenken" class="world-inline-form">
+            {{ csrf_input() }}
+            <input type="hidden" name="prompt_id" value="{{ reflection.id }}">
+            <label class="sr-only" for="reflection-text">Deine Antwort</label>
+            <textarea id="reflection-text" name="text" maxlength="1000" rows="2" placeholder="Ein Satz reicht."></textarea>
+            <button type="submit">Speichern</button>
+          </form>
+        {% else %}
+          <p>Nach der Elternfreigabe kannst du hier Gedanken festhalten.</p>
+        {% endif %}
+      </div>
     </article>
 
-    <article class="world-feature world-hold">
-      <span class="world-kicker">❤️ Festhalten</span>
-      <h3>Was möchtest du von heute behalten?</h3>
-      {% if moment %}
-        <p class="world-saved">✓ Dein Moment für heute ist gespeichert.</p>
-        {% if moment.text %}<p class="world-entry-preview">„{{ moment.text }}“</p>{% endif %}
-        <a class="btn world-btn" href="/welten/jahr">Im Jahr ansehen →</a>
-      {% elif world_settings.enabled %}
-        <div class="world-medium-row" aria-hidden="true"><span>✍️</span><span>📷</span><span>🎙️</span></div>
-        <a class="btn world-btn" href="/welten/festhalten">Festhalten →</a>
-      {% else %}
-        <p>Text, Fotos und Audio werden erst nach Elternfreigabe aktiviert.</p>
-      {% endif %}
+    <article class="world-feature world-hold world-feature-polished">
+      <div class="world-feature-image"><img src="/static/world-moment.svg" alt="" aria-hidden="true"></div>
+      <div class="world-feature-body">
+        <span class="world-kicker">❤️ Festhalten</span>
+        <h3>Was möchtest du von heute behalten?</h3>
+        {% if moment %}
+          <p class="world-saved">✓ Dein Moment für heute ist gespeichert.</p>
+          {% if moment.text %}<p class="world-entry-preview">„{{ moment.text }}“</p>{% endif %}
+          <a class="btn world-btn" href="/welten/jahr">Im Jahr ansehen →</a>
+        {% elif world_settings.enabled %}
+          <a class="btn world-btn" href="/welten/festhalten">Moment festhalten →</a>
+        {% else %}
+          <p>Text, Fotos und Audio werden erst nach Elternfreigabe aktiviert.</p>
+        {% endif %}
+      </div>
     </article>
   </div>
 </section>
 
-<section class="world-lower-grid">
-  <a class="world-big-link" href="/welten/jahr">
+<section class="world-lower-grid world-lower-grid-polished">
+  <a class="world-big-link world-year-link" href="/welten/jahr">
+    <div class="world-big-link-icon">📅</div>
     <div>
-      <span class="world-kicker">📅 Mein Jahr</span>
+      <span class="world-kicker">Mein Jahr</span>
       <h2>{{ year_count }} Erinnerungen & Entdeckungen</h2>
-      <p>Deine Momente in zeitlicher Reihenfolge – ohne Bewertung und ohne Punkte.</p>
+      <p>Deine echten Momente – mit deinen Fotos und Aufnahmen, sobald du welche speicherst.</p>
     </div>
     <span class="world-arrow">→</span>
   </a>
 
   <a class="world-big-link world-capsule-link" href="/welten/zeitkapseln">
+    <div class="world-big-link-icon">🔐</div>
     <div>
-      <span class="world-kicker">🔐 Zeitkapseln</span>
+      <span class="world-kicker">Zeitkapseln</span>
       <h2>{{ capsule_count }} gespeichert</h2>
       <p>Nachrichten für dein späteres Ich. Bis zum Öffnungsdatum wirklich geschlossen.</p>
     </div>
@@ -96,7 +107,7 @@
 
 {% if world_settings.enabled %}
 <div class="world-quota" aria-label="Heutiger Medienspeicher">
-  <span>Heute noch: 📷 {{ usage.photos_left }} Foto(s)</span>
+  <span>📷 {{ usage.photos_left }} Foto(s) heute noch</span>
   <span>🎙️ {{ usage.audio_seconds_left }} Sekunden Audio</span>
 </div>
 {% endif %}

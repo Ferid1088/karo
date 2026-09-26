@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" role="img" aria-labelledby="t d">
+<title id="t">Pastellfarbene Berglandschaft</title><desc id="d">Eine ruhige Berglandschaft bei Sonnenuntergang mit See, Bäumen und einem Kind, das in die Ferne blickt.</desc>
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#efe7ff"/><stop offset=".5" stop-color="#ffd9c5"/><stop offset="1" stop-color="#fff4d5"/></linearGradient>
+  <linearGradient id="lake" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c9e8ff"/><stop offset="1" stop-color="#eadcff"/></linearGradient>
+  <linearGradient id="m1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7f8ec8"/><stop offset="1" stop-color="#5d699e"/></linearGradient>
+  <linearGradient id="m2" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#596e9c"/><stop offset="1" stop-color="#3f567f"/></linearGradient>
+  <filter id="soft"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<rect width="1200" height="420" rx="34" fill="url(#sky)"/>
+<circle cx="875" cy="112" r="56" fill="#ffd66e"/><circle cx="875" cy="112" r="88" fill="#ffe8a8" opacity=".35" filter="url(#soft)"/>
+<g fill="#fff" opacity=".82"><ellipse cx="245" cy="88" rx="72" ry="24"/><ellipse cx="292" cy="80" rx="44" ry="20"/><ellipse cx="940" cy="64" rx="48" ry="16"/></g>
+<path d="M0 255 180 151 300 228 466 106 640 250 770 154 920 255 1045 170 1200 259V420H0Z" fill="url(#m1)"/>
+<path d="M0 293 178 226 325 278 520 188 655 302 832 219 1000 292 1100 235 1200 289V420H0Z" fill="url(#m2)"/>
+<path d="M420 164 466 106 513 169 490 157 466 143 446 157Z" fill="#fff" opacity=".86"/>
+<path d="M739 188 770 154 805 190 786 184 770 175 756 184Z" fill="#fff" opacity=".72"/>
+<path d="M0 315C155 287 261 303 376 328c143 31 225 3 344-12 170-22 310 0 480 41v63H0Z" fill="url(#lake)"/>
+<path d="M0 344c160-19 297-12 430 9 182 29 315 16 490-5 96-12 183-10 280 4v68H0Z" fill="#bfe0e3" opacity=".7"/>
+<g opacity=".78" fill="#264f4d">
+  <path d="m74 329 30-74 30 74h-19l24 58H69l25-58Z"/><path d="m1080 314 25-62 25 62h-15l20 49h-60l20-49Z"/>
+  <path d="m1020 337 20-49 20 49h-13l16 39h-48l17-39Z"/>
+</g>
+<g transform="translate(955 214)">
+  <ellipse cx="42" cy="144" rx="58" ry="11" fill="#314e5c" opacity=".18"/>
+  <path d="M28 60c9-18 33-27 49-9 11 12 8 31-2 42l-12 12-39-17Z" fill="#4a2f25"/>
+  <circle cx="53" cy="44" r="22" fill="#b86e44"/><path d="M34 39c5-26 40-32 49-6-12-8-29-9-49 6Z" fill="#39251f"/>
+  <path d="M23 82c25-14 54-7 64 11l19 49H13l10-60Z" fill="#e49b4e"/>
+  <path d="M16 140h90l20 26H-5Z" fill="#375762"/>
+  <path d="M13 97c-12 9-18 25-21 44h19l17-34Z" fill="#b86e44"/><path d="M88 98c13 10 21 24 27 42h-19l-24-31Z" fill="#b86e44"/>
+</g>
+<g opacity=".7"><circle cx="185" cy="273" r="4" fill="#fff"/><circle cx="212" cy="257" r="3" fill="#fff"/><circle cx="1010" cy="123" r="4" fill="#fff"/></g>
+</svg>

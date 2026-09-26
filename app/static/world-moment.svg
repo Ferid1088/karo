@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" role="img" aria-labelledby="t d">
+<title id="t">Erinnerungen festhalten</title><desc id="d">Eine Kamera, zwei Polaroidbilder und ein kleines Herz vor pastellfarbenem Hintergrund.</desc>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffe7ef"/><stop offset=".55" stop-color="#fff0dc"/><stop offset="1" stop-color="#e9f2ff"/></linearGradient></defs>
+<rect width="760" height="460" rx="36" fill="url(#bg)"/>
+<g transform="translate(110 116) rotate(-8)"><rect width="180" height="225" rx="16" fill="#fff" stroke="#ead9df" stroke-width="4"/><rect x="15" y="15" width="150" height="150" rx="10" fill="#b9def5"/><path d="M15 142 72 84l36 40 32-30 25 48v23H15Z" fill="#6ca36d"/><circle cx="129" cy="52" r="20" fill="#ffd56f"/><path d="M63 195h62" stroke="#d5c4cb" stroke-width="8" stroke-linecap="round"/></g>
+<g transform="translate(462 92) rotate(10)"><rect width="155" height="196" rx="14" fill="#fff" stroke="#ead9df" stroke-width="4"/><rect x="14" y="14" width="127" height="127" rx="9" fill="#ffd6ad"/><path d="M14 116c38-33 79-40 127-19v44H14Z" fill="#b78ec7"/><path d="M52 168h52" stroke="#d5c4cb" stroke-width="7" stroke-linecap="round"/></g>
+<g transform="translate(295 206)"><rect width="210" height="140" rx="30" fill="#5865a2"/><rect x="48" y="-25" width="74" height="34" rx="12" fill="#5865a2"/><circle cx="105" cy="71" r="47" fill="#d7e8ff"/><circle cx="105" cy="71" r="30" fill="#7aa2cf"/><circle cx="176" cy="34" r="10" fill="#ffd66f"/></g>
+<path d="M612 330c25-24 63-3 45 29-12 20-45 41-45 41s-34-21-45-41c-18-32 20-53 45-29Z" fill="#ef7791"/>
+</svg>

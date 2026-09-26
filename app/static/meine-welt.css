@@ -136,3 +136,90 @@
   .world-timeline-item::before { left:5px; top:6px; }
   .world-privacy-grid { grid-template-columns:1fr; }
 }
+
+/* --- Visual refinement: closer to the approved Meine-Welt mockups ---------- */
+.world-page { max-width:1180px!important; }
+.world-hero { position:relative; min-height:300px; overflow:hidden; margin:-.2rem 0 1rem; border:1px solid var(--border); border-radius:32px; background:#efeaff; box-shadow:0 14px 40px rgba(52,45,120,.08); }
+.world-hero>img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.world-hero::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(255,255,255,.97) 0%,rgba(255,255,255,.9) 37%,rgba(255,255,255,.12) 68%,rgba(255,255,255,0) 100%); }
+.world-hero-copy { position:relative; z-index:2; max-width:530px; padding:42px 44px 46px; }
+.world-hero-copy h1 { margin:.15rem 0 .5rem; font-size:clamp(2.6rem,5vw,4.25rem); line-height:.96; letter-spacing:-.035em; }
+.world-hero-copy p:last-child { max-width:45ch; margin:0; font-size:1.04rem; color:var(--muted); }
+.world-hero .world-privacy-note { position:absolute; z-index:3; right:22px; top:20px; backdrop-filter:blur(8px); background:rgba(255,255,255,.84); }
+.world-subnav-polished { margin:-24px auto 1.55rem; position:relative; z-index:4; border:1px solid var(--border); background:rgba(255,255,255,.94); box-shadow:0 8px 24px rgba(52,45,120,.08); }
+.world-subnav-polished a[aria-current] { background:var(--ink); color:#fff; }
+.world-parent-callout-polished { border-color:#f2ba4e; background:#fff8de; box-shadow:0 5px 0 #f5dc99; padding:.8rem 1rem; }
+.world-parent-icon { display:grid; place-items:center; width:42px; height:42px; background:#fff; border-radius:14px; font-size:1.25rem; }
+.world-parent-copy { display:flex; flex-direction:column; flex:1; min-width:220px; }
+.world-parent-copy span { font-size:.9rem; color:var(--muted); }
+.world-section-heading-polished { margin:1.55rem 0 .45rem; }
+.world-card-grid-polished { gap:1.15rem; }
+.world-feature-polished { padding:0; min-height:410px; background:var(--surface); border:0; box-shadow:0 10px 34px rgba(52,45,120,.10); transition:transform .18s ease,box-shadow .18s ease; }
+.world-feature-polished:hover { transform:translateY(-2px); box-shadow:0 14px 38px rgba(52,45,120,.14); }
+.world-feature-image { height:178px; overflow:hidden; background:var(--surface-2); }
+.world-feature-image img { width:100%; height:100%; object-fit:cover; display:block; }
+.world-feature-body { display:flex; flex-direction:column; flex:1; padding:1.2rem 1.25rem 1.3rem; }
+.world-feature-body h3 { margin:.55rem 0 .42rem; font-size:1.28rem; line-height:1.28; }
+.world-feature-body p { color:var(--muted); }
+.world-feature-body .world-btn,.world-feature-body .world-inline-form { margin-top:auto; }
+.world-lower-grid-polished { margin-top:1.25rem; }
+.world-lower-grid-polished .world-big-link { min-height:142px; display:grid; grid-template-columns:54px 1fr 44px; padding:1.2rem 1.25rem; box-shadow:0 7px 24px rgba(52,45,120,.07); border:0; }
+.world-big-link-icon { display:grid; place-items:center; width:50px; height:50px; border-radius:16px; background:rgba(255,255,255,.8); font-size:1.55rem; }
+.world-year-link { background:linear-gradient(135deg,#eaf9f1,#e5f7ff); }
+.world-capsule-link { background:linear-gradient(135deg,#f2edff,#ffeafa); }
+.world-lower-grid-polished h2 { margin:.28rem 0 .16rem; font-size:1.16rem; }
+.world-lower-grid-polished p { font-size:.92rem; }
+
+/* Mein Jahr */
+.world-year-page { max-width:1180px!important; }
+.world-year-hero { position:relative; min-height:220px; overflow:hidden; margin-bottom:1rem; border-radius:30px; border:1px solid var(--border); box-shadow:0 12px 34px rgba(52,45,120,.09); }
+.world-year-hero>img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.world-year-hero::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(255,255,255,.96),rgba(255,255,255,.7) 45%,rgba(255,255,255,.05) 76%); }
+.world-year-hero-copy { position:relative; z-index:2; padding:30px 34px; max-width:570px; }
+.world-year-hero-copy h1 { margin:.05rem 0 .25rem; font-size:clamp(2.8rem,5vw,4.2rem); letter-spacing:-.04em; line-height:1; }
+.world-year-hero-copy p { margin:0; color:var(--muted); font-weight:600; }
+.world-year-toolbar { display:flex; align-items:center; gap:.8rem; justify-content:space-between; margin:.85rem 0; }
+.world-months { display:flex; flex:1; gap:.36rem; overflow:auto; padding:.25rem; }
+.world-months span { flex:1; min-width:54px; text-align:center; padding:.48rem .55rem; border-radius:999px; background:var(--surface); border:1px solid var(--border); font-size:.78rem; font-weight:700; color:var(--muted); }
+.world-months span.active { color:#fff; background:linear-gradient(135deg,#6f5be8,#8a65ec); border-color:transparent; box-shadow:0 4px 12px rgba(99,75,220,.25); }
+.world-stats-polished { gap:.55rem; margin:.6rem 0 1.15rem; }
+.world-stats-polished span { border:0; font-weight:650; }
+.world-stats-polished .photos{background:#e5f6e8}.world-stats-polished .moments{background:#eee8ff}.world-stats-polished .discoveries{background:#e2f3ff}.world-stats-polished .audio{background:#ffe9f1}
+.world-year-layout { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(280px,.75fr); gap:1.2rem; align-items:start; }
+.world-timeline-polished { margin-top:0; padding:.2rem 0; }
+.world-timeline-polished .world-timeline-card { border:0; box-shadow:0 7px 24px rgba(52,45,120,.08); background:linear-gradient(135deg,#fff,#fcfbff); }
+.world-timeline-polished .world-timeline-item:nth-child(4n+1) .world-timeline-card{background:#eff9ff}
+.world-timeline-polished .world-timeline-item:nth-child(4n+2) .world-timeline-card{background:#fff0f4}
+.world-timeline-polished .world-timeline-item:nth-child(4n+3) .world-timeline-card{background:#fff8de}
+.world-timeline-polished .world-timeline-item:nth-child(4n+4) .world-timeline-card{background:#f2eeff}
+.world-timeline-item time { font-size:.9rem; text-align:right; }
+.world-timeline-item time small { display:block; font-size:.68rem; opacity:.7; }
+.world-media-strip-featured img { width:180px; height:116px; border:0; box-shadow:0 4px 14px rgba(20,20,60,.12); }
+.world-year-side { display:grid; gap:1rem; position:sticky; top:1rem; }
+.world-year-ago-polished { margin:0; padding:1.05rem; overflow:hidden; background:#f1edff; border:0; box-shadow:0 7px 24px rgba(52,45,120,.08); }
+.world-year-ago-empty>img { width:100%; height:145px; object-fit:cover; border-radius:16px; margin-bottom:.8rem; }
+.world-year-numbers { display:grid; grid-template-columns:repeat(3,1fr); gap:.55rem; padding:1rem; border-radius:22px; background:#fff7dd; box-shadow:0 7px 24px rgba(52,45,120,.07); }
+.world-year-numbers>.world-kicker { grid-column:1/-1; }
+.world-year-numbers div { text-align:center; padding:.6rem .3rem; border-radius:14px; background:rgba(255,255,255,.72); }
+.world-year-numbers strong,.world-year-numbers small { display:block; }
+.world-year-numbers strong { font-size:1.3rem; }
+.world-year-numbers small { color:var(--muted); font-size:.72rem; }
+.world-empty-illustrated { display:grid; grid-template-columns:minmax(220px,.7fr) 1fr; gap:1.2rem; align-items:center; text-align:left; padding:0; overflow:hidden; border:0; background:#fff; box-shadow:0 8px 28px rgba(52,45,120,.08); }
+.world-empty-illustrated>img { width:100%; height:100%; min-height:260px; object-fit:cover; }
+.world-empty-illustrated>div { padding:1.5rem 1.5rem 1.5rem 0; }
+
+@media (max-width:900px){
+  .world-year-layout{grid-template-columns:1fr}
+  .world-year-side{position:static;grid-template-columns:1fr 1fr}
+  .world-card-grid-polished{grid-template-columns:1fr 1fr}
+  .world-card-grid-polished .world-hold{grid-column:1/-1}
+}
+@media (max-width:680px){
+  .world-hero{min-height:360px}.world-hero::after{background:linear-gradient(0deg,rgba(255,255,255,.98) 0%,rgba(255,255,255,.88) 56%,rgba(255,255,255,.05) 100%)}
+  .world-hero-copy{padding:150px 22px 26px}.world-hero .world-privacy-note{right:12px;top:12px}
+  .world-card-grid-polished{grid-template-columns:1fr}.world-card-grid-polished .world-hold{grid-column:auto}
+  .world-feature-image{height:165px}
+  .world-year-hero{min-height:260px}.world-year-hero-copy{padding:115px 22px 24px}.world-year-hero::after{background:linear-gradient(0deg,rgba(255,255,255,.98),rgba(255,255,255,.72) 62%,rgba(255,255,255,.05))}
+  .world-year-side{grid-template-columns:1fr}
+  .world-empty-illustrated{grid-template-columns:1fr}.world-empty-illustrated>img{min-height:180px}.world-empty-illustrated>div{padding:0 1.2rem 1.35rem}
+}

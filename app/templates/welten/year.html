@@ -1,11 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Mein Jahr – Meine Welt{% endblock %}
-{% block mainclass %}world-page{% endblock %}
+{% block mainclass %}world-page world-year-page{% endblock %}
 {% block content %}
 <a class="back-link" href="/welten">← Meine Welt</a>
-<p class="eyebrow">DEINE ZEITLINIE</p>
-<div class="world-year-head">
-  <div><h1>Mein Jahr</h1><p class="sub">Deine echten Momente, Gedanken und Entdeckungen.</p></div>
+
+<section class="world-year-hero">
+  <img src="/static/world-hero.svg" alt="" aria-hidden="true">
+  <div class="world-year-hero-copy">
+    <p class="eyebrow">DEINE ZEITLINIE</p>
+    <h1>Mein Jahr</h1>
+    <p>{{ stats.moments + stats.thoughts + stats.discoveries }} Erinnerungen – das hast du dieses Jahr erlebt, gedacht und entdeckt.</p>
+  </div>
+</section>
+
+<div class="world-year-toolbar">
+  <div class="world-months" aria-label="Monate">
+    <span>Jan</span><span>Feb</span><span>Mär</span><span>Apr</span><span>Mai</span><span>Jun</span>
+    <span>Jul</span><span class="active">Aug</span><span>Sep</span><span>Okt</span><span>Nov</span><span>Dez</span>
+  </div>
   <form method="get" action="/welten/jahr">
     <label for="world-year" class="sr-only">Jahr</label>
     <select id="world-year" name="year" onchange="this.form.submit()">
@@ -16,62 +28,83 @@
   </form>
 </div>
 
-<div class="world-stats">
-  <span><b>{{ stats.moments }}</b> Momente</span>
-  <span><b>{{ stats.thoughts }}</b> Gedanken</span>
-  <span><b>{{ stats.photos }}</b> Fotos</span>
-  <span><b>{{ stats.audio }}</b> Audio</span>
-  <span><b>{{ stats.discoveries }}</b> Entdeckungen</span>
+<div class="world-stats world-stats-polished">
+  <span class="photos">🖼️ <b>{{ stats.photos }}</b> Fotos</span>
+  <span class="moments">💜 <b>{{ stats.moments }}</b> Momente</span>
+  <span class="discoveries">💡 <b>{{ stats.discoveries }}</b> Entdeckungen</span>
+  <span class="audio">🎵 <b>{{ stats.audio }}</b> Audio-Momente</span>
 </div>
 
-{% if one_year_ago %}
-<section class="world-year-ago">
-  <span class="world-kicker">🕰️ Vor einem Jahr</span>
-  <h2>{{ one_year_ago.entry_date }}</h2>
-  {% if one_year_ago.text %}<p>„{{ one_year_ago.text }}“</p>{% endif %}
-  <div class="world-media-strip">
-    {% for m in one_year_ago.media %}
-      {% if m.media_type == 'photo' %}<img src="/welten/media/{{ m.token }}?thumb=1" alt="Foto aus dieser Erinnerung" loading="lazy">{% endif %}
-    {% endfor %}
-  </div>
-</section>
-{% endif %}
-
-<section class="world-timeline">
-{% for item in timeline %}
-  <article class="world-timeline-item">
-    <time>{{ item.timeline_date }}</time>
-    <div class="world-timeline-card">
-      {% if item.timeline_kind == 'discovery' %}
-        <span class="world-kicker">🌍 Entdeckt</span>
-        <h2>{{ item.title }}</h2>
-      {% elif item.timeline_kind == 'reflection' %}
-        <span class="world-kicker">💭 Gedanke</span>
-        {% if item.text %}<p>„{{ item.text }}“</p>{% endif %}
-      {% else %}
-        <span class="world-kicker">❤️ Moment{% if item.mood %} · {{ mood_labels[item.mood] }}{% endif %}</span>
-        {% if item.text %}<p>„{{ item.text }}“</p>{% endif %}
-        {% if item.media %}
-        <div class="world-media-strip">
+<div class="world-year-layout">
+  <section class="world-timeline world-timeline-polished">
+  {% for item in timeline %}
+    <article class="world-timeline-item">
+      <time>{{ item.timeline_date[8:10] }}.<small>{{ item.timeline_date[5:7] }}</small></time>
+      <div class="world-timeline-card">
+        {% if item.timeline_kind == 'discovery' %}
+          <span class="world-kicker">💡 Entdeckung</span>
+          <h2>{{ item.title }}</h2>
+        {% elif item.timeline_kind == 'reflection' %}
+          <span class="world-kicker">💭 Gedanke</span>
+          {% if item.text %}<p>„{{ item.text }}“</p>{% endif %}
+        {% else %}
+          <span class="world-kicker">❤️ Moment{% if item.mood %} · {{ mood_labels[item.mood] }}{% endif %}</span>
+          {% if item.media %}
+          <div class="world-media-strip world-media-strip-featured">
+            {% for m in item.media %}
+              {% if m.media_type == 'photo' %}
+                <a href="/welten/media/{{ m.token }}" target="_blank" rel="noopener"><img src="/welten/media/{{ m.token }}?thumb=1" alt="Gespeichertes Foto" loading="lazy"></a>
+              {% endif %}
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if item.text %}<p>„{{ item.text }}“</p>{% endif %}
           {% for m in item.media %}
-            {% if m.media_type == 'photo' %}
-              <a href="/welten/media/{{ m.token }}" target="_blank" rel="noopener"><img src="/welten/media/{{ m.token }}?thumb=1" alt="Gespeichertes Foto" loading="lazy"></a>
-            {% else %}
-              <audio controls preload="none" src="/welten/media/{{ m.token }}"></audio>
-            {% endif %}
+            {% if m.media_type == 'audio' %}<audio controls preload="none" src="/welten/media/{{ m.token }}"></audio>{% endif %}
           {% endfor %}
-        </div>
         {% endif %}
-      {% endif %}
-      {% if item.timeline_kind != 'discovery' %}
-      <form method="post" action="/welten/eintrag/{{ item.id }}/loeschen" class="world-delete-form" onsubmit="return confirm('Diesen Eintrag wirklich löschen?');">
-        {{ csrf_input() }}<button type="submit" class="linklike">Löschen</button>
-      </form>
-      {% endif %}
+        {% if item.timeline_kind != 'discovery' %}
+        <form method="post" action="/welten/eintrag/{{ item.id }}/loeschen" class="world-delete-form" onsubmit="return confirm('Diesen Eintrag wirklich löschen?');">
+          {{ csrf_input() }}<button type="submit" class="linklike">Löschen</button>
+        </form>
+        {% endif %}
+      </div>
+    </article>
+  {% else %}
+    <div class="world-empty world-empty-illustrated">
+      <img src="/static/world-moment.svg" alt="" aria-hidden="true">
+      <div><span class="world-kicker">Dein Jahr beginnt hier</span><h2>Noch keine Erinnerungen.</h2><p>Wenn du heute ein Foto, einen Gedanken oder einen Moment festhältst, erscheint er genau hier.</p><a class="btn" href="/welten/festhalten">Ersten Moment festhalten</a></div>
     </div>
-  </article>
-{% else %}
-  <div class="world-empty"><span>🌱</span><h2>Hier wächst dein Jahr.</h2><p>Wenn du etwas festhältst oder eine Entdeckung merkst, erscheint es hier.</p></div>
-{% endfor %}
-</section>
+  {% endfor %}
+  </section>
+
+  <aside class="world-year-side">
+    {% if one_year_ago %}
+    <section class="world-year-ago world-year-ago-polished">
+      <span class="world-kicker">🕰️ Vor einem Jahr</span>
+      <h2>{{ one_year_ago.entry_date }}</h2>
+      <div class="world-media-strip world-media-large">
+        {% for m in one_year_ago.media %}
+          {% if m.media_type == 'photo' %}<img src="/welten/media/{{ m.token }}?thumb=1" alt="Foto aus dieser Erinnerung" loading="lazy">{% endif %}
+        {% endfor %}
+      </div>
+      {% if one_year_ago.text %}<p>„{{ one_year_ago.text }}“</p>{% endif %}
+    </section>
+    {% else %}
+    <section class="world-year-ago world-year-ago-polished world-year-ago-empty">
+      <img src="/static/world-hero.svg" alt="" aria-hidden="true">
+      <span class="world-kicker">🕰️ Vor einem Jahr</span>
+      <h2>Hier wartet später eine Überraschung.</h2>
+      <p>Wenn du Karo länger nutzt, tauchen hier echte Erinnerungen von genau diesem Tag wieder auf.</p>
+    </section>
+    {% endif %}
+
+    <section class="world-year-numbers">
+      <span class="world-kicker">⭐ Dein Jahr in Zahlen</span>
+      <div><strong>{{ stats.photos }}</strong><small>Fotos</small></div>
+      <div><strong>{{ stats.moments }}</strong><small>Momente</small></div>
+      <div><strong>{{ stats.discoveries }}</strong><small>Entdeckungen</small></div>
+    </section>
+  </aside>
+</div>
 {% endblock %}

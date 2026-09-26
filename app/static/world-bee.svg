@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" role="img" aria-labelledby="t d">
+<title id="t">Biene auf einer Blüte</title><desc id="d">Eine freundliche Illustration einer Biene über einer großen lila Blüte.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#dff6ff"/><stop offset=".58" stop-color="#efffe9"/><stop offset="1" stop-color="#fff7c7"/></linearGradient>
+  <linearGradient id="petal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8d72d9"/><stop offset="1" stop-color="#5e4eb5"/></linearGradient>
+</defs>
+<rect width="760" height="460" rx="36" fill="url(#bg)"/>
+<circle cx="636" cy="83" r="48" fill="#ffe07f"/><circle cx="646" cy="76" r="72" fill="#fff2b5" opacity=".35"/>
+<path d="M0 392c102-48 213-56 310-17 115 46 211 26 450-27v112H0Z" fill="#9dd8a8"/>
+<path d="M185 460c35-118 88-180 151-235" fill="none" stroke="#568d60" stroke-width="16" stroke-linecap="round"/>
+<g transform="translate(330 286)">
+  <ellipse rx="48" ry="100" transform="rotate(5)" fill="url(#petal)"/>
+  <ellipse rx="48" ry="100" transform="rotate(50)" fill="url(#petal)"/>
+  <ellipse rx="48" ry="100" transform="rotate(95)" fill="url(#petal)"/>
+  <ellipse rx="48" ry="100" transform="rotate(140)" fill="url(#petal)"/>
+  <circle r="54" fill="#f0b737"/><circle r="25" fill="#7b5725"/>
+</g>
+<g transform="translate(390 126) rotate(-10)">
+  <ellipse cx="-18" cy="-22" rx="45" ry="28" fill="#fff" opacity=".72" stroke="#b9d9e7" stroke-width="4"/>
+  <ellipse cx="26" cy="-27" rx="44" ry="27" fill="#fff" opacity=".72" stroke="#b9d9e7" stroke-width="4"/>
+  <ellipse rx="68" ry="43" fill="#f3bc2f"/>
+  <path d="M-30-36v72M2-40v80M34-31v62" stroke="#3b3025" stroke-width="15"/>
+  <circle cx="-61" cy="-4" r="25" fill="#3b3025"/><circle cx="-69" cy="-10" r="4" fill="#fff"/>
+  <path d="M-73-28c-8-16-15-20-24-23M-69-32c2-16 7-22 14-28" fill="none" stroke="#3b3025" stroke-width="5" stroke-linecap="round"/>
+</g>
+<g fill="#fff" opacity=".85"><circle cx="100" cy="102" r="7"/><circle cx="136" cy="79" r="4"/><circle cx="575" cy="180" r="6"/></g>
+</svg>
