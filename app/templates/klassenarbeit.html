@@ -162,6 +162,48 @@
   </details>
   {% endif %}
 
+  <section class="card exam-calendar">
+    <p class="eyebrow">DEINE ZEITPLANUNG</p>
+    <h3>Wann möchtest du für diese Arbeit lernen?</h3>
+    <p class="hint">Der Lernplan entscheidet, was wichtig ist. Du entscheidest die Lerntage und wie viele Minuten du dir pro Lerntag nimmst.</p>
+    <form method="post" action="/klassenarbeit/{{ e.id }}/kalender">
+      {{ csrf_input() }}
+      <div class="weekday-picker">
+        {% for number, label in weekday_labels.items() %}
+        <label>
+          <input type="checkbox" name="weekdays" value="{{ number }}"
+                 {{ 'checked' if e.schedule and number in e.schedule.weekdays_list }}>
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="field" style="max-width:240px;margin-top:.8rem">
+        <label for="exam-minutes-{{ e.id }}">Minuten pro Lerntag</label>
+        <input id="exam-minutes-{{ e.id }}" type="number" name="minutes" min="1" max="60"
+               value="{{ e.schedule.minutes if e.schedule else 20 }}" required>
+      </div>
+      <button type="submit">{{ 'Lernkalender aktualisieren' if e.schedule else 'Lernkalender speichern' }}</button>
+    </form>
+
+    {% if e.calendar %}
+    <div class="tablewrap" style="margin-top:1rem">
+      <table>
+        <thead><tr><th>Tag</th><th>Was steht an?</th><th class="num">Zeit</th></tr></thead>
+        <tbody>
+        {% for item in e.calendar %}
+          <tr class="{{ 'today-row' if item.today }}">
+            <td><strong>{{ 'Heute' if item.today else item.weekday }}</strong><br><span class="klein">{{ item.date_label }}</span></td>
+            <td>{{ item.inhalt }}</td>
+            <td class="num">{{ item.minutes }} Min.</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">Wenn ein Lerntag heute fällig ist, erscheint er automatisch unter „Heute“.</p>
+    {% endif %}
+  </section>
+
   {% if e.kalibrierung.zeilen %}
   <details class="disclosure"><summary>{{ '' if cfg.klassenarbeit_kind else 'Für Eltern: ' }}Ergebnis der Klassenarbeit eintragen</summary>
   <form method="post" action="/klassenarbeit/{{ e.id }}/ergebnis">
