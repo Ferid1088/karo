@@ -2,7 +2,7 @@
 from html.parser import HTMLParser
 
 from .conftest import csrf_from, make_jpeg, run_jobs
-from .test_app import einrichten, blatt_einlesen, themen_freigeben
+from .test_app import einrichten, blatt_einlesen, themen_freigeben, kind_modus_aktivieren
 
 
 class Forms(HTMLParser):
@@ -220,3 +220,49 @@ def test_home_prefers_child_ready_work_to_parent_review(client, fake_llm, fake_c
     assert f'href="/quiz/{second}"' in page.text
     assert f'href="/quiz/{first}"' not in page.text
     assert f'href="/quiz/{first}"' in client.get('/eltern').text
+
+
+def test_child_can_add_own_topic_from_learning_hub(client, fake_llm, fake_cli, app_env):
+    einrichten(client, fake_llm)
+    kind_modus_aktivieren(client)
+    page = client.get("/lernen")
+    assert page.status_code == 200
+    forms = Forms(page.text).forms
+    form = next(f for f in forms if f["action"] == "/lernen/thema/neu")
+    response = client.post(form["action"], data={
+        **form["fields"],
+        "label": "Prozentrechnung",
+        "beschreibung": "Rabatte sicher ausrechnen",
+    })
+    assert response.status_code == 200
+    topic = app_env.db.q1("SELECT * FROM topic WHERE label='Prozentrechnung'")
+    assert topic is not None
+    assert "Prozentrechnung" in response.text
+    assert "erste Prüfung" in response.text
+
+
+def test_mastered_topic_is_not_in_active_learning_queue(client, fake_llm, fake_cli, app_env):
+    from app import topics
+    from app.services import workflow
+    einrichten(client, fake_llm)
+    topic_id = topics.anlegen("Sicheres Thema")
+    with app_env.db.tx() as db:
+        db.execute(
+            "INSERT INTO topic_flag(topic_id, flag, computed_at) VALUES (?, 'gruen', ?)",
+            (topic_id, app_env.db.now()),
+        )
+    active_topics, steps, _ = workflow.offene_schritte()
+    assert all(t["id"] != topic_id for t in active_topics)
+    assert all(s["topic_id"] != topic_id for s in steps)
+    page = client.get("/lernen")
+    assert "Schon sicher" in page.text
+    assert "Sicheres Thema" in page.text
+
+
+def test_exam_is_own_child_navigation_destination(client, fake_llm, fake_cli, app_env):
+    einrichten(client, fake_llm)
+    app_env.config.update(klassenarbeit_kind=True)
+    page = client.get("/")
+    nav = __import__("re").search(r'<nav class="simple-nav".*?</nav>', page.text, __import__("re").S).group()
+    assert 'href="/klassenarbeit"' in nav
+    assert ">Klassenarbeit<" in nav
