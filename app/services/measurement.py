@@ -66,6 +66,7 @@ def _kalibrierung(exam_id: int) -> dict:
 
 def render_klassenarbeit(request: Request):
     from .. import exam_plan
+    from . import exam_calendar
     zeilen = [dict(r) for r in db.q(
         "SELECT * FROM exam ORDER BY exam_date DESC LIMIT 20")]
     for e in zeilen:
@@ -75,6 +76,9 @@ def render_klassenarbeit(request: Request):
             e["themen_liste"] = []
         e["kalibrierung"] = _kalibrierung(e["id"])
         e["plan"] = exam_plan.holen_plan(e["id"])
+        e["schedule"] = exam_calendar.get(e["id"])
+        e["calendar"] = exam_calendar.calendar(e["id"])
     return render(request, "klassenarbeit.html", zeilen=zeilen,
                   adult_page=not config.load().klassenarbeit_kind,
-                  scan=exam_plan.offene_scan(), counts=jobs.counts())
+                  scan=exam_plan.offene_scan(), counts=jobs.counts(),
+                  weekday_labels=exam_calendar.WEEKDAY_LABELS)
