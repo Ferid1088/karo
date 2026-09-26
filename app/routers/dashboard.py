@@ -1,10 +1,10 @@
 """Einfache Einstiege: ein nächster Lernschritt und ein eigener Elternbereich."""
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 
-from .. import config, db, jobs, kb, quizzes
+from .. import config, db, jobs, kb, quizzes, topics
 from ..services import exam, workflow
-from .shared import render
+from .shared import render, flash, zurueck
 
 router = APIRouter()
 
@@ -19,7 +19,8 @@ def dashboard(request: Request):
     naechstes = workflow.next_action_display(aktion)
     return render(request, 'dashboard.html', naechstes=naechstes, reviews=reviews,
                   hat_erfolge=bool(db.q1("SELECT id FROM topic WHERE state='aktiv' AND learned_at IS NOT NULL LIMIT 1")),
-                  themen=themen, kb_stat=kb.statistik(), exam=exam.get_next_exam())
+                  themen=themen, kb_stat=kb.statistik(), exam=exam.get_next_exam(),
+                  heute_pruefung=exam.get_today_learning_day())
 
 
 @router.get('/lernen', response_class=HTMLResponse)
@@ -35,3 +36,15 @@ def eltern(request: Request):
     return render(request, 'eltern.html', reviews=reviews, schritte=schritte,
                   counts=jobs.counts(), kb_stat=kb.statistik(),
                   einig=quizzes.uebereinstimmung(), fehler=jobs.fehlgeschlagen())
+
+
+@router.post('/lernen/thema/neu')
+def kind_thema_neu(request: Request, label: str = Form(""),
+                   beschreibung: str = Form("")):
+    """Kindgerechter Schnellweg: eigenes Thema anlegen und direkt diagnostizieren."""
+    topic_id = topics.anlegen(label, beschreibung)
+    if topic_id is None:
+        flash(request, "Das Thema gibt es schon oder der Name ist leer.", "warn")
+        return zurueck("/lernen#eigenes-thema")
+    flash(request, "Thema ist da. Jetzt finden wir zuerst heraus, was du schon kannst.")
+    return zurueck(f"/lernzyklus/{topic_id}")
