@@ -80,13 +80,17 @@ def klassenarbeit_themenblatt_status(scan_id: int):
 @router.post("/klassenarbeit/{exam_id}/kalender")
 async def klassenarbeit_kalender(request: Request, exam_id: int):
     formular = await request.form()
+    minuten = {
+        key.removeprefix("minutes_"): value
+        for key, value in formular.multi_items()
+        if key.startswith("minutes_")
+    }
     try:
-        minuten = int(str(formular.get("minutes") or ""))
-        exam_calendar.save(exam_id, formular.getlist("weekdays"), minuten)
-    except (ValueError, exam_calendar.ExamCalendarError) as exc:
+        exam_calendar.save_days(exam_id, minuten)
+    except exam_calendar.ExamCalendarError as exc:
         flash(request, str(exc), "warn")
         return zurueck(f"/klassenarbeit#exam-{exam_id}")
-    flash(request, "Dein Lernkalender ist gespeichert. Fällige Lerntage erscheinen unter „Heute“.")
+    flash(request, "Dein Lernkalender ist gespeichert. Heutige Lerntage erscheinen unter „Heute“.")
     return zurueck(f"/klassenarbeit#exam-{exam_id}")
 
 
