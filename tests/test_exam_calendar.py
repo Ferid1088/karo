@@ -27,23 +27,34 @@ def _exam_with_topic(app_env):
     return exam_id, topic_id
 
 
-def test_exam_calendar_saves_child_days_and_minutes(app_env, monkeypatch):
+def test_exam_calendar_saves_different_minutes_for_each_day(app_env, monkeypatch):
     from app.services import exam_calendar
 
     exam_id, topic_id = _exam_with_topic(app_env)
     monkeypatch.setattr("app.db.today", lambda: "2026-09-27")
 
-    exam_calendar.save(exam_id, ["1", "3", "5"], 25)
-    saved = exam_calendar.get(exam_id)
-    assert saved["weekdays_list"] == [1, 3, 5]
-    assert saved["minutes"] == 25
+    exam_calendar.save_days(exam_id, {
+        "2026-09-28": 23,
+        "2026-09-29": 0,
+        "2026-09-30": 29,
+        "2026-10-01": 10,
+    })
+
+    saved = exam_calendar.get_days(exam_id)
+    assert saved["2026-09-28"] == 23
+    assert saved["2026-09-29"] == 0
+    assert saved["2026-09-30"] == 29
+    assert saved["2026-10-01"] == 10
 
     days = exam_calendar.calendar(exam_id)
     assert [item["date"] for item in days] == [
-        "2026-09-28", "2026-09-30", "2026-10-02"
-    ][:len(days)]
-    assert all(item["minutes"] == 25 for item in days)
-    assert days[0]["topic_id"] == topic_id
+        "2026-09-27", "2026-09-28", "2026-09-29",
+        "2026-09-30", "2026-10-01", "2026-10-02",
+    ]
+    assert next(item for item in days if item["date"] == "2026-09-28")["minutes"] == 23
+    assert next(item for item in days if item["date"] == "2026-09-30")["minutes"] == 29
+    assert next(item for item in days if item["date"] == "2026-10-02")["is_exam"]
+    assert next(item for item in days if item["date"] == "2026-09-28")["topic_id"] == topic_id
 
 
 def test_only_due_exam_session_appears_on_today(app_env, monkeypatch):
@@ -51,13 +62,18 @@ def test_only_due_exam_session_appears_on_today(app_env, monkeypatch):
 
     exam_id, topic_id = _exam_with_topic(app_env)
     monkeypatch.setattr("app.db.today", lambda: "2026-09-28")
-    exam_calendar.save(exam_id, ["1"], 20)
+    exam_calendar.save_days(exam_id, {
+        "2026-09-28": 23,
+        "2026-09-29": 0,
+        "2026-09-30": 29,
+        "2026-10-01": 0,
+    })
 
     task = exam_calendar.today_task()
     assert task is not None
     assert task["exam_id"] == exam_id
     assert task["topic_id"] == topic_id
-    assert task["minutes"] == 20
+    assert task["minutes"] == 23
     assert task["thema"] == "Brüche addieren"
 
     monkeypatch.setattr("app.db.today", lambda: "2026-09-29")
@@ -77,14 +93,22 @@ def test_child_can_save_calendar_and_today_starts_adaptive_topic(
     exam_page = client.get("/klassenarbeit")
     response = client.post(
         f"/klassenarbeit/{exam_id}/kalender",
-        data={"_csrf": csrf_from(exam_page.text), "weekdays": "1", "minutes": "20"},
+        data={
+            "_csrf": csrf_from(exam_page.text),
+            "minutes_2026-09-28": "23",
+            "minutes_2026-09-29": "0",
+            "minutes_2026-09-30": "29",
+            "minutes_2026-10-01": "0",
+        },
         follow_redirects=False,
     )
     assert response.status_code == 303
-    assert exam_calendar.get(exam_id)["minutes"] == 20
+    assert exam_calendar.get_days(exam_id)["2026-09-28"] == 23
+    assert exam_calendar.get_days(exam_id)["2026-09-30"] == 29
 
     today = client.get("/")
     assert "HEUTE · KLASSENARBEIT" in today.text
     assert "Brüche addieren" in today.text
+    assert "23 Minuten" in today.text
     assert 'action="/lernen/adaptiv/start"' in today.text
     assert f'name="topic_id" value="{topic_id}"' in today.text
