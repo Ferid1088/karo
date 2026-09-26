@@ -163,44 +163,57 @@
   {% endif %}
 
   <section class="card exam-calendar">
-    <p class="eyebrow">DEINE ZEITPLANUNG</p>
-    <h3>Wann möchtest du für diese Arbeit lernen?</h3>
-    <p class="hint">Der Lernplan entscheidet, was wichtig ist. Du entscheidest die Lerntage und wie viele Minuten du dir pro Lerntag nimmst.</p>
-    <form method="post" action="/klassenarbeit/{{ e.id }}/kalender">
-      {{ csrf_input() }}
-      <div class="weekday-picker">
-        {% for number, label in weekday_labels.items() %}
-        <label>
-          <input type="checkbox" name="weekdays" value="{{ number }}"
-                 {{ 'checked' if e.schedule and number in e.schedule.weekdays_list }}>
-          <span>{{ label }}</span>
-        </label>
-        {% endfor %}
-      </div>
-      <div class="field" style="max-width:240px;margin-top:.8rem">
-        <label for="exam-minutes-{{ e.id }}">Minuten pro Lerntag</label>
-        <input id="exam-minutes-{{ e.id }}" type="number" name="minutes" min="1" max="60"
-               value="{{ e.schedule.minutes if e.schedule else 20 }}" required>
-      </div>
-      <button type="submit">{{ 'Lernkalender aktualisieren' if e.schedule else 'Lernkalender speichern' }}</button>
-    </form>
+    <p class="eyebrow">DEIN LERNKALENDER</p>
+    <h3>Wie viele Minuten möchtest du an jedem Tag lernen?</h3>
+    <p class="hint">Alle Tage bis zur Klassenarbeit sind sichtbar. Trage für jeden Tag deine Zeit ein. <strong>0 Minuten = Pause.</strong></p>
 
     {% if e.calendar %}
-    <div class="tablewrap" style="margin-top:1rem">
-      <table>
-        <thead><tr><th>Tag</th><th>Was steht an?</th><th class="num">Zeit</th></tr></thead>
-        <tbody>
-        {% for item in e.calendar %}
-          <tr class="{{ 'today-row' if item.today }}">
-            <td><strong>{{ 'Heute' if item.today else item.weekday }}</strong><br><span class="klein">{{ item.date_label }}</span></td>
-            <td>{{ item.inhalt }}</td>
-            <td class="num">{{ item.minutes }} Min.</td>
-          </tr>
+    <form method="post" action="/klassenarbeit/{{ e.id }}/kalender">
+      {{ csrf_input() }}
+
+      <div class="exam-calendar-weekdays" aria-hidden="true">
+        <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+      </div>
+      <div class="exam-calendar-grid" aria-label="Lernkalender bis zur Klassenarbeit">
+        {% for _ in range(e.calendar_leading_blanks) %}
+          <span class="exam-calendar-empty" aria-hidden="true"></span>
         {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <p class="hint">Wenn ein Lerntag heute fällig ist, erscheint er automatisch unter „Heute“.</p>
+        {% for item in e.calendar %}
+          <article class="exam-calendar-day {{ 'today' if item.today }} {{ 'exam' if item.is_exam }} {{ 'learning' if item.is_learning_day }}">
+            <header>
+              <strong>{{ item.date[8:10] }}.{{ item.date[5:7] }}.</strong>
+              <small>{{ 'Heute' if item.today else item.weekday[:2] }}</small>
+            </header>
+            {% if item.is_exam %}
+              <div class="exam-calendar-exam-label">Klassenarbeit</div>
+              <strong class="exam-calendar-exam-time">🎯</strong>
+            {% else %}
+              <label for="minutes-{{ e.id }}-{{ item.date }}">Minuten</label>
+              <div class="exam-calendar-minute-input">
+                <input id="minutes-{{ e.id }}-{{ item.date }}"
+                       type="number"
+                       name="minutes_{{ item.date }}"
+                       min="0" max="60" step="1"
+                       value="{{ item.minutes }}"
+                       inputmode="numeric">
+                <span>min</span>
+              </div>
+              {% if item.is_learning_day and item.inhalt %}
+                <small class="exam-calendar-topic">{{ item.inhalt }}</small>
+              {% else %}
+                <small class="exam-calendar-topic">Pause</small>
+              {% endif %}
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
+
+      <div class="exam-calendar-save">
+        <p class="hint">Beispiel: Montag 23 Min., Donnerstag 29 Min. Du kannst jeden Tag unterschiedlich planen.</p>
+        <button type="submit">{{ 'Kalender aktualisieren' if e.schedule else 'Kalender speichern' }}</button>
+      </div>
+    </form>
+    <p class="hint">Wenn für heute mehr als 0 Minuten eingetragen sind, erscheint diese Lerneinheit automatisch unter „Heute“.</p>
     {% endif %}
   </section>
 
