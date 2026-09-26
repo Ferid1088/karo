@@ -18,7 +18,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from .. import config, db, security, teaching, topics
+from .. import config, db, quizzes, security, teaching, topics
 from ..services import exam, exam_calendar, learning_progress, measurement
 from ..services.exam import ExamError
 from .shared import alter_generator_aus, render, flash, zurueck
@@ -87,11 +87,35 @@ async def klassenarbeit_kalender(request: Request, exam_id: int):
     }
     try:
         exam_calendar.save_days(exam_id, minuten)
+        exam_calendar.set_simulation_early(
+            exam_id, formular.get("simulation_early") == "ja")
     except exam_calendar.ExamCalendarError as exc:
         flash(request, str(exc), "warn")
         return zurueck(f"/klassenarbeit#exam-{exam_id}")
     flash(request, "Dein Lernkalender ist gespeichert. Heutige Lerntage erscheinen unter „Heute“.")
     return zurueck(f"/klassenarbeit#exam-{exam_id}")
+
+
+@router.get("/klassenarbeit/{exam_id}/simulation", response_class=HTMLResponse)
+def klassenarbeit_simulation(request: Request, exam_id: int):
+    if not exam_calendar.simulation_available(exam_id):
+        raise HTTPException(403, "Die Prüfungssimulation ist erst am geplanten Simulationstag verfügbar.")
+    return render(
+        request, "exam_simulation.html",
+        exam_id=exam_id,
+        themen=exam_calendar.simulation_topics(exam_id),
+    )
+
+
+@router.post("/klassenarbeit/{exam_id}/simulation/{topic_id}")
+def klassenarbeit_simulation_starten(request: Request, exam_id: int, topic_id: int):
+    if not exam_calendar.simulation_available(exam_id):
+        raise HTTPException(403, "Die Prüfungssimulation ist heute nicht verfügbar.")
+    erlaubt = {t["id"] for t in exam_calendar.simulation_topics(exam_id)}
+    if topic_id not in erlaubt:
+        raise HTTPException(404, "Dieses Thema gehört nicht zu dieser Klassenarbeit.")
+    quiz_id = quizzes.anfordern(topic_id, anlass="probe", modus=quizzes.BILDSCHIRM, anzahl=5)
+    return zurueck(f"/quiz/{quiz_id}")
 
 
 @router.post("/klassenarbeit/{exam_id}/plan/neu")
