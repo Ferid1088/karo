@@ -5,6 +5,7 @@ on:
     branches:
       - ux-learning-focus-20260926
       - meine-welt-v2-secure
+      - meine-welt-exam-calendar
   workflow_dispatch:
 
 jobs:
