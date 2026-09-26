@@ -1,38 +1,105 @@
 {% extends "base.html" %}
 {% block title %}Lernen – Karo{% endblock %}
 {% block content %}
-<p class="eyebrow">DEIN LERNBEREICH</p><h1>Was möchtest du heute lernen?</h1>
-<p class="sub">Starte ein neues Thema oder mach dort weiter, wo du aufgehört hast.</p>
-<nav class="learning-tabs" aria-label="Lernbereiche">
-{% if cfg.klassenarbeit_kind %}<a href="/lernen?tab=klassenarbeit" {{ 'aria-current=page' if tab == 'klassenarbeit' }}>Klassenarbeit</a>{% endif %}
-<a href="/lernen?tab=bearbeitung" {{ 'aria-current=page' if tab == 'bearbeitung' }}>In Bearbeitung <span>{{ gruppen.bearbeitung|length }}</span></a>
-<a href="/lernen?tab=neu" {{ 'aria-current=page' if tab == 'neu' }}>Neue Themen <span>{{ gruppen.neu|length }}</span></a>
-</nav>
-{% if tab == 'klassenarbeit' %}
-<section aria-labelledby="klassenarbeit-heading">
-<h2 id="klassenarbeit-heading">Dein Plan für die Klassenarbeit</h2>
-<nav class="learning-tabs secondary" aria-label="Themen für die Klassenarbeit">
-<a href="/lernen?tab=klassenarbeit&amp;status=neu" {{ 'aria-current=page' if subtab == 'neu' }}>Neue Themen</a>
-<a href="/lernen?tab=klassenarbeit&amp;status=bearbeitung" {{ 'aria-current=page' if subtab == 'bearbeitung' }}>In Bearbeitung</a>
-</nav>
-{% for exam in exam_gruppen[subtab] %}
-<section class="card"><p class="eyebrow">KLASSENARBEIT AM {{ exam.exam_date[8:10] }}.{{ exam.exam_date[5:7] }}.{{ exam.exam_date[:4] }}</p>
-{% with liste=exam.themen %}{% include "themen_karten.html" %}{% endwith %}
-{% if not exam.themen %}<p>Die Themen für diese Klassenarbeit werden noch vorbereitet.</p>{% endif %}
-<a href="/klassenarbeit#exam-{{ exam.id }}">Lernplan und Lerntage öffnen →</a>
+<header class="page-heading learning-heading">
+  <p class="eyebrow">LERNEN</p>
+  <h1>Nur das üben, was noch nicht sitzt.</h1>
+  <p class="sub">Erst herausfinden, was du kannst. Dann nur die Lücken schließen. Fertiges bleibt draußen.</p>
+</header>
+
+{% if schritte %}
+<section class="learning-now" aria-labelledby="weiter-heading">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">JETZT</p>
+      <h2 id="weiter-heading">Hier geht es weiter</h2>
+    </div>
+  </div>
+  <div class="simple-list card">
+    {% for s in schritte %}
+    <a class="simple-list-link" href="{{ s.url }}">
+      <span>
+        <strong>{{ s.titel }}</strong>
+        <small>{{ s.text }}</small>
+      </span>
+      <span class="round-arrow" aria-hidden="true">→</span>
+    </a>
+    {% endfor %}
+  </div>
 </section>
-{% else %}<section class="card"><h3>{{ 'Noch keine neuen Themen' if subtab == 'neu' else 'Noch nichts in Bearbeitung' }}</h3><p>{{ 'Sobald eine Klassenarbeit vorbereitet ist, findest du ihre Themen hier.' if subtab == 'neu' else 'Starte ein Thema für die Klassenarbeit. Dann kannst du hier weiterlernen.' }}</p></section>{% endfor %}
-<a class="btn ghost" href="/klassenarbeit">Klassenarbeiten und Lernpläne verwalten</a>
-</section>
-{% else %}
-{% if tab == 'bearbeitung' and schritte %}
-<section class="card"><h2>Hier warst du zuletzt</h2><div class="simple-list">
-{% for s in schritte %}<a class="simple-list-link" href="{{ s.url }}"><span><strong>{{ s.titel }}</strong><small>{{ s.text }}</small></span><span aria-hidden="true">→</span></a>{% endfor %}
-</div></section>{% endif %}
-{% with liste=gruppen[tab] %}{% include "themen_karten.html" %}{% endwith %}
-{% if not gruppen[tab] %}<section class="card"><h2>{{ 'Keine neuen Themen' if tab == 'neu' else 'Noch nichts in Bearbeitung' }}</h2><p>{{ 'Hier erscheinen bestätigte Themen, die du noch nicht begonnen hast.' if tab == 'neu' else 'Starte unter „Neue Themen“ ein Thema. Danach findest du es hier.' }}</p></section>{% endif %}
 {% endif %}
-{% if cfg.schulblaetter_kind and tab == 'neu' %}<div class="choice-grid">{% include "schulblaetter_link.html" %}</div>{% endif %}
-{% if cfg.klassenarbeit_kind and tab != 'klassenarbeit' %}<a class="simple-list-link" href="/klassenarbeit">Dein Plan für die Klassenarbeit →</a>{% endif %}
-{% if reviews and not cfg.antworten_pruefen_kind %}<p class="quiet-note">Es gibt Antworten zum gemeinsamen Anschauen. {% if role == 'parent' %}<a href="/eltern">Für Eltern</a>{% endif %}</p>{% endif %}
+
+{% if fokus %}
+<section aria-labelledby="fokus-heading" class="learning-section">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">DEIN FOKUS</p>
+      <h2 id="fokus-heading">Das lohnt sich jetzt</h2>
+    </div>
+    <p>Rot und Gelb zuerst. Kein Wiederholen von Dingen, die schon sicher sind.</p>
+  </div>
+  {% with liste=fokus %}{% include "themen_karten.html" %}{% endwith %}
+</section>
+{% endif %}
+
+{% if diagnose %}
+<section aria-labelledby="diagnose-heading" class="learning-section">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">NOCH NICHT GEPRÜFT</p>
+      <h2 id="diagnose-heading">Kurz testen statt unnötig lernen</h2>
+    </div>
+    <p>Wenn du es schon kannst, verschwindet es aus deinem Fokus.</p>
+  </div>
+  {% with liste=diagnose %}{% include "themen_karten.html" %}{% endwith %}
+</section>
+{% endif %}
+
+<section class="card own-topic" id="eigenes-thema">
+  <div class="own-topic-copy">
+    <p class="eyebrow">DEIN EIGENES THEMA</p>
+    <h2>Was willst du können?</h2>
+    <p>Schreib das Thema so auf, wie du es aus der Schule kennst. Karo prüft zuerst, was du schon kannst.</p>
+  </div>
+  <form method="post" action="/lernen/thema/neu" class="own-topic-form">
+    {{ csrf_input() }}
+    <div class="field">
+      <label for="kind-thema">Thema</label>
+      <input id="kind-thema" name="label" type="text" maxlength="200"
+             placeholder="z. B. Brüche mit verschiedenen Nennern" required>
+    </div>
+    <div class="field">
+      <label for="kind-ziel">Was soll am Ende klappen? <span class="optional">(optional)</span></label>
+      <input id="kind-ziel" name="beschreibung" type="text" maxlength="500"
+             placeholder="z. B. Aufgaben in der Klassenarbeit sicher lösen">
+    </div>
+    <button type="submit">Thema prüfen →</button>
+  </form>
+</section>
+
+{% if not fokus and not diagnose and not schritte %}
+<section class="card done-card">
+  <h2>Im Moment ist keine Lücke offen.</h2>
+  <p>Du kannst ein neues Thema eingeben oder deine bisherigen Erfolge ansehen.</p>
+  <a class="btn ghost" href="/lernstand">Erfolge ansehen</a>
+</section>
+{% endif %}
+
+{% if cfg.schulblaetter_kind %}
+<p class="secondary-action"><a href="/wissen">＋ Schulblatt oder Arbeitsblatt hinzufügen</a></p>
+{% endif %}
+
+{% if sicher %}
+<details class="card disclosure safe-topics">
+  <summary>Schon sicher · {{ sicher|length }} Thema{{ 'en' if sicher|length != 1 }}</summary>
+  <p class="hint">Diese Themen blockieren deinen Lernfokus nicht mehr.</p>
+  <div class="safe-chip-list">
+    {% for t in sicher %}<span class="safe-chip">{{ t.label }}</span>{% endfor %}
+  </div>
+</details>
+{% endif %}
+
+{% if reviews and not cfg.antworten_pruefen_kind %}
+<p class="quiet-note">Ein Erwachsener schaut sich noch {{ reviews|length }} Fragerunde{{ 'n' if reviews|length != 1 }} an.</p>
+{% endif %}
 {% endblock %}
