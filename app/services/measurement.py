@@ -78,6 +78,7 @@ def render_klassenarbeit(request: Request):
         e["kalibrierung"] = _kalibrierung(e["id"])
         e["plan"] = exam_plan.holen_plan(e["id"])
         e["schedule"] = exam_calendar.get(e["id"])
+        e["simulation_early"] = exam_calendar.simulation_early(e["id"])
         e["calendar"] = exam_calendar.calendar(e["id"])
         e["calendar_leading_blanks"] = (
             (dt.date.fromisoformat(e["calendar"][0]["date"]).isoweekday() - 1)
