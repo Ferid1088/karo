@@ -164,8 +164,8 @@
 
   <section class="card exam-calendar">
     <p class="eyebrow">DEIN LERNKALENDER</p>
-    <h3>Wie viele Minuten möchtest du an jedem Tag lernen?</h3>
-    <p class="hint">Alle Tage bis zur Klassenarbeit sind sichtbar. Trage für jeden Tag deine Zeit ein. <strong>0 Minuten = Pause.</strong></p>
+    <h3>Plane deine Tage bis zur Klassenarbeit</h3>
+    <p class="hint">Tippe an den Tagen, an denen du lernen möchtest, einfach deine Zeit ein.</p>
 
     {% if e.calendar %}
     <form method="post" action="/klassenarbeit/{{ e.id }}/kalender">
@@ -188,32 +188,37 @@
               <div class="exam-calendar-exam-label">Klassenarbeit</div>
               <strong class="exam-calendar-exam-time">🎯</strong>
             {% else %}
-              <label for="minutes-{{ e.id }}-{{ item.date }}">Minuten</label>
               <div class="exam-calendar-minute-input">
                 <input id="minutes-{{ e.id }}-{{ item.date }}"
+                       aria-label="Lernzeit am {{ item.date_label }}"
                        type="number"
                        name="minutes_{{ item.date }}"
                        min="0" max="60" step="1"
-                       value="{{ item.minutes }}"
+                       value="{{ item.minutes if item.minutes else '' }}"
+                       placeholder="0"
                        inputmode="numeric">
-                <span>min</span>
               </div>
-              {% if item.is_learning_day and item.inhalt %}
+              {% if item.is_simulation %}
+                <small class="exam-calendar-topic"><strong>Wiederholung + Simulation</strong></small>
+              {% elif item.is_learning_day and item.inhalt %}
                 <small class="exam-calendar-topic">{{ item.inhalt }}</small>
-              {% else %}
-                <small class="exam-calendar-topic">Pause</small>
               {% endif %}
             {% endif %}
           </article>
         {% endfor %}
       </div>
 
+      <label class="exam-simulation-option">
+        <input type="checkbox" name="simulation_early" value="ja"
+               {{ 'checked' if e.simulation_early }}>
+        <span>Simulation einen Tag früher machen</span>
+      </label>
       <div class="exam-calendar-save">
-        <p class="hint">Beispiel: Montag 23 Min., Donnerstag 29 Min. Du kannst jeden Tag unterschiedlich planen.</p>
+        <p class="hint">Der letzte geplante Lerntag ist automatisch für Wiederholung und Prüfungssimulation reserviert.</p>
         <button type="submit">{{ 'Kalender aktualisieren' if e.schedule else 'Kalender speichern' }}</button>
       </div>
     </form>
-    <p class="hint">Wenn für heute mehr als 0 Minuten eingetragen sind, erscheint diese Lerneinheit automatisch unter „Heute“.</p>
+    <p class="hint">Die Simulationsfragen werden vorher nicht angezeigt. Sie entstehen erst am Simulationstag.</p>
     {% endif %}
   </section>
 
