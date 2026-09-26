@@ -200,8 +200,8 @@ def test_today_learning_day_returns_only_exact_scheduled_day(
     from app.services import exam as exam_service
 
     einrichten(client, fake_llm)
-    today_iso = date.today().isoformat()
-    today_de = date.today().strftime("%d.%m.%Y")
+    today_iso = app_env.db.today()
+    today_de = date.fromisoformat(today_iso).strftime("%d.%m.%Y")
     with app_env.db.tx() as db:
         exam_id = db.execute(
             "INSERT INTO exam(subject, exam_date, themen, created_at) VALUES (?,?,?,?)",
