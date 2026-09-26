@@ -338,6 +338,12 @@ CREATE TABLE IF NOT EXISTS exam_schedule_day (
 CREATE INDEX IF NOT EXISTS idx_exam_schedule_day_date
     ON exam_schedule_day(study_date, exam_id);
 
+CREATE TABLE IF NOT EXISTS exam_schedule_pref (
+    exam_id           INTEGER PRIMARY KEY REFERENCES exam(id) ON DELETE CASCADE,
+    simulation_early  INTEGER NOT NULL DEFAULT 0 CHECK(simulation_early IN (0,1)),
+    updated_at        TEXT NOT NULL
+);
+
 -- ==========================================================================
 -- 9. Protokoll jedes Modellaufrufs
 -- ==========================================================================
