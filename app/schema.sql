@@ -327,6 +327,17 @@ CREATE TABLE IF NOT EXISTS exam_schedule (
     updated_at  TEXT NOT NULL
 );
 
+-- Minuten werden pro konkretem Kalendertag gespeichert. 0 bedeutet Pause.
+CREATE TABLE IF NOT EXISTS exam_schedule_day (
+    exam_id     INTEGER NOT NULL REFERENCES exam(id) ON DELETE CASCADE,
+    study_date  TEXT NOT NULL,
+    minutes     INTEGER NOT NULL CHECK(minutes BETWEEN 0 AND 60),
+    updated_at  TEXT NOT NULL,
+    PRIMARY KEY (exam_id, study_date)
+);
+CREATE INDEX IF NOT EXISTS idx_exam_schedule_day_date
+    ON exam_schedule_day(study_date, exam_id);
+
 -- ==========================================================================
 -- 9. Protokoll jedes Modellaufrufs
 -- ==========================================================================
