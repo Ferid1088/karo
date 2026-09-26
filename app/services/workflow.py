@@ -431,8 +431,11 @@ def render_material_variante_notebooklm_quelle(variant_id: int):
 def offene_schritte():
     """Alle offenen Lernschritte, dringlichste zuerst — fuer die Uebersichten
     unter /lernen und /eltern sowie als Basis fuer `get_next_action()`."""
-    themen = [t for t in topics.liste(topics.AKTIV) if not t.get('learned_at')]
-    themen.sort(key=lambda t: (FLAG_ORDER.index(t['flag']), t['sort']))
+    themen = [
+        t for t in topics.liste(topics.AKTIV)
+        if not t.get("learned_at") and t["flag"] != Flag.GRUEN.value
+    ]
+    themen.sort(key=lambda t: (FLAG_ORDER.index(t["flag"]), t["sort"]))
     quizze = quizzes.offene()
     # Auch bei älteren Mehrfacheinträgen zeigt jedes Thema nur einen Einstieg.
     by_topic = {q['topic_id']: topic_workflow.pending_quiz(q['topic_id']) for q in quizze}
