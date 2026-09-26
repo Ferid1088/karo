@@ -1,8 +1,7 @@
-"""Vom Kind gewählte Lerntage für eine Klassenarbeit.
+"""Persönlicher Lernkalender für eine Klassenarbeit.
 
-Der KI-Lernplan entscheidet WAS geübt wird. Dieser Kalender entscheidet nur
-WANN und WIE LANGE das Kind dafür lernen möchte. So bleibt die fachliche
-Priorisierung getrennt von der persönlichen Zeitplanung.
+Der fachliche Lernplan entscheidet WAS geübt wird. Das Kind entscheidet für
+jeden Kalendertag bis zur Arbeit separat, ob und wie lange es lernen möchte.
 """
 from __future__ import annotations
 
@@ -28,67 +27,68 @@ def _exam(exam_id: int) -> dict:
     return dict(row)
 
 
-def _parse_weekdays(raw: str) -> tuple[int, ...]:
-    try:
-        values = tuple(sorted({int(v) for v in (raw or "").split(",") if v}))
-    except ValueError:
-        return ()
-    return tuple(v for v in values if 1 <= v <= 7)
-
-
-def save(exam_id: int, weekdays, minutes: int) -> None:
-    exam = _exam(exam_id)
-    try:
-        days = tuple(sorted({int(v) for v in weekdays}))
-    except (TypeError, ValueError):
-        raise ExamCalendarError("Bitte gültige Lerntage auswählen.") from None
-    if not days or any(v < 1 or v > 7 for v in days):
-        raise ExamCalendarError("Bitte mindestens einen Lerntag auswählen.")
-    if not 1 <= int(minutes) <= 60:
-        raise ExamCalendarError("Die Lernzeit muss zwischen 1 und 60 Minuten liegen.")
-
-    today = dt.date.fromisoformat(db.today())
-    exam_day = dt.date.fromisoformat(exam["exam_date"])
-    if exam_day <= today:
-        raise ExamCalendarError("Für diese Klassenarbeit kann kein neuer Lernkalender mehr angelegt werden.")
-    if not any(day.isoweekday() in days for day in _date_range(today, exam_day)):
-        raise ExamCalendarError("Bis zur Klassenarbeit liegt keiner der gewählten Lerntage.")
-
-    stamp = db.now()
-    with db.tx() as c:
-        c.execute(
-            """INSERT INTO exam_schedule(exam_id, weekdays, minutes, start_date, created_at, updated_at)
-               VALUES(?,?,?,?,?,?)
-               ON CONFLICT(exam_id) DO UPDATE SET
-                   weekdays=excluded.weekdays, minutes=excluded.minutes,
-                   start_date=excluded.start_date, updated_at=excluded.updated_at""",
-            (exam_id, ",".join(map(str, days)), int(minutes), str(today), stamp, stamp),
-        )
-
-
-def get(exam_id: int) -> dict | None:
-    row = db.q1("SELECT * FROM exam_schedule WHERE exam_id=?", exam_id)
-    if row is None:
-        return None
-    item = dict(row)
-    item["weekdays_list"] = list(_parse_weekdays(item["weekdays"]))
-    item["weekday_labels"] = [WEEKDAY_LABELS[d] for d in item["weekdays_list"]]
-    return item
-
-
-def _date_range(start: dt.date, exam_day: dt.date):
+def _date_range(start: dt.date, end: dt.date, *, include_end: bool = False):
     current = start
-    while current < exam_day:
+    limit = end + dt.timedelta(days=1) if include_end else end
+    while current < limit:
         yield current
         current += dt.timedelta(days=1)
 
 
-def _scheduled_dates(schedule: dict, exam: dict) -> list[dt.date]:
-    start = dt.date.fromisoformat(schedule["start_date"])
+def save_days(exam_id: int, minutes_by_date: dict[str, int]) -> None:
+    """Speichert die Minuten für jeden Tag. 0 Minuten bedeutet kein Lerntag."""
+    exam = _exam(exam_id)
+    today = dt.date.fromisoformat(db.today())
     exam_day = dt.date.fromisoformat(exam["exam_date"])
-    weekdays = set(schedule["weekdays_list"])
-    return [day for day in _date_range(start, exam_day)
-            if day.isoweekday() in weekdays]
+    if exam_day <= today:
+        raise ExamCalendarError(
+            "Für diese Klassenarbeit kann kein Lernkalender mehr geändert werden.")
+
+    allowed = {str(day) for day in _date_range(today, exam_day)}
+    cleaned: dict[str, int] = {}
+    for raw_date, raw_minutes in minutes_by_date.items():
+        if raw_date not in allowed:
+            continue
+        try:
+            value = int(raw_minutes)
+        except (TypeError, ValueError):
+            raise ExamCalendarError("Bitte für jeden Tag gültige Minuten eintragen.") from None
+        if not 0 <= value <= 60:
+            raise ExamCalendarError("Die Lernzeit pro Tag muss zwischen 0 und 60 Minuten liegen.")
+        cleaned[raw_date] = value
+
+    stamp = db.now()
+    with db.tx() as c:
+        c.execute("DELETE FROM exam_schedule_day WHERE exam_id=?", (exam_id,))
+        c.executemany(
+            """INSERT INTO exam_schedule_day(exam_id,study_date,minutes,updated_at)
+               VALUES(?,?,?,?)""",
+            [(exam_id, day, minutes, stamp)
+             for day, minutes in sorted(cleaned.items())],
+        )
+
+
+def get_days(exam_id: int) -> dict[str, int]:
+    return {
+        row["study_date"]: int(row["minutes"])
+        for row in db.q(
+            "SELECT study_date,minutes FROM exam_schedule_day WHERE exam_id=?",
+            exam_id,
+        )
+    }
+
+
+def get(exam_id: int) -> dict | None:
+    """Kompatible Zusammenfassung für bestehende Views."""
+    rows = get_days(exam_id)
+    if not rows:
+        return None
+    positive = {day: minutes for day, minutes in rows.items() if minutes > 0}
+    return {
+        "days": rows,
+        "active_days": positive,
+        "total_minutes": sum(positive.values()),
+    }
 
 
 def _content_rows(exam_id: int) -> list[dict]:
@@ -108,32 +108,54 @@ def _content_rows(exam_id: int) -> list[dict]:
     if matching:
         return [{"inhalt": item["label"], "topic_id": item["id"]}
                 for item in matching]
-    return [{"inhalt": str(name), "topic_id": None} for name in names if str(name).strip()]
+    return [{"inhalt": str(name), "topic_id": None}
+            for name in names if str(name).strip()]
 
 
 def calendar(exam_id: int) -> list[dict]:
-    schedule = get(exam_id)
-    if schedule is None:
-        return []
+    """Alle Tage von heute bis einschließlich Prüfungstag.
+
+    Für Lerntage wird Inhalt zugeordnet. Der Prüfungstag selbst ist nur Marker
+    und kann keine Lernminuten erhalten.
+    """
     exam = _exam(exam_id)
-    dates = _scheduled_dates(schedule, exam)
-    rows = _content_rows(exam_id)
+    today = dt.date.fromisoformat(db.today())
+    exam_day = dt.date.fromisoformat(exam["exam_date"])
+    if exam_day < today:
+        return []
+
+    saved = get_days(exam_id)
+    content = _content_rows(exam_id)
+    learning_index = 0
     result = []
-    for index, day in enumerate(dates):
-        row = rows[index % len(rows)] if rows else {
-            "inhalt": "Wiederholen für die Klassenarbeit", "topic_id": None
-        }
-        topic_id = row.get("topic_id")
+
+    for day in _date_range(today, exam_day, include_end=True):
+        is_exam = day == exam_day
+        minutes = 0 if is_exam else int(saved.get(str(day), 0))
+        row = None
+        if minutes > 0:
+            row = content[learning_index % len(content)] if content else {
+                "inhalt": "Wiederholen für die Klassenarbeit",
+                "topic_id": None,
+            }
+            learning_index += 1
+
+        topic_id = row.get("topic_id") if row else None
         topic = topics.get(int(topic_id)) if topic_id else None
+        thema = ((topic or {}).get("label") or (row or {}).get("inhalt")
+                 or "Wiederholen für die Klassenarbeit")
+
         result.append({
             "date": str(day),
             "date_label": day.strftime("%d.%m.%Y"),
             "weekday": WEEKDAY_LABELS[day.isoweekday()],
-            "minutes": int(schedule["minutes"]),
-            "inhalt": row.get("inhalt") or (topic or {}).get("label") or "Wiederholen",
+            "minutes": minutes,
+            "inhalt": (row or {}).get("inhalt") if row else "",
             "topic_id": topic_id,
-            "thema": (topic or {}).get("label") or row.get("inhalt") or "Wiederholen",
-            "today": str(day) == db.today(),
+            "thema": thema,
+            "today": day == today,
+            "is_exam": is_exam,
+            "is_learning_day": minutes > 0,
         })
     return result
 
@@ -142,15 +164,19 @@ def today_task() -> dict | None:
     today = db.today()
     exams = [dict(row) for row in db.q(
         """SELECT e.* FROM exam e
-           JOIN exam_schedule s ON s.exam_id=e.id
            WHERE e.exam_date>? ORDER BY e.exam_date,e.id""", today)]
     for exam in exams:
-        task = next((item for item in calendar(exam["id"]) if item["date"] == today), None)
+        task = next(
+            (item for item in calendar(exam["id"])
+             if item["date"] == today and item["minutes"] > 0),
+            None,
+        )
         if task:
             return {
                 **task,
                 "exam_id": exam["id"],
                 "exam_date": exam["exam_date"],
-                "exam_date_label": dt.date.fromisoformat(exam["exam_date"]).strftime("%d.%m.%Y"),
+                "exam_date_label": dt.date.fromisoformat(
+                    exam["exam_date"]).strftime("%d.%m.%Y"),
             }
     return None
