@@ -167,3 +167,54 @@ def test_simulation_questions_are_gated_until_simulation_day(
     )
     assert response.status_code == 303
     assert response.headers["location"].startswith("/quiz/")
+
+
+def test_exam_plan_stays_on_topic_until_adaptive_mastery(app_env, monkeypatch):
+    from app import topics
+    from app.adaptiv import store as adaptiv_store
+    from app.services import exam_calendar
+
+    app_env.db.init()
+    first_id = topics.anlegen("Brüche addieren")
+    second_id = topics.anlegen("Brüche kürzen")
+    first = topics.get(first_id)
+    second = topics.get(second_id)
+
+    with app_env.db.tx() as c:
+        exam_id = c.execute(
+            "INSERT INTO exam(subject,exam_date,themen,created_at) VALUES(?,?,?,?)",
+            ("Mathematik", "2026-10-05",
+             json.dumps(["Brüche addieren", "Brüche kürzen"]), app_env.db.now()),
+        ).lastrowid
+        c.execute(
+            """INSERT INTO exam_plan(exam_id,state,tagesplan,created_at)
+               VALUES(?,'bereit',?,?)""",
+            (exam_id, json.dumps([
+                {"tag": "28.09.2026", "inhalt": "Brüche addieren",
+                 "minuten": 20, "topic_code": first["code"]},
+                {"tag": "29.09.2026", "inhalt": "Brüche kürzen",
+                 "minuten": 20, "topic_code": second["code"]},
+            ]), app_env.db.now()),
+        )
+
+    monkeypatch.setattr("app.db.today", lambda: "2026-09-27")
+    exam_calendar.save_days(exam_id, {
+        "2026-09-28": 20,
+        "2026-09-29": 20,
+        "2026-09-30": 20,
+    })
+
+    before = exam_calendar.calendar(exam_id)
+    normal = [item for item in before if item["is_learning_day"] and not item["is_simulation"]]
+    assert normal and all(item["topic_id"] == first_id for item in normal)
+
+    input_id = adaptiv_store.eingabe_anlegen(
+        "manuell", fach="Mathematik", thema_text="Brüche addieren",
+        topic_id=first_id)
+    session_id = adaptiv_store.sitzung_anlegen(
+        "INPUT_RECEIVED", eingabe_id=input_id)
+    adaptiv_store.sitzung_aktualisieren(session_id, zustand="MASTERED")
+
+    after = exam_calendar.calendar(exam_id)
+    normal = [item for item in after if item["is_learning_day"] and not item["is_simulation"]]
+    assert normal and all(item["topic_id"] == second_id for item in normal)
