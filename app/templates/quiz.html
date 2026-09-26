@@ -2,7 +2,7 @@
 {% block title %}Fragen – Karo{% endblock %}
 {% block mainclass %}{{ 'focus-view' if quiz.state == 'bereit' and quiz.modus == 'bildschirm' else '' }}{% endblock %}
 {% block content %}
-<a class="back-link" href="/lernen">← Später weiterlernen</a>
+<a class="back-link" href="{{ back_url|default('/lernen') }}">← {{ back_label|default('Zurück zum Lernen') }}</a>
 <div data-quiz-state="{{ quiz.state }}" data-draft-revision="{{ quiz.draft_revision }}" data-draft-position="{{ quiz.draft_position }}" data-draft-key="karo-antworten-{{ quiz.id }}"></div>
 {% set thema = quiz.thema or {} %}
 <h1>{{ thema.label or 'Fragen' }}</h1>
