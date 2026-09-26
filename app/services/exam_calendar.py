@@ -78,6 +78,24 @@ def get_days(exam_id: int) -> dict[str, int]:
     }
 
 
+def simulation_early(exam_id: int) -> bool:
+    row = db.q1("SELECT simulation_early FROM exam_schedule_pref WHERE exam_id=?", exam_id)
+    return bool(row and row["simulation_early"])
+
+
+def set_simulation_early(exam_id: int, enabled: bool) -> None:
+    stamp = db.now()
+    with db.tx() as c:
+        c.execute(
+            """INSERT INTO exam_schedule_pref(exam_id,simulation_early,updated_at)
+               VALUES(?,?,?)
+               ON CONFLICT(exam_id) DO UPDATE SET
+                 simulation_early=excluded.simulation_early,
+                 updated_at=excluded.updated_at""",
+            (exam_id, int(bool(enabled)), stamp),
+        )
+
+
 def get(exam_id: int) -> dict | None:
     """Kompatible Zusammenfassung für bestehende Views."""
     rows = get_days(exam_id)
@@ -129,11 +147,22 @@ def calendar(exam_id: int) -> list[dict]:
     learning_index = 0
     result = []
 
+    positive_days = sorted(
+        dt.date.fromisoformat(day) for day, minutes in saved.items()
+        if minutes > 0 and today <= dt.date.fromisoformat(day) < exam_day
+    )
+    simulation_day = positive_days[-1] if positive_days else None
+    if simulation_day and simulation_early(exam_id):
+        earlier = simulation_day - dt.timedelta(days=1)
+        if earlier >= today:
+            simulation_day = earlier
+
     for day in _date_range(today, exam_day, include_end=True):
         is_exam = day == exam_day
         minutes = 0 if is_exam else int(saved.get(str(day), 0))
+        is_simulation = bool(simulation_day and day == simulation_day)
         row = None
-        if minutes > 0:
+        if minutes > 0 and not is_simulation:
             row = content[learning_index % len(content)] if content else {
                 "inhalt": "Wiederholen für die Klassenarbeit",
                 "topic_id": None,
@@ -156,6 +185,8 @@ def calendar(exam_id: int) -> list[dict]:
             "today": day == today,
             "is_exam": is_exam,
             "is_learning_day": minutes > 0,
+            "is_simulation": is_simulation,
+            "kind": "simulation" if is_simulation else ("learning" if minutes > 0 else "free"),
         })
     return result
 
@@ -168,7 +199,7 @@ def today_task() -> dict | None:
     for exam in exams:
         task = next(
             (item for item in calendar(exam["id"])
-             if item["date"] == today and item["minutes"] > 0),
+             if item["date"] == today and (item["minutes"] > 0 or item["is_simulation"])),
             None,
         )
         if task:
