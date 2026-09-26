@@ -19,7 +19,7 @@ from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .. import config, db, security, teaching, topics
-from ..services import exam, learning_progress, measurement
+from ..services import exam, exam_calendar, learning_progress, measurement
 from ..services.exam import ExamError
 from .shared import alter_generator_aus, render, flash, zurueck
 
@@ -75,6 +75,19 @@ async def klassenarbeit_themenblatt(request: Request,
 @router.get("/klassenarbeit/themenblatt/status")
 def klassenarbeit_themenblatt_status(scan_id: int):
     return {"signatur": exam.get_exam_topic_scan_status(scan_id)}
+
+
+@router.post("/klassenarbeit/{exam_id}/kalender")
+async def klassenarbeit_kalender(request: Request, exam_id: int):
+    formular = await request.form()
+    try:
+        minuten = int(str(formular.get("minutes") or ""))
+        exam_calendar.save(exam_id, formular.getlist("weekdays"), minuten)
+    except (ValueError, exam_calendar.ExamCalendarError) as exc:
+        flash(request, str(exc), "warn")
+        return zurueck(f"/klassenarbeit#exam-{exam_id}")
+    flash(request, "Dein Lernkalender ist gespeichert. Fällige Lerntage erscheinen unter „Heute“.")
+    return zurueck(f"/klassenarbeit#exam-{exam_id}")
 
 
 @router.post("/klassenarbeit/{exam_id}/plan/neu")
