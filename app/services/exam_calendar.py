@@ -9,6 +9,7 @@ import datetime as dt
 import json
 
 from .. import db, exam_plan, topics
+from ..adaptiv import store as adaptiv_store
 
 WEEKDAY_LABELS = {
     1: "Montag", 2: "Dienstag", 3: "Mittwoch", 4: "Donnerstag",
@@ -110,24 +111,45 @@ def get(exam_id: int) -> dict | None:
 
 
 def _content_rows(exam_id: int) -> list[dict]:
-    plan = exam_plan.holen_plan(exam_id) or {}
-    rows = [dict(row) for row in plan.get("tagesplan_liste", [])
-            if int(row.get("minuten") or 0) > 0]
-    if rows:
-        return rows
+    """Prüfungsthemen in Lernreihenfolge, bereits sichere Themen zuletzt.
 
-    exam = _exam(exam_id)
-    try:
-        names = json.loads(exam.get("themen") or "[]")
-    except json.JSONDecodeError:
-        names = []
-    active = topics.liste(topics.AKTIV)
-    matching = topics.passende(names, active)
-    if matching:
-        return [{"inhalt": item["label"], "topic_id": item["id"]}
-                for item in matching]
-    return [{"inhalt": str(name), "topic_id": None}
-            for name in names if str(name).strip()]
+    Der Kalender bleibt beim ersten noch nicht MASTERED Thema. Nach dessen
+    Abschluss wird beim nächsten Render automatisch das nächste Thema aktiv.
+    """
+    plan = exam_plan.holen_plan(exam_id) or {}
+    raw = [dict(row) for row in plan.get("tagesplan_liste", [])
+           if int(row.get("minuten") or 0) > 0]
+
+    if not raw:
+        exam = _exam(exam_id)
+        try:
+            names = json.loads(exam.get("themen") or "[]")
+        except json.JSONDecodeError:
+            names = []
+        matching = topics.passende(names, topics.liste(topics.AKTIV))
+        raw = [{"inhalt": item["label"], "topic_id": item["id"]}
+               for item in matching]
+        if not raw:
+            raw = [{"inhalt": str(name), "topic_id": None}
+                   for name in names if str(name).strip()]
+
+    # Ein Thema kann im KI-Plan an mehreren Tagen vorkommen. Für die
+    # Mastery-Steuerung zählt es trotzdem nur einmal.
+    seen, rows = set(), []
+    for row in raw:
+        key = row.get("topic_id") or row.get("inhalt")
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(row)
+
+    def mastered(row: dict) -> bool:
+        topic_id = row.get("topic_id")
+        return bool(topic_id and adaptiv_store.topic_mastery(int(topic_id)) == "MASTERED")
+
+    unsicher = [row for row in rows if not mastered(row)]
+    sicher = [row for row in rows if mastered(row)]
+    return unsicher + sicher
 
 
 def calendar(exam_id: int) -> list[dict]:
@@ -163,11 +185,10 @@ def calendar(exam_id: int) -> list[dict]:
         is_simulation = bool(simulation_day and day == simulation_day)
         row = None
         if minutes > 0 and not is_simulation:
-            row = content[learning_index % len(content)] if content else {
+            row = content[0] if content else {
                 "inhalt": "Wiederholen für die Klassenarbeit",
                 "topic_id": None,
             }
-            learning_index += 1
 
         topic_id = row.get("topic_id") if row else None
         topic = topics.get(int(topic_id)) if topic_id else None
