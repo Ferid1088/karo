@@ -191,3 +191,39 @@ def test_unbekanntes_thema_auf_dem_blatt_laesst_die_erstellung_nicht_abstuerzen(
     vorhergesagt = {r["topic_id"] for r in app_env.db.q(
         "SELECT topic_id FROM prediction WHERE exam_id=?", ergebnis.exam_id)}
     assert vorhergesagt == {passend_id, unpassend_id}
+
+
+def test_today_learning_day_returns_only_exact_scheduled_day(
+        client, fake_llm, fake_cli, app_env):
+    import json
+    from datetime import date
+    from app.services import exam as exam_service
+
+    einrichten(client, fake_llm)
+    today_iso = date.today().isoformat()
+    today_de = date.today().strftime("%d.%m.%Y")
+    with app_env.db.tx() as db:
+        exam_id = db.execute(
+            "INSERT INTO exam(subject, exam_date, themen, created_at) VALUES (?,?,?,?)",
+            ("Mathematik", today_iso, json.dumps(["Brüche"]), app_env.db.now()),
+        ).lastrowid
+        db.execute(
+            "INSERT INTO exam_plan(exam_id, state, einschaetzung, tagesplan, created_at) "
+            "VALUES (?, 'bereit', '', ?, ?)",
+            (exam_id, json.dumps([
+                {"tag": today_de, "inhalt": "Brüche üben", "minuten": 15,
+                 "topic_code": None}
+            ]), app_env.db.now()),
+        )
+    result = exam_service.get_today_learning_day()
+    assert result is not None
+    assert result["exam_id"] == exam_id
+    assert result["tag"]["tag"] == today_de
+
+    with app_env.db.tx() as db:
+        db.execute(
+            "UPDATE exam_plan SET tagesplan=? WHERE exam_id=?",
+            (json.dumps([{"tag": "01.01.2099", "inhalt": "Nicht heute",
+                          "minuten": 15, "topic_code": None}]), exam_id),
+        )
+    assert exam_service.get_today_learning_day() is None
