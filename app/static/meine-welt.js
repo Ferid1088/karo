@@ -1,5 +1,5 @@
 /* Private browser-only helpers for Meine Welt.
-   No SpeechRecognition, analytics, model API or third-party request. */
+   No browser speech-to-text, analytics, model API or third-party request. */
 (function () {
   "use strict";
 
