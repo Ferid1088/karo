@@ -151,14 +151,7 @@
 /* Ein Knopf für eine neue Arbeit — nicht seitenbreit, er ist eine Aktion
    unter vielen. */
 .neue-arbeit{display:inline-block;width:auto;margin:.2rem 0 1rem}
-/* Ein Bild mit beiden Figuren, hellem Grund und eigener Schrift: kein
-   dunkles Band, kein Zuschnitt — es liegt selbst schon breit. */
-.pruefung-banner{display:block;width:100%;height:auto;margin:.2rem 0 .9rem;border:1px solid #e6edf8;border-radius:22px;background:#fffdf7}
-.pruefung-kopf-text{margin:0 0 1.2rem;text-align:center}
-.pruefung-kopf-text .eyebrow{color:#5b4bdb}
-.pruefung-kopf-text h1{margin:.2rem 0 .3rem;color:#20345d;font-size:clamp(1.7rem,3.6vw,2.6rem);line-height:1.1}
-.pruefung-kopf-text p:not(.eyebrow){margin:0;color:#5b7291}
-@media(max-width:620px){
-  /* Auf dem Handy kleiner, sonst nimmt die Überschrift zu viel Platz. */
-  .pruefung-kopf-text h1{font-size:1.5rem}
-}
+/* Ein Bild mit beiden Figuren, hellem Grund und eigener Schrift.
+   Kleiner gehalten und mittig: ganz gezeigt, aber ohne die halbe Seite zu
+   nehmen — ein Zuschnitt naehme Fuesse oder das Wort weg. */
+.pruefung-banner{display:block;width:100%;max-width:620px;height:auto;margin:.2rem auto 1rem;border:1px solid #e6edf8;border-radius:20px;background:#fffdf7}
