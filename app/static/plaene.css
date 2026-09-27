@@ -5,8 +5,8 @@
   --plan-focus-soft:#fff7d6; --plan-line:#d8e7ef; --plan-bg:#f5fcfd;
 }
 [data-ui-area="child"] body { overflow-x:hidden; background:linear-gradient(135deg,#fff 0%,var(--plan-bg) 100%); color:var(--plan-navy); }
-[data-ui-area="child"] main.plans-page { max-width:1400px; width:calc(100% - 3rem); padding-top:1.5rem; }
-.plans-local-header { display:flex; align-items:center; gap:2rem; min-height:70px; margin:-1.5rem calc(50% - 50vw) 1.5rem; padding:.55rem max(1.5rem,calc((100vw - 1400px)/2)); box-sizing:border-box; background:linear-gradient(110deg,#00666c,#004a5e); color:white; }
+[data-ui-area="child"] main.plans-page { max-width:var(--seite); width:calc(100% - 3rem); padding-top:1.5rem; }
+.plans-local-header { display:flex; align-items:center; gap:2rem; min-height:70px; margin:-1.5rem calc(50% - 50vw) 1.5rem; padding:.55rem var(--seitenrand); box-sizing:border-box; background:linear-gradient(110deg,#00666c,#004a5e); color:white; }
 .plans-logo { color:white!important; text-decoration:none; font:700 2.1rem/1 "Baloo 2",sans-serif; white-space:nowrap; }.plans-logo span { color:#c8fff1; }
 .plans-nav { display:flex; gap:.45rem; flex:1; }.plans-nav a { display:inline-flex; align-items:center; justify-content:center; min-height:48px; padding:.55rem 1.25rem; border-radius:12px; color:white!important; text-decoration:none; font-weight:700; }.plans-nav a:is([aria-current],:hover) { background:#00a88b; }
 /* Der Spruch steht leicht schraeg und in der runden Hausschrift, wie im Entwurf. */
@@ -409,5 +409,8 @@
 
 /* Der Bereichsstreifen trägt seit der gemeinsamen Kopfzeile nur noch Spruch,
    Datum und Profil — ohne Logo und ohne die Wege, die oben stehen. */
-.plans-local-strip { min-height:0; padding-block:.4rem; gap:1rem; justify-content:flex-end; }
-.plans-local-strip .plans-slogan { flex:1; text-align:left; white-space:normal; }
+.plans-local-strip { min-height:0; padding-block:.55rem; gap:1rem; justify-content:flex-end; }
+/* Der Spruch steht schraeg; ohne etwas Luft stossen die beiden Zeilen
+   aneinander, sobald der Streifen schmaler ist als frueher. */
+.plans-local-strip .plans-slogan { flex:1; text-align:left; white-space:normal; line-height:1.5; }
+.plans-local-strip .plans-slogan span { display:inline-block; margin-left:.6rem; }

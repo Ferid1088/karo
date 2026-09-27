@@ -1,4 +1,10 @@
 :root {
+  /* Ein Band für die ganze Oberfläche: Kopfzeile, Unterzeile und Inhalt
+     stehen auf derselben Kante. Vorher hatte jeder Bereich seine eigene
+     Breite (1024, 1080, 1180, 1400) — auf einem breiten Bildschirm stand
+     die Kopfzeile dadurch mitten im Bild, während die Unterzeile links klebte. */
+  --seite: 1200px;
+  --seitenrand: max(1.5rem, calc((100vw - var(--seite)) / 2));
   --ground: #eef2ff;
   --surface: #fff;
   --surface-2: #f4f1ff;
@@ -660,7 +666,7 @@ pre { background: var(--code-bg, var(--surface-2)); border: 1px solid var(--bord
    bleibt auf jeder Seite gleich, damit ein Klick auf "Meine Welt" nicht die
    Wege zurück mitnimmt. */
 .sub-nav { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center;
-  padding: 0.5rem clamp(1rem, 4vw, 2.5rem); border-bottom: 1px solid var(--border);
+  padding: 0.5rem var(--seitenrand); border-bottom: 1px solid var(--border);
   background: var(--surface-2); }
 .sub-nav a { padding: 0.35rem 0.8rem; border-radius: 999px; color: var(--muted);
   font-size: 0.9rem; font-weight: 700; text-decoration: none; }

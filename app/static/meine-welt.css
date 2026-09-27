@@ -138,7 +138,7 @@
 }
 
 /* --- Visual refinement: closer to the approved Meine-Welt mockups ---------- */
-.world-page { max-width:1180px!important; }
+.world-page { max-width:var(--seite)!important; }
 .world-hero { position:relative; min-height:300px; overflow:hidden; margin:-.2rem 0 1rem; border:1px solid var(--border); border-radius:32px; background:#efeaff; box-shadow:0 14px 40px rgba(52,45,120,.08); }
 .world-hero>img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 .world-hero::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(255,255,255,.97) 0%,rgba(255,255,255,.9) 37%,rgba(255,255,255,.12) 68%,rgba(255,255,255,0) 100%); }
