@@ -2,7 +2,7 @@
 {% block title %}Klassenarbeit – {{ companion_name }}{% endblock %}
 {% block content %}
 {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
-{% if cfg.klassenarbeit_kind %}<a class="back-link" href="/lernen">← Lernen</a>{% endif %}<h1>Dein Plan für die Klassenarbeit</h1>
+{% if cfg.klassenarbeit_kind %}<a class="back-link" href="/klassenarbeit">← Klassenarbeiten</a>{% endif %}<h1>Dein Plan für die Klassenarbeit</h1>
 <p class="sub">Du planst nur die Zeit. Am Lerntag prüft Karo zuerst, was schon sitzt, und begleitet dich dann gezielt weiter.</p>
 
 
@@ -220,7 +220,7 @@
               {% elif item.is_learning_day and item.inhalt %}
                 <small class="exam-calendar-topic">{{ item.inhalt }}</small>
                 {% if item.today %}
-                  <form method="post" action="/lernen/adaptiv/start" class="exam-day-start-form">
+                  <form method="post" action="/klassenarbeit/{{ e.id }}/lernen" class="exam-day-start-form">
                     {{ csrf_input() }}
                     <input type="hidden" name="thema" value="{{ item.thema }}">
                     <input type="hidden" name="topic_id" value="{{ item.topic_id or '' }}">

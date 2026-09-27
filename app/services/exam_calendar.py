@@ -357,6 +357,11 @@ def monat(wunsch: str = "", heute: dt.date | None = None) -> dict:
         # Je Arbeit nur ihre eigenen Lernrunden — sonst faerbte eine Runde in
         # einem eigenen Lernthema den Tag einer Arbeit gruen.
         arbeit["gelernt"] = _tage_mit_sitzung(arbeit["id"], str(start), str(ende))
+        from .learning_hub import exam_topics
+        offen = next((t for t in exam_topics(arbeit["id"])
+                      if t["learning_status"] != "sicher"), None)
+        arbeit["thema_id"] = offen["id"] if offen else None
+        arbeit["thema"] = offen["label"] if offen else ""
     nach_id = {arbeit["id"]: arbeit for arbeit in arbeiten}
 
     plan: dict[str, list[dict]] = {}
@@ -370,13 +375,16 @@ def monat(wunsch: str = "", heute: dt.date | None = None) -> dict:
         plan.setdefault(zeile["study_date"], []).append({
             "exam_id": arbeit["id"], "subject": arbeit["subject"],
             "farbe": arbeit["farbe"], "minutes": int(zeile["minutes"]),
+            "thema_id": arbeit["thema_id"], "thema": arbeit["thema"],
             "art": _tages_art(arbeit, zeile["study_date"], heute)})
 
     for arbeit in arbeiten:
         if str(start) <= arbeit["exam_date"] <= str(ende):
             plan.setdefault(arbeit["exam_date"], []).append({
                 "exam_id": arbeit["id"], "subject": arbeit["subject"],
-                "farbe": arbeit["farbe"], "minutes": 0, "art": "arbeit"})
+                "farbe": arbeit["farbe"], "minutes": 0,
+                "thema_id": arbeit["thema_id"], "thema": arbeit["thema"],
+                "art": "arbeit"})
 
     wochen, tag = [], start
     while tag <= ende:

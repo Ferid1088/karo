@@ -20,26 +20,17 @@
       · {{ auswertung.nachher.bewertet }} bewertet.</p>{% endif %}
     {% if auswertung.differenz is not none %}<p>Veränderung: <strong>{{ '%+d'|format(auswertung.differenz) }} Prozentpunkte</strong>.</p>
     <p class="hint">Verglichen werden unterschiedliche Aufgaben zum selben Thema. Das ist ein Hinweis auf deinen Lernstand, kein sicherer Nachweis für die Wirkung dieses Materials.</p>{% endif %}
-    {% if not material.quiz %}
-    <form method="post" action="{{ material.url }}/fragen">{{ csrf_input() }}
-      <button type="submit">Material gelernt – Verständnis prüfen</button>
-    </form>
-    {% else %}
-    <a class="btn" href="/quiz/{{ material.quiz.id }}">{{ 'Antworten ansehen' if material.quiz.finished_at else 'Lernkontrolle fortsetzen' }}</a>
-    {% endif %}
-    {% if auswertung.nachher %}<p><a href="/lernen/{{ material.lesson_id }}">Weiter üben und unsichere Stellen klären</a></p>{% endif %}
+    {% if not material.quiz %}<p class="hint">Deine Lernkontrolle bleibt im Klassenarbeitsbereich und wird dort gestartet, sobald das Material bereit ist.</p>
+    {% else %}<p><a class="btn" href="/klassenarbeit/{{ material.exam_id }}">Zur Klassenarbeit zurück · {{ 'Kontrolle abgeschlossen' if material.quiz.finished_at else 'Kontrolle steht bereit' }}</a></p>{% endif %}
   </div>
 {% else %}
   <div class="card" role="status"><p>{{ material.meldung }}</p>
     {% if material.fehler %}<p>{{ material.fehler }}</p>{% endif %}
-    {% if material.state in ('wartet', 'fehler') %}
-    <a class="btn" href="/lernen/{{ material.lesson_id }}">{{ 'Quellen ergänzen und Erstellung starten' if material.state == 'wartet' else 'Fehler prüfen und erneut versuchen' }}</a>
-    {% endif %}
+    {% if material.state in ('wartet', 'fehler') %}<a class="btn" href="/klassenarbeit/{{ material.exam_id }}">Zur Klassenarbeit zurück</a>{% endif %}
     <p class="hint">Die Seite zeigt das Material automatisch, sobald es fertig ist.</p>
   </div>
   <script>document.addEventListener('DOMContentLoaded', function () {
     karoAutoRefresh("{{ material.url }}/status", "{{ material.state }}");
   });</script>
 {% endif %}
-{% if progress_topic %}{% include "gelernt_form.html" %}{% endif %}
 {% endblock %}

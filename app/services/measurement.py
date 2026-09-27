@@ -76,10 +76,13 @@ def _exam_ansicht(e: dict) -> dict:
     jede Seite ihre eigene Menge — genau der Fehler, den die Zielseiten
     hinter sich haben.
     """
-    from .. import exam_plan
+    from .. import exam_plan, exam_learning
     from . import exam_calendar
     from .learning_hub import exam_topics
     e['topics'] = exam_topics(e['id'])
+    e['materials'] = [m for r in db.q(
+        "SELECT id FROM exam_material WHERE exam_id=? ORDER BY id DESC", e['id'])
+                     if (m := exam_learning.status(r['id']))]
     e['mastered'] = sum(t['learning_status'] == 'sicher' for t in e['topics'])
     # Ein naechster Schritt je Arbeit statt einer Knopfreihe ueber alle
     # Themen — wie "Naechste Einheit" beim Ziel.

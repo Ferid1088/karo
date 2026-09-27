@@ -9,14 +9,14 @@
 <section class="exam-panel">
   <header class="exam-panel-head"><h2>Deine Klassenarbeiten</h2><p>{{ zeilen|length }} {{ 'Arbeit' if zeilen|length == 1 else 'Arbeiten' }} im Blick.</p></header>
   <div class="exam-grid">{% for e in zeilen %}
-    <article class="exam-card" id="exam-{{ e.id }}">
+    <article class="exam-card exam-card-compact" id="exam-{{ e.id }}">
       <h3><a href="/klassenarbeit/{{ e.id }}">{{ e.subject }}</a></h3>
       <p class="exam-when">{{ e.exam_date|datum }}{% if e.days_left >= 0 %} · noch {{ e.days_left }} Tage{% else %} · vorbei{% endif %}</p>
       {% if e.days_left < 0 %}<div class="exam-flags"><span class="status-pill done">✓ Geschrieben</span></div>
       {% elif e.topics and e.mastered == e.topics|length %}<div class="exam-flags"><span class="status-pill done">✓ Alles sicher</span></div>{% endif %}
       {{ exam_metrics(e) }}
       <div class="exam-card-actions">
-        {% if e.next_topic %}<form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ e.next_topic.id }}"><input type="hidden" name="exam_id" value="{{ e.id }}"><button class="exam-start" type="submit">{{ e.next_topic.label }} lernen →</button></form>
+        {% if e.next_topic %}<a class="exam-start" href="/klassenarbeit/{{ e.id }}">Lernplan öffnen →</a>
         {% elif e.topics %}<p class="exam-done-note">Alle Themen sitzen. Schön.</p>
         {% else %}<a class="exam-start" href="/klassenarbeit/{{ e.id }}">Themen ansehen →</a>{% endif %}
         {% if e.simulation_available %}<a class="exam-secondary" href="/klassenarbeit/{{ e.id }}/simulation">Generalprobe starten →</a>{% endif %}
@@ -33,6 +33,7 @@
         <p class="exam-weg"><a href="/klassenarbeit?{{ 'monat=' ~ monat ~ '&amp;' if monat }}weg={{ e.id }}">weglegen</a></p>
         {% endif %}
       </div>
+      {% if e.calendar %}<div class="exam-card-calendar" aria-label="Lernkalender für {{ e.subject }}"><div class="exam-card-calendar-title">Nächste 7 Lerntage <small>mehr im Lernplan</small></div><div class="exam-card-calendar-days">{% for item in e.calendar[:7] %}<a class="exam-mini-day {{ 'today' if item.today }} {{ 'exam' if item.is_exam }} {{ 'planned' if item.is_learning_day }}" href="/klassenarbeit/{{ e.id }}#exam-calendar-{{ item.date }}"><span>{{ item.weekday[:2] }}</span><i>{{ item.date[8:10] }}</i>{% if item.is_learning_day and item.minutes %}<small>{{ item.minutes }}′</small>{% endif %}</a>{% endfor %}</div></div>{% endif %}
     </article>
   {% else %}
     <section class="learn-empty"><h2>Noch keine Klassenarbeit</h2><p>Lege Termin und Themen an, dann entsteht dein eigener Lernplan.</p></section>

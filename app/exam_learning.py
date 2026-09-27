@@ -77,7 +77,7 @@ def status(material_id: int) -> dict | None:
         name = f"{row['label']} – {name}"
     name = f"{name} · {row['created_at'][:10]} · Material {material_id}"
     mime = "video/mp4" if runde and (runde["material_pfad"] or "").lower().endswith(".mp4") else "text/html"
-    result = {"id": material_id, "lesson_id": row["lesson_id"], "state": state,
+    result = {"id": material_id, "exam_id": row["exam_id"], "lesson_id": row["lesson_id"], "state": state,
             "meldung": meldung, "titel": name, "ausgabe": row["ausgabe"],
             "url": f"/klassenarbeit/material/{material_id}",
             "round_id": runde["id"] if runde else None, "mime": mime,

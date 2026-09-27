@@ -13,7 +13,6 @@
 </div>
 <div class="progress exam-bar"><i style="width:{{ [anteil, 100]|min }}%"></i></div>
 <dl class="exam-rows">
-  <div><dt>Lerntage</dt><dd>{{ woche.learning_days }}</dd></div>
-  <div><dt>Nächster Lerntag</dt><dd>{% if woche.next_day %}{{ woche.next_day.date|datum }} · {{ woche.next_day.minutes }} Min{% else %}noch keiner{% endif %}</dd></div>
+  <div><dt>Tage zur Prüfung: <strong>{{ woche.days_left if woche.days_left >= 0 else 0 }}</strong></dt></div>
 </dl>
 {% endmacro %}

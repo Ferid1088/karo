@@ -1,40 +1,35 @@
 {% extends "learning_base.html" %}
 {% block title %}{{ e.subject }} – Klassenarbeit – {{ companion_name }}{% endblock %}
+{% block mainclass %}exam-detail-page{% endblock %}
 {% block content %}
 {% from '_exam_week.html' import exam_metrics %}
 <a class="back-link" href="/klassenarbeit">← Alle Klassenarbeiten</a>
 
-<section class="card exam-card" id="exam-{{ e.id }}">
-  <header class="exam-card-head">
-    <span class="exam-icon" aria-hidden="true">{{ e.subject[:1]|upper }}</span>
-    <div>
-      <h1><img class="pruefung-zeichen" src="/static/pruefung-symbol.svg" alt="" aria-hidden="true">{{ e.subject }}</h1>
-      <p class="exam-when">{{ e.exam_date|datum }}{% if e.days_left >= 0 %} · noch {{ e.days_left }} Tage{% else %} · vorbei{% endif %}</p>
-    </div>
-    <span class="learn-status {{ 'sicher' if e.topics and e.mastered == e.topics|length else 'bearbeitung' }}">{{ e.mastered }} von {{ e.topics|length }} sicher</span>
-  </header>
-  {{ exam_metrics(e) }}
+<section class="exam-detail-hero">
+  <div class="exam-detail-title"><span class="exam-icon" aria-hidden="true">{{ e.subject[:1]|upper }}</span><div><p class="eyebrow">DEINE KLASSENARBEIT</p><h1>{{ e.subject }}</h1><p>{{ e.exam_date|datum }}{% if e.days_left >= 0 %} · noch {{ e.days_left }} Tage{% else %} · vorbei{% endif %}</p></div></div>
+  <span class="learn-status {{ 'sicher' if e.topics and e.mastered == e.topics|length else 'bearbeitung' }}">{{ e.mastered }} von {{ e.topics|length }} sicher</span>
 </section>
 
-<section class="card">
-  <h2>Deine Themen</h2>
+<section class="exam-learning-guide" aria-labelledby="exam-process-title">
+  <div class="exam-section-kicker">SO LERNST DU HIER</div><h2 id="exam-process-title">Ein Thema nach dem anderen</h2>
+  <div class="exam-learning-steps"><div><b>1</b><strong>Prüfen</strong><span>Karo schaut, was du schon kannst.</span></div><div><b>2</b><strong>Verstehen</strong><span>Du bekommst eine Erklärung, die zu deinem Fehler passt.</span></div><div><b>3</b><strong>Üben</strong><span>Du löst eine geführte und eine eigene Aufgabe.</span></div><div><b>4</b><strong>Sicher werden</strong><span>Erst wenn es sitzt, geht es weiter.</span></div></div>
+</section>
+
+<section class="card exam-detail-section" aria-labelledby="exam-topics-title">
+  <header class="exam-detail-section-head"><div><p class="exam-section-kicker">DEIN LERNWEG</p><h2 id="exam-topics-title">Themen, die du können sollst</h2></div><span class="exam-count">{{ e.topics|length }}</span></header>
   <div class="exam-topic-list">{% for t in e.topics %}
-    <div class="exam-topic-row"><span class="topic-dot {{ t.learning_status }}"></span><strong>{{ t.label }}</strong><span class="learn-status {{ t.learning_status }}">{{ t.status_label }}</span>{% if t.learning_status != 'sicher' %}<form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ t.id }}"><input type="hidden" name="exam_id" value="{{ e.id }}"><button class="tile-link" type="submit">Jetzt lernen →</button></form>{% endif %}</div>
-  {% else %}<p>Zu dieser Arbeit sind noch keine Themen hinterlegt.</p>{% endfor %}</div>
+    <article class="exam-topic-row"><span class="topic-dot {{ t.learning_status }}"></span><div class="exam-topic-copy"><strong>{{ t.label }}</strong><small>{{ t.subject }}{% if t.grade %} · {{ t.grade }}. Klasse{% endif %}</small></div><span class="learn-status {{ t.learning_status }}">{{ t.status_label }}</span>{% if t.learning_status != 'sicher' %}<span class="exam-topic-plan">Über deinen Kalender</span>{% else %}<span class="exam-topic-done">✓ sitzt</span>{% endif %}</article>
+  {% else %}<p class="hint">Zu dieser Arbeit sind noch keine Themen hinterlegt.</p>{% endfor %}</div>
 </section>
 
-<section class="card exam-calendar">
-  <h2>Dein Lernkalender</h2>
-  <p class="hint">0 oder leer bedeutet: dieser Tag ist frei. Karo bleibt beim ersten Thema, das noch nicht sicher ist.</p>
-  {% if e.calendar %}
-  <form method="post" action="/klassenarbeit/{{ e.id }}/kalender">{{ csrf_input() }}
-    <div class="exam-calendar-grid">{% for item in e.calendar %}<label class="exam-calendar-day {{ 'today' if item.today }} {{ 'exam' if item.is_exam }} {{ 'learning' if item.is_learning_day }}"><strong>{{ item.date[8:10] }}.{{ item.date[5:7] }}.</strong><small>{{ 'Heute' if item.today else item.weekday[:2] }}</small>{% if item.is_exam %}<span>Klassenarbeit</span>{% else %}<input type="number" name="minutes_{{ item.date }}" min="0" max="60" value="{{ item.minutes if item.minutes else '' }}" placeholder="–" aria-label="Minuten am {{ item.date_label }}">{% if item.is_simulation %}<span>Generalprobe</span>{% elif item.is_learning_day %}<span>{{ item.thema }}</span>{% endif %}{% endif %}</label>{% endfor %}</div>
-    <label class="exam-simulation-option"><input type="checkbox" name="simulation_early" value="ja" {{ 'checked' if e.simulation_early }}> Generalprobe einen Tag früher</label>
-    <button type="submit">Kalender speichern</button>
-  </form>
-  <p class="hint">Die Fragen der Generalprobe werden erst am Simulationstag erstellt.</p>
-  {% else %}<p>Diese Arbeit liegt in der Vergangenheit — es gibt keine Lerntage mehr zu planen.</p>{% endif %}
+<section class="card exam-materials" aria-labelledby="exam-material-title">
+  <header class="exam-detail-section-head"><div><p class="exam-section-kicker">DEINE LERNMATERIALIEN</p><h2 id="exam-material-title">Erklärungen und Übungen</h2></div></header>
+  {% if e.materials %}<div class="exam-material-list">{% for m in e.materials %}<a class="exam-material-row" href="{{ m.url }}"><span class="exam-material-icon">↗</span><span><strong>{{ m.titel }}</strong><small>{{ m.meldung }}</small></span><span aria-hidden="true">›</span></a>{% endfor %}</div>{% else %}<div class="exam-material-empty"><span class="exam-material-icon">＋</span><div><strong>Noch kein Material geöffnet</strong><p>Starte ein Thema oder lerne an einem geplanten Tag. Karo erstellt dort deine Erklärung und die passenden Übungsfragen.</p></div></div>{% endif %}
 </section>
 
-{% if e.simulation_available %}<a class="btn" href="/klassenarbeit/{{ e.id }}/simulation">Generalprobe starten →</a>{% endif %}
+<section class="card exam-calendar compact-exam-calendar" aria-labelledby="exam-calendar-title">
+  <header class="exam-detail-section-head"><div><p class="exam-section-kicker">DEIN PLAN BIS ZUM TERMIN</p><h2 id="exam-calendar-title">Lernzeit festlegen</h2></div><span class="exam-calendar-hint">kleine Schritte reichen</span></header>
+  {% if e.calendar %}<form method="post" action="/klassenarbeit/{{ e.id }}/kalender">{{ csrf_input() }}<div class="exam-calendar-weekdays" aria-hidden="true"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div><div class="exam-calendar-grid" aria-label="Lernkalender bis zur Klassenarbeit">{% for _ in range(e.calendar_leading_blanks) %}<span class="exam-calendar-empty" aria-hidden="true"></span>{% endfor %}{% for item in e.calendar[:20] %}<article id="exam-calendar-{{ item.date }}" class="exam-calendar-day {{ 'today' if item.today }} {{ 'exam' if item.is_exam }} {{ 'learning' if item.is_learning_day }}"><header><strong>{{ item.date[8:10] }}.{{ item.date[5:7] }}.</strong><small>{{ 'Heute' if item.today else item.weekday[:2] }}</small></header>{% if item.is_exam %}<div class="exam-calendar-exam-label">Klassenarbeit</div><strong class="exam-calendar-exam-time">★</strong>{% else %}<label class="exam-calendar-minute-input"><span class="sr">Minuten</span><input aria-label="Lernzeit am {{ item.date_label }}" type="number" name="minutes_{{ item.date }}" min="0" max="60" step="1" value="{{ item.minutes if item.minutes else '' }}" placeholder="0"><small>Min.</small></label>{% if item.is_simulation %}<small class="exam-calendar-topic"><strong>Generalprobe</strong></small>{% elif item.is_learning_day and item.inhalt %}<small class="exam-calendar-topic">{{ item.inhalt }}</small>{% endif %}{% endif %}</article>{% endfor %}</div><label class="exam-simulation-option"><input type="checkbox" name="simulation_early" value="ja" {{ 'checked' if e.simulation_early }}> Simulation einen Tag früher</label><div class="exam-calendar-save"><p class="hint">Der letzte Lerntag ist für Wiederholung und Generalprobe reserviert.</p><button type="submit">Kalender speichern</button></div></form>{% else %}<p class="hint">Diese Klassenarbeit liegt in der Vergangenheit.</p>{% endif %}
+</section>
+{% if e.simulation_available %}<a class="btn exam-simulation-button" href="/klassenarbeit/{{ e.id }}/simulation">Generalprobe starten →</a>{% endif %}
 {% endblock %}

@@ -2,7 +2,7 @@
    geplant ist. Aufbau nach dem Entwurf: volle Wochentagsnamen, hohe Zellen,
    je Eintrag ein Streifen mit farbigem Balken links, zwei Zeilen (Fach, dann
    Zeichen und Angabe). Unten links die Zeichenerklaerung, rechts die Summe. #}
-{% macro exam_monat(kalender, weekday_labels) %}
+{% macro exam_monat(kalender, weekday_labels, csrf_input) %}
 <section class="monat-karte" aria-labelledby="monat-titel">
   <header class="monat-kopf">
     <h2 id="monat-titel">{{ kalender.titel }}</h2>
@@ -21,16 +21,19 @@
     <li class="monat-tag{{ ' fremd' if not tag.im_monat }}{{ ' heute' if tag.heute }}{{ ' wochenende' if loop.index0 >= 5 }}">
       <p class="monat-tag-kopf"><b>{{ tag.nummer }}{% if tag.monat_kurz %} {{ tag.monat_kurz }}{% endif %}</b>{% if tag.heute %}<span>Heute</span>{% endif %}</p>
       {% for eintrag in tag.eintraege %}
-      <span class="monat-chip farbe-{{ eintrag.farbe }} {{ eintrag.art }}">
-        <b>{{ eintrag.subject }}</b>
-        <small>
+      {% set inhalt %}<b>{{ eintrag.subject }}</b><small>
           {%- if eintrag.art == 'arbeit' %}<i>★</i>Arbeit
           {%- elif eintrag.art == 'geschafft' %}<i>✓</i>{{ eintrag.minutes }} Min gelernt
           {%- elif eintrag.art == 'verpasst' %}<i>✗</i>{{ eintrag.minutes }} Min ausgefallen
           {%- elif eintrag.art == 'probe' %}<i>◎</i>Generalprobe · {{ eintrag.minutes }} Min
-          {%- else %}<i>◔</i>{{ eintrag.minutes }} Min{% endif %}
-        </small>
-      </span>
+          {%- else %}<i>◔</i>{{ eintrag.minutes }} Min{% endif %}</small>{% endset %}
+      {% if eintrag.art == 'probe' %}
+      <a class="monat-chip farbe-{{ eintrag.farbe }} {{ eintrag.art }}" href="/klassenarbeit/{{ eintrag.exam_id }}/simulation" title="Generalprobe öffnen">{{ inhalt }}</a>
+      {% elif eintrag.art == 'arbeit' or not eintrag.thema_id %}
+      <a class="monat-chip farbe-{{ eintrag.farbe }} {{ eintrag.art }}" href="/klassenarbeit/{{ eintrag.exam_id }}" title="{{ eintrag.subject }} ansehen">{{ inhalt }}</a>
+      {% else %}
+      <form method="post" action="/lernen/adaptiv/start" class="monat-chip-form">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ eintrag.thema_id }}"><input type="hidden" name="exam_id" value="{{ eintrag.exam_id }}"><input type="hidden" name="thema" value="{{ eintrag.thema }}"><input type="hidden" name="modus" value="bildschirm"><button class="monat-chip farbe-{{ eintrag.farbe }} {{ eintrag.art }}" type="submit" title="{{ eintrag.thema }} jetzt lernen">{{ inhalt }}</button></form>
+      {% endif %}
       {% endfor %}
     </li>
     {% endfor %}{% endfor %}

@@ -5,5 +5,5 @@
 {# Eigener Reiter neben der Klassenarbeit: hier steht nur der Kalender über
    alle Arbeiten, damit die Übersicht ihre Karten zeigen kann. #}
 <h1 class="sr">Prüfungskalender</h1>
-{{ exam_monat(kalender, weekday_labels) }}
+{{ exam_monat(kalender, weekday_labels, csrf_input) }}
 {% endblock %}

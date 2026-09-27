@@ -128,13 +128,34 @@ def klassenarbeit_plan_neu(request: Request, exam_id: int):
     return zurueck("/klassenarbeit")
 
 
+@router.post("/klassenarbeit/{exam_id}/lernen")
+def klassenarbeit_lernen(request: Request, exam_id: int, topic_id: int = Form(0)):
+    """Startet einen Lerntag ausschließlich im Klassenarbeitsbereich."""
+    if alter_generator_aus():
+        flash(request, "Der Prüfungslernweg ist noch nicht freigeschaltet.", "warn")
+        return zurueck(f"/klassenarbeit/{exam_id}")
+    from .. import exam_plan
+    plan = exam_plan.holen_plan(exam_id) or {}
+    tag = next((t for t in plan.get("tagesplan_liste", [])
+                if int(t.get("topic_id") or 0) == topic_id), None)
+    if not tag:
+        flash(request, "Dieses Thema gehört nicht zum Prüfungslernplan.", "warn")
+        return zurueck(f"/klassenarbeit/{exam_id}")
+    try:
+        material_id = exam.start_exam_learning_day(exam_id, tag["row_key"], "")
+    except teaching.TeachingError as exc:
+        flash(request, str(exc), "err")
+        return zurueck(f"/klassenarbeit/{exam_id}")
+    return zurueck(f"/klassenarbeit/material/{material_id}")
+
+
 @router.post("/klassenarbeit/{exam_id}/lerntag")
 def klassenarbeit_lerntag(request: Request, exam_id: int,
                           row_key: str = Form(...), ausgabe: str = Form("")):
     # Lernmaterial zur Klassenarbeit entsteht im selben alten
     # Erzeugungsweg (`exam_learning.starten()` → `teaching.starten()`).
     if alter_generator_aus():
-        return zurueck("/lernen")
+        return zurueck("/klassenarbeit")
     as_json = "application/json" in request.headers.get("accept", "")
     try:
         material_id = exam.start_exam_learning_day(exam_id, row_key, ausgabe)
@@ -153,7 +174,7 @@ def klassenarbeit_lerntag(request: Request, exam_id: int,
 @router.get("/klassenarbeit/material/{material_id}", response_class=HTMLResponse)
 def klassenarbeit_material(request: Request, material_id: int):
     if alter_generator_aus():
-        return zurueck("/lernen")
+        return zurueck("/klassenarbeit")
     material = exam.get_exam_material(material_id)
     if material is None:
         raise HTTPException(404, "Lernmaterial nicht gefunden.")
@@ -169,7 +190,7 @@ def klassenarbeit_material(request: Request, material_id: int):
 @router.get("/klassenarbeit/material/{material_id}/status")
 def klassenarbeit_material_status(material_id: int):
     if alter_generator_aus():
-        return zurueck("/lernen")
+        return zurueck("/klassenarbeit")
     material = exam.get_exam_material(material_id)
     if material is None:
         raise HTTPException(404, "Lernmaterial nicht gefunden.")
@@ -180,7 +201,7 @@ def klassenarbeit_material_status(material_id: int):
 @router.post("/klassenarbeit/material/{material_id}/fragen")
 def klassenarbeit_material_fragen(request: Request, material_id: int):
     if alter_generator_aus():
-        return zurueck("/lernen")
+        return zurueck("/klassenarbeit")
     try:
         quiz_id = exam.request_exam_questions(material_id)
     except teaching.TeachingError as exc:
