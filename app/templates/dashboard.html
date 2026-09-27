@@ -1,12 +1,41 @@
 {% extends 'learning_base.html' %}
 {% block title %}Heute – {{ companion_name }}{% endblock %}
 {% block content %}
-<section class="learn-hero today-hero"><div><p class="eyebrow">SCHÖN, DASS DU DA BIST</p><h1>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</h1><p>Ein kleiner Schritt. Ein bisschen mehr verstanden.</p></div><img src="/static/karo-fox-wave.png" alt="Karo winkt dir zu" width="190" height="190"></section>
-<div class="today-layout"><section class="card today-next"><p class="eyebrow">DEIN NÄCHSTER SCHRITT</p>
-{% if exam_today %}<span class="learn-status bearbeitung">Klassenarbeit{% if exam_today.minutes %} · {{ exam_today.minutes }} Minuten{% endif %}</span><h2>{{ 'Deine Generalprobe' if exam_today.is_simulation else exam_today.inhalt }}</h2><p>{{ 'Probiere in Ruhe aus, was du schon kannst.' if exam_today.is_simulation else 'Wir machen dort weiter, wo du gerade stehst.' }}</p>
-{% if exam_today.is_simulation %}<a class="btn" href="/klassenarbeit/{{ exam_today.exam_id }}/simulation">Generalprobe öffnen →</a>{% elif exam_today.topic_id %}<form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ exam_today.topic_id }}"><input type="hidden" name="exam_id" value="{{ exam_today.exam_id }}"><button type="submit">Jetzt lernen →</button></form>{% else %}<a class="btn" href="/klassenarbeit#exam-{{ exam_today.exam_id }}">Prüfungsthemen ansehen →</a>{% endif %}<a class="subtle-link" href="/klassenarbeit#exam-{{ exam_today.exam_id }}">Deinen Lernkalender ansehen</a>
-{% elif next_topic %}<span class="learn-status {{ next_topic.learning_status }}">{{ next_topic.subject }}</span><h2>{{ next_topic.label }}</h2><p>{{ 'Du kannst genau hier weitermachen.' if next_topic.learning_status == 'bearbeitung' else 'Wir schauen zuerst, was du schon kannst.' }}</p><form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ next_topic.id }}"><button type="submit">{{ 'Weiterlernen' if next_topic.learning_status == 'bearbeitung' else 'Los geht’s' }} →</button></form><a class="subtle-link" href="/lernen">Lieber ein anderes Thema</a>
-{% else %}<h2>{{ 'Das kannst du schon richtig gut!' if safe_count else 'Worauf bist du neugierig?' }}</h2><p>{{ 'Deine sicheren Themen bleiben in deiner Sammlung. Du kannst ein neues entdecken.' if safe_count else 'Such dir ein Thema aus. Karo begleitet dich Schritt für Schritt.' }}</p><a class="btn" href="/lernen/neu">Ein Thema entdecken →</a>{% endif %}
-</section><aside class="card today-progress"><img src="/static/karo-fox-star.png" width="110" height="110" alt=""><h2>Das wächst mit dir</h2><p><strong>{{ safe_count }}</strong> von {{ personal_count }} Themen sicher</p><progress max="{{ personal_count or 1 }}" value="{{ safe_count }}">{{ safe_count }}</progress><a href="/lernen?status=sicher">Meine sicheren Themen →</a></aside></div>
-<div class="learn-shortcuts"><a href="/lernen"><strong>Meine Lernthemen</strong><span>Entdecken, verstehen, üben →</span></a>{% if cfg.klassenarbeit_kind %}<a href="/klassenarbeit"><strong>Klassenarbeit</strong><span>{% if exam %}Nächster Termin: {{ exam.exam_date|datum }}{% else %}In kleinen Schritten vorbereiten{% endif %} →</span></a>{% endif %}</div>
+{# "Heute" beantwortet genau eine Frage: was mache ich jetzt? Alles andere
+   steht eine Zeile tiefer als ruhiger Hinweis oder hinter einem Hauptpunkt.
+   Die Themenliste lebt unter "Lernen" — sie stand hier nur noch einmal. #}
+<p class="heute-gruss"><img src="/static/karo-fox-wave.png" alt="" width="56" height="56"><b>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</b> <span>Ein kleiner Schritt. Ein bisschen mehr verstanden.</span></p>
+
+<section class="card schritt-karte">
+  <p class="eyebrow">DEIN NÄCHSTER SCHRITT</p>
+{% if exam_today %}
+  <span class="learn-status bearbeitung">Klassenarbeit{% if exam_today.minutes %} · {{ exam_today.minutes }} Minuten{% endif %}</span>
+  <h1>{{ 'Deine Generalprobe' if exam_today.is_simulation else exam_today.inhalt }}</h1>
+  <p>{{ 'Probiere in Ruhe aus, was du schon kannst.' if exam_today.is_simulation else 'Wir machen dort weiter, wo du gerade stehst.' }}</p>
+  {% if exam_today.is_simulation %}<a class="btn" href="/klassenarbeit/{{ exam_today.exam_id }}/simulation">Generalprobe öffnen →</a>
+  {% elif exam_today.topic_id %}<form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ exam_today.topic_id }}"><input type="hidden" name="exam_id" value="{{ exam_today.exam_id }}"><button type="submit">Jetzt lernen →</button></form>
+  {% else %}<a class="btn" href="/klassenarbeit/{{ exam_today.exam_id }}">Prüfungsthemen ansehen →</a>{% endif %}
+  <a class="subtle-link" href="/klassenarbeit/{{ exam_today.exam_id }}">Deinen Lernkalender ansehen</a>
+{% elif next_topic %}
+  <span class="learn-status {{ next_topic.learning_status }}">{{ next_topic.subject }}</span>
+  <h1>{{ next_topic.label }}</h1>
+  <p>{{ 'Du kannst genau hier weitermachen.' if next_topic.learning_status == 'bearbeitung' else 'Wir schauen zuerst, was du schon kannst.' }}</p>
+  <form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ next_topic.id }}"><button type="submit">{{ 'Weiterlernen' if next_topic.learning_status == 'bearbeitung' else 'Los geht’s' }} →</button></form>
+  <a class="subtle-link" href="/lernen">Lieber ein anderes Thema</a>
+{% else %}
+  <h1>{{ 'Das kannst du schon richtig gut!' if safe_count else 'Worauf bist du neugierig?' }}</h1>
+  <p>{{ 'Deine sicheren Themen bleiben in deiner Sammlung. Du kannst ein neues entdecken.' if safe_count else 'Such dir ein Thema aus. Karo begleitet dich Schritt für Schritt.' }}</p>
+  <a class="btn" href="/lernen/neu">Ein Thema entdecken →</a>
+{% endif %}
+</section>
+
+{# Der Fortschritt war eine eigene Karte mit eigenem Fuchs. Eine Zeile sagt
+   dasselbe. #}
+<p class="fortschritt-zeile"><b>{{ safe_count }} von {{ personal_count }}</b> Themen sicher
+  <span class="fortschritt-balken" aria-hidden="true"><i style="width:{{ (100 * safe_count / personal_count)|round|int if personal_count else 0 }}%"></i></span>
+  <a href="/lernen?status=sicher">sichere Themen ansehen</a></p>
+
+{% if cfg.klassenarbeit_kind and exam %}
+<a class="heute-hinweis" href="/klassenarbeit">Klassenarbeit am {{ exam.exam_date|datum }} — in kleinen Schritten vorbereiten <span aria-hidden="true">→</span></a>
+{% endif %}
 {% endblock %}
