@@ -66,7 +66,7 @@ def save_days(exam_id: int, minutes_by_date: dict[str, int]) -> None:
 
     stamp = db.now()
     with db.tx() as c:
-        c.execute("DELETE FROM exam_schedule_day WHERE exam_id=?", (exam_id,))
+        c.execute("DELETE FROM exam_schedule_day WHERE exam_id=? AND study_date>=?", (exam_id, str(today)))
         c.executemany(
             """INSERT INTO exam_schedule_day(exam_id,study_date,minutes,updated_at)
                VALUES(?,?,?,?)""",
@@ -122,9 +122,15 @@ def _content_rows(exam_id: int) -> list[dict]:
     Der Kalender bleibt beim ersten noch nicht MASTERED Thema. Nach dessen
     Abschluss wird beim nächsten Render automatisch das nächste Thema aktiv.
     """
+    from .learning_hub import exam_topics
+    members = exam_topics(exam_id)
+    return [{"inhalt": t['label'], "topic_id": t['id']} for t in members
+            if t['learning_status'] != 'sicher']
+
+
+def _legacy_content_rows(exam_id: int) -> list[dict]:
     plan = exam_plan.holen_plan(exam_id) or {}
-    raw = [dict(row) for row in plan.get("tagesplan_liste", [])
-           if int(row.get("minuten") or 0) > 0]
+    raw = [dict(row) for row in plan.get("tagesplan_liste", []) if int(row.get("minuten") or 0) > 0]
 
     if not raw:
         exam = _exam(exam_id)
@@ -177,13 +183,12 @@ def calendar(exam_id: int) -> list[dict]:
 
     positive_days = sorted(
         dt.date.fromisoformat(day) for day, minutes in saved.items()
-        if minutes > 0 and today <= dt.date.fromisoformat(day) < exam_day
+        if minutes > 0 and dt.date.fromisoformat(day) < exam_day
     )
     simulation_day = positive_days[-1] if positive_days else None
     if simulation_day and simulation_early(exam_id):
         earlier = simulation_day - dt.timedelta(days=1)
-        if earlier >= today:
-            simulation_day = earlier
+        simulation_day = earlier
 
     for day in _date_range(today, exam_day, include_end=True):
         is_exam = day == exam_day
@@ -192,7 +197,7 @@ def calendar(exam_id: int) -> list[dict]:
         row = None
         if minutes > 0 and not is_simulation:
             row = content[0] if content else {
-                "inhalt": "Wiederholen für die Klassenarbeit",
+                "inhalt": "Alles sicher – Zeit zum Wiederholen",
                 "topic_id": None,
             }
 
@@ -219,21 +224,24 @@ def calendar(exam_id: int) -> list[dict]:
 
 
 def simulation_date(exam_id: int) -> str | None:
-    item = next((row for row in calendar(exam_id) if row["is_simulation"]), None)
-    return item["date"] if item else None
+    exam_day = _exam(exam_id)['exam_date']
+    days = sorted(day for day, minutes in get_days(exam_id).items() if minutes > 0 and day < exam_day)
+    if not days:
+        return None
+    day = dt.date.fromisoformat(days[-1])
+    if simulation_early(exam_id):
+        day -= dt.timedelta(days=1)
+    return str(day)
 
 
 def simulation_topics(exam_id: int) -> list[dict]:
-    exam = _exam(exam_id)
-    try:
-        names = json.loads(exam.get("themen") or "[]")
-    except json.JSONDecodeError:
-        names = []
-    return topics.passende(names, topics.liste(topics.AKTIV))
+    from .learning_hub import exam_topics
+    return exam_topics(exam_id)
 
 
 def simulation_available(exam_id: int) -> bool:
-    return simulation_date(exam_id) == db.today()
+    day = simulation_date(exam_id)
+    return bool(day and day <= db.today() < _exam(exam_id)['exam_date'])
 
 
 def today_task() -> dict | None:

@@ -474,24 +474,28 @@ def offene_schritte():
     return themen, schritte, reviews
 
 
-def render_lernen_uebersicht(request: Request):
+def render_lernen_uebersicht(request: Request, *, topics_only: bool = False):
     """Die Lernuebersicht (/lernen) — auch der Einstiegspunkt fuer
     /lernzyklus (Index), damit der Lernzyklus-Router nicht dashboard.py's
     Routen-Funktion direkt aufrufen muss."""
-    themen, schritte, reviews = offene_schritte()
-    learning_content.add_creation_options(themen)
-    grouped = learning_progress.groups(themen)
-    cfg = config.load()
-    tab = request.query_params.get('tab', 'bearbeitung')
-    if tab not in ('neu', 'bearbeitung', 'klassenarbeit') or (tab == 'klassenarbeit' and not cfg.klassenarbeit_kind):
-        tab = 'bearbeitung'
-    subtab = request.query_params.get('status', 'neu')
-    if subtab not in ('neu', 'bearbeitung'):
-        subtab = 'neu'
-    return render(request, 'lernen_start.html', themen=themen, schritte=schritte,
-                  gruppen=grouped, tab=tab, subtab=subtab,
-                  exam_gruppen=learning_progress.exam_groups(topics.liste(topics.AKTIV)) if cfg.klassenarbeit_kind else {},
-                  reviews=reviews, reviews_by_topic={q['topic_id']: q for q in reviews})
+    from . import learning_hub
+    if request.query_params.get('tab') == 'klassenarbeit':
+        return zurueck('/klassenarbeit')
+    themen = learning_hub.personal_topics()
+    query = request.query_params.get('q', '').strip()
+    fach = request.query_params.get('fach', '')
+    status = request.query_params.get('status', '')
+    selected = [t for t in themen if query.casefold() in t['label'].casefold()
+                and (not fach or t['subject'] == fach)
+                and (not status or t['learning_status'] == status)]
+    next_topic = next((t for t in themen if t['learning_status'] == 'bearbeitung'), None)
+    next_topic = next_topic or next((t for t in themen if t['learning_status'] == 'neu'), None)
+    return render(request, 'lernen_start.html', themen=selected, alle_themen=themen,
+                  faecher=sorted({t['subject'] for t in themen}), query=query,
+                  fach=fach, status=status, next_topic=next_topic,
+                  safe_count=sum(t['learning_status'] == 'sicher' for t in themen),
+                  active_count=sum(t['learning_status'] == 'bearbeitung' for t in themen),
+                  topics_only=topics_only)
 
 
 def _schritt_kategorie(schritt: dict) -> str:

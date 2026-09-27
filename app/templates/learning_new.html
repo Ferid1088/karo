@@ -1,0 +1,10 @@
+{% extends "learning_base.html" %}
+{% block title %}Neues Thema – {{ companion_name }}{% endblock %}
+{% block content %}
+<a class="back-link" href="/lernen">← Meine Lernthemen</a>
+<section class="learn-heading"><div><p class="eyebrow">NEUGIER IST EIN GUTER ANFANG</p><h1>Was möchtest du verstehen?</h1><p>Beschreibe dein Thema oder wähle eins aus.</p></div><img src="/static/karo-fox-star.png" alt="" width="110"></section>
+<div class="learn-two-col">
+<section class="card"><h2>Mein eigenes Thema</h2><form method="post" action="/lernen/neu" class="learn-form">{{ csrf_input() }}<label for="new-topic">Das möchte ich lernen</label><input id="new-topic" name="thema" placeholder="Zum Beispiel: Brüche addieren" maxlength="200" required>{% include 'learning_subject_fields.html' %}<button type="submit">Thema hinzufügen →</button></form></section>
+<section class="card"><h2>Ein Thema aussuchen</h2><p>Diese Lernreihen sind schon vorbereitet.</p><div class="catalog-list">{% for k in katalog %}<form method="post" action="/lernen/neu">{{ csrf_input() }}<input type="hidden" name="thema" value="{{ k.label }}"><input type="hidden" name="fach" value="{{ k.fach|capitalize }}"><input type="hidden" name="klasse" value="{{ cfg.learner_grade }}"><button type="submit" class="catalog-button"><span><strong>{{ k.label }}</strong><small>{{ k.fach|capitalize }}</small></span><span>+</span></button></form>{% else %}<p>Du kannst dein Thema links beschreiben.</p>{% endfor %}</div></section>
+</div><a class="learn-material-link" href="/lernen/material">Du hast ein Arbeitsblatt? Material hochladen →</a>
+{% endblock %}

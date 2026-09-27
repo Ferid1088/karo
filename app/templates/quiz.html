@@ -2,10 +2,11 @@
 {% block title %}Fragen – {{ companion_name }}{% endblock %}
 {% block mainclass %}{{ 'focus-view' if quiz.state == 'bereit' and quiz.modus == 'bildschirm' else '' }}{% endblock %}
 {% block content %}
-<a class="back-link" href="/lernen">← Später weiterlernen</a>
+<div class="learning-session quiz-session">
+<a class="session-back" href="/lernen">Lernplatz verlassen</a>
 <div data-quiz-state="{{ quiz.state }}" data-draft-revision="{{ quiz.draft_revision }}" data-draft-position="{{ quiz.draft_position }}" data-draft-key="karo-antworten-{{ quiz.id }}"></div>
 {% set thema = quiz.thema or {} %}
-<h1>{{ thema.label or 'Fragen' }}</h1>
+<header class="session-header"><div><p class="eyebrow">DEIN CHECK</p><h1>{{ thema.label or 'Fragen' }}</h1></div><div class="session-progress"><span>Verstehen prüfen</span></div></header>
 <p class="sub">
   {{ 'Verständnisfragen nach der Erklärung' if quiz.anlass == 'lernrunde' else 'Prüfung' }}
   · {{ 'am Bildschirm' if quiz.modus == 'bildschirm' else 'auf Papier' }}
@@ -188,4 +189,5 @@
 {% endif %}
 {% if quiz.finished_at %}<a class="btn section-space" href="/lernstand">Meine Erfolge ansehen</a>{% endif %}
 {% if progress_topic %}{% include "gelernt_form.html" %}{% endif %}
+ </div>
 {% endblock %}

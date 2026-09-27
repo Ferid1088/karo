@@ -453,6 +453,13 @@ def sitzung(sitzung_id: int) -> dict | None:
         db.q1("SELECT * FROM lern_sitzung WHERE id=?", sitzung_id))
 
 
+def letzte_fuer_thema(topic_id: int | None, konzept_id: int) -> dict | None:
+    return _sitzung_aufbereiten(db.q1('''SELECT s.* FROM lern_sitzung s
+        JOIN lern_eingabe e ON e.id=s.eingabe_id
+        WHERE s.child_key=? AND e.topic_id IS ? AND s.konzept_id=?
+        ORDER BY s.id DESC LIMIT 1''', CHILD_KEY, topic_id, konzept_id))
+
+
 def offene_sitzung(child_key: str = CHILD_KEY,
                    abgeschlossen: tuple[str, ...] = ()) -> dict | None:
     """Die laufende Sitzung — Grundlage dafür, dass ein Neu-Login dort weitermacht."""

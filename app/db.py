@@ -118,6 +118,8 @@ def init() -> None:
     # Idempotent — `saeen()` legt an oder zieht nach.
     from .adaptiv.lektionen import saee_alle
     saee_alle()
+    from .services.learning_hub import migrate_exams
+    migrate_exams()
     row = c.execute("SELECT MAX(version) AS v FROM schema_version").fetchone()
     if row is None or row["v"] is None or row["v"] < SCHEMA_VERSION:
         with tx() as migration:
@@ -131,6 +133,8 @@ def init() -> None:
 # Spalten, die spaeter dazugekommen sind. CREATE TABLE IF NOT EXISTS legt sie
 # in einer bestehenden Datenbank nicht an, deshalb hier einzeln nachziehen.
 _ADDED_COLUMNS = [
+    ("topic", "learning_visible", "INTEGER NOT NULL DEFAULT 1"),
+    ("topic", "grade", "INTEGER"),
     ("topic", "merged_into", "INTEGER REFERENCES topic(id)"),
     ("quiz", "superseded_by", "INTEGER REFERENCES quiz(id)"),
     ("quiz", "draft_revision", "INTEGER NOT NULL DEFAULT 0"),

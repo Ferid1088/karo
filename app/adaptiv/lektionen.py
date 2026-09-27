@@ -53,7 +53,7 @@ def _trifft(gesucht: str, lektion: dict) -> bool:
     return gesucht in normalisiere_thema(lektion["label"])
 
 
-def fuer_thema(thema_text: str | None) -> dict | None:
+def fuer_thema(thema_text: str | None, fach: str | None = None, klasse: int | None = None) -> dict | None:
     """Die passende Lektion — oder None, und dann wird das auch gesagt.
 
     Bewusst ein simpler Stichwortabgleich: eine echte Zuordnung beliebiger
@@ -64,6 +64,11 @@ def fuer_thema(thema_text: str | None) -> dict | None:
     if not gesucht:
         return None
     for lektion in verfuegbar():
+        if fach and normalisiere_thema(lektion['fach']) != normalisiere_thema(fach):
+            continue
+        konzept = store.konzept(lektion['konzept_id']) or {}
+        if klasse and not konzept.get('klasse_von', 1) <= klasse <= konzept.get('klasse_bis', 13):
+            continue
         if _trifft(gesucht, lektion):
             return lektion
     return None

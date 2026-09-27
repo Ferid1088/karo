@@ -32,32 +32,35 @@ class ExamCreated:
     themen_eingefroren: int
 
 
-def create_exam(exam_date: str, scan_id: str) -> ExamCreated:
+def create_exam(exam_date: str, scan_id: str = '', manual_topics: str = '', subject: str = '') -> ExamCreated:
     """Legt eine Klassenarbeit aus einem eingelesenen Themenblatt an und
     friert die Prognose fuer die dazu passenden Themen ein — nur fuer
     Themen, die zum Themenblatt passen (`topics.passende`), sonst wuerde
     jede Arbeit sich mit ALLEN aktiven Themen im Fach befassen, auch mit
     Themen, die auf dem Blatt gar nicht standen (change.txt Abschnitt 8).
     """
-    if not scan_id.isdigit():
+    if not scan_id.isdigit() and not manual_topics.strip():
         raise ExamError(
             "Bitte zuerst das Themenblatt hochladen und vollständig einlesen lassen.")
-    scan = db.q1("SELECT * FROM exam_scan WHERE id = ?", int(scan_id))
-    if scan is None or scan["state"] != "gelesen":
+    scan = db.q1("SELECT * FROM exam_scan WHERE id = ?", int(scan_id)) if scan_id.isdigit() else None
+    if scan_id and (scan is None or scan["state"] != "gelesen"):
         raise ExamError(
             "Das Themenblatt wird noch gelesen oder konnte nicht gelesen werden. "
             "Bitte warten oder ein neues Blatt hochladen.")
     try:
-        scan_themen = json.loads(scan["themen"] or "[]")
+        scan_themen = (manual_topics.replace(',', '\n').splitlines() if manual_topics.strip()
+                      else json.loads(scan["themen"] or "[]"))
     except json.JSONDecodeError:
         scan_themen = []
-    liste_themen = [str(t).strip()[:120] for t in scan_themen if str(t).strip()][:20]
+    liste_themen = list(dict.fromkeys(str(t).strip()[:120] for t in scan_themen if str(t).strip()))[:20]
     if not liste_themen:
         raise ExamError(
             "Im hochgeladenen Themenblatt wurden keine Themen erkannt. "
             "Bitte ein klareres Blatt hochladen.")
     try:
-        dt.date.fromisoformat(exam_date)
+        day = dt.date.fromisoformat(exam_date)
+        if day < dt.date.fromisoformat(db.today()):
+            raise ExamError("Der Termin liegt in der Vergangenheit.")
     except ValueError:
         raise ExamError("Ungültiges Datum.")
 
@@ -66,12 +69,14 @@ def create_exam(exam_date: str, scan_id: str) -> ExamCreated:
         cur = c.execute(
             "INSERT INTO exam (subject, exam_date, themen, created_at) "
             "VALUES (?,?,?,?)",
-            (cfg.subject, exam_date, json.dumps(liste_themen, ensure_ascii=False),
+            ((subject.strip() or cfg.subject)[:80], exam_date, json.dumps(liste_themen, ensure_ascii=False),
              db.now()))
         exam_id = cur.lastrowid
         n = 0
         aktiv = [t for t in liste(AKTIV) if t["flag"] != Flag.WEISS.value]
-        for t in passende(liste_themen, aktiv):
+        for t in aktiv:
+            if t['label'].casefold() not in {n.casefold() for n in liste_themen}:
+                continue
             cur2 = c.execute(
                 """INSERT INTO prediction (exam_id, topic_id, prognose, frozen_at)
                    VALUES (?, ?, ?, ?)
@@ -81,8 +86,10 @@ def create_exam(exam_date: str, scan_id: str) -> ExamCreated:
 
     # Erst nach dem Commit: beides loest eigene Hintergrund-Jobs aus und
     # braucht die gerade angelegte Klassenarbeit/den Scan bereits sichtbar.
-    exam_plan.scan_uebernehmen(int(scan_id))
-    exam_plan.plan_anfordern(exam_id)
+    from .learning_hub import link_exam
+    link_exam(exam_id, liste_themen, subject.strip() or cfg.subject)
+    if scan_id:
+        exam_plan.scan_uebernehmen(int(scan_id))
     return ExamCreated(exam_id=exam_id, themen_eingefroren=n)
 
 

@@ -65,7 +65,8 @@ def starte(konzept_id: int, thema_text: str = "",
     `topic_id` ist gesetzt, wenn der Einstieg von einer Themenkarte kam —
     daran erkennt die Lernuebersicht spaeter, woran gerade gearbeitet wird.
     """
-    eingabe_id = store.eingabe_anlegen("manuell", fach="Mathematik",
+    konzept = store.konzept(konzept_id) or {}
+    eingabe_id = store.eingabe_anlegen("manuell", fach=konzept.get('fach', ''),
                                        thema_text=thema_text or None,
                                        konzept_id=konzept_id,
                                        topic_id=topic_id)
@@ -85,9 +86,8 @@ def neu_starten(konzept_id: int) -> dict:
     Verlauf bleibt als Lernsignal erhalten (§8)."""
     offen = zustand.laufende()
     if offen:
-        store.sitzung_aktualisieren(offen["id"], zustand=zustand.MASTERED)
-        store.ereignis_schreiben(offen["id"], "vom Kind neu gestartet",
-                                 nach_zustand=zustand.MASTERED)
+        # Starting again is not evidence of mastery. Preserve the unfinished session.
+        return offen
     return starte(konzept_id)
 
 
@@ -215,13 +215,14 @@ def diagnose_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     loesung = (bestaetigung if daten.get("zweite_diagnose") else erste).get(
         "loesung", "")
 
-    if als_bruch(antwort) is None:
+    if not (antwort or '').strip() or (als_bruch(loesung) is not None and als_bruch(antwort) is None):
         return _merke(sitzung["id"], sitzung,
                       fehlerhinweis="Das kann ich nicht als Bruch lesen. "
                                     "Schreib es zum Beispiel so: 5/6")
 
     if ist_richtig(antwort, loesung):
-        ergebnis = zustand.antwort_richtig(sitzung["id"], antwort, cfg=cfg)
+        ergebnis = zustand.antwort_richtig(sitzung["id"], antwort, cfg=cfg,
+                                           darf_abschliessen=bool(daten.get('zweite_diagnose')))
         if ergebnis["zustand"] == zustand.MASTERED:
             return ergebnis
         # Eine richtige Antwort ist keine Beherrschung (A8): noch eine Aufgabe.
@@ -309,7 +310,7 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     if aufgabe is None:
         return sitzung
 
-    if als_bruch(antwort) is None:
+    if not (antwort or '').strip() or (als_bruch(aufgabe['loesung']) is not None and als_bruch(antwort) is None):
         return _merke(sitzung["id"], sitzung,
                       fehlerhinweis="Das kann ich nicht als Bruch lesen. "
                                     "Schreib es zum Beispiel so: 3/4")
@@ -319,7 +320,7 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
         # Transfer danach gehört dazu.
         ergebnis = zustand.antwort_richtig(
             sitzung["id"], antwort, cfg=cfg,
-            darf_abschliessen=phase != zustand.INDEPENDENT_TASK)
+            darf_abschliessen=False)
         if ergebnis["zustand"] == zustand.MASTERED:
             return ergebnis
         ergebnis = _merke(sitzung["id"], ergebnis, tipp_stufe=0,

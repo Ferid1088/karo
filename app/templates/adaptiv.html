@@ -76,9 +76,11 @@
 {% endif %}
 {%- endmacro %}
 
-<div class="adaptiv">
-<a class="back-link" href="/lernen">← Zurück</a>
-<h1>Brüche addieren</h1>
+<div class="adaptiv learning-session">
+<header class="session-header">
+  <div><a class="session-back" href="{{ learning_back }}">Lernplatz verlassen</a><p class="eyebrow">DEINE LERNREISE</p><h1>{{ learning_title }}</h1></div>
+  <div class="session-progress" aria-label="Schritt {{ learning_step }} von 6"><span>Schritt {{ learning_step }} von 6</span><div class="session-dots">{% for i in range(1,7) %}<i class="{{ 'current' if i == learning_step else 'done' if i < learning_step else '' }}"></i>{% endfor %}</div></div>
+</header>
 
 {% if schirm.fehlerhinweis %}<p class="hint">{{ schirm.fehlerhinweis }}</p>{% endif %}
 

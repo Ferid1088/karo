@@ -382,3 +382,15 @@ CREATE TABLE IF NOT EXISTS job (
     finished_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_job_state ON job(state, not_before, id);
+-- Explicit membership: exam topics never become personal topics implicitly.
+CREATE TABLE IF NOT EXISTS exam_topic (
+  exam_id INTEGER NOT NULL REFERENCES exam(id) ON DELETE CASCADE,
+  topic_id INTEGER NOT NULL REFERENCES topic(id),
+  position INTEGER NOT NULL,
+  PRIMARY KEY (exam_id, topic_id)
+);
+CREATE TABLE IF NOT EXISTS learning_upload (
+  scan_id INTEGER PRIMARY KEY REFERENCES exam_scan(id),
+  subject TEXT NOT NULL,
+  grade INTEGER NOT NULL
+);

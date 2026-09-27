@@ -123,23 +123,23 @@ def _freigeben(konzept_id: int, fehlertyp_ids: list) -> None:
 # Auf Anfrage erzeugen (§5 Modell A, §6 Tier 3, §15 Latenz)
 # --------------------------------------------------------------------------
 
-def auftrag_schluessel(thema: str) -> str:
+def auftrag_schluessel(thema: str, fach: str | None = None, klasse: int | None = None) -> str:
     """Ein Thema, ein Auftrag. Zweimal klicken erzeugt nicht zweimal."""
-    return f"lektion:{normalisiere(thema)}"
+    return f"lektion:{normalisiere(thema)}" + (f':{normalisiere(fach or "")}:{klasse or ""}' if fach or klasse else '')
 
 
-def anfordern(thema: str) -> int | None:
+def anfordern(thema: str, fach: str | None = None, klasse: int | None = None) -> int | None:
     """Reiht die Erzeugung ein. Gibt None zurück, wenn schon eine läuft."""
     from .. import jobs
-    return jobs.enqueue("lektion_erzeugen", {"thema": thema},
-                        dedup_key=auftrag_schluessel(thema))
+    return jobs.enqueue("lektion_erzeugen", {"thema": thema, 'fach': fach, 'klasse': klasse},
+                        dedup_key=auftrag_schluessel(thema, fach, klasse))
 
 
-def laeuft(thema: str) -> bool:
+def laeuft(thema: str, fach: str | None = None, klasse: int | None = None) -> bool:
     from .. import db
     return bool(db.q1(
         "SELECT 1 FROM job WHERE dedup_key=? AND state IN ('wartend','laeuft')",
-        auftrag_schluessel(thema)))
+        auftrag_schluessel(thema, fach, klasse)))
 
 
 def _handler_anmelden():
@@ -163,6 +163,12 @@ def _handler_anmelden():
         if not thema:
             return {"uebersprungen": "kein Thema"}
         cfg = config.load()
+        fach = payload.get('fach') or cfg.subject
+        klasse = payload.get('klasse') or cfg.learner_grade
+        from . import lektionen
+        existing = lektionen.fuer_thema(thema, fach, klasse)
+        if existing:
+            return {'konzept_id': existing['konzept_id'], 'thema': thema}
         # §5: Modell A schreibt Didaktik und ist das starke Modell. Ohne
         # ausdrückliche Wahl nähme `complete()` das kleine Textmodell —
         # das schrieb Komponentenparameter, die die Prüfung verwarf.
@@ -171,12 +177,12 @@ def _handler_anmelden():
             model=cfg.model_vision or None,
             max_tokens=MAX_TOKENS,
             prompt=prompts.lektion_prompt(
-                cfg.learner_grade, cfg.subject,
+                klasse, fach,
                 pii.scrub(thema, cfg.learner_name)),
             schema=prompts.LEKTION_SCHEMA,
             system=prompts.SYSTEM,
         )
-        konzept_id = speichern(ergebnis.data)
+        konzept_id = speichern(ergebnis.data, fach=fach)
         return {"konzept_id": konzept_id, "thema": thema}
 
     return job_lektion_erzeugen

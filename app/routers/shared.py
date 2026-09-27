@@ -87,6 +87,7 @@ def render(request: Request, name: str, status_code: int = 200,
         "offene_vorschlaege": topics.anzahl_vorschlaege(),
         "offene_funde": research.anzahl_vorschlaege(),
         "learner_photo_url": profile.photo_url(),
+        "learning_ui": request.url.path == "/" or request.url.path.startswith(("/lernen", "/lernzyklus", "/quiz")),
     }
     basis.update(ctx)
     # The visible area follows the page, including shared pages enabled for children.

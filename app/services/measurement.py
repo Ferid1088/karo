@@ -71,6 +71,11 @@ def render_klassenarbeit(request: Request):
     zeilen = [dict(r) for r in db.q(
         "SELECT * FROM exam ORDER BY exam_date DESC LIMIT 20")]
     for e in zeilen:
+        from .learning_hub import exam_topics
+        e['topics'] = exam_topics(e['id'])
+        e['mastered'] = sum(t['learning_status'] == 'sicher' for t in e['topics'])
+        e['days_left'] = (dt.date.fromisoformat(e['exam_date']) - dt.date.fromisoformat(db.today())).days
+        e['simulation_available'] = exam_calendar.simulation_available(e['id'])
         try:
             e["themen_liste"] = json.loads(e["themen"] or "[]")
         except json.JSONDecodeError:
@@ -84,7 +89,8 @@ def render_klassenarbeit(request: Request):
             (dt.date.fromisoformat(e["calendar"][0]["date"]).isoweekday() - 1)
             if e["calendar"] else 0
         )
-    return render(request, "klassenarbeit.html", zeilen=zeilen,
+    template = "klassenarbeit_kind.html" if config.load_safe().klassenarbeit_kind else "klassenarbeit.html"
+    return render(request, template, zeilen=zeilen,
                   adult_page=not config.load().klassenarbeit_kind,
                   scan=exam_plan.offene_scan(), counts=jobs.counts(),
                   weekday_labels=exam_calendar.WEEKDAY_LABELS)

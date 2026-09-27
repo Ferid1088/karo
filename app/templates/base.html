@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/static/karo.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/simple.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/areas.css?v={{ asset_version|default('0') }}">
+  {% if learning_ui|default(false) %}<link rel="stylesheet" href="/static/learning.css?v=20260927"><link rel="stylesheet" href="/static/learning-exam.css?v=20260927"><link rel="stylesheet" href="/static/learning-session.css?v=20260927">{% endif %}
   {% if world_page|default(false) %}<link rel="stylesheet" href="/static/meine-welt.css?v={{ asset_version|default('0') }}">{% endif %}
   <script src="/static/simple.js?v={{ asset_version|default('0') }}" defer></script>
   <script src="/static/drafts.js?v={{ asset_version|default('0') }}" defer></script>
@@ -35,7 +36,7 @@
   }
 </script>
 </head>
-<body>
+<body{% if learning_ui|default(false) %} class="learning-ui"{% endif %}>
 {% macro csrf_input() -%}
 <input type="hidden" name="{{ csrf_field }}" value="{{ csrf }}">
 {%- endmacro %}
@@ -50,7 +51,7 @@
 <header class="simple-header">
   <div class="area-brand">
     <a class="brand" href="{{ '/eltern' if adult_page else '/' }}" aria-label="{{ companion_name }} – {{ 'Elternübersicht' if adult_page else 'Startseite' }}">{% if companion_photo_url %}<img src="{{ companion_photo_url }}" alt="" class="brand-photo">{% endif %}{{ companion_name }}<span class="brand-dot" aria-hidden="true">.</span></a>
-    <span class="area-label"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">{% if adult_page %}<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>{% else %}<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/>{% endif %}</svg>{{ 'Elternbereich' if adult_page else 'Kinderbereich' }}</span>
+    <span class="area-label"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">{% if adult_page %}<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>{% else %}<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1-6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/>{% endif %}</svg>{{ 'Elternbereich' if adult_page else ('Ziele planen' if plans_page|default(false) else ('Meine Welt' if world_page|default(false) else ('Lernplatz' if learning_ui|default(false) else 'Kinderbereich'))) }}</span>
   </div>
   <nav class="simple-nav" aria-label="Hauptnavigation">
     {% if adult_page %}
@@ -58,9 +59,25 @@
     <a href="/themen" {{ 'aria-current=page' if path.startswith(('/themen', '/wissen', '/vorbereitung', '/recherche')) }}>Vorbereitung</a>
     <a href="/messung/fortschritt" {{ 'aria-current=page' if path.startswith(('/messung', '/klassenarbeit')) }}>Lernstand</a>
     <a href="/setup" {{ 'aria-current=page' if path.startswith('/setup') }}>Einstellungen</a>
+    {% elif plans_page|default(false) %}
+    <a href="/woche" {{ 'aria-current=page' if path == '/woche' }}>Heute</a>
+    <a href="/woche/woche" {{ 'aria-current=page' if path == '/woche/woche' }}>Woche</a>
+    <a href="/woche/monat" {{ 'aria-current=page' if path == '/woche/monat' }}>Monat</a>
+    <a href="/woche/ziele" {{ 'aria-current=page' if path.startswith('/woche/ziele') }}>Ziele</a>
+    <a href="/woche/schatzkiste" {{ 'aria-current=page' if path == '/woche/schatzkiste' }}>Schatzkiste</a>
+    {% elif world_page|default(false) %}
+    <a href="/welten" {{ 'aria-current=page' if path == '/welten' }}>Heute</a>
+    <a href="/welten/jahr" {{ 'aria-current=page' if path == '/welten/jahr' }}>Mein Jahr</a>
+    <a href="/welten/zeitkapseln" {{ 'aria-current=page' if path.startswith('/welten/zeitkapseln') }}>Zeitkapseln</a>
+    {% elif learning_ui|default(false) %}
+    <a href="/lernen" {{ 'aria-current=page' if path == '/lernen' }}>Lernplatz</a>
+    <a href="/lernen/themen" {{ 'aria-current=page' if path.startswith(('/lernen/themen', '/lernzyklus', '/quiz')) }}>Meine Themen</a>
+    <a href="/lernen/neu" {{ 'aria-current=page' if path == '/lernen/neu' }}>Neues Thema</a>
+    <a class="area-nav-secondary" href="/woche">Ziele planen</a>
+    <a class="area-nav-secondary" href="/welten">Meine Welt</a>
     {% else %}
     <a href="/" {{ 'aria-current=page' if path == '/' }}>Heute</a>
-    <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/klassenarbeit')) }}>Lernen</a>
+    <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz')) }}>Lernen</a>
     <a class="plans-entry" href="/woche" {{ 'aria-current=page' if path.startswith('/woche') }}><img src="/static/karo-fox-wave.png" alt="" aria-hidden="true"><span>Ziele planen</span></a>
     <a href="/welten" {{ 'aria-current=page' if path.startswith('/welten') }}>Meine Welt</a>
     <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>

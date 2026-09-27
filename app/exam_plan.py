@@ -94,6 +94,7 @@ def offene_scan() -> dict | None:
     """Der zuletzt hochgeladene Scan, der noch nicht übernommen wurde."""
     row = db.q1(
         """SELECT * FROM exam_scan WHERE state IN ('offen', 'gelesen', 'fehler')
+            AND id NOT IN (SELECT scan_id FROM learning_upload)
             ORDER BY id DESC LIMIT 1""")
     if row is None:
         return None

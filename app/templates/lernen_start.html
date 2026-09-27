@@ -1,38 +1,43 @@
-{% extends "base.html" %}
-{% block title %}Lernen – {{ companion_name }}{% endblock %}
+{% extends "learning_base.html" %}
+{% block title %}{{ 'Meine Themen' if topics_only else 'Lernplatz' }} – {{ companion_name }}{% endblock %}
 {% block content %}
-<p class="eyebrow">DEIN LERNBEREICH</p><h1>Was möchtest du heute lernen?</h1>
-<p class="sub">Starte ein neues Thema oder mach dort weiter, wo du aufgehört hast.</p>
-<nav class="learning-tabs" aria-label="Lernbereiche">
-{% if cfg.klassenarbeit_kind %}<a href="/lernen?tab=klassenarbeit" {{ 'aria-current=page' if tab == 'klassenarbeit' }}>Klassenarbeit</a>{% endif %}
-<a href="/lernen?tab=bearbeitung" {{ 'aria-current=page' if tab == 'bearbeitung' }}>In Bearbeitung <span>{{ gruppen.bearbeitung|length }}</span></a>
-<a href="/lernen?tab=neu" {{ 'aria-current=page' if tab == 'neu' }}>Neue Themen <span>{{ gruppen.neu|length }}</span></a>
-</nav>
-{% if tab == 'klassenarbeit' %}
-<section aria-labelledby="klassenarbeit-heading">
-<h2 id="klassenarbeit-heading">Dein Plan für die Klassenarbeit</h2>
-<nav class="learning-tabs secondary" aria-label="Themen für die Klassenarbeit">
-<a href="/lernen?tab=klassenarbeit&amp;status=neu" {{ 'aria-current=page' if subtab == 'neu' }}>Neue Themen</a>
-<a href="/lernen?tab=klassenarbeit&amp;status=bearbeitung" {{ 'aria-current=page' if subtab == 'bearbeitung' }}>In Bearbeitung</a>
-</nav>
-{% for exam in exam_gruppen[subtab] %}
-<section class="card"><p class="eyebrow">KLASSENARBEIT AM {{ exam.exam_date[8:10] }}.{{ exam.exam_date[5:7] }}.{{ exam.exam_date[:4] }}</p>
-{% with liste=exam.themen %}{% include "themen_karten.html" %}{% endwith %}
-{% if not exam.themen %}<p>Die Themen für diese Klassenarbeit werden noch vorbereitet.</p>{% endif %}
-<a href="/klassenarbeit#exam-{{ exam.id }}">Lernplan und Lerntage öffnen →</a>
-</section>
-{% else %}<section class="card"><h3>{{ 'Noch keine neuen Themen' if subtab == 'neu' else 'Noch nichts in Bearbeitung' }}</h3><p>{{ 'Sobald eine Klassenarbeit vorbereitet ist, findest du ihre Themen hier.' if subtab == 'neu' else 'Starte ein Thema für die Klassenarbeit. Dann kannst du hier weiterlernen.' }}</p></section>{% endfor %}
-<a class="btn ghost" href="/klassenarbeit">Klassenarbeiten und Lernpläne verwalten</a>
-</section>
-{% else %}
-{% if tab == 'bearbeitung' and schritte %}
-<section class="card"><h2>Hier warst du zuletzt</h2><div class="simple-list">
-{% for s in schritte %}<a class="simple-list-link" href="{{ s.url }}"><span><strong>{{ s.titel }}</strong><small>{{ s.text }}</small></span><span aria-hidden="true">→</span></a>{% endfor %}
-</div></section>{% endif %}
-{% with liste=gruppen[tab] %}{% include "themen_karten.html" %}{% endwith %}
-{% if not gruppen[tab] %}<section class="card"><h2>{{ 'Keine neuen Themen' if tab == 'neu' else 'Noch nichts in Bearbeitung' }}</h2><p>{{ 'Hier erscheinen bestätigte Themen, die du noch nicht begonnen hast.' if tab == 'neu' else 'Starte unter „Neue Themen“ ein Thema. Danach findest du es hier.' }}</p></section>{% endif %}
+<div class="learn-dashboard">
+{% if not topics_only %}
+  <section class="learn-welcome">
+    <div class="learn-welcome-copy">
+      <p class="eyebrow">DEIN LERNPLATZ</p>
+      <h1>Was möchtest du<br><span>heute verstehen?</span></h1>
+      <p class="learn-lead">Karo zeigt dir immer nur den nächsten guten Schritt. Du musst nicht alles auf einmal schaffen.</p>
+      <div class="learn-stats" aria-label="Dein Lernstand"><span><b>{{ active_count }}</b> in Bewegung</span><span><b>{{ safe_count }}</b> sitzen sicher</span></div>
+    </div>
+    <img src="/static/karo-fox-wave.png" alt="Karo winkt dir zu" width="170" height="170">
+  </section>
+
+  {% if next_topic %}
+  <section class="learn-next-card" aria-labelledby="next-topic-title">
+    <div class="learn-next-icon" aria-hidden="true">→</div>
+    <div class="learn-next-copy"><p class="eyebrow">DEIN NÄCHSTER SCHRITT</p><h2 id="next-topic-title">{{ next_topic.label }}</h2><p>{{ next_topic.subject }}{% if next_topic.grade %} · {{ next_topic.grade }}. Klasse{% endif %} · {{ 'weiter üben' if next_topic.learning_status == 'bearbeitung' else 'bereit zum Start' }}</p></div>
+    <form method="post" action="{{ '/lernen/adaptiv/start' if cfg.adaptive_learning_enabled|default(false) else '/lernzyklus/' ~ next_topic.id ~ '/quiz/starten' }}">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ next_topic.id }}"><input type="hidden" name="thema" value="{{ next_topic.label }}"><input type="hidden" name="modus" value="bildschirm"><button class="learn-primary-action" type="submit">Jetzt loslegen <span aria-hidden="true">→</span></button></form>
+  </section>
+  {% else %}
+  <section class="learn-next-card learn-next-empty"><div class="learn-next-icon" aria-hidden="true">+</div><div class="learn-next-copy"><p class="eyebrow">DEIN ERSTER SCHRITT</p><h2>Lege ein Thema an</h2><p>Ein Thema reicht. Karo baut daraus deine Lernreise.</p></div><a class="learn-primary-action" href="/lernen/neu">Thema anlegen <span aria-hidden="true">→</span></a></section>
+  {% endif %}
+
+  <nav class="learn-actions" aria-label="Lernaktionen">
+    <a href="/lernen/neu"><span class="learn-action-icon">＋</span><span><b>Neues Thema</b><small>Was willst du lernen?</small></span></a>
+    <a href="/lernen/material"><span class="learn-action-icon">↥</span><span><b>Arbeitsblatt nutzen</b><small>Karo liest dein Blatt</small></span></a>
+    <a href="#meine-themen"><span class="learn-action-icon">▦</span><span><b>Meine Themen</b><small>{{ alle_themen|length }} Lernkarten</small></span></a>
+  </nav>
 {% endif %}
-{% if cfg.schulblaetter_kind and tab == 'neu' %}<div class="choice-grid">{% include "schulblaetter_link.html" %}</div>{% endif %}
-{% if cfg.klassenarbeit_kind and tab != 'klassenarbeit' %}<a class="simple-list-link" href="/klassenarbeit">Dein Plan für die Klassenarbeit →</a>{% endif %}
-{% if reviews and not cfg.antworten_pruefen_kind %}<p class="quiet-note">Es gibt Antworten zum gemeinsamen Anschauen. {% if role == 'parent' %}<a href="/eltern">Für Eltern</a>{% endif %}</p>{% endif %}
+
+  <section id="meine-themen" class="learn-library" aria-labelledby="library-title">
+    <div class="learn-section-heading"><div><p class="eyebrow">DEINE LERNKARTEN</p><h2 id="library-title">Woran du arbeitest</h2></div><span class="learn-count">{{ alle_themen|length }}</span></div>
+    <details class="learn-filter-drawer" {% if query or fach or status %}open{% endif %}><summary>Finden und filtern</summary><form class="learn-filters" method="get" action="/lernen"><label class="sr" for="topic-search">Thema suchen</label><input id="topic-search" name="q" value="{{ query }}" placeholder="z. B. Brüche …" type="search"><label class="sr" for="subject-filter">Fach</label><select id="subject-filter" name="fach"><option value="">Alle Fächer</option>{% for f in faecher %}<option value="{{ f }}" {{ 'selected' if fach == f }}>{{ f }}</option>{% endfor %}</select><label class="sr" for="status-filter">Status</label><select id="status-filter" name="status"><option value="">Alle Stände</option>{% for key,label in [('neu','Neu'),('bearbeitung','In Bewegung'),('sicher','Sicher')] %}<option value="{{ key }}" {{ 'selected' if status == key }}>{{ label }}</option>{% endfor %}</select><button class="ghost" type="submit">Anwenden</button></form></details>
+    <div class="topic-grid">
+      {% for t in themen %}
+      <article class="topic-tile tone-{{ loop.index0 % 4 }}"><div class="topic-tile-top"><div class="topic-symbol" aria-hidden="true">{% if t.subject|lower == 'mathematik' %}½{% elif t.subject|lower in ['deutsch','englisch','französisch'] %}Aa{% else %}✦{% endif %}</div><span class="learn-status {{ t.learning_status }}">{{ t.status_label }}</span></div><h3>{{ t.label }}</h3><p>{{ t.subject }}{% if t.grade %} · {{ t.grade }}. Klasse{% endif %}</p><form method="post" action="{{ '/lernen/adaptiv/start' if cfg.adaptive_learning_enabled|default(false) else '/lernzyklus/' ~ t.id ~ '/quiz/starten' }}" class="topic-tile-action">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ t.id }}"><input type="hidden" name="thema" value="{{ t.label }}"><input type="hidden" name="modus" value="bildschirm"><button type="submit">{{ 'Weiterlernen' if t.learning_status == 'bearbeitung' else 'Noch einmal' if t.learning_status == 'sicher' else 'Starten' }} <span aria-hidden="true">→</span></button></form></article>
+      {% else %}<section class="learn-empty"><img src="/static/karo-fox-star.png" alt="" width="96" height="96"><h2>Noch keine Lernkarte</h2><p>Starte mit einer Frage, die dich gerade interessiert.</p><a class="learn-primary-action" href="/lernen/neu">Mein erstes Thema</a></section>{% endfor %}
+    </div>
+  </section>
+</div>
 {% endblock %}

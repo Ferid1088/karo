@@ -6,10 +6,12 @@ nur Antworten, nie eine Phase. Alles hier hängt am Schalter
 CSRF-Prüfung und Kinderrolle unverändert.
 """
 
+from __future__ import annotations
+
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 
-from .. import config, topics
+from .. import config, topics, db
 from ..adaptiv import (erzeugung, lektionen, sitzung as zustand,
                        store, unterricht)
 from .shared import render, zurueck
@@ -34,12 +36,21 @@ def _aus() -> bool:
 
 
 def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
+    request.session['learning_session_id'] = sitzung['id']
+    entry = store.eingabe(sitzung['eingabe_id']) if sitzung.get('eingabe_id') else {}
+    concept = store.konzept(sitzung['konzept_id']) or {}
+    screen = unterricht.bildschirm(sitzung)
+    steps = {'anker': 1, 'diagnose': 1, 'vorhersage': 2, 'haken': 2,
+             'regel': 2, 'beispiel': 3, 'anders': 2, 'transfer': 6, 'geschafft': 6}
+    step = steps.get(screen['art'], 5 if sitzung.get('phase') == 'INDEPENDENT_TASK' else 4)
     return render(request, "adaptiv.html", sitzung=sitzung,
-                  schirm=unterricht.bildschirm(sitzung))
+                  schirm=screen, learning_title=(entry or {}).get('thema_text') or concept.get('label', 'Dein Thema'),
+                  learning_step=step, learning_back=request.session.get('learning_back', '/lernen'))
 
 
 def _laufende(request: Request) -> dict | None:
-    sitzung = zustand.laufende()
+    selected = request.session.get('learning_session_id')
+    sitzung = store.sitzung(selected) if selected else zustand.laufende()
     return sitzung
 
 
@@ -62,7 +73,7 @@ def _auswahl(request: Request, thema: str = "", nichts_gefunden: bool = False):
 def start(request: Request):
     if _aus():
         return zurueck("/lernen")
-    laufend = zustand.laufende()
+    laufend = _laufende(request)
     if laufend:
         return _zeige(request, laufend)
     # Kein stilles Zurückfallen auf die eine vorhandene Lektion: erst wählen.
@@ -81,28 +92,45 @@ def _geprueftes_thema(topic_id: str) -> int | None:
     return thema["id"] if thema and thema["state"] == topics.AKTIV else None
 
 
-def _wartet(request: Request, thema: str):
+def _wartet(request: Request, thema: str, topic_id: int | None = None):
     """§15: Das Kind sieht, dass Karo arbeitet — kein Spinner ohne Worte."""
-    return render(request, "adaptiv_wartet.html", thema=thema)
+    return render(request, "adaptiv_wartet.html", thema=thema, topic_id=topic_id)
 
 
 @router.post("/start", response_class=HTMLResponse)
 def start_thema(request: Request, thema: str = Form(""),
-                topic_id: str = Form("")):
+                topic_id: str = Form(""), exam_id: str = Form("")):
+    tid = _geprueftes_thema(topic_id)
+    if topic_id and tid is None:
+        return zurueck('/lernen')
+    # The adaptive pilot may be switched off. A topic card must still have a
+    # useful, visible destination instead of looking like it did nothing.
     if _aus():
-        return zurueck("/lernen")
-    lektion = lektionen.fuer_thema(thema)
+        return zurueck(f"/lernzyklus/{tid}" if tid else "/lernen")
+    topic = topics.get(tid) if tid else None
+    if exam_id:
+        if not exam_id.isdigit() or not db.q1('SELECT 1 FROM exam_topic WHERE exam_id=? AND topic_id=?', int(exam_id), tid):
+            return zurueck('/klassenarbeit')
+        request.session['learning_back'] = f'/klassenarbeit#exam-{exam_id}'
+    else:
+        request.session['learning_back'] = '/lernen'
+    if topic:
+        thema = topic['label']
+    fach = (topic or {}).get('subject')
+    grade = (topic or {}).get('grade')
+    lektion = lektionen.fuer_thema(thema, fach, grade)
     if lektion is None:
         gefragt = bool(thema.strip())
         # §6: Katalog zuerst. Erst wenn dort nichts steht, schreibt Modell A
         # eine Lektion — im Hintergrund, und genau einmal pro Thema.
         if gefragt and getattr(config.load_safe(),
                                "llm_error_creation_enabled", False):
-            erzeugung.anfordern(thema)
-            return _wartet(request, thema)
+            erzeugung.anfordern(thema, fach=fach, klasse=grade)
+            request.session['learning_pending'] = {'thema': thema, 'topic_id': tid, 'exam_id': exam_id}
+            return _wartet(request, thema, tid)
         return _auswahl(request, thema=thema, nichts_gefunden=gefragt)
-    return _zeige(request, unterricht.starte(
-        lektion["konzept_id"], thema, _geprueftes_thema(topic_id)))
+    previous = store.letzte_fuer_thema(tid, lektion['konzept_id'])
+    return _zeige(request, previous or unterricht.starte(lektion['konzept_id'], thema, tid))
 
 
 @router.get("/status")
@@ -110,8 +138,11 @@ def erzeugung_status(request: Request, thema: str = ""):
     """Womit die Warteseite fragt, ob es losgehen kann."""
     if _aus():
         return {"fertig": False, "laeuft": False}
-    fertig = lektionen.fuer_thema(thema) is not None
-    return {"fertig": fertig, "laeuft": erzeugung.laeuft(thema),
+    pending = request.session.get('learning_pending', {})
+    topic = topics.get(pending['topic_id']) if pending.get('topic_id') else {}
+    fach, grade = (topic or {}).get('subject'), (topic or {}).get('grade')
+    fertig = lektionen.fuer_thema(thema, fach, grade) is not None
+    return {"fertig": fertig, "laeuft": erzeugung.laeuft(thema, fach=fach, klasse=grade),
             "thema": thema}
 
 
@@ -129,11 +160,14 @@ def wartet(request: Request, thema: str = ""):
 def neu(request: Request):
     if _aus():
         return zurueck("/lernen")
-    laufend = zustand.laufende()
+    laufend = _laufende(request)
     konzept_id = (laufend or {}).get("konzept_id")
     if konzept_id is None:
         return _auswahl(request)
-    return _zeige(request, unterricht.neu_starten(konzept_id))
+    if laufend['zustand'] not in zustand.ENDZUSTAENDE:
+        return _zeige(request, laufend)
+    entry = store.eingabe(laufend['eingabe_id']) or {}
+    return _zeige(request, unterricht.starte(konzept_id, entry.get('thema_text', ''), entry.get('topic_id')))
 
 
 @router.post("/anker", response_class=HTMLResponse)

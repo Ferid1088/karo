@@ -34,15 +34,14 @@ def klassenarbeit(request: Request):
 
 @router.post("/klassenarbeit")
 def klassenarbeit_neu(request: Request, exam_date: str = Form(...),
-                      scan_id: str = Form("")):
+                      scan_id: str = Form(""), themen: str = Form(""), fach: str = Form("")):
     try:
-        ergebnis = exam.create_exam(exam_date, scan_id)
+        ergebnis = exam.create_exam(exam_date, scan_id, themen, fach)
     except ExamError as exc:
         flash(request, str(exc), "warn")
         return zurueck("/klassenarbeit")
-    flash(request, f"Prognose für {ergebnis.themen_eingefroren} Themen eingefroren. "
-                   "Karo erstellt jetzt einen Lernplan.")
-    return zurueck("/klassenarbeit")
+    flash(request, "Deine Klassenarbeit ist angelegt. Wähle jetzt deine Lerntage.")
+    return zurueck(f"/klassenarbeit#exam-{ergebnis.exam_id}")
 
 
 @router.post("/klassenarbeit/themenblatt")

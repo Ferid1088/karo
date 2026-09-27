@@ -52,7 +52,7 @@ def page(request, status_code=200, **extra):
     state = transient(request, plan)
     helps = store.helps(plan['id']) if plan else []
     action = rules.next_action(plan, store.feedback(plan) if plan else set(), helps, state['hidden'])
-    return render(request, 'woche/pilot_child.html', status_code=status_code,
+    return render(request, 'woche/pilot_child.html', status_code=status_code, plans_page=True,
                   plan=plan, action=action, helps=helps, older_helps=[h for h in store.helps() if not plan or h['plan_id'] != plan['id']],
                   hidden=state['hidden'], easier=state['easier'],
                   day=str(rules.today()), limits=rules.LIMITS, days=rules.DAYS, help_kinds=rules.HELP, statuses=rules.STATUS, **extra)
@@ -288,6 +288,7 @@ def _plans_render(request: Request, template: str, **context):
     context.setdefault("plan_day", plaene.today())
     context.setdefault("weekday_labels", plaene.WEEKDAY_LABELS)
     context.setdefault("show_nav", False)
+    context.setdefault("plans_page", True)
     return render(request, template, **context)
 
 
