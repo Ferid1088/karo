@@ -240,3 +240,29 @@ def test_empty_calendar_days_are_valid_and_mean_no_study(app_env, monkeypatch):
     assert saved["2026-09-29"] == 0
     assert saved["2026-09-30"] == 29
     assert saved["2026-10-01"] == 0
+
+
+def test_child_exam_page_hides_legacy_plan_and_shows_guided_flow(
+        client, fake_llm, fake_cli, app_env, monkeypatch):
+    from app.services import exam_calendar
+
+    einrichten(client, fake_llm)
+    app_env.config.update(klassenarbeit_kind=True, adaptive_learning_enabled=True)
+    exam_id, _ = _exam_with_topic(app_env)
+    monkeypatch.setattr("app.db.today", lambda: "2026-09-28")
+    exam_calendar.save_days(exam_id, {
+        "2026-09-28": 20,
+        "2026-09-29": 0,
+        "2026-09-30": 25,
+        "2026-10-01": 30,
+    })
+
+    kind_modus_aktivieren(client)
+    page = client.get("/klassenarbeit")
+    assert page.status_code == 200
+    assert "SO BEGLEITET DICH KARO" in page.text
+    assert "1 · Prüfen" in page.text
+    assert "3 · Begleiten" in page.text
+    assert "4 · Sicher werden" in page.text
+    assert "Prüfen &amp; lernen" in page.text
+    assert "<th>Tag</th><th>Thema und Lernreihe</th>" not in page.text
