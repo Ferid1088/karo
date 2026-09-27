@@ -458,3 +458,23 @@
     padding: .3rem .42rem; font-size: .78rem;
   }
 }
+
+/* Heute, Lernen und Erfolge gehoeren zusammen; Meine Welt und Ziele planen
+   sind eigene Welten und stehen nach einem Abstand, beide mit Bild. */
+[data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: 2.4rem; }
+[data-ui-area="child"] .simple-nav a.welten-entry {
+  gap: .45rem; padding-block: .35rem; padding-left: .5rem;
+  color: #4a2f9c; border: 1px solid #d5c9f7; background: #f3efff;
+}
+[data-ui-area="child"] .simple-nav a.welten-entry:is(:hover,[aria-current]) {
+  color: #fff; border-color: #5b41c8;
+  background: linear-gradient(135deg, #7a5cf0, #5b41c8);
+}
+[data-ui-area="child"] .simple-nav a.welten-entry img {
+  width: 30px; height: 30px; flex: 0 0 30px; object-fit: contain;
+}
+@media(max-width:680px) {
+  [data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: .55rem; }
+  [data-ui-area="child"] .simple-nav a.welten-entry img { display: none; }
+  [data-ui-area="child"] .simple-nav a.welten-entry { padding-left: .42rem; }
+}

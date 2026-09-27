@@ -69,9 +69,9 @@
     {% else %}
     <a href="/" {{ 'aria-current=page' if path == '/' }}>Heute</a>
     <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/material', '/klassenarbeit')) }}>Lernen</a>
-    <a href="/welten" {{ 'aria-current=page' if path.startswith('/welten') }}>Meine Welt</a>
-    <a class="plans-entry" href="/woche" {{ 'aria-current=page' if path.startswith('/woche') }}><img src="/static/karo-fox-wave.png" alt="" aria-hidden="true"><span>Ziele planen</span></a>
     <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>
+    <a class="welten-entry zweite-gruppe" href="/welten" {{ 'aria-current=page' if path.startswith('/welten') }}><img src="/static/welt-biene.svg" alt="" aria-hidden="true"><span>Meine Welt</span></a>
+    <a class="plans-entry" href="/woche" {{ 'aria-current=page' if path.startswith('/woche') }}><img src="/static/karo-fox-wave.png" alt="" aria-hidden="true"><span>Ziele planen</span></a>
     {% endif %}
   </nav>
   {# Hilfe und Abmelden standen unten in der Fusszeile, wo sie zwischen
