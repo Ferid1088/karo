@@ -39,7 +39,7 @@
 .exam-panel-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:1rem}
 .exam-panel-head h2{margin:0;color:#071a4b}
 .exam-panel-head p{margin:0;color:#64789a;font-size:.9rem}
-.exam-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:1rem;align-items:start}
+.exam-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,420px));gap:1rem;align-items:start}
 .exam-card{display:flex;flex-direction:column;gap:.75rem;padding:1.1rem;border:1px solid #d8e7ef;border-radius:14px;background:#fff}
 .exam-card h3{margin:0;padding-bottom:.6rem;border-bottom:1px solid #e4eef5;color:#071a4b;font-size:1.25rem}
 .exam-card h3 a{color:inherit;text-decoration:none}
@@ -83,3 +83,10 @@
 .learn-week .offen i{border-color:#9fdcc6;background:#e9fbf4}
 .learn-week .frei i{border-style:dashed;background:transparent}
 .learn-monitor{margin:0 0 1.5rem}
+
+/* Das Themenblatt: ein Feld und ein Knopf, sichtbar statt als Satz erwähnt. */
+.blatt-karte{margin-top:1.2rem}
+.blatt-karte h2{margin:0 0 .3rem;font-size:1.15rem}
+.blatt-form{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-top:.8rem}
+.blatt-form input[type=file]{flex:1 1 16rem;width:auto;min-width:0}
+.blatt-form button{flex:none}

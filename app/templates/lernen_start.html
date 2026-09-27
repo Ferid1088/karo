@@ -11,7 +11,10 @@
       <h1>Meine Themen</h1>
       <p>{{ alle_themen|length }} {{ 'Lernkarte' if alle_themen|length == 1 else 'Lernkarten' }}{% if active_count %} · {{ active_count }} in Bewegung{% endif %}{% if safe_count %} · {{ safe_count }} sicher{% endif %}</p>
     </div>
-    <a class="learn-primary-action" href="/lernen/neu">+ Neues Thema</a>
+    <div class="themen-knoepfe">
+      <a class="learn-primary-action" href="/lernen/neu">+ Neues Thema</a>
+      <a class="learn-zweit-action" href="/lernen/material">Arbeitsblatt hochladen</a>
+    </div>
   </header>
 
   <form class="themen-filter" method="get" action="/lernen">

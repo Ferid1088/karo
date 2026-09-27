@@ -32,5 +32,22 @@
 <details class="card disclosure" id="klassenarbeit-neu"{% if not zeilen %} open{% endif %}><summary><strong>Neue Klassenarbeit anlegen</strong></summary>
 <form method="post" action="/klassenarbeit" class="learn-form exam-create-form">{{ csrf_input() }}<div class="learn-two-col compact"><div class="field"><label for="exam_date">Termin</label><input type="date" id="exam_date" name="exam_date" min="{{ today }}" required></div><div class="field"><label for="exam_subject">Fach</label><input id="exam_subject" name="fach" value="{{ cfg.subject }}"></div></div><label for="exam_topics">Prüfungsthemen <small>(ein Thema pro Zeile oder mit Komma)</small></label><textarea id="exam_topics" name="themen" rows="4" required placeholder="Brüche addieren
 Brüche kürzen
-Textaufgaben"></textarea><button type="submit">Klassenarbeit anlegen →</button></form><div class="exam-upload-note">Du kannst später auch ein Themenblatt hochladen.</div></details>
+Textaufgaben"></textarea><button type="submit">Klassenarbeit anlegen →</button></form></details>
+
+{# Hier stand nur der Satz, dass man ein Blatt hochladen kann — ohne einen
+   Weg dahin. Jetzt steht das Feld da, wo der Satz war. #}
+<section class="card blatt-karte">
+  <h2>Themenblatt hochladen</h2>
+  <p class="hint">Foto oder Scan des Ankündigungsblatts. {{ companion_name }} liest die Themen heraus und trägt sie ein.</p>
+  <form method="post" action="/klassenarbeit/themenblatt" enctype="multipart/form-data" class="blatt-form">
+    {{ csrf_input() }}
+    <label class="sr" for="themenblatt-datei">Themenblatt</label>
+    <input type="file" id="themenblatt-datei" name="datei" accept="image/*,application/pdf" required>
+    <button type="submit">Blatt einlesen →</button>
+  </form>
+  {% if scan and scan.state == 'offen' %}
+  <p class="msg">{{ companion_name }} liest das Blatt gerade ein … die Seite geht von selbst weiter.</p>
+  <script>karoAutoRefresh("/klassenarbeit/themenblatt/status?scan_id={{ scan.id }}", "{{ scan.state }}");</script>
+  {% endif %}
+</section>
 {% endblock %}

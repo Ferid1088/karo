@@ -34,3 +34,7 @@
 .themen-filter select{flex:0 1 11rem;width:auto}
 .themen-filter :is(input,select){min-height:44px;border-radius:12px}
 .themen-filter button{flex:none}
+
+.themen-knoepfe{display:flex;flex-wrap:wrap;gap:.5rem}
+.learn-zweit-action{display:inline-flex;align-items:center;padding:.78rem 1rem;border:2px solid #c9dcfb;border-radius:13px;background:#fff;color:var(--learn-blue);font-weight:800;text-decoration:none}
+.learn-zweit-action:hover{background:var(--learn-blue-soft)}
