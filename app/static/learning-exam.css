@@ -111,7 +111,8 @@
 .monat-tag-kopf span{color:#5b4bdb;font-size:.82rem;font-weight:800}
 /* Ein Streifen je Arbeit: Balken links in ihrer Farbe, Fach fett, darunter
    Zeichen und Angabe. */
-.monat-chip{display:grid;gap:1px;padding:.32rem .45rem .32rem .55rem;border-radius:8px;border-left:5px solid currentColor;min-width:0;font-size:.8rem;line-height:1.25}
+.monat-chip{display:grid;gap:1px;padding:.32rem .45rem .32rem .55rem;border-radius:8px;border-left:0;min-width:0;font-size:.8rem;line-height:1.25}
+.monat-chip.arbeit,.monat-chip.probe{border-left:5px solid currentColor}
 .monat-chip b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
 .monat-chip small{display:flex;align-items:center;gap:.28rem;font-size:.74rem;font-weight:700;opacity:.92}
 .monat-chip small i{font-style:normal;font-size:.8rem}
@@ -154,4 +155,13 @@
 /* Ein Bild mit beiden Figuren, hellem Grund und eigener Schrift.
    Kleiner gehalten und mittig: ganz gezeigt, aber ohne die halbe Seite zu
    nehmen — ein Zuschnitt naehme Fuesse oder das Wort weg. */
-.pruefung-banner{display:block;width:100%;max-width:620px;height:auto;margin:.2rem auto 1rem;border:1px solid #e6edf8;border-radius:20px;background:#fffdf7}
+.pruefung-banner{display:block;width:100%;max-width:420px;height:auto;margin:.2rem auto 1rem;border:1px solid #e6edf8;border-radius:20px;background:#fffdf7}
+/* Die Streifen sind anklickbar: als Knopf (Lernrunde starten) oder als
+   Verweis (Generalprobe, Prüfungstag). Sie sollen dabei genau wie vorher
+   aussehen — nur mit Zeigefinger und einer Spur Hervorhebung. */
+.monat-chip-form{display:block;margin:0}
+button.monat-chip{width:100%;border:0;border-left:0;text-align:left;font:inherit;font-size:.8rem;box-shadow:none;min-height:0;cursor:pointer}
+button.monat-chip.arbeit,button.monat-chip.probe{border-left:5px solid currentColor}
+a.monat-chip{text-decoration:none;cursor:pointer}
+:is(a,button).monat-chip:hover{filter:brightness(.97);box-shadow:inset 0 0 0 1px currentColor}
+:is(a,button).monat-chip:focus-visible{outline:3px solid #5b4bdb;outline-offset:2px}

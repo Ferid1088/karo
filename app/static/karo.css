@@ -727,7 +727,11 @@ a.tab-btn .archiv-zahl { margin-left: 0.3rem; min-width: 20px; height: 18px; fon
 .sub-nav a.kalender-tab img { width: 90px; height: 90px; display: block; }
 .sub-nav a.kalender-tab:hover { background: var(--surface); }
 .sub-nav a.kalender-tab[aria-current] { background: var(--ink-soft); }
+.sub-nav .exam-nav-pair { position: relative; display: inline-flex; align-items: center; flex: 0 0 90px; height: 90px; z-index: 5; }
+.sub-nav .exam-nav-banner { position: absolute; left: calc(100% + .35rem); top: 0; width: 432px; height: 200px; object-fit: cover; object-position: center; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 3px 10px rgba(20,20,60,.12); }
 @media (max-width: 620px) {
   /* Auf dem Handy nimmt das Logo in voller Größe ein Drittel des Bildes. */
   .sub-nav a.kalender-tab img { width: 56px; height: 56px; }
+  .sub-nav .exam-nav-pair { flex-basis: 56px; height: 56px; }
+  .sub-nav .exam-nav-banner { width: 82px; height: 48px; left: calc(100% + .25rem); top: 4px; border-radius: 10px; }
 }
