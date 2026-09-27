@@ -1,7 +1,5 @@
 .exam-topic-list{display:grid;gap:.5rem;margin:1rem 0}.exam-card-head,.exam-topic-row{display:flex;align-items:center;gap:.7rem}.exam-card-head{justify-content:space-between}.exam-topic-row{padding:.65rem;border-radius:12px;background:#f6faff}.exam-topic-row strong{flex:1}.topic-dot{width:11px;height:11px;border-radius:50%;background:#74a2e8}.topic-dot.bearbeitung{background:#f2be3f}.topic-dot.sicher{background:#20a96b}.exam-calendar{margin-top:1rem;padding-top:1rem;border-top:1px solid #d8e5f4}.exam-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(45px,1fr));gap:.4rem}.exam-calendar-day{display:grid;gap:.25rem;min-height:90px;padding:.45rem;border:1px solid #d9e5f3;border-radius:10px;background:#fff;font-size:.8rem}.exam-calendar-day.today{border:2px solid #347ff0}.exam-calendar-day.learning{background:#eef8ff}.exam-calendar-day.exam{background:#e9e5ff}.exam-calendar-day input{width:100%;padding:.3rem}.exam-calendar-day span{color:#46617d;font-size:.7rem}.exam-simulation-option{display:block;margin:1rem 0}@media(max-width:700px){.exam-calendar-grid{grid-template-columns:repeat(4,1fr)}}
-
 .exam-card-head{justify-content:space-between}.exam-topic-row{padding:.65rem;border-radius:12px;background:#f6faff}.exam-topic-row strong{flex:1}.topic-dot{width:11px;height:11px;border-radius:50%;background:#74a2e8}.topic-dot.bearbeitung{background:#f2be3f}.topic-dot.sicher{background:#20a96b}.exam-calendar{margin-top:1rem;padding-top:1rem;border-top:1px solid #d8e5f4}.exam-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(45px,1fr));gap:.4rem}.exam-calendar-day{display:grid;gap:.25rem;min-height:90px;padding:.45rem;border:1px solid #d9e5f3;border-radius:10px;background:#fff;font-size:.8rem}.exam-calendar-day.today{border:2px solid #347ff0}.exam-calendar-day.learning{background:#eef8ff}.exam-calendar-day.exam{background:#e9e5ff}.exam-calendar-day input{width:100%;padding:.3rem}.exam-calendar-day span{color:#46617d;font-size:.7rem}.exam-simulation-option{display:block;margin:1rem 0}@media(max-width:700px){.exam-calendar-grid{grid-template-columns:repeat(4,1fr)}}
-
 /* Die Lernwoche einer Klassenarbeit — dieselbe Bildsprache wie die Lernwoche
    eines Ziels (plaene.css, .goal-week): ein Kreis je Wochentag, gefuellt = da
    passiert etwas. Damit lesen Kind und Eltern beide Bereiche gleich. */
@@ -32,7 +30,6 @@
 .exam-progress .progress i{display:block;height:100%;border-radius:999px;background:#22a66f}
 .exam-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-top:.9rem}
 .exam-done-note{margin:0;color:#22a66f;font-weight:700}
-
 /* Karten wie auf der Zielseite: drei nebeneinander, jede in sich
    abgeschlossen. Die Farben sind bewusst dieselben wie in plaene.css
    (--plan-blue-soft/--plan-green-soft/--plan-focus-soft), nur ohne dessen
@@ -50,7 +47,6 @@
 .exam-flags{display:flex;flex-wrap:wrap;gap:.4rem}
 .exam-card .exam-week-row{border-top:0;padding-top:0;margin-top:0;gap:.5rem .8rem}
 .exam-card .exam-details{margin-left:auto}
-
 /* Drei Kennzahlen je Karte. Die Beschriftung bleibt klein und darf umbrechen —
    sonst laeuft ein langes Wort wie "Konzentration" aus der Kachel heraus. */
 .exam-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
@@ -70,7 +66,6 @@
 .exam-rows>div{display:flex;align-items:baseline;justify-content:space-between;gap:.6rem;border-bottom:1px solid #eef3f8;padding-bottom:.25rem}
 .exam-rows dt{color:#64789a;font-size:.85rem}
 .exam-rows dd{margin:0;color:#071a4b;font-weight:800;font-size:.9rem;text-align:right}
-
 /* Der breite Knopf am Fuss der Karte. Weisse Schrift samt Pfeil — die
    Ziel-Karten zeigen hier einen Pfeil, der im Indigo verschwindet. */
 .exam-card-actions{display:grid;gap:.5rem;margin-top:auto}
@@ -78,21 +73,18 @@
 .exam-start:hover{background:#4c3ecb}
 .exam-card-actions form{margin:0}
 .exam-secondary{display:block;padding:.55rem;border-radius:12px;background:#eef4ff;color:#2f66e0;font-weight:800;font-size:.88rem;text-align:center;text-decoration:none}
-
 /* Lernmonitoring auf /lernen: dieselben Kreise, eigene Zustaende —
    gruen heisst "an dem Tag lief eine Runde", nicht "geplant". */
 .learn-week .geschafft i{border-color:#008466;background:#008466;color:#fff}
 .learn-week .offen i{border-color:#9fdcc6;background:#e9fbf4}
 .learn-week .frei i{border-style:dashed;background:transparent}
 .learn-monitor{margin:0 0 1.5rem}
-
 /* Das Themenblatt: ein Feld und ein Knopf, sichtbar statt als Satz erwähnt. */
 .blatt-karte{margin-top:1.2rem}
 .blatt-karte h2{margin:0 0 .3rem;font-size:1.15rem}
 .blatt-form{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-top:.8rem}
 .blatt-form input[type=file]{flex:1 1 16rem;width:auto;min-width:0}
 .blatt-form button{flex:none}
-
 /* Monatskalender über alle Arbeiten — Aufbau nach dem Entwurf:
    weisse Karte, volle Wochentagsnamen, hohe Zellen, je Eintrag ein Streifen
    mit farbigem Balken links und zwei Zeilen. Wochenenden leicht getoent,
@@ -104,7 +96,6 @@
 .monat-blaettern a{display:grid;place-items:center;min-width:44px;min-height:40px;padding:0 .7rem;border-radius:13px;background:#eef4ff;color:#2f66e0;font-size:1.1rem;font-weight:800;line-height:1;text-decoration:none}
 .monat-blaettern a.monat-heute-knopf{min-width:86px;font-size:1rem}
 .monat-blaettern a:hover{background:#dfe9ff}
-
 .monat-tage{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin:0;padding:0;list-style:none}
 .monat-wochentag{padding:0 0 .25rem;color:#3c5285;font-size:.95rem;font-weight:700;text-align:center}
 .monat-wochentag abbr{display:none;border:0;text-decoration:none}
@@ -118,7 +109,6 @@
 .monat-tag.heute{border:2px solid #5b4bdb;box-shadow:0 0 0 3px rgba(91,75,219,.12)}
 .monat-tag.heute .monat-tag-kopf b{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#5b4bdb;color:#fff;font-size:.95rem}
 .monat-tag-kopf span{color:#5b4bdb;font-size:.82rem;font-weight:800}
-
 /* Ein Streifen je Arbeit: Balken links in ihrer Farbe, Fach fett, darunter
    Zeichen und Angabe. */
 .monat-chip{display:grid;gap:1px;padding:.32rem .45rem .32rem .55rem;border-radius:8px;border-left:5px solid currentColor;min-width:0;font-size:.8rem;line-height:1.25}
@@ -131,7 +121,6 @@
 .monat-chip.farbe-3{background:#ffe4ec;color:#97123f}
 .monat-chip.farbe-4{background:#f3f2d4;color:#54510c}
 .monat-chip.arbeit{font-weight:800}
-
 .monat-fuss{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1.2rem;margin-top:1rem;padding-top:.8rem;border-top:1px solid #eef3fa}
 .monat-erklaerung{display:flex;flex-wrap:wrap;gap:.5rem 1rem;margin:0;padding:0;list-style:none;color:#44567f;font-size:.82rem;font-weight:700}
 .monat-erklaerung li{display:flex;align-items:center;gap:.3rem}
@@ -142,7 +131,6 @@
 .monat-erklaerung .zeichen.verpasst{background:#d3202f}
 .monat-erklaerung .zeichen.probe{background:#dd6b00}
 .monat-fuss>small{margin-left:auto;color:#5b7291;font-size:.85rem}
-
 @media(max-width:900px){
   .monat-karte{padding:1rem}
   .monat-tage{gap:5px}
@@ -160,28 +148,17 @@
   .monat-chip{font-size:.68rem}
   .monat-chip small{font-size:.62rem}
 }
-
 /* Ein Knopf für eine neue Arbeit — nicht seitenbreit, er ist eine Aktion
    unter vielen. */
 .neue-arbeit{display:inline-block;width:auto;margin:.2rem 0 1rem}
-
-.pruefung-bild{align-self:center;filter:drop-shadow(0 8px 10px rgba(40,60,120,.12))}
-
-/* Kopf der Prüfungsseite: beide Bilder ganz, nebeneinander. Sie tragen ihr
-   Wort selbst, deshalb steht die Überschrift darunter und nicht darüber —
-   sonst verdeckt sie die Figuren oder die Figuren werden beschnitten. */
-.pruefung-kopf{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin:.4rem 0 .9rem;border-radius:22px;overflow:hidden;background:#15112e}
-.pruefung-figur{display:block;width:100%;height:100%;object-fit:contain;background:#15112e}
+/* Ein Bild mit beiden Figuren, hellem Grund und eigener Schrift: kein
+   dunkles Band, kein Zuschnitt — es liegt selbst schon breit. */
+.pruefung-banner{display:block;width:100%;height:auto;margin:.2rem 0 .9rem;border:1px solid #e6edf8;border-radius:22px;background:#fffdf7}
 .pruefung-kopf-text{margin:0 0 1.2rem;text-align:center}
 .pruefung-kopf-text .eyebrow{color:#5b4bdb}
 .pruefung-kopf-text h1{margin:.2rem 0 .3rem;color:#20345d;font-size:clamp(1.7rem,3.6vw,2.6rem);line-height:1.1}
 .pruefung-kopf-text p:not(.eyebrow){margin:0;color:#5b7291}
 @media(max-width:620px){
-  /* Nebeneinander waeren beide zu klein: eines bleibt, und flacher — sonst
-     nimmt es die halbe Seite. */
-  .pruefung-kopf{grid-template-columns:1fr}
-  .pruefung-kopf img:last-child{display:none}
-  .pruefung-figur{height:190px}
+  /* Auf dem Handy kleiner, sonst nimmt die Überschrift zu viel Platz. */
   .pruefung-kopf-text h1{font-size:1.5rem}
-}
 }
