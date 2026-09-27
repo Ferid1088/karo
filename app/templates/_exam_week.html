@@ -8,7 +8,7 @@
 <div class="exam-week-row">
   <ol class="exam-week" aria-label="Die Lernwoche für {{ exam.subject }}">
     {% for day in woche.days %}
-    <li class="{{ day.state }}{{ ' heute' if day.today }}"><span>{{ weekday_labels[day.weekday][:2] }}</span><i aria-hidden="true">{% if day.state == 'pruefung' %}★{% elif day.state == 'learning' %}{{ day.minutes }}{% elif day.state == 'simulation' %}◎{% endif %}</i><small class="sr">{{ weekday_labels[day.weekday] }}: {{ day.label }}</small></li>
+    <li class="{{ day.state }}{{ ' heute' if day.today }}"><span>{{ weekday_labels[day.weekday][:2] }}</span><i aria-hidden="true">{% if day.state == 'pruefung' %}★{% elif day.state == 'geschafft' %}✓{% elif day.state == 'simulation' %}◎{% elif day.minutes %}{{ day.minutes }}{% endif %}</i><small class="sr">{{ weekday_labels[day.weekday] }}: {{ day.label }}</small></li>
     {% endfor %}
   </ol>
   <div class="exam-week-facts">

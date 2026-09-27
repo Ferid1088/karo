@@ -73,3 +73,47 @@ def exam_topics(exam_id: int) -> list[dict]:
 
 def catalog() -> list[dict]:
     return lektionen.verfuegbar()
+
+
+def monitor(heute: str = "") -> dict:
+    """Lernmonitoring der laufenden Woche — das Gegenstueck zur Lernwoche
+    eines Ziels (`woche/plaene.goal_week`).
+
+    Ein Kreis je Wochentag: gruen, wenn an dem Tag wirklich eine Lernsitzung
+    lief, sonst leer. Dazu drei Kennzahlen ueber die eigenen Themen. Alles
+    aus vorhandenen Spuren gerechnet, nichts geschaetzt.
+    """
+    import datetime as dt
+
+    tag = dt.date.fromisoformat(heute or db.today())
+    montag = tag - dt.timedelta(days=tag.isoweekday() - 1)
+    sonntag = montag + dt.timedelta(days=6)
+
+    sitzungen = {zeile["tag"]: zeile["anzahl"] for zeile in db.q(
+        """SELECT substr(updated_at, 1, 10) AS tag, COUNT(*) AS anzahl
+             FROM lern_sitzung
+            WHERE substr(updated_at, 1, 10) BETWEEN ? AND ?
+            GROUP BY tag""", str(montag), str(sonntag))}
+
+    tage = []
+    for versatz in range(7):
+        heutiger = montag + dt.timedelta(days=versatz)
+        text = str(heutiger)
+        anzahl = sitzungen.get(text, 0)
+        zustand = ("geschafft" if anzahl else
+                   "offen" if heutiger >= tag else "frei")
+        tage.append({"date": text, "weekday": heutiger.isoweekday(),
+                     "state": zustand, "sessions": anzahl,
+                     "today": heutiger == tag,
+                     "label": (f"{anzahl} Lernrunden" if anzahl > 1 else
+                               "eine Lernrunde" if anzahl else
+                               "noch offen" if heutiger >= tag else
+                               "nicht gelernt")})
+
+    themen = personal_topics()
+    stand = {"sicher": 0, "bearbeitung": 0, "neu": 0}
+    for t in themen:
+        stand[t["learning_status"]] += 1
+    return {"days": tage, "sessions_week": sum(sitzungen.values()),
+            "days_learned": sum(1 for t in tage if t["state"] == "geschafft"),
+            "topics": len(themen), **stand}

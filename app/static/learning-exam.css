@@ -7,10 +7,12 @@
 .exam-week{display:flex;gap:.35rem;margin:0;padding:0;list-style:none}
 .exam-week li{display:grid;justify-items:center;gap:.15rem;min-width:42px;color:#4a628a;font-size:.82rem;font-weight:700}
 .exam-week i{display:grid;place-items:center;width:32px;height:32px;border:2px solid #dce6f4;border-radius:50%;background:#f4f8ff;color:#20345d;font-style:normal;font-size:.82rem;font-weight:800;line-height:1}
-.exam-week .learning i{border-color:#8fc7ff;background:#dceaff;color:#14498f}
-.exam-week .simulation i{border-color:#f0b64a;background:#fff0d2;color:#8a5a00}
+.exam-week .geplant i{border-color:#9fdcc6;background:#e9fbf4;color:#0a6b52}
+.exam-week .geschafft i{border-color:#008466;background:#008466;color:#fff}
+.exam-week .verpasst i{border-color:#e23b47;background:#fdeaec;color:#b1121f}
+.exam-week .simulation i{border-color:#f3b61f;background:#fff7d6;color:#8a5200}
 .exam-week .pruefung i{border-color:#5b4bdb;background:#5b4bdb;color:#fff}
-.exam-week .vorbei i,.exam-week .danach i{border-style:dashed;background:transparent}
+.exam-week .frei i{border-style:dashed;background:transparent;color:transparent}
 .exam-week .heute span{color:#5b4bdb;text-decoration:underline}
 .exam-week-facts{flex:1;min-width:14rem;display:grid;gap:.1rem}
 .exam-week-facts b{color:#20345d;font-size:.92rem}
@@ -74,3 +76,10 @@
 .exam-start:hover{background:#4c3ecb}
 .exam-card-actions form{margin:0}
 .exam-secondary{display:block;padding:.55rem;border-radius:12px;background:#eef4ff;color:#2f66e0;font-weight:800;font-size:.88rem;text-align:center;text-decoration:none}
+
+/* Lernmonitoring auf /lernen: dieselben Kreise, eigene Zustaende —
+   gruen heisst "an dem Tag lief eine Runde", nicht "geplant". */
+.learn-week .geschafft i{border-color:#008466;background:#008466;color:#fff}
+.learn-week .offen i{border-color:#9fdcc6;background:#e9fbf4}
+.learn-week .frei i{border-style:dashed;background:transparent}
+.learn-monitor{margin:0 0 1.5rem}

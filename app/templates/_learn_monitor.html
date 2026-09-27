@@ -1,0 +1,26 @@
+{# Lernmonitoring der Woche — gleiche Bauart wie die Lernwoche eines Ziels
+   und die einer Klassenarbeit: ein Kreis je Wochentag plus drei Kennzahlen. #}
+{% macro learn_monitor(monitor, weekday_labels) %}
+<section class="exam-panel learn-monitor" aria-labelledby="monitor-titel">
+  <header class="exam-panel-head">
+    <h2 id="monitor-titel">Deine Lernwoche</h2>
+    <p>{{ monitor.days_learned }} von 7 Tagen gelernt · {{ monitor.sessions_week }} {{ 'Runde' if monitor.sessions_week == 1 else 'Runden' }}</p>
+  </header>
+  <div class="exam-week-row">
+    <ol class="exam-week learn-week" aria-label="Deine Lerntage diese Woche">
+      {% for day in monitor.days %}
+      <li class="{{ day.state }}{{ ' heute' if day.today }}"><span>{{ weekday_labels[day.weekday][:2] }}</span><i aria-hidden="true">{% if day.state == 'geschafft' %}✓{% endif %}</i><small class="sr">{{ weekday_labels[day.weekday] }}: {{ day.label }}</small></li>
+      {% endfor %}
+    </ol>
+    <div class="exam-week-facts">
+      <b>{{ monitor.topics }} {{ 'Thema' if monitor.topics == 1 else 'Themen' }} in Arbeit</b>
+      <small>Grün heißt: an diesem Tag hast du eine Runde gemacht.</small>
+    </div>
+  </div>
+  <div class="exam-metrics">
+    <div class="exam-metric green"><b>Sicher</b><strong>{{ monitor.sicher }}</strong><small>{{ 'Thema' if monitor.sicher == 1 else 'Themen' }} sitzen</small></div>
+    <div class="exam-metric blue"><b>In Bewegung</b><strong>{{ monitor.bearbeitung }}</strong><small>gerade dran</small></div>
+    <div class="exam-metric focus"><b>Neu</b><strong>{{ monitor.neu }}</strong><small>noch nicht begonnen</small></div>
+  </div>
+</section>
+{% endmacro %}

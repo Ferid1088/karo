@@ -1,6 +1,7 @@
 {% extends "learning_base.html" %}
 {% block title %}{{ 'Meine Themen' if topics_only else 'Lernplatz' }} – {{ companion_name }}{% endblock %}
 {% block content %}
+{% from '_learn_monitor.html' import learn_monitor %}
 <div class="learn-dashboard">
 {% if not topics_only %}
   <section class="learn-welcome">
@@ -27,6 +28,8 @@
     <a href="/lernen/material"><span class="learn-action-icon">↥</span><span><b>Arbeitsblatt nutzen</b><small>Karo liest dein Blatt</small></span></a>
     <a href="#meine-themen"><span class="learn-action-icon">▦</span><span><b>Meine Themen</b><small>{{ alle_themen|length }} Lernkarten</small></span></a>
   </nav>
+
+  {{ learn_monitor(monitor, weekday_labels) }}
 {% endif %}
 
   <section id="meine-themen" class="learn-library" aria-labelledby="library-title">
