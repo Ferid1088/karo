@@ -38,9 +38,13 @@ BASE = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 
 try:
+    # Alle ausgelieferten Dateien zaehlen mit, nicht eine handverlesene Liste:
+    # eine Korrektur in areas.css oder plaene.css blieb sonst im Browser-Cache
+    # haengen, und es sah aus, als haette die Aenderung nicht gewirkt.
     ASSET_VERSION = str(max(
-        (BASE / "static" / name).stat().st_mtime_ns
-        for name in ("karo.css", "simple.css", "simple.js", "drafts.js", "setup.js")
+        pfad.stat().st_mtime_ns
+        for muster in ("*.css", "*.js")
+        for pfad in (BASE / "static").glob(muster)
     ))
 except OSError:
     ASSET_VERSION = "0"
@@ -71,7 +75,7 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
     if klassenarbeit_kind and (
         path in {"/klassenarbeit", "/messung/examen",
                  "/klassenarbeit/themenblatt", "/klassenarbeit/themenblatt/status"}
-        or re.fullmatch(r"/klassenarbeit/[0-9]+/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|simulation(?:/[0-9]+)?)", path)
+        or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|simulation(?:/[0-9]+)?))?", path)
     ):
         return True
     if schulblaetter_kind and (

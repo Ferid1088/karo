@@ -65,32 +65,64 @@ def _kalibrierung(exam_id: int) -> dict:
             "vorbereitet": round(vorbereitet) if vorbereitet is not None else None}
 
 
+def _exam_ansicht(e: dict) -> dict:
+    """Eine Klassenarbeit mit allem, was eine Ansicht von ihr zeigt.
+
+    Uebersicht und Detailseite rechnen aus derselben Quelle. Sonst zaehlt
+    jede Seite ihre eigene Menge — genau der Fehler, den die Zielseiten
+    hinter sich haben.
+    """
+    from .. import exam_plan
+    from . import exam_calendar
+    from .learning_hub import exam_topics
+    e['topics'] = exam_topics(e['id'])
+    e['mastered'] = sum(t['learning_status'] == 'sicher' for t in e['topics'])
+    # Ein naechster Schritt je Arbeit statt einer Knopfreihe ueber alle
+    # Themen — wie "Naechste Einheit" beim Ziel.
+    e['next_topic'] = next((t for t in e['topics']
+                            if t['learning_status'] != 'sicher'), None)
+    e['days_left'] = (dt.date.fromisoformat(e['exam_date']) - dt.date.fromisoformat(db.today())).days
+    e['simulation_available'] = exam_calendar.simulation_available(e['id'])
+    try:
+        e["themen_liste"] = json.loads(e["themen"] or "[]")
+    except json.JSONDecodeError:
+        e["themen_liste"] = []
+    e["kalibrierung"] = _kalibrierung(e["id"])
+    e["plan"] = exam_plan.holen_plan(e["id"])
+    e["schedule"] = exam_calendar.get(e["id"])
+    e["simulation_early"] = exam_calendar.simulation_early(e["id"])
+    e["calendar"] = exam_calendar.calendar(e["id"])
+    e["woche"] = exam_calendar.woche(e["id"])
+    e["calendar_leading_blanks"] = (
+        (dt.date.fromisoformat(e["calendar"][0]["date"]).isoweekday() - 1)
+        if e["calendar"] else 0
+    )
+    return e
+
+
 def render_klassenarbeit(request: Request):
     from .. import exam_plan
     from . import exam_calendar
-    zeilen = [dict(r) for r in db.q(
+    zeilen = [_exam_ansicht(dict(r)) for r in db.q(
         "SELECT * FROM exam ORDER BY exam_date DESC LIMIT 20")]
-    for e in zeilen:
-        from .learning_hub import exam_topics
-        e['topics'] = exam_topics(e['id'])
-        e['mastered'] = sum(t['learning_status'] == 'sicher' for t in e['topics'])
-        e['days_left'] = (dt.date.fromisoformat(e['exam_date']) - dt.date.fromisoformat(db.today())).days
-        e['simulation_available'] = exam_calendar.simulation_available(e['id'])
-        try:
-            e["themen_liste"] = json.loads(e["themen"] or "[]")
-        except json.JSONDecodeError:
-            e["themen_liste"] = []
-        e["kalibrierung"] = _kalibrierung(e["id"])
-        e["plan"] = exam_plan.holen_plan(e["id"])
-        e["schedule"] = exam_calendar.get(e["id"])
-        e["simulation_early"] = exam_calendar.simulation_early(e["id"])
-        e["calendar"] = exam_calendar.calendar(e["id"])
-        e["calendar_leading_blanks"] = (
-            (dt.date.fromisoformat(e["calendar"][0]["date"]).isoweekday() - 1)
-            if e["calendar"] else 0
-        )
     template = "klassenarbeit_kind.html" if config.load_safe().klassenarbeit_kind else "klassenarbeit.html"
     return render(request, template, zeilen=zeilen,
                   adult_page=not config.load().klassenarbeit_kind,
                   scan=exam_plan.offene_scan(), counts=jobs.counts(),
+                  weekday_labels=exam_calendar.WEEKDAY_LABELS)
+
+
+def render_klassenarbeit_detail(request: Request, exam_id: int):
+    """Eine einzelne Arbeit: Themen, Kalender, Generalprobe.
+
+    Das Schwere steht hier, nicht auf der Uebersicht — wie beim Ziel, wo der
+    Monatskalender auch erst in den Details auftaucht.
+    """
+    from fastapi import HTTPException
+    from . import exam_calendar
+    row = db.q1("SELECT * FROM exam WHERE id=?", exam_id)
+    if row is None:
+        raise HTTPException(404, "Diese Klassenarbeit gibt es nicht.")
+    return render(request, "klassenarbeit_detail.html", e=_exam_ansicht(dict(row)),
+                  adult_page=not config.load().klassenarbeit_kind,
                   weekday_labels=exam_calendar.WEEKDAY_LABELS)

@@ -139,7 +139,7 @@
 .progress-trio .focus-stat { border-color:#efd88c; background:var(--plan-focus-soft); }
 .progress-trio .focus-stat b { color:var(--plan-focus-dark); }
 .mini-progress-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.35rem; margin:.45rem 0; }
-.goal-mini .mini-progress-stats span,.weeks-grid .mini-progress-stats span { display:grid; gap:.1rem; padding:.4rem; border-radius:8px; background:#f5f9fc; color:#56759a; font-size:.7rem; }
+.goal-mini .mini-progress-stats span,.weeks-grid .mini-progress-stats span { display:grid; gap:.1rem; padding:.4rem; border-radius:8px; background:#f5f9fc; color:#56759a; overflow-wrap:anywhere; font-size:.7rem; }
 .mini-progress-stats b { color:var(--plan-navy); font-size:.9rem; }
 .goal-mini .mini-progress-stats .progress-stat,.weeks-grid .mini-progress-stats .progress-stat { background:var(--plan-blue-soft); color:#1260cf; }
 .goal-mini .mini-progress-stats .adherence-stat,.weeks-grid .mini-progress-stats .adherence-stat { background:var(--plan-green-soft); color:var(--plan-green-dark); }
@@ -401,3 +401,8 @@
 @media(max-width:760px){.plans-page{font-size:18px;line-height:1.65}.plans-panel{padding:1.15rem}.stats-table{overflow:visible}.stats-row.stats-data{grid-template-columns:1fr 1fr;min-width:0;gap:1rem;padding:1.1rem}.stats-data .stats-subject{grid-column:1/-1;padding-bottom:.65rem;border-bottom:1px solid var(--plan-line)}.stats-data>[data-label]{display:grid;gap:.2rem;text-align:left!important}.stats-data>[data-label]::before{content:attr(data-label);color:#3d628d;font-size:1rem;font-weight:700}.stats-data form{grid-column:1/-1}.focus-scale{grid-auto-flow:column;grid-auto-columns:minmax(52px,1fr);grid-template-columns:none;overflow-x:auto;padding-bottom:.35rem}.calendar-weekdays span{font-size:1rem}.calendar-grid small{font-size:1rem}}
 @media(max-width:600px){.progress-hero{display:grid;grid-template-columns:1fr}.progress-trio{grid-template-columns:1fr}.progress-hero img{width:120px;height:105px;justify-self:center}.detail-metrics{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.plans-page *{scroll-behavior:auto;transition:none!important}}
+
+/* Der Pfeil im "Starten"-Knopf gehoert zum Knopf, nicht zu den Wertzeilen.
+   `.goal-mini span` faerbt sonst auch ihn slate-blau ein — auf dem dunklen
+   Knopf war er dadurch kaum zu sehen. */
+.goal-mini button span { display:inline; justify-content:normal; color:inherit; }

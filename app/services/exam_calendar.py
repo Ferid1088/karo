@@ -264,3 +264,62 @@ def today_task() -> dict | None:
                     exam["exam_date"]).strftime("%d.%m.%Y"),
             }
     return None
+
+
+def woche(exam_id: int, heute: dt.date | None = None) -> dict:
+    """Eine Klassenarbeit in einer Zeile — dieselbe Darstellung wie die
+    Lernwoche eines Ziels (`woche/plaene.goal_week`).
+
+    Ein Kreis je Wochentag statt einer Kachel je Kalendertag: bis zu einer
+    weit entfernten Arbeit liegen sonst sechzig Kaesten auf der Uebersicht,
+    und niemand sieht mehr, worauf es diese Woche ankommt. Der vollstaendige
+    Kalender steht auf der Detailseite, wie beim Ziel auch.
+    """
+    heute = heute or dt.date.fromisoformat(db.today())
+    tage = {d["date"]: d for d in calendar(exam_id)}
+    exam_day = dt.date.fromisoformat(_exam(exam_id)["exam_date"])
+
+    # Sieben Tage ab heute, nicht die Kalenderwoche: eine Arbeit laeuft auf
+    # einen Termin zu. An einem Sonntag waeren sechs von sieben Kreisen sonst
+    # vergangene Tage, und der eine Lerntag von morgen faellt aus dem Bild.
+    reihe = []
+    for versatz in range(7):
+        tag = heute + dt.timedelta(days=versatz)
+        eintrag = tage.get(str(tag))
+        if tag < heute:
+            zustand, minuten = "vorbei", 0
+        elif eintrag is None:
+            # Nach dem Pruefungstag liegt kein Plan mehr.
+            zustand, minuten = "danach", 0
+        else:
+            minuten = eintrag["minutes"]
+            zustand = "pruefung" if eintrag["is_exam"] else eintrag["kind"]
+        reihe.append({"date": str(tag), "weekday": tag.isoweekday(),
+                      "state": zustand, "minutes": minuten,
+                      "today": tag == heute,
+                      "label": _tages_text(zustand, minuten)})
+
+    lerntage = [d for d in tage.values() if d["is_learning_day"] and not d["is_exam"]]
+    naechster = next((d for d in sorted(lerntage, key=lambda d: d["date"])), None)
+    anfang = min(tage) if tage else str(heute)
+    return {"days": reihe, "next_day": naechster,
+            "learning_days": len(lerntage),
+            "planned_minutes": sum(d["minutes"] for d in lerntage),
+            "days_left": (exam_day - heute).days,
+            "period": _zeitraum(anfang, str(exam_day))}
+
+
+def _zeitraum(start: str, ende: str) -> str:
+    """Zeitraum in deutscher Schreibweise — wie `woche/plaene.period_label`."""
+    teile = [dt.date.fromisoformat(w).strftime("%d.%m.%Y") for w in (start, ende) if w]
+    return " – ".join(teile)
+
+
+_TAGES_TEXT = {"pruefung": "Klassenarbeit", "simulation": "Generalprobe",
+               "free": "frei", "vorbei": "vorbei", "danach": "nach der Arbeit"}
+
+
+def _tages_text(zustand: str, minuten: int) -> str:
+    if zustand == "learning":
+        return f"{minuten} Minuten lernen"
+    return _TAGES_TEXT.get(zustand, zustand)

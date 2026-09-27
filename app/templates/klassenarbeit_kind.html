@@ -1,11 +1,36 @@
 {% extends "base.html" %}
 {% block title %}Klassenarbeit – {{ companion_name }}{% endblock %}
 {% block content %}
+{% from '_exam_week.html' import exam_week_row, exam_metrics %}
 <a class="back-link" href="/lernen">← Lernen</a>
-<section class="learn-hero"><div><p class="eyebrow">DEIN PRÜFUNGSPLAN</p><h1>Schritt für Schritt<br>zur Klassenarbeit</h1><p>Du entscheidest, an welchen Tagen du lernen möchtest.</p></div><img src="/static/karo-fox-star.png" width="170" alt=""></section>
-<details class="card disclosure" id="klassenarbeit-neu" open><summary><strong>Neue Klassenarbeit anlegen</strong></summary>
+<section class="learn-hero"><div><p class="eyebrow">DEIN PRÜFUNGSPLAN</p><h1>Schritt für Schritt<br>zur Klassenarbeit</h1><p>Jede Arbeit mit ihrer Lernwoche und ihrem Stand. Alles Weitere steht in den Details.</p></div><img src="/static/karo-fox-star.png" width="170" alt=""></section>
+
+<nav class="quick-actions" aria-label="Schnellaktionen"><a class="quick-new" href="#klassenarbeit-neu">+ Neue Klassenarbeit →</a></nav>
+
+<section class="exam-panel">
+  <header class="exam-panel-head"><h2>Deine Klassenarbeiten</h2><p>{{ zeilen|length }} {{ 'Arbeit' if zeilen|length == 1 else 'Arbeiten' }} im Blick.</p></header>
+  <div class="exam-grid">{% for e in zeilen %}
+    <article class="exam-card" id="exam-{{ e.id }}">
+      <h3><a href="/klassenarbeit/{{ e.id }}">{{ e.subject }}</a></h3>
+      <p class="exam-when">{{ e.exam_date|datum }}{% if e.days_left >= 0 %} · noch {{ e.days_left }} Tage{% else %} · vorbei{% endif %}</p>
+      {% if e.days_left < 0 %}<div class="exam-flags"><span class="status-pill done">✓ Geschrieben</span></div>
+      {% elif e.topics and e.mastered == e.topics|length %}<div class="exam-flags"><span class="status-pill done">✓ Alles sicher</span></div>{% endif %}
+      {{ exam_week_row(e, weekday_labels) }}
+      {{ exam_metrics(e) }}
+      <div class="exam-card-actions">
+        {% if e.next_topic %}<form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ e.next_topic.id }}"><input type="hidden" name="exam_id" value="{{ e.id }}"><button class="exam-start" type="submit">{{ e.next_topic.label }} lernen →</button></form>
+        {% elif e.topics %}<p class="exam-done-note">Alle Themen sitzen. Schön.</p>
+        {% else %}<a class="exam-start" href="/klassenarbeit/{{ e.id }}">Themen ansehen →</a>{% endif %}
+        {% if e.simulation_available %}<a class="exam-secondary" href="/klassenarbeit/{{ e.id }}/simulation">Generalprobe starten →</a>{% endif %}
+      </div>
+    </article>
+  {% else %}
+    <section class="learn-empty"><h2>Noch keine Klassenarbeit</h2><p>Lege unten Termin und Themen an, dann entsteht dein eigener Lernplan.</p></section>
+  {% endfor %}</div>
+</section>
+
+<details class="card disclosure" id="klassenarbeit-neu"{% if not zeilen %} open{% endif %}><summary><strong>Neue Klassenarbeit anlegen</strong></summary>
 <form method="post" action="/klassenarbeit" class="learn-form exam-create-form">{{ csrf_input() }}<div class="learn-two-col compact"><div class="field"><label for="exam_date">Termin</label><input type="date" id="exam_date" name="exam_date" min="{{ today }}" required></div><div class="field"><label for="exam_subject">Fach</label><input id="exam_subject" name="fach" value="{{ cfg.subject }}"></div></div><label for="exam_topics">Prüfungsthemen <small>(ein Thema pro Zeile oder mit Komma)</small></label><textarea id="exam_topics" name="themen" rows="4" required placeholder="Brüche addieren
 Brüche kürzen
 Textaufgaben"></textarea><button type="submit">Klassenarbeit anlegen →</button></form><div class="exam-upload-note">Du kannst später auch ein Themenblatt hochladen.</div></details>
-<section class="exam-list">{% for e in zeilen %}<article class="card exam-card" id="exam-{{ e.id }}"><div class="exam-card-head"><div><p class="eyebrow">{{ e.exam_date|datum }} · noch {{ e.days_left }} Tage</p><h2>{{ e.subject }}</h2></div><span class="learn-status bearbeitung">{{ e.mastered }}/{{ e.topics|length }} sicher</span></div><div class="exam-topic-list">{% for t in e.topics %}<div class="exam-topic-row"><span class="topic-dot {{ t.learning_status }}"></span><strong>{{ t.label }}</strong><span class="learn-status {{ t.learning_status }}">{{ t.status_label }}</span>{% if t.learning_status != 'sicher' %}<form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ t.id }}"><input type="hidden" name="exam_id" value="{{ e.id }}"><button class="tile-link" type="submit">Jetzt lernen →</button></form>{% endif %}</div>{% endfor %}</div><section class="exam-calendar"><h3>Dein Lernkalender</h3><p class="hint">0 oder leer bedeutet: heute ist frei. Karo bleibt beim ersten Thema, das noch nicht sicher ist.</p>{% if e.calendar %}<form method="post" action="/klassenarbeit/{{ e.id }}/kalender">{{ csrf_input() }}<div class="exam-calendar-grid">{% for item in e.calendar %}<label class="exam-calendar-day {{ 'today' if item.today }} {{ 'exam' if item.is_exam }} {{ 'learning' if item.is_learning_day }}"><strong>{{ item.date[8:10] }}.{{ item.date[5:7] }}.</strong><small>{{ 'Heute' if item.today else item.weekday[:2] }}</small>{% if item.is_exam %}<span>Klassenarbeit</span>{% else %}<input type="number" name="minutes_{{ item.date }}" min="0" max="60" value="{{ item.minutes if item.minutes else '' }}" placeholder="–" aria-label="Minuten am {{ item.date_label }}">{% if item.is_simulation %}<span>Generalprobe</span>{% elif item.is_learning_day %}<span>{{ item.thema }}</span>{% endif %}{% endif %}</label>{% endfor %}</div><label class="exam-simulation-option"><input type="checkbox" name="simulation_early" value="ja" {{ 'checked' if e.simulation_early }}> Generalprobe einen Tag früher</label><button type="submit">Kalender speichern</button></form><p class="hint">Die Fragen der Generalprobe werden erst am Simulationstag erstellt.</p>{% else %}<p>Lege zuerst einen Termin fest.</p>{% endif %}</section>{% if e.simulation_available %}<a class="btn" href="/klassenarbeit/{{ e.id }}/simulation">Generalprobe starten →</a>{% endif %}</article>{% else %}<section class="learn-empty"><h2>Noch keine Klassenarbeit</h2><p>Füge oben Termin und Themen hinzu, dann entsteht dein eigener Lernplan.</p></section>{% endfor %}</section>
 {% endblock %}

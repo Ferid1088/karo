@@ -203,6 +203,13 @@ async def klassenarbeit_ergebnis(request: Request, exam_id: int):
     return zurueck("/klassenarbeit")
 
 
+# Steht bewusst hinter allen festen Pfaden (/klassenarbeit/themenblatt,
+# /klassenarbeit/material/...): eine Zahl im Pfad faengt sonst nichts davon ab.
+@router.get("/klassenarbeit/{exam_id}", response_class=HTMLResponse)
+def klassenarbeit_detail(request: Request, exam_id: int):
+    return measurement.render_klassenarbeit_detail(request, exam_id)
+
+
 @router.get("/protokoll", response_class=HTMLResponse)
 def protokoll(request: Request):
     zeilen = [dict(r) for r in db.q(

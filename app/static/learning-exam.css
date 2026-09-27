@@ -1,1 +1,76 @@
 .exam-topic-list{display:grid;gap:.5rem;margin:1rem 0}.exam-card-head,.exam-topic-row{display:flex;align-items:center;gap:.7rem}.exam-card-head{justify-content:space-between}.exam-topic-row{padding:.65rem;border-radius:12px;background:#f6faff}.exam-topic-row strong{flex:1}.topic-dot{width:11px;height:11px;border-radius:50%;background:#74a2e8}.topic-dot.bearbeitung{background:#f2be3f}.topic-dot.sicher{background:#20a96b}.exam-calendar{margin-top:1rem;padding-top:1rem;border-top:1px solid #d8e5f4}.exam-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(45px,1fr));gap:.4rem}.exam-calendar-day{display:grid;gap:.25rem;min-height:90px;padding:.45rem;border:1px solid #d9e5f3;border-radius:10px;background:#fff;font-size:.8rem}.exam-calendar-day.today{border:2px solid #347ff0}.exam-calendar-day.learning{background:#eef8ff}.exam-calendar-day.exam{background:#e9e5ff}.exam-calendar-day input{width:100%;padding:.3rem}.exam-calendar-day span{color:#46617d;font-size:.7rem}.exam-simulation-option{display:block;margin:1rem 0}@media(max-width:700px){.exam-calendar-grid{grid-template-columns:repeat(4,1fr)}}
+
+/* Die Lernwoche einer Klassenarbeit — dieselbe Bildsprache wie die Lernwoche
+   eines Ziels (plaene.css, .goal-week): ein Kreis je Wochentag, gefuellt = da
+   passiert etwas. Damit lesen Kind und Eltern beide Bereiche gleich. */
+.exam-week-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1.2rem;padding-top:.6rem;margin-top:.6rem;border-top:1px solid #dfe8f5}
+.exam-week{display:flex;gap:.35rem;margin:0;padding:0;list-style:none}
+.exam-week li{display:grid;justify-items:center;gap:.15rem;min-width:42px;color:#4a628a;font-size:.82rem;font-weight:700}
+.exam-week i{display:grid;place-items:center;width:32px;height:32px;border:2px solid #dce6f4;border-radius:50%;background:#f4f8ff;color:#20345d;font-style:normal;font-size:.82rem;font-weight:800;line-height:1}
+.exam-week .learning i{border-color:#8fc7ff;background:#dceaff;color:#14498f}
+.exam-week .simulation i{border-color:#f0b64a;background:#fff0d2;color:#8a5a00}
+.exam-week .pruefung i{border-color:#5b4bdb;background:#5b4bdb;color:#fff}
+.exam-week .vorbei i,.exam-week .danach i{border-style:dashed;background:transparent}
+.exam-week .heute span{color:#5b4bdb;text-decoration:underline}
+.exam-week-facts{flex:1;min-width:14rem;display:grid;gap:.1rem}
+.exam-week-facts b{color:#20345d;font-size:.92rem}
+.exam-week-facts small{color:#64789a}
+.exam-details{margin-left:auto;padding:.4rem .9rem;border-radius:999px;background:#eef4ff;color:#2f66e0;font-weight:800;font-size:.85rem;text-decoration:none}
+.exam-details:hover{background:#dfe9ff}
+.exam-card-head{display:flex;align-items:center;gap:.9rem}
+.exam-card-head h1,.exam-card-head h2{margin:0;font-size:1.3rem}
+.exam-card-head h2 a{color:inherit;text-decoration:none}
+.exam-card-head h2 a:hover{text-decoration:underline}
+.exam-card-head .learn-status{margin-left:auto;white-space:nowrap}
+.exam-icon{display:grid;place-items:center;width:42px;height:42px;flex:none;border-radius:14px;background:#eef4ff;color:#2f66e0;font-weight:800;font-size:1.1rem}
+.exam-when{margin:.15rem 0 0;color:#64789a;font-size:.88rem}
+.exam-progress .progress{height:8px;margin:.7rem 0 0;border-radius:999px;background:#e6edf8;overflow:hidden}
+.exam-progress .progress i{display:block;height:100%;border-radius:999px;background:#22a66f}
+.exam-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-top:.9rem}
+.exam-done-note{margin:0;color:#22a66f;font-weight:700}
+
+/* Karten wie auf der Zielseite: drei nebeneinander, jede in sich
+   abgeschlossen. Die Farben sind bewusst dieselben wie in plaene.css
+   (--plan-blue-soft/--plan-green-soft/--plan-focus-soft), nur ohne dessen
+   globale Regeln fuer body und Kopfzeile mitzuschleppen. */
+.exam-panel{padding:1.4rem;border:1px solid #d8e7ef;border-radius:18px;background:rgba(255,255,255,.94);box-shadow:0 8px 25px rgba(16,99,119,.06)}
+.exam-panel-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:1rem}
+.exam-panel-head h2{margin:0;color:#071a4b}
+.exam-panel-head p{margin:0;color:#64789a;font-size:.9rem}
+.exam-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:1rem;align-items:start}
+.exam-card{display:flex;flex-direction:column;gap:.75rem;padding:1.1rem;border:1px solid #d8e7ef;border-radius:14px;background:#fff}
+.exam-card h3{margin:0;padding-bottom:.6rem;border-bottom:1px solid #e4eef5;color:#071a4b;font-size:1.25rem}
+.exam-card h3 a{color:inherit;text-decoration:none}
+.exam-card h3 a:hover{text-decoration:underline}
+.exam-card .exam-when{margin:-.35rem 0 0;color:#64789a;font-size:.86rem}
+.exam-flags{display:flex;flex-wrap:wrap;gap:.4rem}
+.exam-card .exam-week-row{border-top:0;padding-top:0;margin-top:0;gap:.5rem .8rem}
+.exam-card .exam-details{margin-left:auto}
+
+/* Drei Kennzahlen je Karte. Die Beschriftung bleibt klein und darf umbrechen —
+   sonst laeuft ein langes Wort wie "Konzentration" aus der Kachel heraus. */
+.exam-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+.exam-metric{display:grid;gap:.1rem;padding:.6rem .55rem;border:1px solid #d8e7ef;border-radius:12px;background:#fff;min-width:0}
+.exam-metric b{color:#33507c;font-size:.72rem;font-weight:800;line-height:1.15;overflow-wrap:anywhere}
+.exam-metric strong{font-size:1.45rem;line-height:1.1}
+.exam-metric small{color:#6d80a0;font-size:.68rem;line-height:1.15;overflow-wrap:anywhere}
+.exam-metric.blue{background:linear-gradient(135deg,#fff,#eaf4ff)}
+.exam-metric.blue strong{color:#1674e8}
+.exam-metric.green{background:linear-gradient(135deg,#fff,#e9fbf4)}
+.exam-metric.green strong{color:#008466}
+.exam-metric.focus{background:linear-gradient(135deg,#fff,#fff7d6);border-color:#efd88c}
+.exam-metric.focus strong{color:#8a5200}
+.exam-bar{height:9px;margin:0;border-radius:999px;background:#e6edf8;overflow:hidden}
+.exam-bar i{display:block;height:100%;border-radius:999px;background:#1674e8}
+.exam-rows{display:grid;gap:.3rem;margin:0}
+.exam-rows>div{display:flex;align-items:baseline;justify-content:space-between;gap:.6rem;border-bottom:1px solid #eef3f8;padding-bottom:.25rem}
+.exam-rows dt{color:#64789a;font-size:.85rem}
+.exam-rows dd{margin:0;color:#071a4b;font-weight:800;font-size:.9rem;text-align:right}
+
+/* Der breite Knopf am Fuss der Karte. Weisse Schrift samt Pfeil — die
+   Ziel-Karten zeigen hier einen Pfeil, der im Indigo verschwindet. */
+.exam-card-actions{display:grid;gap:.5rem;margin-top:auto}
+.exam-start{display:block;width:100%;padding:.8rem 1rem;border:0;border-radius:14px;background:#5b4bdb;color:#fff;font:inherit;font-weight:800;text-align:center;text-decoration:none;cursor:pointer}
+.exam-start:hover{background:#4c3ecb}
+.exam-card-actions form{margin:0}
+.exam-secondary{display:block;padding:.55rem;border-radius:12px;background:#eef4ff;color:#2f66e0;font-weight:800;font-size:.88rem;text-align:center;text-decoration:none}
