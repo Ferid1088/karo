@@ -307,3 +307,38 @@ main.settings-page { max-width: 880px; }
   .exam-calendar-empty { display: none; }
   .exam-calendar-save { align-items: stretch; flex-direction: column; }
 }
+
+
+/* Klassenarbeit: der Kindbereich zeigt den Lernprozess statt der alten Plantabelle. */
+.exam-learning-guide { margin: .9rem 0; }
+.exam-learning-guide h3 { margin-bottom: .8rem; }
+.exam-learning-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: .65rem;
+}
+.exam-learning-steps > div {
+  padding: .9rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.exam-learning-steps strong,
+.exam-learning-steps span { display: block; }
+.exam-learning-steps span {
+  margin-top: .35rem;
+  color: var(--muted);
+  font-size: .9rem;
+  line-height: 1.4;
+}
+.exam-day-start-form { margin: .55rem 0 0; }
+.exam-day-start {
+  display: inline-flex;
+  margin-top: .55rem;
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .exam-learning-steps { grid-template-columns: 1fr; }
+}
