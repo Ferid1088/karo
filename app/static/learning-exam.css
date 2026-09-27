@@ -93,68 +93,72 @@
 .blatt-form input[type=file]{flex:1 1 16rem;width:auto;min-width:0}
 .blatt-form button{flex:none}
 
-/* Monatskalender über alle Arbeiten: klein, oben, ein Kästchen je Tag.
-   Die Gewichtung liegt auf den belegten Tagen — leere Kästchen traten
-   vorher stärker hervor als die Chips darin. Farbe = welche Arbeit,
-   Zeichen rechts = Zustand (✓ gelernt, ✗ ausgefallen, ◎ Probe, ★ Arbeit). */
-.monat-karte{padding:1.1rem 1.2rem;margin:.4rem 0 1rem;border:1px solid #dde8f7;border-radius:18px;background:#fff;box-shadow:0 6px 18px rgba(38,82,150,.05)}
-.monat-kopf{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.7rem}
-.monat-kopf h2{margin:0;color:#20345d;font-size:1.15rem}
-.monat-blaettern{display:flex;align-items:center;gap:.25rem}
-.monat-blaettern a{min-width:30px;padding:.25rem .6rem;border-radius:9px;background:#eef4ff;color:#2f66e0;font-weight:800;font-size:.85rem;line-height:1.5;text-align:center;text-decoration:none}
+/* Monatskalender über alle Arbeiten — Aufbau nach dem Entwurf:
+   weisse Karte, volle Wochentagsnamen, hohe Zellen, je Eintrag ein Streifen
+   mit farbigem Balken links und zwei Zeilen. Wochenenden leicht getoent,
+   heute mit Rahmen und Kreis, Nachbarmonate mit Kuerzel. */
+.monat-karte{padding:1.4rem 1.5rem 1.1rem;margin:.2rem 0 1.4rem;border:1px solid #e3ebf7;border-radius:26px;background:#fff;box-shadow:0 10px 30px rgba(38,82,150,.07)}
+.monat-kopf{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
+.monat-kopf h2{margin:0;color:#14245c;font-size:clamp(1.5rem,2.6vw,2.1rem);letter-spacing:-.01em}
+.monat-blaettern{display:flex;align-items:center;gap:.5rem}
+.monat-blaettern a{display:grid;place-items:center;min-width:44px;min-height:40px;padding:0 .7rem;border-radius:13px;background:#eef4ff;color:#2f66e0;font-size:1.1rem;font-weight:800;line-height:1;text-decoration:none}
+.monat-blaettern a.monat-heute-knopf{min-width:86px;font-size:1rem}
 .monat-blaettern a:hover{background:#dfe9ff}
 
-.monat-tage{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:0;padding:0;list-style:none}
-.monat-wochentag{padding:0 0 .2rem;color:#8ea0bd;font-size:.7rem;font-weight:800;text-align:center;letter-spacing:.06em}
-.monat-tag{display:flex;flex-direction:column;gap:3px;min-height:42px;padding:.24rem;border-radius:10px;background:#fbfdff;box-shadow:inset 0 0 0 1px #eef3fa;min-width:0}
-.monat-tag>b{color:#93a4c0;font-size:.8rem;font-weight:700;line-height:1.1}
-.monat-tag.belegt{background:#fff;box-shadow:inset 0 0 0 1px #cfdff5,0 1px 2px rgba(35,70,130,.06)}
-.monat-tag.belegt>b{color:#334c74}
-.monat-tag.wochenende{background:#f3f7fd}
-.monat-tag.fremd{background:transparent;box-shadow:none}
-.monat-tag.fremd>b{color:#c2ccdd}
-.monat-tag.heute{background:#efecff;box-shadow:inset 0 0 0 2px #5b4bdb}
-.monat-tag.heute>b{display:inline-grid;place-items:center;width:19px;height:19px;border-radius:50%;background:#5b4bdb;color:#fff;font-size:.72rem}
+.monat-tage{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin:0;padding:0;list-style:none}
+.monat-wochentag{padding:0 0 .25rem;color:#3c5285;font-size:.95rem;font-weight:700;text-align:center}
+.monat-wochentag abbr{display:none;border:0;text-decoration:none}
+.monat-tag{display:flex;flex-direction:column;gap:5px;min-height:104px;padding:.5rem .55rem;border:1px solid #e6edf8;border-radius:12px;background:#fff;min-width:0}
+.monat-tag.wochenende,.monat-wochentag.wochenende{background:#eef2fa}
+.monat-tag.wochenende{border-color:#e2e9f6}
+.monat-tag-kopf{display:flex;align-items:center;gap:.4rem;margin:0}
+.monat-tag-kopf b{color:#14245c;font-size:1.02rem;font-weight:800;line-height:1.1}
+.monat-tag.fremd{background:#f6f8fc;border-color:#eaeff8}
+.monat-tag.fremd .monat-tag-kopf b{color:#98a6c2;font-weight:700}
+.monat-tag.heute{border:2px solid #5b4bdb;box-shadow:0 0 0 3px rgba(91,75,219,.12)}
+.monat-tag.heute .monat-tag-kopf b{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#5b4bdb;color:#fff;font-size:.95rem}
+.monat-tag-kopf span{color:#5b4bdb;font-size:.82rem;font-weight:800}
 
-/* Ein Chip je Arbeit: Name links, Minuten rechts, Zustand als Zeichen. */
-.monat-chip{display:flex;align-items:center;gap:4px;min-width:0;padding:2px 6px;border-radius:7px;font-size:.7rem;font-weight:800;line-height:1.35}
-.monat-chip b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
-.monat-chip i{flex:none;font-style:normal;font-variant-numeric:tabular-nums;opacity:.9}
-/* Der Zustand ist eine gefuellte Marke: bei dieser Groesse ist ein Rand in
-   Gelb oder Rosa kaum zu sehen. Gruen, Rot und Orange stehen dafuer, und sie
-   kommen in den Farben der Arbeiten nicht vor — deshalb dort kein Gelb und
-   kein Gruen mehr. */
-.monat-chip em{flex:none;display:grid;place-items:center;width:14px;height:14px;border-radius:50%;background:#7c8fae;color:#fff;font-style:normal;font-size:.58rem;font-weight:800;line-height:1}
-.monat-chip.farbe-0{background:#d5e6ff;color:#0b3a7a}
-.monat-chip.farbe-1{background:#d9c9ff;color:#331480}
-.monat-chip.farbe-2{background:#c7ecef;color:#05555e}
-.monat-chip.farbe-3{background:#ffd5e4;color:#8a0f35}
-.monat-chip.farbe-4{background:#e7e8c4;color:#4d4a07}
-.monat-chip.geschafft em{background:#067a5a}
-.monat-chip.verpasst em{background:#d3202f}
-.monat-chip.probe em{background:#dd6b00}
-.monat-chip.arbeit{box-shadow:inset 0 0 0 2px currentColor;font-weight:800}
-.monat-chip.arbeit em{width:auto;height:auto;border-radius:0;background:none;color:inherit;font-size:.64rem}
-.monat-fuss{display:flex;align-items:center;gap:.6rem;margin:.7rem 0 0}
-.monat-fuss small{margin-left:auto;color:#7c8fae;font-size:.78rem}
-.monat-hilfe{position:relative;display:grid;place-items:center;width:17px;height:17px;border-radius:50%;background:#eef2f9;color:#6b7f9e;font-size:.66rem;font-weight:800;cursor:help}
-.monat-hilfe:is(:hover,:focus-visible){background:#5b4bdb;color:#fff;outline:none}
-.monat-tafel{position:absolute;bottom:calc(100% + .45rem);left:0;z-index:20;display:none;grid-gap:.3rem;width:max-content;max-width:min(20rem,80vw);padding:.7rem .8rem;border:1px solid #dbe6f6;border-radius:12px;background:#fff;box-shadow:0 10px 26px rgba(30,60,110,.16);color:#42597f;font-size:.76rem;font-weight:600;text-align:left;cursor:default}
-.monat-hilfe:is(:hover,:focus-visible) .monat-tafel{display:grid}
-.monat-tafel b{color:#20345d;font-size:.8rem}
-.monat-tafel span{display:flex;align-items:center;gap:.45rem}
-.monat-tafel .zeichen{display:grid;place-items:center;width:15px;height:15px;flex:none;border-radius:50%;color:#fff;font-size:.6rem;font-weight:800}
-.monat-tafel .zeichen.geschafft{background:#067a5a}
-.monat-tafel .zeichen.verpasst{background:#d3202f}
-.monat-tafel .zeichen.probe{background:#dd6b00}
-.monat-tafel .zeichen.arbeit{background:#4b3ccc}
-.monat-tafel .zeichen.heute{background:#5b4bdb}
+/* Ein Streifen je Arbeit: Balken links in ihrer Farbe, Fach fett, darunter
+   Zeichen und Angabe. */
+.monat-chip{display:grid;gap:1px;padding:.32rem .45rem .32rem .55rem;border-radius:8px;border-left:5px solid currentColor;min-width:0;font-size:.8rem;line-height:1.25}
+.monat-chip b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
+.monat-chip small{display:flex;align-items:center;gap:.28rem;font-size:.74rem;font-weight:700;opacity:.92}
+.monat-chip small i{font-style:normal;font-size:.8rem}
+.monat-chip.farbe-0{background:#e7f0ff;color:#12448c}
+.monat-chip.farbe-1{background:#efe6ff;color:#3d208f}
+.monat-chip.farbe-2{background:#dcf4f2;color:#065f63}
+.monat-chip.farbe-3{background:#ffe4ec;color:#97123f}
+.monat-chip.farbe-4{background:#f3f2d4;color:#54510c}
+.monat-chip.arbeit{font-weight:800}
 
+.monat-fuss{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1.2rem;margin-top:1rem;padding-top:.8rem;border-top:1px solid #eef3fa}
+.monat-erklaerung{display:flex;flex-wrap:wrap;gap:.5rem 1rem;margin:0;padding:0;list-style:none;color:#44567f;font-size:.82rem;font-weight:700}
+.monat-erklaerung li{display:flex;align-items:center;gap:.3rem}
+.monat-erklaerung .zeichen{display:grid;place-items:center;width:17px;height:17px;border-radius:50%;color:#fff;font-style:normal;font-size:.68rem}
+.monat-erklaerung .zeichen.arbeit{background:#14245c}
+.monat-erklaerung .zeichen.geplant{background:#2f66e0}
+.monat-erklaerung .zeichen.geschafft{background:#067a5a}
+.monat-erklaerung .zeichen.verpasst{background:#d3202f}
+.monat-erklaerung .zeichen.probe{background:#dd6b00}
+.monat-fuss>small{margin-left:auto;color:#5b7291;font-size:.85rem}
+
+@media(max-width:900px){
+  .monat-karte{padding:1rem}
+  .monat-tage{gap:5px}
+  .monat-tag{min-height:88px;padding:.4rem}
+  .monat-wochentag span{display:none}
+  .monat-wochentag abbr{display:inline}
+  .monat-chip{font-size:.72rem;padding-left:.45rem;border-left-width:4px}
+  .monat-chip small{font-size:.66rem}
+}
 @media(max-width:620px){
-  .monat-tag{min-height:34px;padding:.2rem}
-  .monat-chip{gap:2px;padding:1px 3px;font-size:.58rem}
-  .monat-chip i,.monat-chip em{display:none}
-  .monat-chip.arbeit em{display:inline}
+  .monat-karte{overflow-x:auto}
+  .monat-tage{min-width:600px}
+  .monat-tag{min-height:76px}
+  .monat-tag-kopf span{display:none}
+  .monat-chip{font-size:.68rem}
+  .monat-chip small{font-size:.62rem}
 }
 
 /* Ein Knopf für eine neue Arbeit — nicht seitenbreit, er ist eine Aktion

@@ -326,6 +326,9 @@ def _tages_art(arbeit: dict, tag: str, heute: dt.date) -> str:
 MONATE = ("Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
           "August", "September", "Oktober", "November", "Dezember")
 
+MONATE_KURZ = ("Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug",
+               "Sep", "Okt", "Nov", "Dez")
+
 
 def monat(wunsch: str = "", heute: dt.date | None = None) -> dict:
     """Alle Klassenarbeiten in einem Monatsraster.
@@ -380,8 +383,10 @@ def monat(wunsch: str = "", heute: dt.date | None = None) -> dict:
         reihe = []
         for _ in range(7):
             eintraege = plan.get(str(tag), [])
+            fremd = tag.month != erster.month
             reihe.append({"date": str(tag), "nummer": tag.day,
-                          "im_monat": tag.month == erster.month,
+                          "im_monat": not fremd,
+                          "monat_kurz": MONATE_KURZ[tag.month - 1] if fremd else "",
                           "heute": tag == heute, "eintraege": eintraege})
             tag += dt.timedelta(days=1)
         wochen.append(reihe)
