@@ -40,8 +40,13 @@
 .learn-zweit-action:hover{background:var(--learn-blue-soft)}
 
 .topic-tile-weg{margin:.35rem 0 0;text-align:right}
-.topic-tile-weg button{font-size:.78rem;color:#8496b3}
-.topic-tile-weg button:hover{color:#c62033;text-decoration:underline}
 .exam-weg{margin:.2rem 0 0;text-align:center}
-.exam-weg button{font-size:.78rem;color:#8496b3}
-.exam-weg button:hover{color:#c62033;text-decoration:underline}
+:is(.topic-tile-weg,.exam-weg) a{color:#c62033;font-size:.8rem;font-weight:700;text-decoration:none}
+:is(.topic-tile-weg,.exam-weg) a:hover{text-decoration:underline}
+
+/* Die Rueckfrage sitzt in der Karte selbst, damit klar ist, um welche es geht. */
+.karte-nachfrage{display:grid;gap:.3rem;margin-top:.5rem;padding:.7rem .8rem;border:1px solid #f1c2c9;border-radius:13px;background:#fffafb}
+.karte-nachfrage b{color:#c62033;font-size:.92rem}
+.karte-nachfrage small{color:#6a80a1;font-size:.78rem;line-height:1.35}
+.karte-nachfrage-wege{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.2rem}
+.karte-nachfrage-wege .btn{min-height:38px;padding:.35rem .8rem;font-size:.85rem}

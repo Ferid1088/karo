@@ -115,6 +115,7 @@ def render_klassenarbeit(request: Request, monat: str = ""):
                   adult_page=not config.load().klassenarbeit_kind,
                   scan=exam_plan.offene_scan(), counts=jobs.counts(),
                   kalender=exam_calendar.monat(monat),
+                  monat=monat, nachfrage=request.query_params.get("weg", ""),
                   weekday_labels=exam_calendar.WEEKDAY_LABELS)
 
 

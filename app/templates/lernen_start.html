@@ -29,8 +29,19 @@
       <div class="topic-tile-top"><div class="topic-symbol" aria-hidden="true">{% if t.subject|lower == 'mathematik' %}½{% elif t.subject|lower in ['deutsch','englisch','französisch'] %}Aa{% else %}✦{% endif %}</div><span class="learn-status {{ t.learning_status }}">{{ t.status_label }}</span></div>
       <h2>{{ t.label }}</h2>
       <p>{{ t.subject }}{% if t.grade %} · {{ t.grade }}. Klasse{% endif %}</p>
+      {% if nachfrage == t.id|string %}
+      <div class="karte-nachfrage">
+        <b>Wirklich weglegen?</b>
+        <small>Es kommt zu deinen Erfolgen. Dort kannst du es zurückholen — oder endgültig löschen.</small>
+        <div class="karte-nachfrage-wege">
+          <form method="post" action="/lernen/{{ t.id }}/loeschen">{{ csrf_input() }}<button class="loeschen-echt" type="submit">Ja, weglegen</button></form>
+          <a class="quiet btn" href="/lernen">Abbrechen</a>
+        </div>
+      </div>
+      {% else %}
       <form method="post" action="{{ '/lernen/adaptiv/start' if cfg.adaptive_learning_enabled|default(false) else '/lernzyklus/' ~ t.id ~ '/quiz/starten' }}" class="topic-tile-action">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ t.id }}"><input type="hidden" name="thema" value="{{ t.label }}"><input type="hidden" name="modus" value="bildschirm"><button class="quiet" type="submit">{{ 'Weiterlernen' if t.learning_status == 'bearbeitung' else 'Noch einmal' if t.learning_status == 'sicher' else 'Starten' }} <span aria-hidden="true">→</span></button></form>
-      <form method="post" action="/lernen/{{ t.id }}/loeschen" class="topic-tile-weg">{{ csrf_input() }}<button class="linklike" type="submit" title="Ins Archiv unter Erfolge legen">weglegen</button></form>
+      <p class="topic-tile-weg"><a href="/lernen?weg={{ t.id }}">weglegen</a></p>
+      {% endif %}
     </article>
     {% else %}
     <section class="learn-empty"><img src="/static/karo-fox-star.png" alt="" width="96" height="96"><h2>{{ 'Nichts gefunden' if query or fach or status else 'Noch keine Lernkarte' }}</h2><p>{{ 'Ändere die Suche oder lege ein neues Thema an.' if query or fach or status else 'Starte mit einer Frage, die dich gerade interessiert.' }}</p><a class="learn-primary-action" href="/lernen/neu">Neues Thema</a></section>

@@ -494,7 +494,8 @@ def render_lernen_uebersicht(request: Request):
                   faecher=sorted({t['subject'] for t in themen}), query=query,
                   fach=fach, status=status, next_topic=next_topic,
                   safe_count=sum(t['learning_status'] == 'sicher' for t in themen),
-                  active_count=sum(t['learning_status'] == 'bearbeitung' for t in themen))
+                  active_count=sum(t['learning_status'] == 'bearbeitung' for t in themen),
+                  nachfrage=request.query_params.get('weg', ''))
 
 
 def _schritt_kategorie(schritt: dict) -> str:

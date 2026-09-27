@@ -23,7 +23,18 @@
         {% elif e.topics %}<p class="exam-done-note">Alle Themen sitzen. Schön.</p>
         {% else %}<a class="exam-start" href="/klassenarbeit/{{ e.id }}">Themen ansehen →</a>{% endif %}
         {% if e.simulation_available %}<a class="exam-secondary" href="/klassenarbeit/{{ e.id }}/simulation">Generalprobe starten →</a>{% endif %}
-        <form method="post" action="/klassenarbeit/{{ e.id }}/loeschen" class="exam-weg">{{ csrf_input() }}<button class="linklike" type="submit" title="Ins Archiv unter Erfolge legen">weglegen</button></form>
+        {% if nachfrage == e.id|string %}
+        <div class="karte-nachfrage">
+          <b>Wirklich weglegen?</b>
+          <small>Sie kommt zu deinen Erfolgen. Dort kannst du sie zurücknehmen — oder endgültig löschen.</small>
+          <div class="karte-nachfrage-wege">
+            <form method="post" action="/klassenarbeit/{{ e.id }}/loeschen">{{ csrf_input() }}<button class="loeschen-echt" type="submit">Ja, weglegen</button></form>
+            <a class="quiet btn" href="/klassenarbeit{{ '?monat=' ~ monat if monat }}">Abbrechen</a>
+          </div>
+        </div>
+        {% else %}
+        <p class="exam-weg"><a href="/klassenarbeit?{{ 'monat=' ~ monat ~ '&amp;' if monat }}weg={{ e.id }}">weglegen</a></p>
+        {% endif %}
       </div>
     </article>
   {% else %}
