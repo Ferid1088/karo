@@ -104,12 +104,14 @@
 .monat-blaettern a:hover{background:#dfe9ff}
 .monat-tage{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin:0;padding:0;list-style:none}
 .monat-wochentag{padding:.15rem 0;color:#7c8fae;font-size:.68rem;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:.04em}
-.monat-tag{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:42px;padding:.2rem .1rem;border:1px solid #eaf0f9;border-radius:9px;background:#fbfdff}
-.monat-tag>b{color:#4a628a;font-size:.68rem;font-weight:700}
+.monat-tag{display:flex;flex-direction:column;align-items:stretch;gap:2px;min-height:38px;padding:.18rem .22rem;border:1px solid #eaf0f9;border-radius:9px;background:#fbfdff;min-width:0}
+.monat-tag>b{color:#4a628a;font-size:.68rem;font-weight:700;text-align:center}
 .monat-tag.fremd{opacity:.4}
 .monat-tag.heute{border-color:#5b4bdb;background:#f3f1ff}
 .monat-tag.heute>b{color:#5b4bdb}
-.monat-chip{display:inline-grid;place-items:center;min-width:19px;height:16px;padding:0 3px;border-radius:5px;font-size:.6rem;font-weight:800;line-height:1}
+.monat-chip{display:flex;align-items:center;gap:3px;min-width:0;padding:1px 4px;border-radius:5px;font-size:.58rem;font-weight:800;line-height:1.35}
+.monat-chip b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
+.monat-chip i{flex:none;font-style:normal;opacity:.85}
 .monat-chip.farbe-0{background:#dceaff;color:#14498f}
 .monat-chip.farbe-1{background:#e2f6ec;color:#0a6b52}
 .monat-chip.farbe-2{background:#fff0d2;color:#8a5a00}
@@ -121,4 +123,4 @@
 .monat-chip.arbeit{box-shadow:inset 0 0 0 2px #5b4bdb;font-size:.7rem}
 .monat-legende{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem;margin:.7rem 0 0;color:#5b7291;font-size:.8rem}
 .monat-legende small{margin-left:auto;color:#7c8fae}
-@media(max-width:560px){.monat-tag{min-height:36px}.monat-chip{min-width:16px;height:14px}}
+@media(max-width:560px){.monat-tag{min-height:32px}.monat-chip{font-size:.52rem}.monat-chip i{display:none}}

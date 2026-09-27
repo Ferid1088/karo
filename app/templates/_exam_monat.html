@@ -16,13 +16,10 @@
     {% for woche in kalender.wochen %}{% for tag in woche %}
     <li class="monat-tag{{ ' fremd' if not tag.im_monat }}{{ ' heute' if tag.heute }}">
       <b>{{ tag.nummer }}</b>
-      {% for eintrag in tag.eintraege %}<span class="monat-chip farbe-{{ eintrag.farbe }} {{ eintrag.art }}" title="{{ eintrag.subject }}{% if eintrag.minutes %} · {{ eintrag.minutes }} Minuten{% endif %}{% if eintrag.art == 'arbeit' %} · Klassenarbeit{% elif eintrag.art == 'probe' %} · Generalprobe{% elif eintrag.art == 'geschafft' %} · gelernt{% elif eintrag.art == 'verpasst' %} · nicht gelernt{% endif %}">{% if eintrag.art == 'arbeit' %}★{% else %}{{ eintrag.minutes }}{% endif %}</span>{% endfor %}
+      {% for eintrag in tag.eintraege %}<span class="monat-chip farbe-{{ eintrag.farbe }} {{ eintrag.art }}" title="{{ eintrag.subject }}{% if eintrag.minutes %} · {{ eintrag.minutes }} Minuten{% endif %}{% if eintrag.art == 'arbeit' %} · Klassenarbeit{% elif eintrag.art == 'probe' %} · Generalprobe{% elif eintrag.art == 'geschafft' %} · gelernt{% elif eintrag.art == 'verpasst' %} · nicht gelernt{% endif %}"><b>{{ eintrag.subject }}</b><i>{% if eintrag.art == 'arbeit' %}★{% else %}{{ eintrag.minutes }}′{% endif %}</i></span>{% endfor %}
     </li>
     {% endfor %}{% endfor %}
   </ol>
-  {% if kalender.arbeiten %}
-  <p class="monat-legende">{% for a in kalender.arbeiten %}<span class="monat-chip farbe-{{ a.farbe }} lernen"></span>{{ a.subject }}{% if not loop.last %} · {% endif %}{% endfor %}
-    <small>{{ kalender.lernminuten }} Minuten in diesem Monat geplant</small></p>
-  {% else %}<p class="monat-legende"><small>In diesem Monat ist nichts geplant.</small></p>{% endif %}
+  <p class="monat-legende"><small>{% if kalender.arbeiten %}{{ kalender.lernminuten }} Minuten in diesem Monat geplant{% else %}In diesem Monat ist nichts geplant.{% endif %}</small></p>
 </section>
 {% endmacro %}
