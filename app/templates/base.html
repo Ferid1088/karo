@@ -56,58 +56,49 @@
        Bereiche behalten es, dort benennt es den Bereich wirklich. #}
     {% if not learning_ui|default(false) %}<span class="area-label"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">{% if adult_page %}<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>{% else %}<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1-6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/>{% endif %}</svg>{{ 'Elternbereich' if adult_page else ('Ziele planen' if plans_page|default(false) else ('Meine Welt' if world_page|default(false) else 'Kinderbereich')) }}</span>{% endif %}
   </div>
+  {# Diese Zeile bleibt auf jeder Seite dieselbe. Vorher tauschte jeder
+     Bereich sie gegen seine eigenen Punkte aus: wer "Meine Welt" drueckte,
+     verlor die Wege zurueck und musste raten, wo er ist. Die Punkte des
+     Bereichs stehen jetzt eine Zeile tiefer. #}
   <nav class="simple-nav" aria-label="Hauptnavigation">
     {% if adult_page %}
     <a href="/eltern" {{ 'aria-current=page' if path == '/eltern' }}>Übersicht</a>
     <a href="/themen" {{ 'aria-current=page' if path.startswith(('/themen', '/wissen', '/vorbereitung', '/recherche')) }}>Vorbereitung</a>
     <a href="/messung/fortschritt" {{ 'aria-current=page' if path.startswith(('/messung', '/klassenarbeit')) }}>Lernstand</a>
     <a href="/setup" {{ 'aria-current=page' if path.startswith('/setup') }}>Einstellungen</a>
-    {% elif plans_page|default(false) %}
-    <a href="/woche" {{ 'aria-current=page' if path == '/woche' }}>Heute</a>
-    <a href="/woche/woche" {{ 'aria-current=page' if path == '/woche/woche' }}>Woche</a>
-    <a href="/woche/monat" {{ 'aria-current=page' if path == '/woche/monat' }}>Monat</a>
-    <a href="/woche/ziele" {{ 'aria-current=page' if path.startswith('/woche/ziele') }}>Ziele</a>
-    <a href="/woche/schatzkiste" {{ 'aria-current=page' if path == '/woche/schatzkiste' }}>Schatzkiste</a>
-    {% elif world_page|default(false) %}
-    <a href="/welten" {{ 'aria-current=page' if path == '/welten' }}>Heute</a>
-    <a href="/welten/jahr" {{ 'aria-current=page' if path == '/welten/jahr' }}>Mein Jahr</a>
-    <a href="/welten/zeitkapseln" {{ 'aria-current=page' if path.startswith('/welten/zeitkapseln') }}>Zeitkapseln</a>
-    {% elif learning_ui|default(false) %}
-    {# Die Wege des Lernbereichs stehen in der Seitenleiste unten, nicht hier
-       oben doppelt. #}
     {% else %}
     <a href="/" {{ 'aria-current=page' if path == '/' }}>Heute</a>
-    <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz')) }}>Lernen</a>
-    <a class="plans-entry" href="/woche" {{ 'aria-current=page' if path.startswith('/woche') }}><img src="/static/karo-fox-wave.png" alt="" aria-hidden="true"><span>Ziele planen</span></a>
+    <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/material', '/klassenarbeit')) }}>Lernen</a>
     <a href="/welten" {{ 'aria-current=page' if path.startswith('/welten') }}>Meine Welt</a>
+    <a class="plans-entry" href="/woche" {{ 'aria-current=page' if path.startswith('/woche') }}><img src="/static/karo-fox-wave.png" alt="" aria-hidden="true"><span>Ziele planen</span></a>
     <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>
     {% endif %}
   </nav>
   {% if adult_page %}<a class="parent-link area-switch" href="/">Zum Kinderbereich <span aria-hidden="true">→</span></a>
   {% elif role != 'child' %}<a class="parent-link area-switch" href="/eltern">Für Eltern <span aria-hidden="true">→</span></a>{% endif %}
 </header>
-{% endif %}
 
-{# Der Lernbereich fuehrt seine Wege links mit, wie im Entwurfsbogen: ein Ort
-   fuer "wo bin ich", statt derselben Woerter oben im Kopf und nochmal als
-   Kacheln im Inhalt. Sitzungsseiten (show_nav=false) bleiben ohne Leiste,
-   damit beim Lernen nichts ablenkt. #}
-{% set learn_shell = learning_ui|default(false) and show_nav|default(true) %}
-{% if learn_shell %}
-<div class="learn-shell">
-  <aside class="learn-sidebar">
-    <nav aria-label="Lernbereich">
-      <a href="/" {{ 'aria-current=page' if path == '/' }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1Z"/></svg><span>Heute</span></a>
-      <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/material')) }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5Z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5A1.5 1.5 0 0 0 20 18.5Z"/></svg><span>Lernen</span></a>
-      {% if role != 'child' or (cfg is defined and cfg.klassenarbeit_kind) %}
-      <a href="/klassenarbeit" {{ 'aria-current=page' if path.startswith('/klassenarbeit') }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><span>Klassenarbeit</span></a>
-      {% endif %}
-      <a href="/welten" {{ 'aria-current=page' if path.startswith('/welten') }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.5 2.5 2.5 13 0 16M12 4c-2.5 2.5-2.5 13 0 16"/></svg><span>Meine Welt</span></a>
-      <a href="/woche" {{ 'aria-current=page' if path.startswith('/woche') }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/></svg><span>Ziele planen</span></a>
-      <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7"/></svg><span>Erfolge</span></a>
-    </nav>
-    <img class="learn-sidebar-mascot" src="/static/karo-fox-star.png" alt="" width="84" height="84">
-  </aside>
+{% set unterpunkte = [] %}
+{# "Heute" erbt dieselbe Grundlage wie der Lernbereich, ist aber ein
+   Hauptpunkt: dort waeren die Lern-Unterpunkte fehl am Platz. #}
+{% if learning_ui|default(false) and path.startswith(('/lernen', '/klassenarbeit', '/lernzyklus', '/quiz', '/material')) %}
+  {% set unterpunkte = [('/lernen', 'Übersicht'), ('/lernen/themen', 'Meine Themen'),
+                        ('/lernen/neu', 'Neues Thema'), ('/lernen/material', 'Arbeitsblatt')]
+                       + ([('/klassenarbeit', 'Klassenarbeit')]
+                          if role != 'child' or (cfg is defined and cfg.klassenarbeit_kind) else []) %}
+{% elif world_page|default(false) %}
+  {% set unterpunkte = [('/welten', 'Heute'), ('/welten/jahr', 'Mein Jahr'),
+                        ('/welten/zeitkapseln', 'Zeitkapseln')] %}
+{% elif plans_page|default(false) %}
+  {% set unterpunkte = [('/woche', 'Heute'), ('/woche/woche', 'Woche'),
+                        ('/woche/monat', 'Monat'), ('/woche/ziele', 'Ziele'),
+                        ('/woche/schatzkiste', 'Schatzkiste')] %}
+{% endif %}
+{% if unterpunkte %}
+<nav class="sub-nav" aria-label="{{ 'Lernbereich' if learning_ui|default(false) else ('Meine Welt' if world_page|default(false) else 'Ziele planen') }}">
+  {% for ziel, text in unterpunkte %}<a href="{{ ziel }}" {{ 'aria-current=page' if path == ziel or (ziel not in ('/lernen', '/welten', '/woche') and path.startswith(ziel)) }}>{{ text }}</a>{% endfor %}
+</nav>
+{% endif %}
 {% endif %}
 
 <main id="inhalt" tabindex="-1" class="simple-main {% block mainclass %}{% endblock %}">
@@ -120,7 +111,6 @@
   {% if error %}<div class="msg err">{{ error }}</div>{% endif %}
   {% block content %}{% endblock %}
 </main>
-{% if learn_shell %}</div>{% endif %}
 
 {% if show_nav|default(true) %}
 <footer class="simple-footer"><a href="/hilfe">{{ 'Hilfe & Anleitung' if adult_page else 'Brauchst du Hilfe?' }}</a><span>{{ 'Vorbereiten. Begleiten. Fortschritte sehen.' if adult_page else 'Ein Schritt nach dem anderen.' }}</span>{% if request.session.get('auth') %}<form method="post" action="/logout" class="footer-logout">{{ csrf_input() }}<button type="submit" class="ghost">Abmelden</button></form>{% endif %}</footer>

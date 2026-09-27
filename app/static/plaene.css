@@ -406,3 +406,8 @@
    `.goal-mini span` faerbt sonst auch ihn slate-blau ein — auf dem dunklen
    Knopf war er dadurch kaum zu sehen. */
 .goal-mini button span { display:inline; justify-content:normal; color:inherit; }
+
+/* Der Bereichsstreifen trägt seit der gemeinsamen Kopfzeile nur noch Spruch,
+   Datum und Profil — ohne Logo und ohne die Wege, die oben stehen. */
+.plans-local-strip { min-height:0; padding-block:.4rem; gap:1rem; justify-content:flex-end; }
+.plans-local-strip .plans-slogan { flex:1; text-align:left; white-space:normal; }

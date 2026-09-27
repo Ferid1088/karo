@@ -655,3 +655,14 @@ pre { background: var(--code-bg, var(--surface-2)); border: 1px solid var(--bord
 
 /* Einstieg in die adaptive Lernreihe, direkt auf der Themenkarte. */
 .adaptiv-start { margin: 0.85rem 0 0; }
+
+/* Unterzeile: die Wege innerhalb eines Bereichs. Die Hauptzeile darüber
+   bleibt auf jeder Seite gleich, damit ein Klick auf "Meine Welt" nicht die
+   Wege zurück mitnimmt. */
+.sub-nav { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center;
+  padding: 0.5rem clamp(1rem, 4vw, 2.5rem); border-bottom: 1px solid var(--border);
+  background: var(--surface-2); }
+.sub-nav a { padding: 0.35rem 0.8rem; border-radius: 999px; color: var(--muted);
+  font-size: 0.9rem; font-weight: 700; text-decoration: none; }
+.sub-nav a:hover { background: var(--surface); color: var(--text); }
+.sub-nav a[aria-current] { background: var(--ink); color: #fff; }

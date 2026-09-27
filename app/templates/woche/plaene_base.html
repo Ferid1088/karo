@@ -6,15 +6,10 @@
 <script src="/static/plaene.js?v=8" defer></script>
 <span hidden>{{ csrf_input() }}</span>
 <a class="skip-link" href="#plans-content">Zum Inhalt</a>
-<header class="plans-local-header">
-  <a class="plans-logo" href="/" title="Zurück zu Karo" aria-label="Zurück zur Karo-Startseite">Karo<span>.</span></a>
-  <nav class="plans-nav" aria-label="Ziele Plannen">
-    <a href="/woche" {{ 'aria-current=page' if path == '/woche' }}>Heute</a>
-    <a href="/woche/woche" {{ 'aria-current=page' if path == '/woche/woche' }}>Woche</a>
-    <a href="/woche/monat" {{ 'aria-current=page' if path == '/woche/monat' }}>Monat</a>
-    <a href="/woche/ziele" {{ 'aria-current=page' if path.startswith('/woche/ziele') }}>Ziele</a>
-    <a href="/woche/schatzkiste" {{ 'aria-current=page' if path == '/woche/schatzkiste' }}>Schatzkiste</a>
-  </nav>
+{# Logo und die Wege des Bereichs stehen jetzt in der gemeinsamen Kopfzeile
+   (base.html: Hauptzeile plus Unterzeile). Hier bleibt, was diesen Bereich
+   ausmacht: der Spruch, das Datum und wer angemeldet ist. #}
+<header class="plans-local-header plans-local-strip">
   <p class="plans-slogan">Kleine Schritte.<span>Große Erfolge!</span></p>
   <time class="plans-clock" datetime="{{ plan_day.isoformat() }}" data-plans-clock aria-label="Aktuelles Datum und Uhrzeit">
     <span data-clock-date>{{ plan_day.strftime('%d.%m.%Y') }}</span>

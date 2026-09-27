@@ -287,7 +287,10 @@ def _overall(items: list[dict], on: date) -> dict:
 def _plans_render(request: Request, template: str, **context):
     context.setdefault("plan_day", plaene.today())
     context.setdefault("weekday_labels", plaene.WEEKDAY_LABELS)
-    context.setdefault("show_nav", False)
+    # Die gemeinsame Kopfzeile bleibt stehen: "Ziele planen" ist ein Bereich
+    # von Karo, kein eigenes Programm. Vorher verschwanden hier die Wege
+    # zurueck nach Heute, Lernen oder Meine Welt.
+    context.setdefault("show_nav", True)
     context.setdefault("plans_page", True)
     return render(request, template, **context)
 
