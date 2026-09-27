@@ -58,10 +58,10 @@ def save_days(exam_id: int, minutes_by_date: dict[str, int]) -> None:
                 value = int(text)
             except (TypeError, ValueError):
                 raise ExamCalendarError(
-                    "Bitte nur ganze Zahlen zwischen 1 und 60 eintragen.") from None
-            if not 1 <= value <= 60:
+                    "Bitte nur ganze Zahlen zwischen 0 und 60 eintragen.") from None
+            if not 0 <= value <= 60:
                 raise ExamCalendarError(
-                    "Die Lernzeit muss zwischen 1 und 60 Minuten liegen.")
+                    "Die Lernzeit muss zwischen 0 und 60 Minuten liegen.")
         cleaned[raw_date] = value
 
     stamp = db.now()
