@@ -3,7 +3,7 @@
 {% block content %}
 {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
 {% if cfg.klassenarbeit_kind %}<a class="back-link" href="/lernen">← Lernen</a>{% endif %}<h1>Dein Plan für die Klassenarbeit</h1>
-<p class="sub">Such dir einen Lerntag aus. Öffne dein Material und übe danach mit Fragen.</p>
+<p class="sub">Du planst nur die Zeit. Am Lerntag prüft Karo zuerst, was schon sitzt, und begleitet dich dann gezielt weiter.</p>
 
 
 
@@ -100,7 +100,9 @@
     <button type="submit" class="ghost">Erneut versuchen</button>
   </form>
   {% elif e.plan and e.plan.state == 'bereit' %}
-  <details style="margin:.7rem 0" open>
+  {% if role != 'child' %}
+  <details style="margin:.7rem 0">
+
     <summary style="cursor:pointer"><strong>Lernplan</strong></summary>
     {% if e.plan.einschaetzung %}<p class="hint" style="margin-top:.5rem">{{ e.plan.einschaetzung }}</p>{% endif %}
     {% if e.plan.tagesplan_liste %}
@@ -160,6 +162,18 @@
       <button type="submit" class="quiet">Lernplan neu erstellen</button>
     </form>
   </details>
+  {% else %}
+  <section class="card exam-learning-guide">
+    <p class="eyebrow">SO BEGLEITET DICH KARO</p>
+    <h3>Nicht nur üben – erst prüfen, dann gezielt lernen</h3>
+    <div class="exam-learning-steps">
+      <div><strong>1 · Prüfen</strong><span>Du bekommst zuerst eine passende Aufgabe. Karo schaut, was schon sicher ist und wo es hakt.</span></div>
+      <div><strong>2 · Verstehen</strong><span>Karo erkennt die konkrete Fehlvorstellung – nicht nur „richtig“ oder „falsch“.</span></div>
+      <div><strong>3 · Begleiten</strong><span>Du bekommst genau dazu eine Erklärung, ein Beispiel, Hinweise und Übungen.</span></div>
+      <div><strong>4 · Sicher werden</strong><span>Karo prüft erneut. Das Thema bleibt dran, bis du es wirklich sicher kannst. Erst dann kommt das nächste Thema.</span></div>
+    </div>
+  </section>
+  {% endif %}
   {% endif %}
 
   <section class="card exam-calendar">
@@ -200,8 +214,19 @@
               </div>
               {% if item.is_simulation %}
                 <small class="exam-calendar-topic"><strong>Wiederholung + Simulation</strong></small>
+                {% if item.today %}
+                  <a class="btn exam-day-start" href="/klassenarbeit/{{ e.id }}/simulation">Simulation starten →</a>
+                {% endif %}
               {% elif item.is_learning_day and item.inhalt %}
                 <small class="exam-calendar-topic">{{ item.inhalt }}</small>
+                {% if item.today %}
+                  <form method="post" action="/lernen/adaptiv/start" class="exam-day-start-form">
+                    {{ csrf_input() }}
+                    <input type="hidden" name="thema" value="{{ item.thema }}">
+                    <input type="hidden" name="topic_id" value="{{ item.topic_id or '' }}">
+                    <button class="btn exam-day-start" type="submit">Prüfen &amp; lernen →</button>
+                  </form>
+                {% endif %}
               {% endif %}
             {% endif %}
           </article>
