@@ -73,7 +73,8 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
                   schulblaetter_kind: bool = False,
                   klassenarbeit_kind: bool = False) -> bool:
     if klassenarbeit_kind and (
-        path in {"/klassenarbeit", "/klassenarbeit/neu", "/messung/examen",
+        path in {"/klassenarbeit", "/klassenarbeit/neu",
+                 "/klassenarbeit/kalender", "/messung/examen",
                  "/klassenarbeit/themenblatt", "/klassenarbeit/themenblatt/status"}
         or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|loeschen|simulation(?:/[0-9]+)?))?", path)
     ):

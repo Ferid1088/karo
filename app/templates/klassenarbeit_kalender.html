@@ -1,0 +1,9 @@
+{% extends "learning_base.html" %}
+{% block title %}Prüfungskalender – {{ companion_name }}{% endblock %}
+{% block content %}
+{% from '_exam_monat.html' import exam_monat %}
+{# Eigener Reiter neben der Klassenarbeit: hier steht nur der Kalender über
+   alle Arbeiten, damit die Übersicht ihre Karten zeigen kann. #}
+<h1 class="sr">Prüfungskalender</h1>
+{{ exam_monat(kalender, weekday_labels) }}
+{% endblock %}

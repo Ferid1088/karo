@@ -720,3 +720,14 @@ a.tab-btn .archiv-zahl { margin-left: 0.3rem; min-width: 20px; height: 18px; fon
 .sub-nav a.pruefung-tab { display: inline-flex; align-items: center; gap: 0.35rem; }
 .sub-nav a.pruefung-tab img { width: 18px; height: 18px; flex: none; }
 .pruefung-zeichen { width: 26px; height: 26px; vertical-align: -0.3rem; margin-right: 0.45rem; }
+
+/* Der Prüfungskalender hat einen Reiter ohne Wort: das runde Logo genügt.
+   Der Name steht im title und aria-label, damit er vorgelesen wird. */
+.sub-nav a.kalender-tab { padding: 0.15rem 0.35rem; border-radius: 999px; line-height: 0; }
+.sub-nav a.kalender-tab img { width: 90px; height: 90px; display: block; }
+.sub-nav a.kalender-tab:hover { background: var(--surface); }
+.sub-nav a.kalender-tab[aria-current] { background: var(--ink-soft); }
+@media (max-width: 620px) {
+  /* Auf dem Handy nimmt das Logo in voller Größe ein Drittel des Bildes. */
+  .sub-nav a.kalender-tab img { width: 56px; height: 56px; }
+}

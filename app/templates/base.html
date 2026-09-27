@@ -93,7 +93,8 @@
      Themenseite, wo er hingehoert. Und keine "Uebersicht" neben "Meine
      Themen" — das war dieselbe Seite zweimal. #}
   {% set unterpunkte = [('/lernen', 'Meine Themen')]
-                       + ([('/klassenarbeit', 'Klassenarbeit')]
+                       + ([('/klassenarbeit', 'Klassenarbeit'),
+                           ('/klassenarbeit/kalender', '')]
                           if role != 'child' or (cfg is defined and cfg.klassenarbeit_kind) else []) %}
 {% elif world_page|default(false) %}
   {% set unterpunkte = [('/welten', 'Heute'), ('/welten/jahr', 'Mein Jahr'),
@@ -105,7 +106,7 @@
 {% endif %}
 {% if unterpunkte %}
 <nav class="sub-nav" aria-label="{{ 'Lernbereich' if learning_ui|default(false) else ('Meine Welt' if world_page|default(false) else 'Ziele planen') }}">
-  {% for ziel, text in unterpunkte %}<a class="{{ 'pruefung-tab' if ziel == '/klassenarbeit' }}" href="{{ ziel }}" {{ 'aria-current=page' if path == ziel or (ziel not in ('/lernen', '/welten', '/woche') and path.startswith(ziel)) }}>{% if ziel == '/klassenarbeit' %}<img src="/static/pruefung-symbol.svg" alt="" aria-hidden="true">{% endif %}{{ text }}</a>{% endfor %}
+  {% for ziel, text in unterpunkte %}{% if text %}<a class="{{ 'pruefung-tab' if ziel == '/klassenarbeit' }}" href="{{ ziel }}" {{ 'aria-current=page' if path == ziel or (ziel not in ('/lernen', '/welten', '/woche') and path == ziel) }}>{% if ziel == '/klassenarbeit' %}<img src="/static/pruefung-symbol.svg" alt="" aria-hidden="true">{% endif %}{{ text }}</a>{% else %}<a class="kalender-tab" href="{{ ziel }}" title="Prüfungskalender" aria-label="Prüfungskalender" {{ 'aria-current=page' if path.startswith(ziel) }}><img src="/static/pruefungskalender.png" alt="" aria-hidden="true"></a>{% endif %}{% endfor %}
 </nav>
 {% endif %}
 {% endif %}

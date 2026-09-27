@@ -203,6 +203,11 @@ async def klassenarbeit_ergebnis(request: Request, exam_id: int):
     return zurueck("/klassenarbeit")
 
 
+@router.get("/klassenarbeit/kalender", response_class=HTMLResponse)
+def klassenarbeit_kalender_seite(request: Request, monat: str = ""):
+    return measurement.render_klassenarbeit_kalender(request, monat)
+
+
 @router.get("/klassenarbeit/neu", response_class=HTMLResponse)
 def klassenarbeit_neu_seite(request: Request):
     return measurement.render_klassenarbeit_neu(request)
