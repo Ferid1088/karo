@@ -3,15 +3,15 @@
 {% block content %}
 {% from '_exam_week.html' import exam_metrics %}
 {% from '_exam_monat.html' import exam_monat %}
-<section class="pruefung-kopf">
-  <img class="pruefung-figur links" src="/static/pruefung-held.jpg" alt="" aria-hidden="true">
-  <div class="pruefung-kopf-text">
-    <p class="eyebrow">DEIN PRÜFUNGSPLAN</p>
-    <h1>Schritt für Schritt<br>zur Klassenarbeit</h1>
-    <p>Wann du für welche Arbeit lernst — und wie weit du bist.</p>
-  </div>
-  <img class="pruefung-figur rechts" src="/static/pruefung-heldin.jpg" alt="" aria-hidden="true">
+<section class="pruefung-kopf" aria-hidden="true">
+  <img class="pruefung-figur" src="/static/pruefung-held.jpg" alt="">
+  <img class="pruefung-figur" src="/static/pruefung-heldin.jpg" alt="">
 </section>
+<div class="pruefung-kopf-text">
+  <p class="eyebrow">DEIN PRÜFUNGSPLAN</p>
+  <h1>Schritt für Schritt zur Klassenarbeit</h1>
+  <p>Wann du für welche Arbeit lernst — und wie weit du bist.</p>
+</div>
 
 {{ exam_monat(kalender, weekday_labels) }}
 
