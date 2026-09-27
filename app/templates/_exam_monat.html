@@ -28,6 +28,19 @@
     </li>
     {% endfor %}{% endfor %}
   </ol>
-  <p class="monat-legende"><small>{% if kalender.arbeiten %}{{ kalender.lernminuten }} Minuten in diesem Monat geplant{% else %}In diesem Monat ist nichts geplant.{% endif %}</small></p>
+  <div class="monat-fuss">
+    <span class="monat-hilfe" tabindex="0" role="button" aria-label="Was bedeuten die Zeichen?" aria-describedby="monat-tafel">?
+      <span class="monat-tafel" id="monat-tafel" role="tooltip">
+        <b>Was die Zeichen heißen</b>
+        <span><em class="zeichen geschafft">✓</em> an dem Tag gelernt</span>
+        <span><em class="zeichen verpasst">✗</em> Lerntag war geplant, es lief nichts</span>
+        <span><em class="zeichen probe">◎</em> Generalprobe — Karo übt die ganze Arbeit</span>
+        <span><em class="zeichen arbeit">★</em> der Tag der Klassenarbeit</span>
+        <span><em class="zeichen heute">6</em> heute</span>
+        <span>Die Farbe eines Kästchens sagt, zu welcher Arbeit es gehört.</span>
+      </span>
+    </span>
+    <small>{% if kalender.arbeiten %}{{ kalender.lernminuten }} Minuten in diesem Monat geplant{% else %}In diesem Monat ist nichts geplant.{% endif %}</small>
+  </div>
 </section>
 {% endmacro %}

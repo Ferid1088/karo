@@ -119,20 +119,35 @@
 .monat-chip{display:flex;align-items:center;gap:4px;min-width:0;padding:2px 5px;border-radius:7px;font-size:.68rem;font-weight:700;line-height:1.3}
 .monat-chip b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
 .monat-chip i{flex:none;font-style:normal;font-variant-numeric:tabular-nums;opacity:.9}
-.monat-chip em{flex:none;font-style:normal;font-weight:800}
-.monat-chip.farbe-0{background:#dbe9ff;color:#0f3f80}
-.monat-chip.farbe-1{background:#d9f3e6;color:#075b45}
-.monat-chip.farbe-2{background:#ffeec6;color:#7a4e00}
-.monat-chip.farbe-3{background:#eadfff;color:#452a94}
-.monat-chip.farbe-4{background:#ffdde5;color:#8d1330}
-.monat-chip.geschafft em{color:#00795e}
-.monat-chip.verpasst em{color:#cf2233}
-.monat-chip.probe em{color:#8a5a00}
-.monat-chip.probe{box-shadow:inset 0 0 0 1.5px #f0bc45}
-.monat-chip.verpasst{box-shadow:inset 0 0 0 1.5px #f3a4ae}
-.monat-chip.arbeit{background:#5b4bdb;color:#fff;font-weight:800}
-.monat-chip.arbeit em{color:#fff}
-.monat-legende{margin:.8rem 0 0;color:#7c8fae;font-size:.78rem;text-align:right}
+/* Der Zustand ist eine gefuellte Marke: bei dieser Groesse ist ein Rand in
+   Gelb oder Rosa kaum zu sehen. Gruen, Rot und Orange stehen dafuer, und sie
+   kommen in den Farben der Arbeiten nicht vor — deshalb dort kein Gelb und
+   kein Gruen mehr. */
+.monat-chip em{flex:none;display:grid;place-items:center;width:14px;height:14px;border-radius:50%;background:#7c8fae;color:#fff;font-style:normal;font-size:.58rem;font-weight:800;line-height:1}
+.monat-chip.farbe-0{background:#d8e7ff;color:#0d3d80}
+.monat-chip.farbe-1{background:#d7c9ff;color:#33187f}
+.monat-chip.farbe-2{background:#cfeef1;color:#065c65}
+.monat-chip.farbe-3{background:#ffdbe7;color:#8c1138}
+.monat-chip.farbe-4{background:#dde4ee;color:#26405e}
+.monat-chip.geschafft em{background:#067a5a}
+.monat-chip.verpasst em{background:#d3202f}
+.monat-chip.probe em{background:#dd6b00}
+.monat-chip.arbeit{background:#4b3ccc;color:#fff;font-weight:800}
+.monat-chip.arbeit em{width:auto;height:auto;border-radius:0;background:none;color:#fff;font-size:.66rem}
+.monat-fuss{display:flex;align-items:center;gap:.6rem;margin:.7rem 0 0}
+.monat-fuss small{margin-left:auto;color:#7c8fae;font-size:.78rem}
+.monat-hilfe{position:relative;display:grid;place-items:center;width:17px;height:17px;border-radius:50%;background:#eef2f9;color:#6b7f9e;font-size:.66rem;font-weight:800;cursor:help}
+.monat-hilfe:is(:hover,:focus-visible){background:#5b4bdb;color:#fff;outline:none}
+.monat-tafel{position:absolute;bottom:calc(100% + .45rem);left:0;z-index:20;display:none;grid-gap:.3rem;width:max-content;max-width:min(20rem,80vw);padding:.7rem .8rem;border:1px solid #dbe6f6;border-radius:12px;background:#fff;box-shadow:0 10px 26px rgba(30,60,110,.16);color:#42597f;font-size:.76rem;font-weight:600;text-align:left;cursor:default}
+.monat-hilfe:is(:hover,:focus-visible) .monat-tafel{display:grid}
+.monat-tafel b{color:#20345d;font-size:.8rem}
+.monat-tafel span{display:flex;align-items:center;gap:.45rem}
+.monat-tafel .zeichen{display:grid;place-items:center;width:15px;height:15px;flex:none;border-radius:50%;color:#fff;font-size:.6rem;font-weight:800}
+.monat-tafel .zeichen.geschafft{background:#067a5a}
+.monat-tafel .zeichen.verpasst{background:#d3202f}
+.monat-tafel .zeichen.probe{background:#dd6b00}
+.monat-tafel .zeichen.arbeit{background:#4b3ccc}
+.monat-tafel .zeichen.heute{background:#5b4bdb}
 
 @media(max-width:620px){
   .monat-tag{min-height:34px;padding:.2rem}
