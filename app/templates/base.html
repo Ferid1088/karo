@@ -82,8 +82,10 @@
 {# "Heute" erbt dieselbe Grundlage wie der Lernbereich, ist aber ein
    Hauptpunkt: dort waeren die Lern-Unterpunkte fehl am Platz. #}
 {% if learning_ui|default(false) and path.startswith(('/lernen', '/klassenarbeit', '/lernzyklus', '/quiz', '/material')) %}
-  {% set unterpunkte = [('/lernen', 'Übersicht'), ('/lernen/themen', 'Meine Themen'),
-                        ('/lernen/neu', 'Neues Thema'), ('/lernen/material', 'Arbeitsblatt')]
+  {# Kein eigener Punkt fuer "Neues Thema": der Knopf steht auf der
+     Themenseite, wo er hingehoert. Und keine "Uebersicht" neben "Meine
+     Themen" — das war dieselbe Seite zweimal. #}
+  {% set unterpunkte = [('/lernen', 'Meine Themen'), ('/lernen/material', 'Arbeitsblatt')]
                        + ([('/klassenarbeit', 'Klassenarbeit')]
                           if role != 'child' or (cfg is defined and cfg.klassenarbeit_kind) else []) %}
 {% elif world_page|default(false) %}

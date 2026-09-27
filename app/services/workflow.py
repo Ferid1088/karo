@@ -474,7 +474,7 @@ def offene_schritte():
     return themen, schritte, reviews
 
 
-def render_lernen_uebersicht(request: Request, *, topics_only: bool = False):
+def render_lernen_uebersicht(request: Request):
     """Die Lernuebersicht (/lernen) — auch der Einstiegspunkt fuer
     /lernzyklus (Index), damit der Lernzyklus-Router nicht dashboard.py's
     Routen-Funktion direkt aufrufen muss."""
@@ -497,8 +497,7 @@ def render_lernen_uebersicht(request: Request, *, topics_only: bool = False):
                   fach=fach, status=status, next_topic=next_topic,
                   safe_count=sum(t['learning_status'] == 'sicher' for t in themen),
                   active_count=sum(t['learning_status'] == 'bearbeitung' for t in themen),
-                  monitor=monitor(), weekday_labels=WEEKDAY_LABELS,
-                  topics_only=topics_only)
+                  monitor=monitor(), weekday_labels=WEEKDAY_LABELS)
 
 
 def _schritt_kategorie(schritt: dict) -> str:

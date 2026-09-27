@@ -111,9 +111,11 @@ def lernen(request: Request):
     return workflow.render_lernen_uebersicht(request)
 
 
-@router.get('/lernen/themen', response_class=HTMLResponse)
+@router.get('/lernen/themen')
 def lernen_themen(request: Request):
-    return workflow.render_lernen_uebersicht(request, topics_only=True)
+    """Alter Weg zur Themenliste. /lernen ist sie inzwischen selbst —
+    zwei Adressen für dieselbe Seite waren nur Verwechslungsgefahr."""
+    return zurueck('/lernen')
 
 
 @router.get('/eltern', response_class=HTMLResponse)

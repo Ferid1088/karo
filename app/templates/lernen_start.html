@@ -1,5 +1,5 @@
 {% extends "learning_base.html" %}
-{% block title %}{{ 'Meine Themen' if topics_only else 'Lernen' }} – {{ companion_name }}{% endblock %}
+{% block title %}Meine Themen – {{ companion_name }}{% endblock %}
 {% block content %}
 {% from '_learn_monitor.html' import learn_monitor %}
 {# "Lernen" zeigt die Themen und sonst nichts: der naechste Schritt steht auf
@@ -8,7 +8,7 @@
 <div class="learn-dashboard">
   <header class="themen-kopf">
     <div>
-      <h1>{{ 'Meine Themen' if topics_only else 'Deine Themen' }}</h1>
+      <h1>Meine Themen</h1>
       <p>{{ alle_themen|length }} {{ 'Lernkarte' if alle_themen|length == 1 else 'Lernkarten' }}{% if active_count %} · {{ active_count }} in Bewegung{% endif %}{% if safe_count %} · {{ safe_count }} sicher{% endif %}</p>
     </div>
     <a class="learn-primary-action" href="/lernen/neu">+ Neues Thema</a>
@@ -37,8 +37,6 @@
     {% endfor %}
   </div>
 
-{% if not topics_only %}
   {{ learn_monitor(monitor, weekday_labels) }}
-{% endif %}
 </div>
 {% endblock %}
