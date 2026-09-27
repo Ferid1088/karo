@@ -106,17 +106,18 @@
 
 .monat-tage{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:0;padding:0;list-style:none}
 .monat-wochentag{padding:0 0 .2rem;color:#8ea0bd;font-size:.7rem;font-weight:800;text-align:center;letter-spacing:.06em}
-.monat-tag{display:flex;flex-direction:column;gap:3px;min-height:44px;padding:.28rem;border-radius:10px;background:#f7fafe;min-width:0}
-.monat-tag>b{color:#8ea0bd;font-size:.78rem;font-weight:700;line-height:1}
-.monat-tag.belegt{background:#fff;box-shadow:inset 0 0 0 1px #dbe6f6}
-.monat-tag.belegt>b{color:#42597f}
-.monat-tag.fremd{background:transparent}
+.monat-tag{display:flex;flex-direction:column;gap:3px;min-height:42px;padding:.24rem;border-radius:10px;background:#fbfdff;box-shadow:inset 0 0 0 1px #eef3fa;min-width:0}
+.monat-tag>b{color:#93a4c0;font-size:.8rem;font-weight:700;line-height:1.1}
+.monat-tag.belegt{background:#fff;box-shadow:inset 0 0 0 1px #cfdff5,0 1px 2px rgba(35,70,130,.06)}
+.monat-tag.belegt>b{color:#334c74}
+.monat-tag.wochenende{background:#f3f7fd}
+.monat-tag.fremd{background:transparent;box-shadow:none}
 .monat-tag.fremd>b{color:#c2ccdd}
 .monat-tag.heute{background:#efecff;box-shadow:inset 0 0 0 2px #5b4bdb}
 .monat-tag.heute>b{display:inline-grid;place-items:center;width:19px;height:19px;border-radius:50%;background:#5b4bdb;color:#fff;font-size:.72rem}
 
 /* Ein Chip je Arbeit: Name links, Minuten rechts, Zustand als Zeichen. */
-.monat-chip{display:flex;align-items:center;gap:4px;min-width:0;padding:2px 5px;border-radius:7px;font-size:.68rem;font-weight:700;line-height:1.3}
+.monat-chip{display:flex;align-items:center;gap:4px;min-width:0;padding:2px 6px;border-radius:7px;font-size:.7rem;font-weight:800;line-height:1.35}
 .monat-chip b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
 .monat-chip i{flex:none;font-style:normal;font-variant-numeric:tabular-nums;opacity:.9}
 /* Der Zustand ist eine gefuellte Marke: bei dieser Groesse ist ein Rand in
@@ -124,16 +125,16 @@
    kommen in den Farben der Arbeiten nicht vor — deshalb dort kein Gelb und
    kein Gruen mehr. */
 .monat-chip em{flex:none;display:grid;place-items:center;width:14px;height:14px;border-radius:50%;background:#7c8fae;color:#fff;font-style:normal;font-size:.58rem;font-weight:800;line-height:1}
-.monat-chip.farbe-0{background:#d8e7ff;color:#0d3d80}
-.monat-chip.farbe-1{background:#d7c9ff;color:#33187f}
-.monat-chip.farbe-2{background:#cfeef1;color:#065c65}
-.monat-chip.farbe-3{background:#ffdbe7;color:#8c1138}
-.monat-chip.farbe-4{background:#dde4ee;color:#26405e}
+.monat-chip.farbe-0{background:#d5e6ff;color:#0b3a7a}
+.monat-chip.farbe-1{background:#d9c9ff;color:#331480}
+.monat-chip.farbe-2{background:#c7ecef;color:#05555e}
+.monat-chip.farbe-3{background:#ffd5e4;color:#8a0f35}
+.monat-chip.farbe-4{background:#e7e8c4;color:#4d4a07}
 .monat-chip.geschafft em{background:#067a5a}
 .monat-chip.verpasst em{background:#d3202f}
 .monat-chip.probe em{background:#dd6b00}
-.monat-chip.arbeit{background:#4b3ccc;color:#fff;font-weight:800}
-.monat-chip.arbeit em{width:auto;height:auto;border-radius:0;background:none;color:#fff;font-size:.66rem}
+.monat-chip.arbeit{box-shadow:inset 0 0 0 2px currentColor;font-weight:800}
+.monat-chip.arbeit em{width:auto;height:auto;border-radius:0;background:none;color:inherit;font-size:.64rem}
 .monat-fuss{display:flex;align-items:center;gap:.6rem;margin:.7rem 0 0}
 .monat-fuss small{margin-left:auto;color:#7c8fae;font-size:.78rem}
 .monat-hilfe{position:relative;display:grid;place-items:center;width:17px;height:17px;border-radius:50%;background:#eef2f9;color:#6b7f9e;font-size:.66rem;font-weight:800;cursor:help}
