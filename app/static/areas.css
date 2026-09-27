@@ -114,3 +114,338 @@
  }
  [data-ui-area="child"] .simple-nav a:last-child:nth-child(odd) {grid-column:1 / -1;}
 }
+
+
+/* -------------------------------------------------------------------------
+   Kinderbereich: freundlicher, spielerischer und fokussierter Lernmodus.
+   Nur CSS – keine Lernlogik, keine Inhalte und keine Elternseiten ändern.
+   ------------------------------------------------------------------------- */
+[data-ui-area="child"] body {
+  background:
+    radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--ink-soft) 70%, transparent) 0 90px, transparent 92px),
+    radial-gradient(circle at 90% 16%, color-mix(in srgb, var(--surface-2) 88%, transparent) 0 120px, transparent 122px),
+    linear-gradient(180deg, color-mix(in srgb, var(--ground) 94%, white 6%), var(--ground));
+}
+
+[data-ui-area="child"] main.simple-main {
+  position: relative;
+}
+
+[data-ui-area="child"] h1 {
+  color: var(--text);
+  letter-spacing: -.025em;
+}
+
+[data-ui-area="child"] h2,
+[data-ui-area="child"] h3 {
+  letter-spacing: -.015em;
+}
+
+[data-ui-area="child"] .sub {
+  color: var(--muted);
+}
+
+/* Lern-Tabs: wie freundliche Reiter statt einer nüchternen Linkleiste. */
+[data-ui-area="child"] .learning-tabs {
+  gap: .7rem;
+  padding: .4rem;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--ink-soft) 12%);
+  box-shadow: 0 4px 0 var(--border);
+}
+
+[data-ui-area="child"] .learning-tabs a {
+  position: relative;
+  flex: 1 1 150px;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+[data-ui-area="child"] .learning-tabs a:hover {
+  transform: translateY(-2px);
+  background: var(--surface);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+[data-ui-area="child"] .learning-tabs a[aria-current] {
+  background: var(--ink);
+  color: #fff;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--ink) 72%, black 28%);
+}
+
+[data-ui-area="child"] .learning-tabs a[aria-current] span {
+  color: var(--text);
+  background: #fff;
+}
+
+[data-ui-area="child"] .learning-tabs span {
+  min-width: 1.7rem;
+  text-align: center;
+  font-weight: 800;
+}
+
+/* Themenkarten: klarer, lebendiger, aber ohne Reizüberflutung. */
+[data-ui-area="child"] .choice-grid {
+  gap: 1.15rem;
+}
+
+[data-ui-area="child"] .choice-card {
+  position: relative;
+  overflow: hidden;
+  padding: 1.35rem;
+  background:
+    linear-gradient(145deg,
+      var(--surface) 0%,
+      color-mix(in srgb, var(--surface) 84%, var(--ink-soft) 16%) 100%);
+  border-color: color-mix(in srgb, var(--border-firm) 75%, var(--ink) 25%);
+  box-shadow:
+    0 5px 0 var(--border),
+    0 12px 26px color-mix(in srgb, var(--text) 8%, transparent);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+[data-ui-area="child"] .choice-card::before {
+  content: "";
+  position: absolute;
+  width: 86px;
+  height: 86px;
+  right: -28px;
+  top: -30px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink-soft) 72%, transparent);
+}
+
+[data-ui-area="child"] .choice-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--ink);
+  box-shadow:
+    0 7px 0 var(--border-firm),
+    0 18px 30px color-mix(in srgb, var(--text) 11%, transparent);
+}
+
+[data-ui-area="child"] .choice-card h2 {
+  position: relative;
+  margin-top: .75rem;
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+[data-ui-area="child"] .choice-card .adaptiv-start {
+  margin-top: .9rem;
+}
+
+[data-ui-area="child"] .choice-card .adaptiv-start .btn,
+[data-ui-area="child"] .choice-card > form > button,
+[data-ui-area="child"] .choice-card > .btn {
+  width: 100%;
+  text-align: center;
+}
+
+/* Status wirkt wie ein gut lesbares Abzeichen. */
+[data-ui-area="child"] .child-status {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  border-radius: 999px;
+  padding: .35rem .7rem;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+[data-ui-area="child"] .child-status.gruen {
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+[data-ui-area="child"] .child-status.gelb {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+[data-ui-area="child"] .child-status.rot {
+  color: var(--bad);
+  background: var(--bad-bg);
+}
+
+/* Primäre Aktionen fühlen sich wie echte, eindeutige Lernschritte an. */
+[data-ui-area="child"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn) {
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--ink) 88%, white 12%),
+    var(--ink));
+  box-shadow:
+    0 5px 0 color-mix(in srgb, var(--ink) 66%, black 34%),
+    0 10px 18px color-mix(in srgb, var(--ink) 18%, transparent);
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+}
+
+[data-ui-area="child"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):hover {
+  transform: translateY(-2px);
+  filter: saturate(1.05);
+  box-shadow:
+    0 7px 0 color-mix(in srgb, var(--ink) 66%, black 34%),
+    0 14px 24px color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+[data-ui-area="child"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):active {
+  transform: translateY(3px);
+  box-shadow:
+    0 2px 0 color-mix(in srgb, var(--ink) 66%, black 34%);
+}
+
+[data-ui-area="child"] :is(.btn.ghost,button.ghost) {
+  border-radius: 16px;
+  background: var(--surface);
+  border: 2px solid var(--border-firm);
+}
+
+/* Adaptive Lernseiten: eine Aufgabe pro Bildschirm, klarer Fokus. */
+[data-ui-area="child"] .adaptiv {
+  max-width: 40rem;
+}
+
+[data-ui-area="child"] .adaptiv > h1 {
+  text-align: center;
+  margin-bottom: 1.1rem;
+}
+
+[data-ui-area="child"] .adaptiv > .card:not(.disclosure) {
+  position: relative;
+  padding: clamp(1.35rem, 3vw, 2rem);
+  border-color: color-mix(in srgb, var(--border-firm) 60%, var(--ink) 40%);
+  background:
+    linear-gradient(160deg,
+      var(--surface) 0%,
+      color-mix(in srgb, var(--surface) 88%, var(--ink-soft) 12%) 100%);
+  box-shadow:
+    0 6px 0 var(--border-firm),
+    0 18px 36px color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+[data-ui-area="child"] .adaptiv > .card:not(.disclosure)::after {
+  content: "✦";
+  position: absolute;
+  top: .9rem;
+  right: 1rem;
+  color: color-mix(in srgb, var(--ink) 40%, transparent);
+  font-size: 1.25rem;
+}
+
+[data-ui-area="child"] .adaptiv .card p > strong {
+  display: block;
+  font-size: clamp(1.3rem, 3vw, 1.65rem);
+  line-height: 1.4;
+  color: var(--text);
+}
+
+[data-ui-area="child"] .adaptiv input[type="text"] {
+  min-height: 58px;
+  margin: .7rem 0;
+  border-width: 3px;
+  border-radius: 16px;
+  font-size: 1.2rem;
+  text-align: center;
+  background: var(--surface);
+}
+
+[data-ui-area="child"] .adaptiv form > button:not(.ghost) {
+  width: 100%;
+  min-height: 56px;
+  margin-top: .35rem;
+  font-size: 1.05rem;
+}
+
+[data-ui-area="child"] .adaptiv .actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px,1fr));
+  gap: .75rem;
+}
+
+[data-ui-area="child"] .adaptiv .actions button {
+  min-height: 58px;
+}
+
+/* Hilfe ist leicht auffindbar, aber visuell klar sekundär. */
+[data-ui-area="child"] .adaptiv .disclosure {
+  border-style: dashed;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--surface) 88%, var(--surface-2) 12%);
+}
+
+[data-ui-area="child"] .adaptiv .disclosure > summary {
+  color: var(--ink);
+}
+
+/* Fortschritt/Erfolg: positives Feedback ohne Punkte- oder Belohnungsdruck. */
+[data-ui-area="child"] progress {
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+[data-ui-area="child"] progress::-webkit-progress-bar {
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+
+[data-ui-area="child"] progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--ink), var(--ok));
+}
+
+[data-ui-area="child"] progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--ink), var(--ok));
+}
+
+[data-ui-area="child"] .next-step {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(145deg,
+      var(--surface) 0%,
+      color-mix(in srgb, var(--surface) 84%, var(--ink-soft) 16%) 100%);
+}
+
+[data-ui-area="child"] .next-step::after {
+  content: "";
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  right: -70px;
+  bottom: -85px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink-soft) 72%, transparent);
+}
+
+/* Kleine Bildschirme: spielerisch, aber ruhig und gut bedienbar. */
+@media (max-width: 680px) {
+  [data-ui-area="child"] .learning-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  [data-ui-area="child"] .learning-tabs a {
+    width: 100%;
+  }
+
+  [data-ui-area="child"] .choice-card {
+    padding: 1.2rem;
+  }
+
+  [data-ui-area="child"] .adaptiv > .card:not(.disclosure) {
+    padding: 1.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ui-area="child"] .choice-card,
+  [data-ui-area="child"] .learning-tabs a,
+  [data-ui-area="child"] :is(button,.btn) {
+    transition: none !important;
+    transform: none !important;
+  }
+}
