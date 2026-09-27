@@ -14,9 +14,17 @@
   <ol class="monat-tage">
     {% for kuerzel in ['Mo','Di','Mi','Do','Fr','Sa','So'] %}<li class="monat-wochentag">{{ kuerzel }}</li>{% endfor %}
     {% for woche in kalender.wochen %}{% for tag in woche %}
-    <li class="monat-tag{{ ' fremd' if not tag.im_monat }}{{ ' heute' if tag.heute }}">
+    <li class="monat-tag{{ ' fremd' if not tag.im_monat }}{{ ' heute' if tag.heute }}{{ ' belegt' if tag.eintraege }}">
       <b>{{ tag.nummer }}</b>
-      {% for eintrag in tag.eintraege %}<span class="monat-chip farbe-{{ eintrag.farbe }} {{ eintrag.art }}" title="{{ eintrag.subject }}{% if eintrag.minutes %} · {{ eintrag.minutes }} Minuten{% endif %}{% if eintrag.art == 'arbeit' %} · Klassenarbeit{% elif eintrag.art == 'probe' %} · Generalprobe{% elif eintrag.art == 'geschafft' %} · gelernt{% elif eintrag.art == 'verpasst' %} · nicht gelernt{% endif %}"><b>{{ eintrag.subject }}</b><i>{% if eintrag.art == 'arbeit' %}★{% else %}{{ eintrag.minutes }}′{% endif %}</i></span>{% endfor %}
+      {% for eintrag in tag.eintraege %}<span class="monat-chip farbe-{{ eintrag.farbe }} {{ eintrag.art }}" title="{{ eintrag.subject }}{% if eintrag.minutes %} · {{ eintrag.minutes }} Minuten{% endif %} · {{ {'arbeit': 'Klassenarbeit', 'probe': 'Generalprobe', 'geschafft': 'gelernt', 'verpasst': 'nicht gelernt', 'geplant': 'geplant'}[eintrag.art] }}">
+        <b>{{ eintrag.subject }}</b>
+        {%- if eintrag.art == 'arbeit' %}<em>★ Arbeit</em>
+        {%- else %}<i>{{ eintrag.minutes }} Min</i>
+          {%- if eintrag.art == 'geschafft' %}<em title="gelernt">✓</em>
+          {%- elif eintrag.art == 'verpasst' %}<em title="nicht gelernt">✗</em>
+          {%- elif eintrag.art == 'probe' %}<em title="Generalprobe">◎</em>{% endif %}
+        {%- endif %}
+      </span>{% endfor %}
     </li>
     {% endfor %}{% endfor %}
   </ol>
