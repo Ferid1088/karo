@@ -113,6 +113,14 @@ def render_klassenarbeit(request: Request, monat: str = ""):
                   weekday_labels=exam_calendar.WEEKDAY_LABELS)
 
 
+def render_klassenarbeit_neu(request: Request):
+    """Beide Wege zu einer neuen Arbeit: selbst eintragen oder Blatt hochladen."""
+    from .. import exam_plan
+    return render(request, "klassenarbeit_neu.html",
+                  adult_page=not config.load().klassenarbeit_kind,
+                  scan=exam_plan.offene_scan())
+
+
 def render_klassenarbeit_detail(request: Request, exam_id: int):
     """Eine einzelne Arbeit: Themen, Kalender, Generalprobe.
 

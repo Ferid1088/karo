@@ -155,3 +155,7 @@
   .monat-chip i,.monat-chip em{display:none}
   .monat-chip.arbeit em{display:inline}
 }
+
+/* Ein Knopf für eine neue Arbeit — nicht seitenbreit, er ist eine Aktion
+   unter vielen. */
+.neue-arbeit{display:inline-block;width:auto;margin:.2rem 0 1rem}
