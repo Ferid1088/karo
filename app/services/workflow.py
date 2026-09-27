@@ -490,14 +490,11 @@ def render_lernen_uebersicht(request: Request):
                 and (not status or t['learning_status'] == status)]
     next_topic = next((t for t in themen if t['learning_status'] == 'bearbeitung'), None)
     next_topic = next_topic or next((t for t in themen if t['learning_status'] == 'neu'), None)
-    from .learning_hub import monitor
-    from .exam_calendar import WEEKDAY_LABELS
     return render(request, 'lernen_start.html', themen=selected, alle_themen=themen,
                   faecher=sorted({t['subject'] for t in themen}), query=query,
                   fach=fach, status=status, next_topic=next_topic,
                   safe_count=sum(t['learning_status'] == 'sicher' for t in themen),
-                  active_count=sum(t['learning_status'] == 'bearbeitung' for t in themen),
-                  monitor=monitor(), weekday_labels=WEEKDAY_LABELS)
+                  active_count=sum(t['learning_status'] == 'bearbeitung' for t in themen))
 
 
 def _schritt_kategorie(schritt: dict) -> str:

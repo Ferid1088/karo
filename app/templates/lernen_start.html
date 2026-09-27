@@ -1,7 +1,6 @@
 {% extends "learning_base.html" %}
 {% block title %}Meine Themen – {{ companion_name }}{% endblock %}
 {% block content %}
-{% from '_learn_monitor.html' import learn_monitor %}
 {# "Lernen" zeigt die Themen und sonst nichts: der naechste Schritt steht auf
    "Heute", die Wege zu Neues Thema, Arbeitsblatt und Klassenarbeit stehen in
    der Unterzeile. Vorher stand beides hier noch einmal als Karte. #}
@@ -11,10 +10,7 @@
       <h1>Meine Themen</h1>
       <p>{{ alle_themen|length }} {{ 'Lernkarte' if alle_themen|length == 1 else 'Lernkarten' }}{% if active_count %} · {{ active_count }} in Bewegung{% endif %}{% if safe_count %} · {{ safe_count }} sicher{% endif %}</p>
     </div>
-    <div class="themen-knoepfe">
-      <a class="learn-primary-action" href="/lernen/neu">+ Neues Thema</a>
-      <a class="learn-zweit-action" href="/lernen/material">Arbeitsblatt hochladen</a>
-    </div>
+    <a class="learn-primary-action" href="/lernen/neu">+ Neues Thema</a>
   </header>
 
   <form class="themen-filter" method="get" action="/lernen">
@@ -39,7 +35,5 @@
     <section class="learn-empty"><img src="/static/karo-fox-star.png" alt="" width="96" height="96"><h2>{{ 'Nichts gefunden' if query or fach or status else 'Noch keine Lernkarte' }}</h2><p>{{ 'Ändere die Suche oder lege ein neues Thema an.' if query or fach or status else 'Starte mit einer Frage, die dich gerade interessiert.' }}</p><a class="learn-primary-action" href="/lernen/neu">Neues Thema</a></section>
     {% endfor %}
   </div>
-
-  {{ learn_monitor(monitor, weekday_labels) }}
 </div>
 {% endblock %}
