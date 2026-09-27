@@ -700,3 +700,12 @@ pre { background: var(--code-bg, var(--surface-2)); border: 1px solid var(--bord
 .archiv-aktionen{display:flex;flex-wrap:wrap;gap:.4rem}
 .archiv-aktionen button,.archiv-aktionen .btn{min-height:38px;padding:.35rem .8rem;font-size:.85rem}
 .archiv-leer{color:#6a80a1;font-size:.9rem}
+
+/* Endgültig löschen fragt erst nach — in derselben Zeile, ohne JavaScript. */
+.loeschen-weg { align-self: center; color: var(--faint); font-size: 0.8rem; font-weight: 700; text-decoration: none; }
+.loeschen-weg:hover { color: #c62033; text-decoration: underline; }
+.archiv-aktionen.ist-nachfrage { align-items: center; gap: 0.5rem; }
+.archiv-aktionen.ist-nachfrage b { color: #c62033; font-size: 0.85rem; }
+.loeschen-echt { min-height: 38px; padding: 0.35rem 0.9rem; border: 0; border-radius: 10px;
+  background: #c62033; color: #fff; font-size: 0.85rem; font-weight: 800; box-shadow: none; }
+.loeschen-echt:hover { background: #a5101f; }

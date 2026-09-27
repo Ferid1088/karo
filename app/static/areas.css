@@ -54,7 +54,7 @@
 [data-ui-area="parent"] .choice-card h2 { font-size: 1.15rem; }
 [data-ui-area="parent"] .choice-card p { margin-bottom: .4rem; font-size: .92rem; }
 [data-ui-area="parent"] :is(button,.btn,input,select) { border-radius: 8px; box-shadow: none; }
-[data-ui-area="parent"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):not(.exam-start):not(.action-link):not(.goal-reactivate) { color: var(--button-text); }
+[data-ui-area="parent"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):not(.exam-start):not(.action-link):not(.goal-reactivate):not(.loeschen-echt) { color: var(--button-text); }
 [data-ui-area="parent"] .eyebrow { color: var(--ink); font-size: .7rem; letter-spacing: .12em; }
 [data-ui-area="parent"] th { background: var(--surface-2); }
 [data-ui-area="parent"] .simple-footer { font-size: .8rem; border-top: 1px solid var(--border); padding-top: 1rem; }
@@ -83,7 +83,7 @@
 :root[data-ui-area="child"][data-theme-color="wiese"] { --ink: #187a3b; }
 :root[data-ui-area="child"][data-theme-color="sonne"] { --ink: #ba4310; }
 [data-ui-area="child"][data-theme-color="dunkel"] :is(.simple-nav a[aria-current],.step-number) { color: #1c1a3a; }
-[data-ui-area="child"][data-theme-color="dunkel"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):not(.exam-start):not(.action-link):not(.goal-reactivate) { color: #1c1a3a; }
+[data-ui-area="child"][data-theme-color="dunkel"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):not(.exam-start):not(.action-link):not(.goal-reactivate):not(.loeschen-echt) { color: #1c1a3a; }
 @media (max-width: 1000px) {
   [data-ui-area="parent"] .simple-header { flex-wrap: wrap; gap: 1rem; padding-inline: 1.2rem; }
   [data-ui-area="parent"] .area-brand { flex: 1; }
@@ -269,7 +269,7 @@
 }
 
 /* Primäre Aktionen fühlen sich wie echte, eindeutige Lernschritte an. */
-[data-ui-area="child"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):not(.exam-start):not(.action-link):not(.goal-reactivate) {
+[data-ui-area="child"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):not(.exam-start):not(.action-link):not(.goal-reactivate):not(.loeschen-echt) {
   border: 0;
   border-radius: 16px;
   background: linear-gradient(135deg,
@@ -281,7 +281,7 @@
   transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
 }
 
-[data-ui-area="child"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):not(.exam-start):not(.action-link):not(.goal-reactivate):hover {
+[data-ui-area="child"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):not(.exam-start):not(.action-link):not(.goal-reactivate):not(.loeschen-echt):hover {
   transform: translateY(-2px);
   filter: saturate(1.05);
   box-shadow:
@@ -289,7 +289,7 @@
     0 14px 24px color-mix(in srgb, var(--ink) 22%, transparent);
 }
 
-[data-ui-area="child"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):not(.exam-start):not(.action-link):not(.goal-reactivate):active {
+[data-ui-area="child"] :is(button,.btn):not(.ghost):not(.quiet):not(.tab-btn):not(.linklike):not(.hilfe-btn):not(.exam-start):not(.action-link):not(.goal-reactivate):not(.loeschen-echt):active {
   transform: translateY(3px);
   box-shadow:
     0 2px 0 color-mix(in srgb, var(--ink) 66%, black 34%);

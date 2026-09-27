@@ -70,7 +70,7 @@ def decorate(rows: list[dict]) -> list[dict]:
 def personal_topics() -> list[dict]:
     return decorate([t for t in topics.liste(topics.AKTIV)
                      if t.get('learning_visible', 1) and not t.get('deleted_at')
-                     and not t.get('learned_at')])
+                     and not t.get('purged_at') and not t.get('learned_at')])
 
 
 def exam_topics(exam_id: int) -> list[dict]:
@@ -157,7 +157,7 @@ def archiv_themen() -> list[dict]:
     """
     zeilen = [dict(r) for r in db.q(
         """SELECT * FROM topic
-            WHERE learning_visible = 1
+            WHERE learning_visible = 1 AND purged_at IS NULL
               AND (deleted_at IS NOT NULL OR learned_at IS NOT NULL)
             ORDER BY COALESCE(deleted_at, learned_at) DESC""")]
     for t in zeilen:
@@ -181,7 +181,8 @@ def archiv_arbeiten() -> list[dict]:
     heute = db.today()
     zeilen = [dict(r) for r in db.q(
         """SELECT * FROM exam
-            WHERE deleted_at IS NOT NULL OR exam_date < ?
+            WHERE purged_at IS NULL
+              AND (deleted_at IS NOT NULL OR exam_date < ?)
             ORDER BY COALESCE(deleted_at, exam_date) DESC""", heute)]
     for e in zeilen:
         e["gelöscht"] = bool(e.get("deleted_at"))
@@ -189,3 +190,23 @@ def archiv_arbeiten() -> list[dict]:
         e["themen_zahl"] = len(themen)
         e["sicher_zahl"] = sum(t["learning_status"] == "sicher" for t in themen)
     return zeilen
+
+
+def thema_entfernen(topic_id: int) -> None:
+    """Endgueltig loeschen: verschwindet aus Liste und Archiv.
+
+    Die Zeile bleibt in der Datenbank stehen, nur unsichtbar. An ihr haengen
+    Fragen, Antworten und der Lernverlauf; ein hartes DELETE liesse die auf
+    eine Nummer zeigen, die es nicht mehr gibt. Fuer das Kind ist das Thema
+    weg, und der Elternbereich behaelt seine Aufzeichnungen.
+    """
+    with db.tx() as c:
+        c.execute("UPDATE topic SET purged_at=?, deleted_at=COALESCE(deleted_at, ?) WHERE id=?",
+                  (db.now(), db.now(), topic_id))
+
+
+def arbeit_entfernen(exam_id: int) -> None:
+    """Endgueltig loeschen — wie thema_entfernen, aus demselben Grund weich."""
+    with db.tx() as c:
+        c.execute("UPDATE exam SET purged_at=?, deleted_at=COALESCE(deleted_at, ?) WHERE id=?",
+                  (db.now(), db.now(), exam_id))

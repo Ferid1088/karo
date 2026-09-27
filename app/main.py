@@ -91,7 +91,7 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
         return False
     if path in CHILD_ALLOWED_EXACT:
         return True
-    if re.fullmatch(r"/lernstand/(?:thema|arbeit)/[0-9]+/zurueck", path):
+    if re.fullmatch(r"/lernstand/(?:thema|arbeit)/[0-9]+/(?:zurueck|entfernen)", path):
         return True
     return any(path == p or path.startswith(p + "/")
               for p in CHILD_ALLOWED_PREFIXES)

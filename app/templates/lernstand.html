@@ -18,10 +18,19 @@
         <p>{{ t.subject }}{% if t.grade %} · {{ t.grade }}. Klasse{% endif %}
           {%- if t['gelöscht'] %} · <b class="geloescht-marke">gelöscht</b>{% else %} · <span class="learn-status sicher">gelernt</span>{% endif %}</p>
       </div>
+      {% if nachfrage == 'thema-' ~ t.id %}
+      <div class="archiv-aktionen ist-nachfrage">
+        <b>Wirklich löschen? Das lässt sich nicht zurückholen.</b>
+        <form method="post" action="/lernstand/thema/{{ t.id }}/entfernen">{{ csrf_input() }}<button class="loeschen-echt" type="submit">Ja, löschen</button></form>
+        <a class="quiet btn" href="/lernstand">Abbrechen</a>
+      </div>
+      {% else %}
       <div class="archiv-aktionen">
         <form method="post" action="/lernstand/thema/{{ t.id }}/zurueck">{{ csrf_input() }}<button class="quiet" type="submit">Zurück zum Lernen</button></form>
         <form method="post" action="/lernstand/thema/{{ t.id }}/zurueck">{{ csrf_input() }}<input type="hidden" name="erneut" value="ja"><button class="quiet" type="submit">Erneut lernen →</button></form>
+        <a class="loeschen-weg" href="/lernstand?weg=thema-{{ t.id }}">löschen</a>
       </div>
+      {% endif %}
     </article>
     {% endfor %}
   </div>
@@ -40,10 +49,19 @@
           {%- if e['gelöscht'] %} · <b class="geloescht-marke">gelöscht</b>{% else %} · geschrieben{% endif %}
           {%- if e.themen_zahl %} · {{ e.sicher_zahl }} von {{ e.themen_zahl }} Themen sicher{% endif %}</p>
       </div>
+      {% if nachfrage == 'arbeit-' ~ e.id %}
+      <div class="archiv-aktionen ist-nachfrage">
+        <b>Wirklich löschen? Das lässt sich nicht zurückholen.</b>
+        <form method="post" action="/lernstand/arbeit/{{ e.id }}/entfernen">{{ csrf_input() }}<button class="loeschen-echt" type="submit">Ja, löschen</button></form>
+        <a class="quiet btn" href="/lernstand">Abbrechen</a>
+      </div>
+      {% else %}
       <div class="archiv-aktionen">
         {% if e['gelöscht'] %}<form method="post" action="/lernstand/arbeit/{{ e.id }}/zurueck">{{ csrf_input() }}<button class="quiet" type="submit">Zurücknehmen</button></form>
         {% else %}<a class="quiet btn" href="/klassenarbeit/{{ e.id }}">Ansehen</a>{% endif %}
+        <a class="loeschen-weg" href="/lernstand?weg=arbeit-{{ e.id }}">löschen</a>
       </div>
+      {% endif %}
     </article>
     {% endfor %}
   </div>

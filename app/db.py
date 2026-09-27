@@ -145,6 +145,8 @@ _ADDED_COLUMNS = [
     ("topic", "learned_at", "TEXT"),
     ("topic", "deleted_at", "TEXT"),
     ("exam", "deleted_at", "TEXT"),
+    ("topic", "purged_at", "TEXT"),
+    ("exam", "purged_at", "TEXT"),
     ("document", "rolle", "TEXT NOT NULL DEFAULT 'wissen'"),
     ("llm_call", "backend", "TEXT"),
     ("job", "not_before", "TEXT"),

@@ -75,6 +75,24 @@ def thema_zurueck(request: Request, topic_id: int, erneut: str = Form('')):
     return zurueck('/lernstand')
 
 
+@router.post('/lernstand/thema/{topic_id}/entfernen')
+def thema_entfernen(request: Request, topic_id: int):
+    """Endgültig löschen. Die Rückfrage stellt die Seite selbst (?weg=…),
+    damit sie auch ohne JavaScript kommt."""
+    from ..services import learning_hub
+    learning_hub.thema_entfernen(topic_id)
+    flash(request, 'Das Thema ist gelöscht.')
+    return zurueck('/lernstand')
+
+
+@router.post('/lernstand/arbeit/{exam_id}/entfernen')
+def arbeit_entfernen(request: Request, exam_id: int):
+    from ..services import learning_hub
+    learning_hub.arbeit_entfernen(exam_id)
+    flash(request, 'Die Klassenarbeit ist gelöscht.')
+    return zurueck('/lernstand')
+
+
 @router.post('/klassenarbeit/{exam_id}/loeschen')
 def arbeit_loeschen(request: Request, exam_id: int):
     from ..services import learning_hub
