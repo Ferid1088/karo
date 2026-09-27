@@ -3,9 +3,7 @@ name: Full pytest
 on:
   push:
     branches:
-      - ux-learning-focus-20260926
-      - meine-welt-v2-secure
-      - meine-welt-exam-calendar
+      - master
   workflow_dispatch:
 
 jobs:
