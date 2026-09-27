@@ -3,22 +3,6 @@
    zwei Wertzeilen, ein breiter Knopf. Wird von Uebersicht und Detailseite
    benutzt, damit beide dasselbe Bild zeigen. #}
 
-{% macro exam_week_row(exam, weekday_labels, details=True) %}
-{% set woche = exam.woche %}
-<div class="exam-week-row">
-  <ol class="exam-week" aria-label="Die Lernwoche für {{ exam.subject }}">
-    {% for day in woche.days %}
-    <li class="{{ day.state }}{{ ' heute' if day.today }}"><span>{{ weekday_labels[day.weekday][:2] }}</span><i aria-hidden="true">{% if day.state == 'pruefung' %}★{% elif day.state == 'geschafft' %}✓{% elif day.state == 'simulation' %}◎{% elif day.minutes %}{{ day.minutes }}{% endif %}</i><small class="sr">{{ weekday_labels[day.weekday] }}: {{ day.label }}</small></li>
-    {% endfor %}
-  </ol>
-  <div class="exam-week-facts">
-    <b>{{ woche.learning_days }} {{ 'Lerntag' if woche.learning_days == 1 else 'Lerntage' }} · {{ woche.planned_minutes }} Minuten geplant</b>
-    <small>{{ woche.period }}</small>
-  </div>
-  {% if details %}<a class="exam-details" href="/klassenarbeit/{{ exam.id }}">Details</a>{% endif %}
-</div>
-{% endmacro %}
-
 {% macro exam_metrics(exam) %}
 {% set woche = exam.woche %}
 {% set anteil = (100 * exam.mastered / exam.topics|length)|round|int if exam.topics else 0 %}

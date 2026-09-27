@@ -276,42 +276,14 @@ def woche(exam_id: int, heute: dt.date | None = None) -> dict:
     (hellgruen). Der vollstaendige Kalender steht auf der Detailseite.
     """
     heute = heute or dt.date.fromisoformat(db.today())
-    montag = heute - dt.timedelta(days=heute.isoweekday() - 1)
     exam_day = dt.date.fromisoformat(_exam(exam_id)["exam_date"])
     geplant = {tag: int(minuten) for tag, minuten in get_days(exam_id).items()}
-    probe = simulation_date(exam_id)
-    gelernt = _tage_mit_sitzung(exam_id, str(montag),
-                                str(montag + dt.timedelta(days=6)))
-
-    reihe = []
-    for versatz in range(7):
-        tag = montag + dt.timedelta(days=versatz)
-        text = str(tag)
-        minuten = 0 if tag == exam_day else geplant.get(text, 0)
-        if tag == exam_day:
-            zustand = "pruefung"
-        elif minuten > 0:
-            # Rot nur fuer einen Tag, der vorbei ist und an dem nichts lief —
-            # die Lernsitzungen sagen das, nicht eine Schaetzung.
-            zustand = ("geschafft" if text in gelernt
-                       else "verpasst" if tag < heute else "geplant")
-            # Gelb steht fuer eine Generalprobe, die noch aussteht. Eine
-            # gelaufene faerbt die Ampel, sonst waere nicht zu sehen, ob sie
-            # stattgefunden hat.
-            if probe and text == probe and zustand == "geplant":
-                zustand = "simulation"
-        else:
-            zustand = "frei"
-        reihe.append({"date": text, "weekday": tag.isoweekday(),
-                      "state": zustand, "minutes": minuten,
-                      "today": tag == heute,
-                      "label": _tages_text(zustand, minuten)})
 
     tage = {d["date"]: d for d in calendar(exam_id)}
     offene = [d for d in tage.values() if d["is_learning_day"] and not d["is_exam"]]
     naechster = next(iter(sorted(offene, key=lambda d: d["date"])), None)
     alle_lerntage = [t for t, m in geplant.items() if m > 0 and t != str(exam_day)]
-    return {"days": reihe, "next_day": naechster,
+    return {"next_day": naechster,
             "learning_days": len(alle_lerntage),
             "planned_minutes": sum(geplant[t] for t in alle_lerntage),
             "days_left": (exam_day - heute).days,
@@ -342,15 +314,85 @@ def _zeitraum(start: str, ende: str) -> str:
     return " \u2013 ".join(teile)
 
 
-_TAGES_TEXT = {"pruefung": "Klassenarbeit", "simulation": "Generalprobe",
-               "frei": "frei"}
+def _tages_art(arbeit: dict, tag: str, heute: dt.date) -> str:
+    """Ampel je geplanten Tag: geschafft, verpasst, geplant — oder Probe."""
+    if tag in arbeit["gelernt"]:
+        return "geschafft"
+    if arbeit["probe"] == tag:
+        return "probe"
+    return "verpasst" if dt.date.fromisoformat(tag) < heute else "geplant"
 
 
-def _tages_text(zustand: str, minuten: int) -> str:
-    if zustand == "geschafft":
-        return f"{minuten} Minuten gelernt"
-    if zustand == "verpasst":
-        return f"{minuten} Minuten geplant, nicht gelernt"
-    if zustand == "geplant":
-        return f"{minuten} Minuten lernen"
-    return _TAGES_TEXT.get(zustand, zustand)
+MONATE = ("Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
+          "August", "September", "Oktober", "November", "Dezember")
+
+
+def monat(wunsch: str = "", heute: dt.date | None = None) -> dict:
+    """Alle Klassenarbeiten in einem Monatsraster.
+
+    Ein Kind hat selten nur eine Arbeit. Die Karten zeigen je Arbeit ihren
+    Stand; dieser Kalender zeigt umgekehrt je Tag, fuer welche Arbeit wie
+    lange geplant ist — damit auffaellt, wenn an einem Dienstag drei
+    Arbeiten gleichzeitig Zeit wollen.
+    """
+    heute = heute or dt.date.fromisoformat(db.today())
+    try:
+        jahr, nummer = (int(teil) for teil in (wunsch or "").split("-"))
+        erster = dt.date(jahr, nummer, 1)
+    except (ValueError, TypeError):
+        erster = heute.replace(day=1)
+
+    letzter = (erster + dt.timedelta(days=31)).replace(day=1) - dt.timedelta(days=1)
+    start = erster - dt.timedelta(days=erster.isoweekday() - 1)
+    ende = letzter + dt.timedelta(days=7 - letzter.isoweekday())
+
+    arbeiten = [dict(r) for r in db.q(
+        "SELECT id, subject, exam_date FROM exam ORDER BY exam_date, id")]
+    for platz, arbeit in enumerate(arbeiten):
+        arbeit["farbe"] = platz % 5
+        arbeit["probe"] = simulation_date(arbeit["id"])
+        # Je Arbeit nur ihre eigenen Lernrunden — sonst faerbte eine Runde in
+        # einem eigenen Lernthema den Tag einer Arbeit gruen.
+        arbeit["gelernt"] = _tage_mit_sitzung(arbeit["id"], str(start), str(ende))
+    nach_id = {arbeit["id"]: arbeit for arbeit in arbeiten}
+
+    plan: dict[str, list[dict]] = {}
+    for zeile in db.q(
+            """SELECT exam_id, study_date, minutes FROM exam_schedule_day
+                WHERE study_date BETWEEN ? AND ? AND minutes > 0
+                ORDER BY study_date, exam_id""", str(start), str(ende)):
+        arbeit = nach_id.get(zeile["exam_id"])
+        if arbeit is None or zeile["study_date"] == arbeit["exam_date"]:
+            continue
+        plan.setdefault(zeile["study_date"], []).append({
+            "exam_id": arbeit["id"], "subject": arbeit["subject"],
+            "farbe": arbeit["farbe"], "minutes": int(zeile["minutes"]),
+            "art": _tages_art(arbeit, zeile["study_date"], heute)})
+
+    for arbeit in arbeiten:
+        if str(start) <= arbeit["exam_date"] <= str(ende):
+            plan.setdefault(arbeit["exam_date"], []).append({
+                "exam_id": arbeit["id"], "subject": arbeit["subject"],
+                "farbe": arbeit["farbe"], "minutes": 0, "art": "arbeit"})
+
+    wochen, tag = [], start
+    while tag <= ende:
+        reihe = []
+        for _ in range(7):
+            eintraege = plan.get(str(tag), [])
+            reihe.append({"date": str(tag), "nummer": tag.day,
+                          "im_monat": tag.month == erster.month,
+                          "heute": tag == heute, "eintraege": eintraege})
+            tag += dt.timedelta(days=1)
+        wochen.append(reihe)
+
+    im_monat = [e for woche in wochen for t in woche if t["im_monat"]
+                for e in t["eintraege"]]
+    return {"titel": f"{MONATE[erster.month - 1]} {erster.year}",
+            "wochen": wochen,
+            "vorher": (erster - dt.timedelta(days=1)).strftime("%Y-%m"),
+            "nachher": (letzter + dt.timedelta(days=1)).strftime("%Y-%m"),
+            "jetzt": heute.strftime("%Y-%m"),
+            "arbeiten": [a for a in arbeiten
+                         if any(e["exam_id"] == a["id"] for e in im_monat)],
+            "lernminuten": sum(e["minutes"] for e in im_monat)}

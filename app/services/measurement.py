@@ -100,7 +100,7 @@ def _exam_ansicht(e: dict) -> dict:
     return e
 
 
-def render_klassenarbeit(request: Request):
+def render_klassenarbeit(request: Request, monat: str = ""):
     from .. import exam_plan
     from . import exam_calendar
     zeilen = [_exam_ansicht(dict(r)) for r in db.q(
@@ -109,6 +109,7 @@ def render_klassenarbeit(request: Request):
     return render(request, template, zeilen=zeilen,
                   adult_page=not config.load().klassenarbeit_kind,
                   scan=exam_plan.offene_scan(), counts=jobs.counts(),
+                  kalender=exam_calendar.monat(monat),
                   weekday_labels=exam_calendar.WEEKDAY_LABELS)
 
 

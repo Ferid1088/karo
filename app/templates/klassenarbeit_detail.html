@@ -1,7 +1,7 @@
 {% extends "learning_base.html" %}
 {% block title %}{{ e.subject }} – Klassenarbeit – {{ companion_name }}{% endblock %}
 {% block content %}
-{% from '_exam_week.html' import exam_week_row, exam_metrics %}
+{% from '_exam_week.html' import exam_metrics %}
 <a class="back-link" href="/klassenarbeit">← Alle Klassenarbeiten</a>
 
 <section class="card exam-card" id="exam-{{ e.id }}">
@@ -13,7 +13,6 @@
     </div>
     <span class="learn-status {{ 'sicher' if e.topics and e.mastered == e.topics|length else 'bearbeitung' }}">{{ e.mastered }} von {{ e.topics|length }} sicher</span>
   </header>
-  {{ exam_week_row(e, weekday_labels, details=False) }}
   {{ exam_metrics(e) }}
 </section>
 

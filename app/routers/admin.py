@@ -28,8 +28,8 @@ router = APIRouter()
 
 
 @router.get("/klassenarbeit", response_class=HTMLResponse)
-def klassenarbeit(request: Request):
-    return measurement.render_klassenarbeit(request)
+def klassenarbeit(request: Request, monat: str = ""):
+    return measurement.render_klassenarbeit(request, monat)
 
 
 @router.post("/klassenarbeit")
