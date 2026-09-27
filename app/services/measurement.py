@@ -33,6 +33,7 @@ def render_lernstand(request: Request):
                   zeilen=zeilen, erfolge=[t for t in zeilen if t.get('learned_at')],
                   archiv_themen=archiv_themen(), archiv_arbeiten=archiv_arbeiten(),
                   nachfrage=request.query_params.get("weg", ""),
+                  tab=request.query_params.get("tab", ""),
                   full_progress=request.url.path.startswith('/messung'),
                   adult_page=request.url.path.startswith('/messung'),
                   verlauf=export.verlauf_zeilen(limit=200),

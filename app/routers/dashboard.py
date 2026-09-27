@@ -90,7 +90,7 @@ def arbeit_entfernen(request: Request, exam_id: int):
     from ..services import learning_hub
     learning_hub.arbeit_entfernen(exam_id)
     flash(request, 'Die Klassenarbeit ist gelöscht.')
-    return zurueck('/lernstand')
+    return zurueck('/lernstand?tab=arbeiten')
 
 
 @router.post('/klassenarbeit/{exam_id}/loeschen')

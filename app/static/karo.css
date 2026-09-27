@@ -709,3 +709,8 @@ pre { background: var(--code-bg, var(--surface-2)); border: 1px solid var(--bord
 .loeschen-echt { min-height: 38px; padding: 0.35rem 0.9rem; border: 0; border-radius: 10px;
   background: #c62033; color: #fff; font-size: 0.85rem; font-weight: 800; box-shadow: none; }
 .loeschen-echt:hover { background: #a5101f; }
+
+/* Die Reiter des Archivs sind Verweise (damit die Wahl in der Adresse steht
+   und ohne Skript arbeitet) — sie sollen aber wie Reiter aussehen. */
+a.tab-btn { text-decoration: none; }
+a.tab-btn .archiv-zahl { margin-left: 0.3rem; min-width: 20px; height: 18px; font-size: 0.7rem; }

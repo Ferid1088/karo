@@ -7,8 +7,15 @@
 <h1>Deine Erfolge</h1>
 <p class="sub">Was du geschafft hast — und was du weggelegt hast. Nichts geht verloren.</p>
 
+{% set reiter = 'arbeiten' if tab == 'arbeiten' else 'themen' %}
+<nav class="tabs" aria-label="Archiv">
+  <a class="tab-btn{{ ' active' if reiter == 'themen' }}" href="/lernstand">Themen <span class="archiv-zahl">{{ archiv_themen|length }}</span></a>
+  <a class="tab-btn{{ ' active' if reiter == 'arbeiten' }}" href="/lernstand?tab=arbeiten">Klassenarbeiten <span class="archiv-zahl">{{ archiv_arbeiten|length }}</span></a>
+</nav>
+
+{% if reiter == 'themen' %}
 <section class="archiv-block" aria-labelledby="archiv-themen">
-  <h2 id="archiv-themen">Themen <span class="archiv-zahl">{{ archiv_themen|length }}</span></h2>
+  <h2 class="sr" id="archiv-themen">Themen</h2>
   {% if archiv_themen %}
   <div class="archiv-liste">
     {% for t in archiv_themen %}
@@ -37,8 +44,9 @@
   {% else %}<p class="archiv-leer">Noch kein Thema hier. Was du lernst oder weglegst, landet hier.</p>{% endif %}
 </section>
 
+{% else %}
 <section class="archiv-block" aria-labelledby="archiv-arbeiten">
-  <h2 id="archiv-arbeiten">Klassenarbeiten <span class="archiv-zahl">{{ archiv_arbeiten|length }}</span></h2>
+  <h2 class="sr" id="archiv-arbeiten">Klassenarbeiten</h2>
   {% if archiv_arbeiten %}
   <div class="archiv-liste">
     {% for e in archiv_arbeiten %}
@@ -53,13 +61,13 @@
       <div class="archiv-aktionen ist-nachfrage">
         <b>Wirklich löschen? Das lässt sich nicht zurückholen.</b>
         <form method="post" action="/lernstand/arbeit/{{ e.id }}/entfernen">{{ csrf_input() }}<button class="loeschen-echt" type="submit">Ja, löschen</button></form>
-        <a class="quiet btn" href="/lernstand">Abbrechen</a>
+        <a class="quiet btn" href="/lernstand?tab=arbeiten">Abbrechen</a>
       </div>
       {% else %}
       <div class="archiv-aktionen">
         {% if e['gelöscht'] %}<form method="post" action="/lernstand/arbeit/{{ e.id }}/zurueck">{{ csrf_input() }}<button class="quiet" type="submit">Zurücknehmen</button></form>
         {% else %}<a class="quiet btn" href="/klassenarbeit/{{ e.id }}">Ansehen</a>{% endif %}
-        <a class="loeschen-weg" href="/lernstand?weg=arbeit-{{ e.id }}">löschen</a>
+        <a class="loeschen-weg" href="/lernstand?tab=arbeiten&amp;weg=arbeit-{{ e.id }}">löschen</a>
       </div>
       {% endif %}
     </article>
@@ -67,6 +75,7 @@
   </div>
   {% else %}<p class="archiv-leer">Noch keine geschriebene Klassenarbeit.</p>{% endif %}
 </section>
+{% endif %}
 
 {% if role == 'parent' and not full_progress %}<a href="/messung/fortschritt">Ausführlichen Lernstand und Export öffnen</a>{% endif %}
 {% if role == 'parent' and full_progress %}
