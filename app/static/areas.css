@@ -100,19 +100,19 @@
   [data-ui-area="child"] .card { padding: 1.2rem; }
 }
 
-/* The fourth child link stays readable on small phones. */
-@media (max-width: 420px) {
-  [data-ui-area="child"] .simple-header .simple-nav {
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* Five child links fit phone widths without squeezing the labels. */
+/* Die fuenf Wege des Kinderbereichs bleiben auf dem Handy eine Zeile. */
 @media(max-width:680px) {
- [data-ui-area="child"] .simple-header .simple-nav {
-  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
- }
- [data-ui-area="child"] .simple-nav a:last-child:nth-child(odd) {grid-column:1 / -1;}
+  [data-ui-area="child"] .simple-header .simple-nav {
+    display: flex; flex-wrap: nowrap; gap: .25rem; overflow-x: auto;
+    scrollbar-width: none;
+  }
+  [data-ui-area="child"] .simple-header .simple-nav::-webkit-scrollbar { display: none; }
+  [data-ui-area="child"] .simple-nav a {
+    flex: none; min-height: 38px; padding: .3rem .6rem; font-size: .84rem;
+    white-space: nowrap;
+  }
+  [data-ui-area="child"] .simple-nav a.plans-entry { padding-left: .6rem; }
+  [data-ui-area="child"] .simple-nav a.plans-entry img { display: none; }
 }
 
 
@@ -447,5 +447,14 @@
   [data-ui-area="child"] :is(button,.btn) {
     transition: none !important;
     transform: none !important;
+  }
+}
+
+/* Auf schmalen Handys passen die fuenf Wege nur knapp: enger gesetzt, damit
+   "Erfolge" nicht hinter dem Rand liegt und niemand schieben muss. */
+@media(max-width:430px) {
+  [data-ui-area="child"] .simple-header .simple-nav { gap: .15rem; }
+  [data-ui-area="child"] .simple-nav a {
+    padding: .3rem .42rem; font-size: .78rem;
   }
 }

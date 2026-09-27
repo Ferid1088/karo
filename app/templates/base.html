@@ -74,8 +74,15 @@
     <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>
     {% endif %}
   </nav>
-  {% if adult_page %}<a class="parent-link area-switch" href="/">Zum Kinderbereich <span aria-hidden="true">→</span></a>
-  {% elif role != 'child' %}<a class="parent-link area-switch" href="/eltern">Für Eltern <span aria-hidden="true">→</span></a>{% endif %}
+  {# Hilfe und Abmelden standen unten in der Fusszeile, wo sie zwischen
+     Motto und Rand niemandem halfen. Oben klein daneben: die Hilfe als
+     Fragezeichen, das Abmelden als leise Schrift. #}
+  <div class="kopf-werkzeuge">
+    {% if adult_page %}<a class="parent-link area-switch" href="/">Zum Kinderbereich <span aria-hidden="true">→</span></a>
+    {% elif role != 'child' %}<a class="parent-link area-switch" href="/eltern">Für Eltern <span aria-hidden="true">→</span></a>{% endif %}
+    <a class="kopf-hilfe" href="/hilfe" title="{{ 'Hilfe & Anleitung' if adult_page else 'Brauchst du Hilfe?' }}" aria-label="{{ 'Hilfe & Anleitung' if adult_page else 'Brauchst du Hilfe?' }}">?</a>
+    {% if request.session.get('auth') %}<form method="post" action="/logout" class="kopf-abmelden">{{ csrf_input() }}<button type="submit" class="linklike">Abmelden</button></form>{% endif %}
+  </div>
 </header>
 
 {% set unterpunkte = [] %}
@@ -115,7 +122,7 @@
 </main>
 
 {% if show_nav|default(true) %}
-<footer class="simple-footer"><a href="/hilfe">{{ 'Hilfe & Anleitung' if adult_page else 'Brauchst du Hilfe?' }}</a><span>{{ 'Vorbereiten. Begleiten. Fortschritte sehen.' if adult_page else 'Ein Schritt nach dem anderen.' }}</span>{% if request.session.get('auth') %}<form method="post" action="/logout" class="footer-logout">{{ csrf_input() }}<button type="submit" class="ghost">Abmelden</button></form>{% endif %}</footer>
+<footer class="simple-footer"><span>{{ 'Vorbereiten. Begleiten. Fortschritte sehen.' if adult_page else 'Ein Schritt nach dem anderen.' }}</span></footer>
 <script>
 // Reiter oben: bedient jede Seite, die das .tabs/.tab-panel-Muster benutzt
 // (Uebersicht, Themen, Recherche, ...) — ein Skript fuer alle, statt eines

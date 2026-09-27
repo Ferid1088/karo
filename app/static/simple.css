@@ -106,8 +106,12 @@ code, dd { overflow-wrap: anywhere; }
 @media (max-width: 680px) {
   .simple-header { flex-wrap: wrap; padding: .65rem 1rem; gap: .4rem 1rem; }
   .simple-header .brand { flex: 1; }
-  .simple-header .simple-nav { order: 3; flex-basis: 100%; justify-content: stretch; gap: .3rem; }
-  .simple-nav a { flex: 1; }
+  .simple-header .simple-nav { order: 3; flex-basis: 100%; flex-wrap: nowrap;
+    justify-content: flex-start; gap: .3rem; overflow-x: auto;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .simple-header .simple-nav::-webkit-scrollbar { display: none; }
+  .simple-nav a { flex: none; min-height: 42px; padding: .45rem .8rem;
+    white-space: nowrap; font-size: .92rem; }
   main.simple-main { width: calc(100% - 2rem); padding-top: 1.5rem; }
   .choice-grid { grid-template-columns: 1fr; }
   .next-step { padding: 1.3rem; gap: .85rem; }

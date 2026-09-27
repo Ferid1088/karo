@@ -672,3 +672,16 @@ pre { background: var(--code-bg, var(--surface-2)); border: 1px solid var(--bord
   font-size: 0.9rem; font-weight: 700; text-decoration: none; }
 .sub-nav a:hover { background: var(--surface); color: var(--text); }
 .sub-nav a[aria-current] { background: var(--ink); color: #fff; }
+
+/* Hilfe und Abmelden oben, klein, neben dem Bereichswechsel. */
+.kopf-werkzeuge { display: flex; align-items: center; gap: 0.6rem; margin-left: auto; }
+.kopf-werkzeuge .parent-link { margin-left: 0; }
+.kopf-hilfe { display: grid; place-items: center; width: 24px; height: 24px; flex: none;
+  border-radius: 50%; background: var(--surface-2); color: var(--muted);
+  font-size: 0.82rem; font-weight: 800; text-decoration: none; }
+.kopf-hilfe:hover { background: var(--ink); color: #fff; }
+.kopf-abmelden { margin: 0; }
+.kopf-abmelden button { padding: 0; min-height: 0; font-size: 0.78rem; font-weight: 700;
+  color: var(--faint); }
+.kopf-abmelden button:hover { color: var(--text); text-decoration: underline; }
+.simple-footer { justify-content: center; }
