@@ -38,3 +38,10 @@
 .themen-knoepfe{display:flex;flex-wrap:wrap;gap:.5rem}
 .learn-zweit-action{display:inline-flex;align-items:center;padding:.78rem 1rem;border:2px solid #c9dcfb;border-radius:13px;background:#fff;color:var(--learn-blue);font-weight:800;text-decoration:none}
 .learn-zweit-action:hover{background:var(--learn-blue-soft)}
+
+.topic-tile-weg{margin:.35rem 0 0;text-align:right}
+.topic-tile-weg button{font-size:.78rem;color:#8496b3}
+.topic-tile-weg button:hover{color:#c62033;text-decoration:underline}
+.exam-weg{margin:.2rem 0 0;text-align:center}
+.exam-weg button{font-size:.78rem;color:#8496b3}
+.exam-weg button:hover{color:#c62033;text-decoration:underline}

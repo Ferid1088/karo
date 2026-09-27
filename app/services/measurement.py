@@ -28,8 +28,10 @@ from ..routers.shared import flash, render, zurueck
 def render_lernstand(request: Request):
     cfg = config.load_safe()
     zeilen = export.lernstand_zeilen()
+    from .learning_hub import archiv_themen, archiv_arbeiten
     return render(request, "lernstand.html",
                   zeilen=zeilen, erfolge=[t for t in zeilen if t.get('learned_at')],
+                  archiv_themen=archiv_themen(), archiv_arbeiten=archiv_arbeiten(),
                   full_progress=request.url.path.startswith('/messung'),
                   adult_page=request.url.path.startswith('/messung'),
                   verlauf=export.verlauf_zeilen(limit=200),
@@ -103,8 +105,9 @@ def _exam_ansicht(e: dict) -> dict:
 def render_klassenarbeit(request: Request, monat: str = ""):
     from .. import exam_plan
     from . import exam_calendar
+    # Geloeschte Arbeiten stehen im Archiv unter "Erfolge".
     zeilen = [_exam_ansicht(dict(r)) for r in db.q(
-        "SELECT * FROM exam ORDER BY exam_date DESC LIMIT 20")]
+        "SELECT * FROM exam WHERE deleted_at IS NULL ORDER BY exam_date DESC LIMIT 20")]
     template = "klassenarbeit_kind.html" if config.load_safe().klassenarbeit_kind else "klassenarbeit.html"
     return render(request, template, zeilen=zeilen,
                   adult_page=not config.load().klassenarbeit_kind,

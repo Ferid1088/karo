@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Request, Form, UploadFile
 from fastapi.responses import HTMLResponse
 
-from .. import config, db, jobs, kb, quizzes
+from .. import config, db, jobs, kb, quizzes, topics
 from ..services import exam, exam_calendar, workflow
 from .shared import render, flash, zurueck
 from ..woche.pilot_store import parent_summary
@@ -17,6 +17,7 @@ def dashboard(request: Request):
     personal = learning_hub.personal_topics()
     next_topic = next((t for t in personal if t['learning_status'] == 'bearbeitung'), None)
     next_topic = next_topic or next((t for t in personal if t['learning_status'] == 'neu'), None)
+    gelernt = [t for t in learning_hub.archiv_themen() if not t['gelöscht']]
     themen, schritte, reviews = workflow.offene_schritte()
     # Heute zeigt den Kind-Bereich, auch wenn Eltern gerade mitlesen.
     aktion = workflow.get_next_action(
@@ -27,8 +28,9 @@ def dashboard(request: Request):
                   hat_erfolge=bool(db.q1("SELECT id FROM topic WHERE state='aktiv' AND learned_at IS NOT NULL LIMIT 1")),
                   themen=themen, kb_stat=kb.statistik(), exam=exam.get_next_exam(),
                   exam_today=exam_calendar.today_task() if config.load().klassenarbeit_kind else None,
-                  next_topic=next_topic, personal_count=len(personal),
-                  safe_count=sum(t['learning_status'] == 'sicher' for t in personal))
+                  next_topic=next_topic,
+                  personal_count=len(personal) + len(gelernt),
+                  safe_count=len(gelernt))
 
 
 @router.get('/lernen/neu', response_class=HTMLResponse)
@@ -47,6 +49,46 @@ def thema_anlegen(request: Request, thema: str = Form(''), fach: str = Form(''),
         return zurueck('/lernen/neu')
     flash(request, 'Dein Thema ist da. Los geht’s, wenn du bereit bist.')
     return zurueck('/lernen')
+
+
+@router.post('/lernen/{topic_id}/loeschen')
+def thema_loeschen(request: Request, topic_id: int):
+    """Aus der Themenliste nehmen. Es landet im Archiv unter "Erfolge" und
+    kann von dort zurueckgeholt werden — nichts geht verloren."""
+    from ..services import learning_hub
+    learning_hub.thema_loeschen(topic_id)
+    flash(request, 'Das Thema liegt jetzt in deinen Erfolgen. Du kannst es dort zurückholen.')
+    return zurueck('/lernen')
+
+
+@router.post('/lernstand/thema/{topic_id}/zurueck')
+def thema_zurueck(request: Request, topic_id: int, erneut: str = Form('')):
+    from ..services import learning_hub
+    learning_hub.thema_zurueck(topic_id)
+    if erneut:
+        # Gleich weiterlernen: die Lernrunde startet die adaptive Schicht.
+        thema = topics.get(topic_id)
+        if thema:
+            flash(request, f'„{thema["label"]}" ist zurück. Los geht’s.')
+        return zurueck('/lernen')
+    flash(request, 'Das Thema ist zurück in deiner Liste.')
+    return zurueck('/lernstand')
+
+
+@router.post('/klassenarbeit/{exam_id}/loeschen')
+def arbeit_loeschen(request: Request, exam_id: int):
+    from ..services import learning_hub
+    learning_hub.arbeit_loeschen(exam_id)
+    flash(request, 'Die Klassenarbeit liegt jetzt in deinen Erfolgen.')
+    return zurueck('/klassenarbeit')
+
+
+@router.post('/lernstand/arbeit/{exam_id}/zurueck')
+def arbeit_zurueck(request: Request, exam_id: int):
+    from ..services import learning_hub
+    learning_hub.arbeit_zurueck(exam_id)
+    flash(request, 'Die Klassenarbeit ist zurück in deiner Liste.')
+    return zurueck('/klassenarbeit')
 
 
 @router.get('/lernen/material', response_class=HTMLResponse)

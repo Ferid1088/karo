@@ -68,7 +68,9 @@ def decorate(rows: list[dict]) -> list[dict]:
 
 
 def personal_topics() -> list[dict]:
-    return decorate([t for t in topics.liste(topics.AKTIV) if t.get('learning_visible', 1)])
+    return decorate([t for t in topics.liste(topics.AKTIV)
+                     if t.get('learning_visible', 1) and not t.get('deleted_at')
+                     and not t.get('learned_at')])
 
 
 def exam_topics(exam_id: int) -> list[dict]:
@@ -127,3 +129,63 @@ def monitor(heute: str = "") -> dict:
     return {"days": tage, "sessions_week": sum(sitzungen.values()),
             "days_learned": sum(1 for t in tage if t["state"] == "geschafft"),
             "topics": len(themen), **stand}
+
+
+# --------------------------------------------------------------------------
+# Archiv: was gelernt, geschrieben oder geloescht ist (siehe "Erfolge")
+# --------------------------------------------------------------------------
+
+def thema_loeschen(topic_id: int) -> None:
+    """Aus der Themenliste nehmen. Geloescht heisst hier: ins Archiv."""
+    with db.tx() as c:
+        c.execute("UPDATE topic SET deleted_at=? WHERE id=? AND deleted_at IS NULL",
+                  (db.now(), topic_id))
+
+
+def thema_zurueck(topic_id: int) -> None:
+    """Zurück zum Lernen: wieder in der Liste, ohne Haken, ohne Löschung."""
+    with db.tx() as c:
+        c.execute("""UPDATE topic SET deleted_at=NULL, learned_at=NULL,
+                            learning_visible=1 WHERE id=?""", (topic_id,))
+
+
+def archiv_themen() -> list[dict]:
+    """Eigene Themen im Archiv: abgehakt oder geloescht, Geloeschtes zuerst.
+
+    Nur eigene Lernthemen (learning_visible=1). Pruefungsthemen haben ihr
+    eigenes Archiv — die beiden Dinge bleiben getrennt.
+    """
+    zeilen = [dict(r) for r in db.q(
+        """SELECT * FROM topic
+            WHERE learning_visible = 1
+              AND (deleted_at IS NOT NULL OR learned_at IS NOT NULL)
+            ORDER BY COALESCE(deleted_at, learned_at) DESC""")]
+    for t in zeilen:
+        t["gelöscht"] = bool(t.get("deleted_at"))
+    return decorate(zeilen)
+
+
+def arbeit_loeschen(exam_id: int) -> None:
+    with db.tx() as c:
+        c.execute("UPDATE exam SET deleted_at=? WHERE id=? AND deleted_at IS NULL",
+                  (db.now(), exam_id))
+
+
+def arbeit_zurueck(exam_id: int) -> None:
+    with db.tx() as c:
+        c.execute("UPDATE exam SET deleted_at=NULL WHERE id=?", (exam_id,))
+
+
+def archiv_arbeiten() -> list[dict]:
+    """Klassenarbeiten im Archiv: geschrieben (Termin vorbei) oder geloescht."""
+    heute = db.today()
+    zeilen = [dict(r) for r in db.q(
+        """SELECT * FROM exam
+            WHERE deleted_at IS NOT NULL OR exam_date < ?
+            ORDER BY COALESCE(deleted_at, exam_date) DESC""", heute)]
+    for e in zeilen:
+        e["gelöscht"] = bool(e.get("deleted_at"))
+        themen = exam_topics(e["id"])
+        e["themen_zahl"] = len(themen)
+        e["sicher_zahl"] = sum(t["learning_status"] == "sicher" for t in themen)
+    return zeilen

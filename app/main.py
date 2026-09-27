@@ -75,7 +75,7 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
     if klassenarbeit_kind and (
         path in {"/klassenarbeit", "/klassenarbeit/neu", "/messung/examen",
                  "/klassenarbeit/themenblatt", "/klassenarbeit/themenblatt/status"}
-        or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|simulation(?:/[0-9]+)?))?", path)
+        or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|loeschen|simulation(?:/[0-9]+)?))?", path)
     ):
         return True
     if schulblaetter_kind and (
@@ -90,6 +90,8 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
     if not antworten_pruefen_kind and any(path.endswith(s) for s in CHILD_FORBIDDEN_SUFFIXES):
         return False
     if path in CHILD_ALLOWED_EXACT:
+        return True
+    if re.fullmatch(r"/lernstand/(?:thema|arbeit)/[0-9]+/zurueck", path):
         return True
     return any(path == p or path.startswith(p + "/")
               for p in CHILD_ALLOWED_PREFIXES)

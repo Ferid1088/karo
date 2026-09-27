@@ -30,6 +30,7 @@
       <h2>{{ t.label }}</h2>
       <p>{{ t.subject }}{% if t.grade %} · {{ t.grade }}. Klasse{% endif %}</p>
       <form method="post" action="{{ '/lernen/adaptiv/start' if cfg.adaptive_learning_enabled|default(false) else '/lernzyklus/' ~ t.id ~ '/quiz/starten' }}" class="topic-tile-action">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ t.id }}"><input type="hidden" name="thema" value="{{ t.label }}"><input type="hidden" name="modus" value="bildschirm"><button class="quiet" type="submit">{{ 'Weiterlernen' if t.learning_status == 'bearbeitung' else 'Noch einmal' if t.learning_status == 'sicher' else 'Starten' }} <span aria-hidden="true">→</span></button></form>
+      <form method="post" action="/lernen/{{ t.id }}/loeschen" class="topic-tile-weg">{{ csrf_input() }}<button class="linklike" type="submit" title="Ins Archiv unter Erfolge legen">weglegen</button></form>
     </article>
     {% else %}
     <section class="learn-empty"><img src="/static/karo-fox-star.png" alt="" width="96" height="96"><h2>{{ 'Nichts gefunden' if query or fach or status else 'Noch keine Lernkarte' }}</h2><p>{{ 'Ändere die Suche oder lege ein neues Thema an.' if query or fach or status else 'Starte mit einer Frage, die dich gerade interessiert.' }}</p><a class="learn-primary-action" href="/lernen/neu">Neues Thema</a></section>

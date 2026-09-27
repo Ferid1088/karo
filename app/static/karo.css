@@ -685,3 +685,18 @@ pre { background: var(--code-bg, var(--surface-2)); border: 1px solid var(--bord
   color: var(--faint); }
 .kopf-abmelden button:hover { color: var(--text); text-decoration: underline; }
 .simple-footer { justify-content: center; }
+
+/* Archiv unter "Erfolge": zwei getrennte Blöcke, Gelöschtes rot markiert. */
+.archiv-block{margin:0 0 1.6rem}
+.archiv-block h2{display:flex;align-items:center;gap:.5rem;margin:0 0 .6rem;color:var(--learn-ink);font-size:1.15rem}
+.archiv-zahl{display:grid;place-items:center;min-width:24px;height:22px;padding:0 .35rem;border-radius:999px;background:#e8eefb;color:#42597f;font-size:.78rem;font-weight:800}
+.archiv-liste{display:grid;gap:.5rem}
+.archiv-zeile{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;padding:.7rem .9rem;border:1px solid #e0e9f7;border-radius:14px;background:#fff}
+.archiv-zeile.ist-geloescht{border-color:#f1c2c9;background:#fffafb}
+.archiv-text{flex:1;min-width:12rem}
+.archiv-text h3{margin:0;color:var(--learn-ink);font-size:1.02rem}
+.archiv-text p{margin:.15rem 0 0;color:#6a80a1;font-size:.85rem}
+.geloescht-marke{color:#c62033;font-weight:800}
+.archiv-aktionen{display:flex;flex-wrap:wrap;gap:.4rem}
+.archiv-aktionen button,.archiv-aktionen .btn{min-height:38px;padding:.35rem .8rem;font-size:.85rem}
+.archiv-leer{color:#6a80a1;font-size:.9rem}

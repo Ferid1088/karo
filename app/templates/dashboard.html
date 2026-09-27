@@ -33,7 +33,7 @@
    dasselbe. #}
 <p class="fortschritt-zeile"><b>{{ safe_count }} von {{ personal_count }}</b> Themen sicher
   <span class="fortschritt-balken" aria-hidden="true"><i style="width:{{ (100 * safe_count / personal_count)|round|int if personal_count else 0 }}%"></i></span>
-  <a href="/lernen?status=sicher">sichere Themen ansehen</a></p>
+  <a href="/lernstand">deine Erfolge ansehen</a></p>
 
 {% if cfg.klassenarbeit_kind and exam %}
 <a class="heute-hinweis" href="/klassenarbeit">Klassenarbeit am {{ exam.exam_date|datum }} — in kleinen Schritten vorbereiten <span aria-hidden="true">→</span></a>

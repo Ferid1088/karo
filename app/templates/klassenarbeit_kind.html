@@ -23,6 +23,7 @@
         {% elif e.topics %}<p class="exam-done-note">Alle Themen sitzen. Schön.</p>
         {% else %}<a class="exam-start" href="/klassenarbeit/{{ e.id }}">Themen ansehen →</a>{% endif %}
         {% if e.simulation_available %}<a class="exam-secondary" href="/klassenarbeit/{{ e.id }}/simulation">Generalprobe starten →</a>{% endif %}
+        <form method="post" action="/klassenarbeit/{{ e.id }}/loeschen" class="exam-weg">{{ csrf_input() }}<button class="linklike" type="submit" title="Ins Archiv unter Erfolge legen">weglegen</button></form>
       </div>
     </article>
   {% else %}

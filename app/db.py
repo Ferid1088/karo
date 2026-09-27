@@ -143,6 +143,8 @@ _ADDED_COLUMNS = [
     ("quiz", "review_draft", "TEXT NOT NULL DEFAULT '{}'"),
     ("topic", "learning_started_at", "TEXT"),
     ("topic", "learned_at", "TEXT"),
+    ("topic", "deleted_at", "TEXT"),
+    ("exam", "deleted_at", "TEXT"),
     ("document", "rolle", "TEXT NOT NULL DEFAULT 'wissen'"),
     ("llm_call", "backend", "TEXT"),
     ("job", "not_before", "TEXT"),
