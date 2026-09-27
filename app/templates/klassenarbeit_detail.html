@@ -8,7 +8,7 @@
   <header class="exam-card-head">
     <span class="exam-icon" aria-hidden="true">{{ e.subject[:1]|upper }}</span>
     <div>
-      <h1>{{ e.subject }}</h1>
+      <h1><img class="pruefung-zeichen" src="/static/pruefung-symbol.svg" alt="" aria-hidden="true">{{ e.subject }}</h1>
       <p class="exam-when">{{ e.exam_date|datum }}{% if e.days_left >= 0 %} · noch {{ e.days_left }} Tage{% else %} · vorbei{% endif %}</p>
     </div>
     <span class="learn-status {{ 'sicher' if e.topics and e.mastered == e.topics|length else 'bearbeitung' }}">{{ e.mastered }} von {{ e.topics|length }} sicher</span>

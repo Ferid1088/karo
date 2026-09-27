@@ -3,7 +3,7 @@
 {% block content %}
 {% from '_exam_week.html' import exam_metrics %}
 {% from '_exam_monat.html' import exam_monat %}
-<section class="learn-hero"><div><p class="eyebrow">DEIN PRÜFUNGSPLAN</p><h1>Schritt für Schritt<br>zur Klassenarbeit</h1><p>Wann du für welche Arbeit lernst — und wie weit du bist.</p></div><img src="/static/karo-fox-star.png" width="170" alt=""></section>
+<section class="learn-hero"><div><p class="eyebrow">DEIN PRÜFUNGSPLAN</p><h1>Schritt für Schritt<br>zur Klassenarbeit</h1><p>Wann du für welche Arbeit lernst — und wie weit du bist.</p></div><img class="pruefung-bild" src="/static/pruefung-symbol.svg" width="150" height="150" alt=""></section>
 
 {{ exam_monat(kalender, weekday_labels) }}
 

@@ -714,3 +714,9 @@ pre { background: var(--code-bg, var(--surface-2)); border: 1px solid var(--bord
    und ohne Skript arbeitet) — sie sollen aber wie Reiter aussehen. */
 a.tab-btn { text-decoration: none; }
 a.tab-btn .archiv-zahl { margin-left: 0.3rem; min-width: 20px; height: 18px; font-size: 0.7rem; }
+
+/* Eigenes Prüfungs-Symbol (pruefung-symbol.svg) überall bei der
+   Klassenarbeit: im Reiter klein, im Seitenkopf groß, im Titel als Zeichen. */
+.sub-nav a.pruefung-tab { display: inline-flex; align-items: center; gap: 0.35rem; }
+.sub-nav a.pruefung-tab img { width: 18px; height: 18px; flex: none; }
+.pruefung-zeichen { width: 26px; height: 26px; vertical-align: -0.3rem; margin-right: 0.45rem; }
