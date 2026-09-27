@@ -18,20 +18,25 @@ def create_topic(label: str, subject: str = "", grade: int | None = None,
         raise ValueError("Beschreibe dein Thema bitte mit 1 bis 200 Zeichen.")
     if len(subject) > 80 or not 1 <= int(grade) <= 13:
         raise ValueError("Bitte ein Fach und eine Klasse von 1 bis 13 wählen.")
+    # Ein eigenes Lernthema und ein Prüfungsthema sind zwei Dinge, auch wenn
+    # sie gleich heissen: "Bruchrechnen" fuer die Arbeit am Freitag hat einen
+    # anderen Stand als "Bruchrechnen", das aus Neugier laeuft. Deshalb
+    # sucht ein Prüfungsthema nur unter Prüfungsthemen nach einem passenden
+    # Eintrag — und bekommt sonst seinen eigenen.
     existing = next((t for t in topics.liste(topics.AKTIV)
                      if t['label'].casefold() == label.casefold()
                      and t['subject'].casefold() == subject.casefold()
-                     and (t.get('grade') or cfg.learner_grade) == grade), None)
+                     and (t.get('grade') or cfg.learner_grade) == grade
+                     and bool(t.get('learning_visible', 1)) == personal), None)
+    if existing:
+        return existing['id']
+    key = hashlib.sha256(f'{subject.casefold()}:{grade}:{label.casefold()}'.encode()).hexdigest()[:16]
     with db.tx() as c:
-        if existing:
-            if personal:
-                c.execute('UPDATE topic SET learning_visible=1 WHERE id=?', (existing['id'],))
-            return existing['id']
-        key = hashlib.sha256(f'{subject.casefold()}:{grade}:{label.casefold()}'.encode()).hexdigest()[:16]
         return c.execute('''INSERT INTO topic
             (subject,code,label,state,sort,created_at,learning_visible,grade)
             VALUES(?,?,?,'aktiv',500,?,?,?)''',
-            (subject, 'LEARN.' + key, label, db.now(), int(personal), grade)).lastrowid
+            (subject, ('LEARN.' if personal else 'EXAM.') + key, label,
+             db.now(), int(personal), grade)).lastrowid
 
 
 def link_exam(exam_id: int, names: list[str], subject: str) -> None:
@@ -89,10 +94,15 @@ def monitor(heute: str = "") -> dict:
     montag = tag - dt.timedelta(days=tag.isoweekday() - 1)
     sonntag = montag + dt.timedelta(days=6)
 
+    # Nur eigene Lernthemen. Was fuer eine Klassenarbeit gelernt wird, zaehlt
+    # auf deren Seite — zwei getrennte Dinge, zwei getrennte Wochen.
     sitzungen = {zeile["tag"]: zeile["anzahl"] for zeile in db.q(
-        """SELECT substr(updated_at, 1, 10) AS tag, COUNT(*) AS anzahl
-             FROM lern_sitzung
-            WHERE substr(updated_at, 1, 10) BETWEEN ? AND ?
+        """SELECT substr(s.updated_at, 1, 10) AS tag, COUNT(*) AS anzahl
+             FROM lern_sitzung s
+             JOIN lern_eingabe e ON e.id = s.eingabe_id
+             JOIN topic t ON t.id = e.topic_id
+            WHERE substr(s.updated_at, 1, 10) BETWEEN ? AND ?
+              AND t.learning_visible = 1
             GROUP BY tag""", str(montag), str(sonntag))}
 
     tage = []

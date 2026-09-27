@@ -280,7 +280,8 @@ def woche(exam_id: int, heute: dt.date | None = None) -> dict:
     exam_day = dt.date.fromisoformat(_exam(exam_id)["exam_date"])
     geplant = {tag: int(minuten) for tag, minuten in get_days(exam_id).items()}
     probe = simulation_date(exam_id)
-    gelernt = _tage_mit_sitzung(str(montag), str(montag + dt.timedelta(days=6)))
+    gelernt = _tage_mit_sitzung(exam_id, str(montag),
+                                str(montag + dt.timedelta(days=6)))
 
     reihe = []
     for versatz in range(7):
@@ -318,12 +319,21 @@ def woche(exam_id: int, heute: dt.date | None = None) -> dict:
                                 str(exam_day))}
 
 
-def _tage_mit_sitzung(von: str, bis: str) -> set[str]:
-    """Tage, an denen tatsaechlich eine Lernsitzung lief."""
+def _tage_mit_sitzung(exam_id: int, von: str, bis: str) -> set[str]:
+    """Tage, an denen fuer DIESE Arbeit gelernt wurde.
+
+    Ohne die Einschraenkung auf ihre Themen faerbte auch eine Runde in einem
+    eigenen Lernthema den Prüfungstag gruen — die Karte behauptete dann einen
+    Lerntag, den es nicht gab.
+    """
     return {zeile["tag"] for zeile in db.q(
-        """SELECT DISTINCT substr(updated_at, 1, 10) AS tag
-             FROM lern_sitzung
-            WHERE substr(updated_at, 1, 10) BETWEEN ? AND ?""", von, bis)}
+        """SELECT DISTINCT substr(s.updated_at, 1, 10) AS tag
+             FROM lern_sitzung s
+             JOIN lern_eingabe e ON e.id = s.eingabe_id
+             JOIN exam_topic x ON x.topic_id = e.topic_id
+            WHERE x.exam_id = ?
+              AND substr(s.updated_at, 1, 10) BETWEEN ? AND ?""",
+        exam_id, von, bis)}
 
 
 def _zeitraum(start: str, ende: str) -> str:
