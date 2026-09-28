@@ -73,7 +73,7 @@
     <a class="learning-entry" href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/material')) }}><img src="/static/karo-owl-book.png" alt="" aria-hidden="true" width="28" height="28"><span>Lernen</span></a>
     <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>
     <a class="welten-entry zweite-gruppe" href="/welten" {{ 'aria-current=page' if path.startswith('/welten') }}><img src="/static/welt-biene.svg" alt="" aria-hidden="true"><span>Meine Welt</span></a>
-    <a class="plans-entry" href="/woche" {{ 'aria-current=page' if path.startswith('/woche') }}><img src="/static/karo-fox-wave.png" alt="" aria-hidden="true"><span>Ziele planen</span></a>
+    <a class="plans-entry" href="/woche/woche" {{ 'aria-current=page' if path.startswith('/woche') }}><img src="/static/karo-fox-wave.png" alt="" aria-hidden="true"><span>Ziele planen</span></a>
     {% endif %}
   </nav>
   {# Hilfe und Abmelden standen unten in der Fusszeile, wo sie zwischen
@@ -109,7 +109,7 @@
   {% set unterpunkte = [('/welten', 'Heute'), ('/welten/jahr', 'Mein Jahr'),
                         ('/welten/zeitkapseln', 'Zeitkapseln')] %}
 {% elif plans_page|default(false) %}
-  {% set unterpunkte = [('/woche', 'Heute'), ('/woche/woche', 'Woche'),
+  {% set unterpunkte = [('/woche/woche', 'Woche'),
                         ('/woche/monat', 'Monat'), ('/woche/ziele', 'Ziele'),
                         ('/woche/schatzkiste', 'Schatzkiste')] %}
 {% endif %}

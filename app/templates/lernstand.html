@@ -6,6 +6,10 @@
    traegt einen roten Hinweis, und ein Thema kann von hier zurueck. #}
 <h1>Deine Erfolge</h1>
 <p class="sub">Was du geschafft hast — und was du weggelegt hast. Nichts geht verloren.</p>
+{% if not adult_page and personal_count %}
+<p class="fortschritt-zeile"><b>{{ safe_count }} von {{ personal_count }}</b> Themen sicher
+  <span class="fortschritt-balken" aria-hidden="true"><i style="width:{{ (100 * safe_count / personal_count)|round|int }}%"></i></span></p>
+{% endif %}
 
 {% set reiter = 'arbeiten' if tab == 'arbeiten' else 'themen' %}
 <nav class="tabs" aria-label="Archiv">

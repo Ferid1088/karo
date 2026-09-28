@@ -28,10 +28,13 @@ from ..routers.shared import flash, render, zurueck
 def render_lernstand(request: Request):
     cfg = config.load_safe()
     zeilen = export.lernstand_zeilen()
-    from .learning_hub import archiv_themen, archiv_arbeiten
+    from .learning_hub import archiv_themen, archiv_arbeiten, personal_topics
+    archiv = archiv_themen()
+    sicher = sum(not t["gelöscht"] for t in archiv)
     return render(request, "lernstand.html",
+                  safe_count=sicher, personal_count=len(personal_topics()) + sicher,
                   zeilen=zeilen, erfolge=[t for t in zeilen if t.get('learned_at')],
-                  archiv_themen=archiv_themen(), archiv_arbeiten=archiv_arbeiten(),
+                  archiv_themen=archiv, archiv_arbeiten=archiv_arbeiten(),
                   nachfrage=request.query_params.get("weg", ""),
                   tab=request.query_params.get("tab", ""),
                   full_progress=request.url.path.startswith('/messung'),

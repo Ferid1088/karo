@@ -173,7 +173,16 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
     assert "Ziele planen" in dashboard.text
     assert 'class="plans-entry"' in dashboard.text
     assert '/static/karo-fox-wave.png' in dashboard.text
-    today = client.get("/woche")
+    # Der Tag steht auf "Heute": das Ziel ist der naechste Schritt und
+    # steht auf der Tagesliste. "Ziele planen" hat kein eigenes Heute mehr.
+    assert "Heute ist es eine kleine Sache, etwa 20 Minuten." in dashboard.text
+    assert "Ich möchte besser in Englisch werden." in dashboard.text
+    assert f'action="/woche/ziele/{goal_id}/start"' in dashboard.text
+    assert "Dienstag, 22. September" in dashboard.text
+    redirect = client.get("/woche", follow_redirects=False)
+    assert redirect.status_code == 303 and redirect.headers["location"] == "/woche/woche"
+    assert '>Heute</a>' not in client.get("/woche/woche").text.split('class="sub-nav"', 1)[1].split("</nav>", 1)[0]
+    today = client.get(f"/woche?abschluss={item['id']}")
     assert 'class="quick-edit"' in today.text
     assert 'class="quick-new"' in today.text
     assert 'class="quick-week"' not in today.text
@@ -184,7 +193,7 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
     assert today.text.index('class="quick-new"') < today.text.index('class="quick-edit"')
     assert today.text.index('class="quick-edit"') < today.text.index('class="plans-panel"', today.text.index('class="today-main"'))
     for path, text in [
-        ("/woche", "Deine Aufgaben heute"), ("/woche/woche", "Wochenfortschritt"),
+        (f"/woche?abschluss={item['id']}", "Deine Aufgaben heute"), ("/woche/woche", "Wochenfortschritt"),
         ("/woche/monat", "Monatsfortschritt"), ("/woche/ziele", "Alle Ziele"),
         (f"/woche/ziele/{goal_id}", "Bis zum Ziel"), ("/woche/schatzkiste", "Schatzkiste"),
         ("/woche/ziele/neu", "Was möchtest du schaffen?"),
@@ -194,7 +203,7 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
         assert text in response.text
 
     for path, marker in [
-        ("/woche", 'data-progress-set="gesamt"'),
+        (f"/woche?abschluss={item['id']}", 'data-progress-set="gesamt"'),
         ("/woche/woche", 'data-progress-set="woche"'),
         ("/woche/monat", 'data-progress-set="monat"'),
         ("/woche/ziele", 'data-progress-set="gesamt"'),
@@ -240,7 +249,7 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
     october = client.get(f"/woche/ziele/{goal_id}?month=2026-10")
     assert 'aria-label="Lernkalender Oktober 2026"' in october.text
     assert client.get(f"/woche/ziele/{goal_id}?month=ungueltig").status_code == 400
-    for path in ("/woche", "/woche/woche", "/woche/monat", "/woche/ziele", f"/woche/ziele/{goal_id}"):
+    for path in ("/", "/woche/woche", "/woche/monat", "/woche/ziele", f"/woche/ziele/{goal_id}"):
         assert f'action="/woche/ziele/{goal_id}/start"' in client.get(path).text
 
     start_source = client.get("/woche/ziele")
@@ -256,8 +265,12 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
     response = client.post(f"/woche/sitzung/{item['id']}/abschluss", data={
         "_csrf": csrf_from(page.text), "actual_minutes": "27", "focus_percent": "80"}, follow_redirects=False)
     assert response.status_code == 303
+    assert response.headers["location"] == "/"
     completed = store.session(item["id"])
     assert completed["actual_minutes"] == 27 and completed["focus_percent"] == 80
+    done_today = client.get("/").text
+    assert "Für heute geschafft!" in done_today
+    assert 'href="/welten"' in done_today
 
 
 def test_parent_completion_stays_on_karo_page_with_role_notice(client, app_env, fake_llm, fake_cli, monkeypatch):

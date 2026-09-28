@@ -226,6 +226,17 @@ def capsules() -> list[dict]:
            ORDER BY opens_on,id""", CHILD_KEY)]
 
 
+def capsules_opening_today() -> list[dict]:
+    """Kapseln, deren Tag heute ist und die noch niemand geoeffnet hat.
+
+    Nur Kennung und Titel: "Heute" zeigt einen Hinweis, nie den Inhalt.
+    """
+    return [dict(row) for row in world_db.q(
+        """SELECT id,title FROM world_capsule
+           WHERE child_key=? AND opens_on=? AND opened_at IS NULL
+           ORDER BY id""", CHILD_KEY, world_db.today())]
+
+
 def capsule_is_open(item: dict) -> bool:
     return str(item["opens_on"]) <= world_db.today()
 

@@ -10,12 +10,14 @@ def test_school_material_moves_between_sections(client, fake_llm, fake_cli, app_
     for enabled in (False, True, False):
         app_env.config.update(schulblaetter_kind=enabled)
         assert ('<h2>Schulblätter</h2>' in client.get('/eltern').text) is not enabled
-        for path in ('/', '/lernen?status=neu', '/lernzyklus?status=neu'):
+        # "Heute" bleibt beim Tag; die Schulblätter stehen unter Lernen.
+        assert '<h2>Schulblätter</h2>' not in client.get('/').text
+        for path in ('/lernen?status=neu', '/lernzyklus?status=neu'):
             assert ('<h2>Schulblätter</h2>' in client.get(path).text) is enabled
     kind_modus_aktivieren(client)
     assert 'href="/wissen"' not in client.get('/').text
     app_env.config.update(schulblaetter_kind=True)
-    for path in ('/', '/lernen?status=neu', '/lernzyklus?status=neu'):
+    for path in ('/lernen?status=neu', '/lernzyklus?status=neu'):
         assert 'href="/wissen"' in client.get(path).text
 
 

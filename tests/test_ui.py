@@ -174,7 +174,7 @@ def test_child_navigation_includes_week_and_parent_features_remain(client, fake_
     einrichten(client, fake_llm)
     page = client.get('/')
     nav = re.search(r'<nav class="simple-nav".*?</nav>', page.text, re.S).group()
-    assert re.findall(r'href="([^"]+)"', nav) == ['/', '/lernen', '/lernstand', '/welten', '/woche']
+    assert re.findall(r'href="([^"]+)"', nav) == ['/', '/lernen', '/lernstand', '/welten', '/woche/woche']
     assert 'verbindung-popup-slot' not in page.text
     parent = client.get('/eltern').text
     for path in ('/wissen', '/themen', '/klassenarbeit', '/messung/fortschritt#ausfuehrlich', '/recherche', '/setup', '/protokoll', '/hilfe'):

@@ -3,24 +3,54 @@
 /* Lernplatz 2.0: one calm decision at a time. */
 .learning-ui{--learn-ink:#20345d;--learn-blue:#356ff2;--learn-blue-soft:#eef4ff;--learn-green:#22a66f;background:#f8fbff}.learn-dashboard{margin:0 auto;padding-bottom:3rem}.learn-welcome{display:flex;align-items:center;justify-content:space-between;gap:2rem;padding:2.25rem 2.6rem;margin:.4rem 0 1.2rem;border:1px solid #d9e6f7;border-radius:30px;background:linear-gradient(125deg,#eef6ff 0%,#fff 72%);box-shadow:0 12px 34px rgba(38,82,150,.08);overflow:hidden}.learn-welcome h1{margin:.35rem 0 .65rem;color:var(--learn-ink);font-size:clamp(2.1rem,5vw,4rem);line-height:1.03;letter-spacing:-.04em}.learn-welcome h1 span{color:var(--learn-blue)}.learn-welcome img{align-self:flex-end;filter:drop-shadow(0 12px 6px rgba(50,95,170,.12))}.learn-lead{max-width:36rem;color:#58708f;font-size:1.05rem}.learn-stats{display:flex;gap:1.2rem;margin-top:1.15rem;color:#5a7190;font-size:.88rem}.learn-stats b{color:var(--learn-ink);font-size:1.25rem;margin-right:.25rem}.learn-next-card{display:flex;align-items:center;gap:1rem;padding:1.1rem 1.25rem;margin-bottom:1.1rem;border:2px solid #b9d0ff;border-radius:22px;background:#fff;box-shadow:0 6px 0 #dce8ff}.learn-next-icon{width:48px;height:48px;display:grid;place-items:center;border-radius:16px;background:#e3edff;color:var(--learn-blue);font-size:1.6rem;font-weight:800}.learn-next-copy{flex:1}.learn-next-copy h2{margin:.1rem 0;color:var(--learn-ink);font-size:1.35rem}.learn-next-copy p:last-child{margin:0;color:#607792}.learn-primary-action{display:inline-flex;align-items:center;justify-content:center;gap:.55rem;border:0;border-radius:13px;padding:.78rem 1rem;background:var(--learn-blue);color:#fff;font-weight:800;text-decoration:none;cursor:pointer;white-space:nowrap;transition:transform .18s ease,box-shadow .18s ease}.learn-primary-action:hover{transform:translateY(-2px);box-shadow:0 5px 12px rgba(53,111,242,.25)}.learn-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin:1.2rem 0 2.3rem}.learn-actions a{display:flex;align-items:center;gap:.7rem;padding:.85rem 1rem;border:1px solid #dce6f4;border-radius:17px;background:#fff;color:var(--learn-ink);text-decoration:none;transition:border-color .18s ease,transform .18s ease}.learn-actions a:hover{border-color:#9ebaff;transform:translateY(-2px)}.learn-actions b,.learn-actions small{display:block}.learn-actions small{margin-top:.15rem;color:#71849d}.learn-action-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:var(--learn-blue-soft);color:var(--learn-blue);font-size:1.35rem;font-weight:700}.learn-section-heading{display:flex;align-items:end;justify-content:space-between;margin-bottom:.8rem}.learn-section-heading h2{margin:.15rem 0;color:var(--learn-ink)}.learn-count{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#e5efff;color:var(--learn-blue);font-weight:800}.learn-filter-drawer{margin-bottom:1rem;border-bottom:1px solid #dce6f2}.learn-filter-drawer summary{padding:.6rem 0;color:#55708f;font-weight:700;cursor:pointer}.learn-filter-drawer .learn-filters{padding:.6rem 0}.learn-filter-drawer input,.learn-filter-drawer select{min-height:42px}.topic-tile{min-height:220px;border:1px solid #dce6f4;border-radius:20px;box-shadow:0 4px 0 rgba(205,220,240,.7);transition:transform .18s ease,box-shadow .18s ease}.topic-tile:hover{transform:translateY(-3px);box-shadow:0 8px 0 rgba(205,220,240,.7)}.topic-tile-top{display:flex;justify-content:space-between;align-items:center}.topic-tile h3{margin:.85rem 0 .15rem;color:var(--learn-ink);font-size:1.2rem}.topic-tile-action{margin-top:auto;padding-top:1.1rem}.topic-tile-action button{width:100%;border:0;border-radius:11px;padding:.65rem .8rem;background:var(--learn-blue-soft);color:var(--learn-blue);box-shadow:none;font-weight:800;text-align:left;cursor:pointer}.topic-tile-action button:hover{background:#eaf1ff}.learn-empty{background:#fff}.learn-empty .learn-primary-action{margin-top:.7rem}@media(max-width:700px){.learn-welcome{padding:1.5rem;gap:.4rem}.learn-welcome img{width:112px;height:112px}.learn-actions{grid-template-columns:1fr}.learn-next-card{align-items:flex-start;flex-wrap:wrap}.learn-next-card form,.learn-next-card>a{width:100%}.learn-primary-action{width:100%}.learn-stats{gap:.7rem;flex-wrap:wrap}}
 
-/* "Heute": Gruss, eine Karte, eine Zeile Fortschritt. Die fruehere
-   Hero-Karte samt zweitem Fuchs und die Fortschrittskarte daneben sagten
-   dasselbe in viel mehr Flaeche. */
-.heute-gruss{display:flex;align-items:center;gap:.7rem;margin:.6rem 0 1rem;color:#4a628a;font-size:1.05rem}
-.heute-gruss b{color:var(--learn-ink);font-size:1.35rem}
-.heute-gruss img{flex:none}
+/* "Heute": der Tag des Kindes. Kopf mit Datum und einem Satz zum Stand,
+   eine Karte "Jetzt", die Liste des Tages und ein paar kleine Erfolge. */
+.heute-kopf{display:flex;align-items:center;gap:.9rem;margin:.6rem 0 1rem}
+.heute-kopf img{flex:none;border-radius:50%;object-fit:cover}
+.heute-datum{margin:0;color:#6a80a1;font-size:.9rem;font-weight:700}
+.heute-hallo{margin:.05rem 0;color:var(--learn-ink);font-size:clamp(1.6rem,4vw,2.2rem);line-height:1.1}
+.heute-satz{margin:0;color:#4a628a;font-size:1.05rem}
 .schritt-karte{padding:1.6rem 1.8rem;border:2px solid #c7dbf6;border-radius:24px;background:linear-gradient(120deg,#eef6ff,#fff 70%)}
-.schritt-karte h1{margin:.3rem 0 .4rem;color:var(--learn-ink);font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.1}
+.schritt-karte h2{margin:.3rem 0 .4rem;color:var(--learn-ink);font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.1}
 .schritt-karte p{color:#58708f}
 .schritt-karte .learn-status{margin-bottom:.2rem}
 .schritt-karte form{margin:1rem 0 .4rem}
 .schritt-karte .subtle-link{color:#4a76c4;font-weight:700}
-.fortschritt-zeile{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin:1rem 0;color:#58708f;font-size:.95rem}
-.fortschritt-zeile b{color:var(--learn-ink)}
-.fortschritt-balken{flex:1;min-width:8rem;max-width:22rem;height:8px;border-radius:999px;background:#e3ecfa;overflow:hidden}
-.fortschritt-balken i{display:block;height:100%;border-radius:999px;background:var(--learn-green)}
-.heute-hinweis{display:inline-block;padding:.7rem 1.1rem;border-radius:14px;background:#fff7e3;color:#8a5a00;font-weight:700;text-decoration:none}
-.heute-hinweis:hover{background:#ffeec9}
+.schritt-karte.ist-fertig{border-color:#9fdcbc;background:linear-gradient(120deg,#eafbf2,#fff 70%)}
+.fertig-inhalt{display:flex;align-items:center;gap:1.2rem}
+.fertig-inhalt img{flex:none}
+.tagesplan{margin-top:1rem;padding:1.2rem 1.4rem;border:1px solid #dce6f4;border-radius:22px;background:#fff}
+.tagesplan header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.6rem}
+.tagesplan h2{margin:0;color:var(--learn-ink);font-size:1.15rem}
+.tagesring{display:grid;place-items:center;width:54px;height:54px;border-radius:50%;background:conic-gradient(var(--learn-green) calc(var(--anteil)*1%),#e3ecfa 0)}
+.tagesring b{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:#fff;color:var(--learn-ink);font-size:.85rem}
+.tagesplan ul{list-style:none;margin:0;padding:0;display:grid;gap:.4rem}
+.tagesplan li{border-radius:14px;background:#f6f9fe}
+.plan-zeile{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border-radius:inherit;color:inherit;text-decoration:none}
+a.plan-zeile{cursor:pointer;transition:background .15s ease,box-shadow .15s ease}
+a.plan-zeile:hover,a.plan-zeile:focus-visible{background:#fff;box-shadow:inset 0 0 0 1px #c9d9f5}
+a.plan-zeile:focus-visible{outline:3px solid var(--learn-blue);outline-offset:2px}
+.plan-waehlen{color:var(--learn-blue);font-weight:800;font-size:.88rem;white-space:nowrap}
+.tagesplan li.dran{background:#eef4ff;box-shadow:inset 0 0 0 2px #b9d0ff}
+.tagesplan li.erledigt{background:#effaf4}
+
+.tagesplan li.erledigt .plan-text{color:#58708f;text-decoration:line-through;text-decoration-color:#9fdcbc}
+.plan-haken{display:grid;place-items:center;width:26px;height:26px;flex:none;border-radius:50%;background:#fff;color:var(--learn-blue);font-weight:800}
+.erledigt .plan-haken{background:var(--learn-green);color:#fff}
+.plan-titel{flex:1;color:var(--learn-ink);font-weight:700}
+.plan-titel small{display:block;color:#71849d;font-weight:500}
+.plan-minuten{color:#58708f;font-size:.9rem;white-space:nowrap}
+.heute-chips{list-style:none;display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0;padding:0}
+.heute-chips li{padding:.5rem .85rem;border-radius:999px;background:#fff;border:1px solid #dce6f4;color:#4a628a;font-size:.92rem}
+.heute-chips a{color:inherit;text-decoration:none}
+.heute-chips li:has(a):hover{border-color:#9ebaff}
+.heute-chips b{color:var(--learn-ink)}
+.heute-chips .chip-serie{background:#fff4e5;border-color:#ffd9a3}
+.heute-chips .chip-kapsel{background:#f4efff;border-color:#d9c9ff}
+.heute-chips .chip-kapsel a{display:flex;align-items:center;gap:.5rem}
+.heute-chips .chip-kapsel img{flex:none}
+.heute-chips .chip-arbeit{background:#fff7e3;border-color:#ffe2a3}
+@media(max-width:700px){.plan-waehlen-text{display:none}.schritt-karte{padding:1.2rem}.fertig-inhalt{flex-direction:column;align-items:flex-start}.fertig-inhalt img{width:72px;height:72px}}
 
 /* "Lernen": Kopf, Filter, Karten. Ohne Hero, ohne Aktionskacheln — die
    stehen in der Unterzeile. */

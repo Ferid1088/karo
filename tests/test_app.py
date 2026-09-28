@@ -638,7 +638,7 @@ def test_heute_schlaegt_ein_bestaetigtes_thema_zum_start_vor(
     blatt_einlesen(client, fake_llm, app_env)
     topic_id = themen_freigeben(client, app_env)[0]
     r = client.get("/")
-    assert "DEIN NÄCHSTER SCHRITT" in r.text
+    assert "JETZT" in r.text
     assert f'action="/lernzyklus/{topic_id}/quiz/starten"' in r.text
     assert "Los geht" in r.text
 

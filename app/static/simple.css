@@ -348,3 +348,9 @@ main.settings-page { max-width: 880px; }
 @media (max-width: 760px) {
   .exam-learning-steps { grid-template-columns: 1fr; }
 }
+
+/* Erfolge: wie viele eigene Themen schon sicher sind, in einer Zeile. */
+.fortschritt-zeile{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin:.4rem 0 1rem;color:#58708f;font-size:.95rem}
+.fortschritt-zeile b{color:#20345d}
+.fortschritt-balken{flex:1;min-width:8rem;max-width:22rem;height:8px;border-radius:999px;background:#e3ecfa;overflow:hidden}
+.fortschritt-balken i{display:block;height:100%;border-radius:999px;background:#22a66f}

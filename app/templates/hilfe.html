@@ -36,7 +36,7 @@
     <table class="hilfe-tabelle">
       <thead><tr><th>Aufgabe</th><th>Wo?</th><th>Ergebnis</th></tr></thead>
       <tbody>
-        <tr><td>Neues Blatt hinzufügen</td><td>{{ 'Heute oder Lernen → Schulblätter' if cfg.schulblaetter_kind else 'Für Eltern → Schulblätter' }}</td><td>Erklärungen, Regeln und Aufgaben werden erkannt. Unter Einstellungen &gt; Schulblätter und Speicherort können Eltern „Schulblätter“ beim Kind anzeigen aktivieren.</td></tr>
+        <tr><td>Neues Blatt hinzufügen</td><td>{{ 'Lernen → Schulblätter' if cfg.schulblaetter_kind else 'Für Eltern → Schulblätter' }}</td><td>Erklärungen, Regeln und Aufgaben werden erkannt. Unter Einstellungen &gt; Schulblätter und Speicherort können Eltern „Schulblätter“ beim Kind anzeigen aktivieren.</td></tr>
         <tr><td>Themen prüfen</td><td>Für Eltern &gt; Themen</td><td>Nur freigegebene Themen erscheinen im Lernbereich.</td></tr>
         <tr><td>Antworten freigeben</td><td>{{ 'Heute oder Lernen &gt; Antworten prüfen' if cfg.antworten_pruefen_kind else 'Für Eltern &gt; Antworten prüfen' }}</td><td>Erst nach der Bestätigung fließt eine Antwort in die Flagge ein. Unter Einstellungen &gt; Lernen und Internetquellen entscheiden Eltern mit der Checkbox „Antworten prüfen“ beim Kind anzeigen, wer prüft.</td></tr>
         <tr><td>Lernstand ansehen</td><td>Lernstand</td><td>Status und Antworten je Thema werden verständlich zusammengefasst.</td></tr>

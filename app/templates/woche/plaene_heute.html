@@ -29,7 +29,7 @@
 </div></div>
 
 {% if selected_session %}<div class="modal-backdrop" data-modal><section class="completion-modal" role="dialog" aria-modal="true" aria-labelledby="finish-title">
-  <a class="modal-close" href="/woche" aria-label="Schließen">×</a><img src="/static/karo-fox-cheer.png" alt="" class="modal-fox">
+  <a class="modal-close" href="/" aria-label="Schließen">×</a><img src="/static/karo-fox-cheer.png" alt="" class="modal-fox">
   <h2 id="finish-title">Einheit abschließen</h2><p class="lead">Trag ein, wie lange du gerade daran gearbeitet hast.</p>
   {% if selected_session.entry_count %}<p class="lead again">Heute schon geschafft: <b>{{ selected_session.actual_minutes }} Minuten</b> in {{ selected_session.entry_count }} Abschnitt{{ 'en' if selected_session.entry_count > 1 }}. Dieser Abschnitt kommt dazu.</p>{% endif %}
   <div class="selected-goal"><span class="subject-icon">{{ selected_session.statement[:1]|upper }}</span><div><b>{{ selected_session.statement }}</b><small>Geplant: {{ selected_session.planned_minutes }} Minuten</small></div></div>
@@ -49,7 +49,7 @@
       {% endfor %}
     </div>
     <div class="range-labels"><span>wenig</span><span>okay</span><span>sehr konzentriert</span></div>
-    <div class="modal-actions"><a class="outline-btn" href="/woche">Abbrechen</a><button class="plan-btn" type="submit">✓ Speichern</button></div>
+    <div class="modal-actions"><a class="outline-btn" href="/">Abbrechen</a><button class="plan-btn" type="submit">✓ Speichern</button></div>
   </form>
 </section></div>{% endif %}
 {% if selected_session and role != 'child' %}

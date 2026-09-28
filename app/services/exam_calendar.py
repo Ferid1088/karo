@@ -272,6 +272,21 @@ def _tage_mit_sitzung(exam_id: int, von: str, bis: str) -> set[str]:
         exam_id, von, bis)}
 
 
+def learned_on(exam_id: int, day: str) -> bool:
+    """Ob an ``day`` fuer diese Arbeit gelernt wurde — fuer die Tagesliste."""
+    return day in _tage_mit_sitzung(exam_id, day, day)
+
+
+def rehearsal_done(exam_id: int) -> bool:
+    """Die Generalprobe ist durch, wenn mindestens ein Thema abgeschlossen
+    und keines mehr halb bearbeitet ist."""
+    from . import exam_rehearsal
+    exam_rehearsal.init()
+    row = db.q1("""SELECT SUM(finished_at IS NOT NULL) AS fertig, SUM(finished_at IS NULL) AS offen
+                     FROM exam_rehearsal WHERE exam_id=?""", exam_id)
+    return bool(row and row["fertig"] and not row["offen"])
+
+
 def _zeitraum(start: str, ende: str) -> str:
     """Zeitraum in deutscher Schreibweise — wie `woche/plaene.period_label`."""
     teile = [dt.date.fromisoformat(w).strftime("%d.%m.%Y") for w in (start, ende) if w]

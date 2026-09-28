@@ -1,46 +1,102 @@
 {% extends 'learning_base.html' %}
 {% block title %}Heute – {{ companion_name }}{% endblock %}
 {% block content %}
-{# "Heute" beantwortet genau eine Frage: was mache ich jetzt? Alles andere
-   steht eine Zeile tiefer als ruhiger Hinweis oder hinter einem Hauptpunkt.
-   Die Themenliste lebt unter "Lernen" — sie stand hier nur noch einmal. #}
-<p class="heute-gruss"><img src="{{ learner_photo_url or '/static/karo-fox-wave.png' }}" alt="" width="56" height="56"><b>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</b> <span>Ein kleiner Schritt. Ein bisschen mehr verstanden.</span></p>
+{# "Heute" ist der Tag des Kindes und beantwortet drei Fragen: Was mache ich
+   jetzt? Wie viel ist es heute? Was habe ich schon geschafft? Der Tag kommt
+   aus "Ziele planen" und dem Lernkalender der Klassenarbeit — es gibt nur
+   dieses eine "Heute". #}
+{% set fuchs = '/static/karo-fox-cheer.png' if tag.state in ('fertig', 'unterwegs') else '/static/karo-fox-wave.png' %}
+{% set anzahl = tag['items']|length %}
+<header class="heute-kopf">
+  <img src="{{ learner_photo_url or fuchs }}" alt="" width="64" height="64">
+  <div>
+    <p class="heute-datum">{{ tag.date_label }}</p>
+    <h1 class="heute-hallo">Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</h1>
+    <p class="heute-satz">
+    {%- if tag.state == 'fertig' %}Für heute ist alles geschafft. Stark!
+    {%- elif tag.state == 'unterwegs' %}{{ tag.done }} von {{ anzahl }} geschafft{{ ' – noch etwa ' ~ tag.open_minutes ~ ' Minuten' if tag.open_minutes }}. Weiter so!
+    {%- elif tag.state == 'start' %}Heute {{ 'ist es eine kleine Sache' if anzahl == 1 else 'sind es ' ~ anzahl ~ ' kleine Dinge' }}{{ ', etwa ' ~ tag.minutes ~ ' Minuten' if tag.minutes }}.
+    {%- else %}Heute ist nichts geplant. Du entscheidest, ob du etwas lernen möchtest.{% endif %}</p>
+  </div>
+</header>
 
-<section class="card schritt-karte">
-  <p class="eyebrow">DEIN NÄCHSTER SCHRITT</p>
-{% if exam_today %}
-  <span class="learn-status bearbeitung">Klassenarbeit{% if exam_today.minutes %} · {{ exam_today.minutes }} Minuten{% endif %}</span>
-  <h1>{{ 'Deine Generalprobe' if exam_today.is_simulation else exam_today.inhalt }}</h1>
-  <p>{{ 'Probiere in Ruhe aus, was du schon kannst.' if exam_today.is_simulation else 'Wir machen dort weiter, wo du gerade stehst.' }}</p>
-  {% if exam_today.is_simulation %}<a class="btn" href="/klassenarbeit/{{ exam_today.exam_id }}/simulation">Generalprobe öffnen →</a>
-  {% elif exam_today.topic_id %}<form method="post" action="/klassenarbeit/{{ exam_today.exam_id }}/lernen/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ exam_today.topic_id }}"><input type="hidden" name="exam_id" value="{{ exam_today.exam_id }}"><button type="submit">Jetzt lernen →</button></form>
-  {% else %}<a class="btn" href="/klassenarbeit/{{ exam_today.exam_id }}">Prüfungsthemen ansehen →</a>{% endif %}
-  <a class="subtle-link" href="/klassenarbeit/{{ exam_today.exam_id }}">Deinen Lernkalender ansehen</a>
+<section id="jetzt" class="card schritt-karte{{ ' ist-fertig' if tag.state == 'fertig' }}">
+{% set item = tag.next_item %}
+{% if tag.state == 'fertig' %}
+  <p class="eyebrow">GESCHAFFT</p>
+  <div class="fertig-inhalt"><img src="/static/karo-fox-trophy.png" alt="" width="96" height="96">
+  <div><h2>Für heute geschafft!</h2>
+  <p>Du hast alles erledigt, was heute auf deinem Plan stand. Lust auf etwas ganz anderes?</p>
+  <a class="btn" href="/welten">Meine Welt entdecken →</a></div></div>
+  {% if naechstes and next_action_kind in ('review', 'quiz', 'lesson') %}<a class="subtle-link" href="{{ naechstes.url }}">Noch Lust zu lernen? {{ naechstes.titel }}</a>
+  {% elif next_topic %}<a class="subtle-link" href="/lernen/thema/{{ next_topic.id }}">Noch Lust zu lernen? {{ next_topic.label }}</a>{% endif %}
+{% elif item and item.kind == 'arbeit' %}
+  {% set task = item.task %}
+  <p class="eyebrow">JETZT</p>
+  <span class="learn-status bearbeitung">Klassenarbeit{% if task.minutes %} · {{ task.minutes }} Minuten{% endif %}</span>
+  <h2>{{ 'Deine Generalprobe' if task.is_simulation else task.inhalt }}</h2>
+  <p>{{ 'Probiere in Ruhe aus, was du schon kannst.' if task.is_simulation else 'Wir machen dort weiter, wo du gerade stehst.' }}</p>
+  {% if task.is_simulation %}<a class="btn" href="/klassenarbeit/{{ task.exam_id }}/simulation">Generalprobe öffnen →</a>
+  {% elif task.topic_id %}<form method="post" action="/klassenarbeit/{{ task.exam_id }}/lernen/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ task.topic_id }}"><input type="hidden" name="exam_id" value="{{ task.exam_id }}"><button type="submit">Jetzt lernen →</button></form>
+  {% else %}<a class="btn" href="/klassenarbeit/{{ task.exam_id }}">Prüfungsthemen ansehen →</a>{% endif %}
+  <a class="subtle-link" href="/klassenarbeit/{{ task.exam_id }}">Deinen Lernkalender ansehen</a>
+{% elif item and item.kind == 'ziel' %}
+  <p class="eyebrow">JETZT</p>
+  <span class="learn-status bearbeitung">Dein Ziel · {{ item.minutes }} Minuten</span>
+  <h2>{{ item.title }}</h2>
+  <p>Das hast du dir für heute vorgenommen. Danach trägst du ein, wie lange du dran warst.</p>
+  <form method="post" action="/woche/ziele/{{ item.goal_id }}/start">{{ csrf_input() }}<button type="submit">Los geht’s →</button></form>
 {% elif naechstes and next_action_kind in ('review', 'quiz', 'lesson') %}
-  <h1>{{ naechstes.titel }}</h1>
+  <p class="eyebrow">JETZT</p>
+  <h2>{{ naechstes.titel }}</h2>
   <p>{{ naechstes.text }}</p>
   <a class="btn" href="{{ naechstes.url }}">{{ naechstes.button }} →</a>
 {% elif next_topic %}
+  <p class="eyebrow">JETZT</p>
   <span class="learn-status {{ next_topic.learning_status }}">{{ next_topic.subject }}</span>
-  <h1>{{ next_topic.label }}</h1>
+  <h2>{{ next_topic.label }}</h2>
   <p>{{ 'Du kannst genau hier weitermachen.' if next_topic.learning_status == 'bearbeitung' else 'Wir schauen zuerst, was du schon kannst.' }}</p>
   <form method="post" action="{{ '/lernen/adaptiv/start' if cfg.adaptive_learning_enabled else '/lernzyklus/' ~ next_topic.id ~ '/quiz/starten' }}">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ next_topic.id }}"><input type="hidden" name="modus" value="bildschirm"><button type="submit">{{ 'Weiterlernen' if next_topic.learning_status == 'bearbeitung' else 'Los geht’s' }} →</button></form>
   <a class="subtle-link" href="/lernen">Lieber ein anderes Thema</a>
 {% else %}
-  <h1>{{ 'Das kannst du schon richtig gut!' if safe_count else 'Worauf bist du neugierig?' }}</h1>
+  <p class="eyebrow">JETZT</p>
+  <h2>{{ 'Das kannst du schon richtig gut!' if safe_count else 'Worauf bist du neugierig?' }}</h2>
   <p>{{ 'Deine sicheren Themen bleiben in deiner Sammlung. Du kannst ein neues entdecken.' if safe_count else 'Such dir ein Thema aus. Karo begleitet dich Schritt für Schritt.' }}</p>
   <a class="btn" href="/lernen/neu">Ein Thema entdecken →</a>
 {% endif %}
 </section>
 
-{# Der Fortschritt war eine eigene Karte mit eigenem Fuchs. Eine Zeile sagt
-   dasselbe. #}
-<p class="fortschritt-zeile"><b>{{ safe_count }} von {{ personal_count }}</b> Themen sicher
-  <span class="fortschritt-balken" aria-hidden="true"><i style="width:{{ (100 * safe_count / personal_count)|round|int if personal_count else 0 }}%"></i></span>
-  <a href="/lernstand">deine Erfolge ansehen</a></p>
-
-{% if cfg.klassenarbeit_kind and exam %}
-<a class="heute-hinweis" href="/klassenarbeit">Klassenarbeit am {{ exam.exam_date|datum }} — in kleinen Schritten vorbereiten <span aria-hidden="true">→</span></a>
+{# Mit nur einem Eintrag wiederholte die Liste bloss die Karte darueber. #}
+{% if anzahl > 1 %}
+<section class="card tagesplan" aria-labelledby="tagesplan-titel">
+  <header><h2 id="tagesplan-titel">Heute auf deinem Plan</h2>
+    <span class="tagesring" role="img" aria-label="{{ tag.done }} von {{ anzahl }} geschafft" style="--anteil:{{ (100 * tag.done / anzahl)|round|int }}"><b>{{ tag.done }}/{{ anzahl }}</b></span></header>
+  <ul>
+  {% for eintrag in tag['items'] %}
+    {% set dran = eintrag is sameas tag.next_item %}
+    <li class="{{ 'erledigt' if eintrag.done else ('dran' if dran else '') }}">
+      {# Jeder offene Eintrag laesst sich antippen: er wird dann "Jetzt".
+         So kann das Kind seine Wahl jederzeit aendern. #}
+      {% if not eintrag.done and not dran %}<a class="plan-zeile" href="/?jetzt={{ eintrag.key }}#jetzt">{% else %}<div class="plan-zeile"{% if dran %} aria-current="true"{% endif %}>{% endif %}
+      <span class="plan-haken" aria-hidden="true">{{ '✓' if eintrag.done else ('●' if dran else '○') }}</span>
+      <span class="plan-titel"><span class="plan-text">{{ eintrag.title }}</span><small>{{ eintrag.tag }}{{ ' · jetzt dran' if dran }}</small></span>
+      {% if eintrag.minutes %}<span class="plan-minuten">{{ eintrag.minutes }} Min</span>{% endif %}
+      <span class="sr">{{ 'erledigt' if eintrag.done else ('ist jetzt dran' if dran else 'noch offen – antippen, um das jetzt zu machen') }}</span>
+      {% if not eintrag.done and not dran %}<span class="plan-waehlen" aria-hidden="true"><span class="plan-waehlen-text">Jetzt machen </span>→</span></a>{% else %}</div>{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+</section>
 {% endif %}
-{% include '_learning_support.html' %}
+
+{% if tag.streak >= 2 or tag.last_success or tag.exam or tag.missed or tag.capsules %}
+<ul class="heute-chips" aria-label="Dein Stand">
+  {# Nur ein Hinweis mit Link: geoeffnet wird die Kapsel in Meine Welt. #}
+  {% if tag.capsules %}{% set kapsel = tag.capsules[0] %}<li class="chip-kapsel"><a href="{{ '/welten/zeitkapseln/' ~ kapsel.id if tag.capsules|length == 1 else '/welten/zeitkapseln' }}"><img src="/static/welt-biene.svg" alt="" aria-hidden="true" width="22" height="22"><span>{% if tag.capsules|length == 1 %}Deine Zeitkapsel <b>„{{ kapsel.title }}“</b> öffnet sich heute{% else %}<b>{{ tag.capsules|length }} Zeitkapseln</b> öffnen sich heute{% endif %} →</span></a></li>{% endif %}
+  {% if tag.streak >= 2 %}<li class="chip-serie">🔥 <b>{{ tag.streak }} Tage</b> in Folge gelernt{% if not tag.active_today %} – heute geht’s weiter{% endif %}</li>{% endif %}
+  {% if tag.last_success %}<li class="chip-erfolg"><a href="/lernstand">⭐ {{ tag.last_success.when|capitalize }} sicher: <b>{{ tag.last_success.label }}</b></a></li>{% endif %}
+  {% if tag.exam %}<li class="chip-arbeit"><a href="/klassenarbeit/{{ tag.exam.id }}">📅 {{ tag.exam.name }} <b>{{ tag.exam.when }}</b></a></li>{% endif %}
+  {% if tag.missed %}<li class="chip-nachholen"><a href="/woche?abschluss={{ tag.missed.id }}">↺ Noch offen: {{ tag.missed.statement }} – nachholen</a></li>{% endif %}
+</ul>
+{% endif %}
 {% endblock %}

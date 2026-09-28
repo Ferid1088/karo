@@ -72,6 +72,10 @@ def child_page(request: Request):
     legacy = db.q1("SELECT COUNT(*) AS n FROM woche_plan")
     if legacy and legacy["n"] and not plan_store.goals(("active", "paused", "completed", "archived")):
         return page(request)
+    # Der Tag steht auf "Heute" (/). Hier oeffnet nur noch das Fenster zum
+    # Abschliessen einer Einheit; sonst beginnt "Ziele planen" mit der Woche.
+    if not request.query_params.get("abschluss"):
+        return zurueck("/woche/woche")
     return today_page(request)
 
 
@@ -496,7 +500,7 @@ async def finish_session(request: Request, session_id: int):
         actual = number(data, "actual_minutes")
         plan_store.complete(session_id, actual, number(data, "focus_percent"))
         flash(request, "Deine Lernzeit ist gespeichert." if actual else "Die Einheit wurde mit 0 Minuten gespeichert.")
-        return zurueck("/woche")
+        return zurueck("/")
     except (ValueError, LookupError) as exc:
         flash(request, str(exc), "err")
         return zurueck(f"/woche?abschluss={session_id}")

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request, Form, UploadFile
 from fastapi.responses import HTMLResponse
 
 from .. import config, db, jobs, kb, quizzes, topics
-from ..services import exam, exam_calendar, workflow
+from ..services import exam, workflow
 from .shared import render, flash, zurueck
 from ..woche.pilot_store import parent_summary
 from ..welten.store import current_companion, current_interest
@@ -13,24 +13,21 @@ router = APIRouter()
 
 @router.get('/', response_class=HTMLResponse)
 def dashboard(request: Request):
-    from ..services import learning_hub
+    from ..services import learning_hub, today
     personal = learning_hub.personal_topics()
     next_topic = next((t for t in personal if t['learning_status'] == 'bearbeitung'), None)
     next_topic = next_topic or next((t for t in personal if t['learning_status'] == 'neu'), None)
-    gelernt = [t for t in learning_hub.archiv_themen() if not t['gelöscht']]
     themen, schritte, reviews = workflow.offene_schritte()
     # Heute zeigt den Kind-Bereich, auch wenn Eltern gerade mitlesen.
     aktion = workflow.get_next_action(
         'child', themen, schritte, reviews,
         antworten_pruefen_kind=config.load().antworten_pruefen_kind)
-    naechstes = workflow.next_action_display(aktion)
-    return render(request, 'dashboard.html', naechstes=naechstes, next_action_kind=aktion.kind, reviews=reviews,
-                  hat_erfolge=bool(db.q1("SELECT id FROM topic WHERE state='aktiv' AND learned_at IS NOT NULL LIMIT 1")),
-                  themen=themen, kb_stat=kb.statistik(), exam=exam.get_next_exam(),
-                  exam_today=exam_calendar.today_task() if config.load().klassenarbeit_kind else None,
+    return render(request, 'dashboard.html', tag=today.mein_tag(choice=request.query_params.get('jetzt', ''),
+                                     role=request.session.get('role')),
+                  naechstes=workflow.next_action_display(aktion), next_action_kind=aktion.kind,
                   next_topic=next_topic,
-                  personal_count=len(personal) + len(gelernt),
-                  safe_count=len(gelernt))
+                  safe_count=db.q1("SELECT COUNT(*) AS n FROM topic WHERE learning_visible=1 AND learned_at IS NOT NULL "
+                                   "AND deleted_at IS NULL AND purged_at IS NULL")['n'])
 
 
 @router.get('/lernen/neu', response_class=HTMLResponse)
