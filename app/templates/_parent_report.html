@@ -1,0 +1,264 @@
+{#- Elternbericht: oben nur Bilder, Details erst beim Antippen (Dialoge).
+    Ohne JavaScript öffnen die Kacheln dieselben Dialoge per #Anker (:target). -#}
+{% set icon = {'good': '✓', 'warn': '!', 'crit': '!!', 'off': '–'} %}
+{% set state_text = {'sicher': 'sicher', 'uebt': 'übt noch', 'offen': 'noch nicht begonnen'} %}
+{% set session_text = {'done': 'geschafft', 'missed': 'nicht geschafft', 'open': 'heute offen', 'planned': 'geplant'} %}
+{% macro opener(id) -%}href="#{{ id }}" data-dialog="{{ id }}" aria-haspopup="dialog"{%- endmacro %}
+{% macro chev() -%}<span class="pr-chev" aria-hidden="true">›</span>{%- endmacro %}
+{% macro ten(n, cls='') -%}<span class="pr-ten {{ cls }}" aria-hidden="true">{% for i in range(10) %}<i{% if n is not none and i < n %} class="on"{% endif %}></i>{% endfor %}</span>{%- endmacro %}
+{% macro dstate(d) -%}{{ 'fut' if d.future else 'on' if d.active else 'miss' if d.missed else '' }}{%- endmacro %}
+{% macro lamp(level, cls='') -%}<span class="pr-lamp pr-l-{{ level }} {{ cls }}" aria-hidden="true">{{ icon[level] }}</span>{%- endmacro %}
+{% macro badge(level, text) -%}<span class="pr-badge pr-l-{{ level }}">{% if level != 'off' %}{{ icon[level] }} {% endif %}{{ text }}</span>{%- endmacro %}
+{% macro mbar(states, cls='') -%}<span class="pr-mbar {{ cls }}" aria-hidden="true">{% for s in states %}<i class="pr-m-{{ s }}"></i>{% else %}<i class="pr-m-none"></i>{% endfor %}</span>{%- endmacro %}
+{% macro ring(value, total, size=124) -%}
+{%- set rad = size / 2 - 9 -%}{%- set circ = 2 * 3.14159265 * rad -%}
+{%- set part = ([value / total, 1]|min) if total else (1 if value else 0) -%}
+<svg class="pr-ring" viewBox="0 0 {{ size }} {{ size }}" width="{{ size }}" height="{{ size }}" aria-hidden="true"><circle cx="{{ size/2 }}" cy="{{ size/2 }}" r="{{ rad }}" class="pr-ring-track"/>{% if part > 0 %}<circle cx="{{ size/2 }}" cy="{{ size/2 }}" r="{{ rad }}" class="pr-ring-fill" stroke-dasharray="{{ '%.1f'|format(circ * part) }} {{ '%.1f'|format(circ) }}" transform="rotate(-90 {{ size/2 }} {{ size/2 }})"/>{% endif %}</svg>
+{%- endmacro %}
+{% macro sheet(id, title) -%}
+<dialog id="{{ id }}" class="pr-sheet" aria-labelledby="{{ id }}-t"><div class="pr-sheet-body">
+  <header class="pr-sheet-head"><h2 id="{{ id }}-t">{{ title }}</h2><a class="pr-close" href="#parent-report" data-close>Schließen</a></header>
+  <div class="pr-sheet-content">{{ caller() }}</div>
+</div></dialog>
+{%- endmacro %}
+
+<section id="parent-report" class="pr" aria-label="Elternbericht" data-date="{{ report.anchor }}" data-mode="{{ report.mode }}">
+  <header class="pr-heading">
+    <div><p class="pr-eyebrow">ELTERNBERICHT · {{ cfg.learner_name or 'Ihr Kind' }} · Klasse {{ cfg.learner_grade }}</p>
+      <h1>Alles Wichtige im Blick</h1><p class="pr-muted">{{ report.title }} · Alle Fächer · Eigene Themen, Prüfungen &amp; Ziele</p></div>
+    <nav class="pr-period" aria-label="Berichtszeitraum">
+      <div class="pr-switch"><a data-report-link href="{{ report.day_link }}" {% if report.mode == 'tag' %}aria-current="true"{% endif %}>Tag</a><a data-report-link href="{{ report.week_link }}" {% if report.mode == 'woche' %}aria-current="true"{% endif %}>Woche</a><a data-report-link href="{{ report.month_link }}" {% if report.mode == 'monat' %}aria-current="true"{% endif %}>Monat</a></div>
+      <div class="pr-date-nav">
+        {% if report.previous %}<a data-report-link class="pr-arrow" href="{{ report.previous }}" aria-label="Vorheriger Zeitraum">‹</a>{% endif %}
+        <span class="pr-range">{{ report.range_label }}</span>
+        {% if report.next %}<a data-report-link class="pr-arrow" href="{{ report.next }}" aria-label="Nächster Zeitraum">›</a>{% endif %}
+      </div>
+      <a data-report-link class="pr-now" href="{{ report.today_link }}">Heute</a>
+      <a class="pr-help" {{ opener('pr-d-help') }} aria-label="So lesen Sie den Bericht">?</a>
+    </nav>
+  </header>
+  <p class="pr-error" id="report-error" role="alert" hidden></p>
+  <p class="pr-tapnote"><span aria-hidden="true">›</span>Alles antippen, was Sie genauer wissen möchten.</p>
+
+  {# ---------- Überblick: eine Ampel und vier Anzeigen ---------- #}
+  <div class="pr-overview" aria-label="Überblick">
+    {% set st = report.status %}
+    <a class="pr-tile pr-status pr-l-{{ st.level }}" {{ opener('pr-d-status') }}>
+      <svg class="pr-ampel" width="44" height="112" viewBox="0 0 44 112" aria-hidden="true"><rect x="1" y="1" width="42" height="110" rx="13"/>
+        <circle cx="22" cy="23" r="12" class="pr-al pr-al-crit {{ 'on' if st.level == 'crit' }}"/>
+        <circle cx="22" cy="56" r="12" class="pr-al pr-al-warn {{ 'on' if st.level == 'warn' }}"/>
+        <circle cx="22" cy="89" r="12" class="pr-al pr-al-good {{ 'on' if st.level == 'good' }}"/></svg>
+      <span class="pr-status-text"><span class="pr-kicker">Lagebild · {{ report.period_short }}</span>
+        <strong class="pr-status-head">{{ st.head }}</strong>
+        <span class="pr-status-line"><i aria-hidden="true"></i>{{ st.line }}</span>
+        <span class="pr-more">Was heißt das? {{ chev() }}</span></span>
+    </a>
+    <a class="pr-tile" {{ opener('pr-d-days') }}>
+      <span class="pr-tile-top"><span class="pr-kicker">Lerntage</span></span>
+      <span class="pr-vis">{% if report.mode == 'monat' %}<span class="pr-mdots" aria-hidden="true">{% for _ in range(report.strip_offset) %}<i class="x"></i>{% endfor %}{% for d in report.strip %}<i class="{{ dstate(d) }}"></i>{% endfor %}</span>
+        {% else %}<span class="pr-wdots" aria-hidden="true">{% for d in report.strip %}<span class="{{ dstate(d) }} {{ 'sel' if d.selected }} {{ 'today' if d.today }}"><i></i><small>{{ d.weekday }}</small></span>{% endfor %}</span>{% endif %}</span>
+      <span class="pr-tile-foot"><span>{% if report.future %}noch offen{% elif report.mode == 'tag' %}<b>{{ 'Lerntag' if report.active_days else 'Kein Lerntag' }}</b>{% else %}<b>{{ report.active_days }} von {{ report.elapsed_days }}</b> Tagen{% endif %}</span>{{ chev() }}</span>
+    </a>
+    <a class="pr-tile" {{ opener('pr-d-answers') }}>
+      <span class="pr-tile-top"><span class="pr-kicker">Richtig</span></span>
+      <span class="pr-vis">{{ ten(report.answer_ten, 'pr-ten-big') }}</span>
+      <span class="pr-tile-foot"><span>{% if report.answer_ten is none %}noch keine Antworten{% else %}<b>{{ report.answer_ten }} von 10</b> richtig{% endif %}</span>{{ chev() }}</span>
+    </a>
+    <a class="pr-tile" {{ opener('pr-d-checks') }}>
+      <span class="pr-tile-top"><span class="pr-kicker">Neu sicher</span></span>
+      <span class="pr-vis pr-newbig"><b>{{ '–' if report.future else report.all_checks }}</b><span class="pr-checks" aria-hidden="true">{% for c in report.check_rows[:6] %}<i class="{{ c.subject }}">✓</i>{% endfor %}</span></span>
+      <span class="pr-tile-foot"><span>{{ 'Lerncheck' if report.all_checks == 1 else 'Lernchecks' }} bestanden</span>{{ chev() }}</span>
+    </a>
+    <a class="pr-tile" {{ opener('pr-d-goals') }}>
+      <span class="pr-tile-top"><span class="pr-kicker">Ziele</span></span>
+      <span class="pr-vis"><span class="pr-ringwrap">{{ ring(report.goal_minutes, report.goal_due_minutes) }}<span class="pr-ring-c"><b>{{ report.goal_minutes }}</b><small>Min. gemeldet</small></span></span></span>
+      <span class="pr-tile-foot"><span>{% if report.goal_due %}<b>{{ report.goal_done }} von {{ report.goal_due }}</b> Einheiten{% elif report.goal_planned %}{{ report.goal_planned }} geplant{% else %}nichts fällig{% endif %}</span>{{ chev() }}</span>
+    </a>
+  </div>
+
+  {# ---------- Verlauf + Prüfungen ---------- #}
+  <div class="pr-row">
+    <section class="pr-panel pr-activity" aria-labelledby="pr-activity-title">
+      {% if report.mode == 'tag' %}
+        <div class="pr-panel-heading"><h2 id="pr-activity-title">Was an diesem Tag passiert ist</h2><a data-report-link href="{{ report.back_link }}" class="pr-back">Zum Zeitraum</a></div>
+        <div class="pr-day-items">
+        {% for item in report.day_items %}<article class="pr-day-item"><div><h3>{{ item.label }}</h3><p>{{ item.kind }}{% if item.note %} · {{ item.note }}{% endif %}</p></div><strong>{{ item.value }}</strong></article>
+        {% else %}<p class="pr-empty">Keine Aktivität erfasst. Das sagt nichts über das Lernen außerhalb von Karo aus.</p>{% endfor %}
+        </div>
+      {% elif report.mode == 'woche' %}
+        <div class="pr-panel-heading"><h2 id="pr-activity-title">Antworten pro Tag</h2>
+          <span class="pr-legend">{% for s in report.subjects %}<span><i class="pr-dot {{ s.key }}" aria-hidden="true"></i>{{ s.name }}</span>{% endfor %}<span><i class="pr-dot pr-hatched" aria-hidden="true"></i>noch nicht richtig</span></span></div>
+        <div class="pr-plot">
+          {% for group in report.groups %}{% set d = report.strip[loop.index0] %}
+          <a class="pr-chart-group {{ 'pr-today' if d.today }}" data-report-link data-day="{{ d.iso }}" href="{{ group.href }}" aria-label="{{ group.label }}: {{ group.total }} bewertete Antworten, {{ group.right }} richtig. {{ group.checks }} erste Lernchecks bestanden. {{ group.goal_minutes }} Zielminuten gemeldet. Tag anzeigen.">
+            <span class="pr-bar-space"><span class="pr-bar-total">{{ '–' if group.future else group.total }}</span>{% for val in group['values']|reverse if val.value %}<span class="pr-bar {{ val.key }}" style="height:{{ val.height }}%" aria-hidden="true"><span class="pr-bar-retry" style="height:{{ val.retry_height }}%"></span></span>{% endfor %}</span>
+            <span class="pr-bar-label">{{ group.label }}</span>
+            <span class="pr-bar-marks" aria-hidden="true">{{ '✓' if group.checks }}{{ '○' if d.planned and not d.active }}</span>
+          </a>
+          {% endfor %}
+        </div>
+        <div class="pr-panel-foot"><span class="pr-note">✓ Lerncheck bestanden · ○ geplant · Tag antippen für Details</span><a class="pr-link" {{ opener('pr-d-table') }}>Zahlen ansehen</a></div>
+      {% else %}
+        <div class="pr-panel-heading"><h2 id="pr-activity-title">Lernkalender {{ report.month_label }}</h2>
+          <span class="pr-legend"><span>wenig</span><span class="pr-scale" aria-hidden="true">{% for h in range(5) %}<i class="h{{ h }}"></i>{% endfor %}</span><span>viele Antworten</span><span>✓ Lerncheck</span><span><i class="pr-dot pr-miss-dot" aria-hidden="true"></i>Plan verpasst</span></span></div>
+        <div class="pr-cal" role="grid" aria-label="Lernkalender">
+          {% for w in ['Mo','Di','Mi','Do','Fr','Sa','So'] %}<span class="pr-cal-h" aria-hidden="true">{{ w }}</span>{% endfor %}<span class="pr-cal-h" aria-hidden="true">Woche</span>
+          {% for row in report.calendar_rows %}
+            {% for d in row.days %}{% if d %}<a data-report-link href="{{ d.href }}" data-day="{{ d.iso }}" class="pr-cell h{{ d.heat }} {{ 'fut' if d.future }} {{ 'pr-today' if d.today }}" aria-label="{{ d.label }}: {{ d.answers }} Antworten{{ ', Lerncheck bestanden' if d.checks }}{{ ', Plan verpasst' if d.missed }}{{ ', Prüfung' if d.exam_day }}">
+              <span class="pr-cd">{{ d.day }}</span>{% if d.checks %}<span class="pr-ck" aria-hidden="true">✓</span>{% endif %}
+              <span class="pr-cm">{{ d.answers if d.answers else '' }}</span>
+              {% if d.exam_day %}<span class="pr-exm" aria-hidden="true">◆</span>{% elif d.missed %}<span class="pr-miss" aria-hidden="true"></span>{% endif %}</a>
+            {% else %}<span aria-hidden="true"></span>{% endif %}{% endfor %}
+            <a data-report-link href="{{ row.href }}" class="pr-wk" aria-label="Kalenderwoche {{ row.week }} öffnen"><b>KW {{ row.week }}</b><span>{{ '–' if row.future else row.total }}</span></a>
+          {% endfor %}
+        </div>
+        <div class="pr-panel-foot"><span class="pr-note">Zahl im Feld = bewertete Antworten · Tag oder Woche antippen</span><a class="pr-link" {{ opener('pr-d-table') }}>Zahlen ansehen</a></div>
+      {% endif %}
+    </section>
+
+    <section class="pr-panel pr-exams-panel" aria-labelledby="pr-exams-title">
+      <div class="pr-panel-heading"><h2 id="pr-exams-title">Prüfungen</h2><span class="pr-note">Tage bis zur Prüfung</span></div>
+      {% for exam in report.upcoming[:3] %}
+      <a class="pr-xrow" {{ opener('pr-d-exam-' ~ exam.id) }}>
+        <span class="pr-cdbox pr-l-{{ exam.verdict.level }}"><b>{{ exam.days }}</b><small>{{ 'Tag' if exam.days == 1 else 'Tage' }}</small></span>
+        <span class="pr-x-main"><span class="pr-x-t"><i class="pr-dot {{ exam.subject }}" aria-hidden="true"></i>{{ exam.titel or exam.subject|fachname }}</span>
+          <span class="pr-x-d">{{ exam.weekday }}, {{ exam.date_label }} · {{ exam.verdict.text }}</span>
+          {{ mbar(exam.topic_rows|map(attribute='state')|list, '' if exam.total else 'pr-mbar-empty') }}</span>
+        {{ chev() }}</a>
+      {% else %}<p class="pr-empty">Keine Klassenarbeit eingetragen.</p>{% endfor %}
+      {% if report.upcoming|length > 3 %}<a class="pr-link" {{ opener('pr-d-exams') }}>{{ report.upcoming|length - 3 }} weitere Prüfungen</a>{% endif %}
+    </section>
+  </div>
+
+  {# ---------- Fächer + Ziele ---------- #}
+  <div class="pr-row">
+    <section class="pr-panel pr-subjects" aria-labelledby="pr-subject-title">
+      <div class="pr-panel-heading"><h2 id="pr-subject-title">Fächer</h2><span class="pr-legend"><span><i class="pr-dot pr-m-sicher" aria-hidden="true"></i>sicher</span><span><i class="pr-dot pr-m-uebt" aria-hidden="true"></i>übt noch</span><span><i class="pr-dot pr-m-offen" aria-hidden="true"></i>offen</span></span></div>
+      <div class="pr-subj-grid">
+      {% for s in report.subjects %}
+        <a class="pr-stile" {{ opener('pr-d-subj-' ~ s.key) }}>
+          <span class="pr-st-n"><i class="pr-dot {{ s.key }}" aria-hidden="true"></i>{{ s.name }}</span>
+          <span class="pr-st-big">{% if s.ten is not none %}{{ s.ten }}<small> von 10 richtig</small>{% else %}–<small> keine Antworten</small>{% endif %}</span>
+          {{ ten(s.ten) }}
+          {{ mbar(s.mastery) }}
+          <span class="pr-st-foot"><span>{{ s.safe_total }} von {{ s.mastery|length }} Themen sicher</span>{{ chev() }}</span>
+        </a>
+      {% endfor %}
+      </div>
+    </section>
+    <section class="pr-panel pr-goals-panel" aria-labelledby="pr-goals-title">
+      <div class="pr-panel-heading"><h2 id="pr-goals-title">Ziele</h2><span class="pr-legend"><span><i class="pr-pip" aria-hidden="true"></i>geschafft</span><span><i class="pr-pip missed" aria-hidden="true"></i>verpasst</span><span><i class="pr-pip planned" aria-hidden="true"></i>geplant</span></span></div>
+      {% for goal in report.goals %}
+        <a class="pr-grow" {{ opener('pr-d-goal-' ~ goal.id) }}>
+          <span class="pr-gline"><span class="pr-g-q">„{{ goal.label }}“</span>{{ chev() }}</span>
+          <span class="pr-gline"><span class="pr-pips" aria-hidden="true">{% for x in goal.sessions %}<i class="pr-pip {{ x.state if x.state != 'done' }}"></i>{% endfor %}</span>
+            <span class="pr-g-ct">{% if goal.due %}{{ goal.done }}<small> von {{ goal.due }}</small>{% else %}<small>{{ goal.reports }} Meldung{{ 'en' if goal.reports != 1 }}</small>{% endif %}</span></span>
+        </a>
+      {% else %}<p class="pr-empty">Keine Zielplanung oder Zielmeldung in diesem Zeitraum.</p>{% endfor %}
+    </section>
+  </div>
+
+  <footer class="pr-foot"><p>{{ report.conversation }}</p><a class="pr-link" {{ opener('pr-d-help') }}>Was bedeuten diese Zahlen?</a></footer>
+
+  {# ================= Details (Dialoge) ================= #}
+  {% call sheet('pr-d-status', 'Lagebild') %}
+    <div class="pr-d-hero">{{ lamp(st.level, 'big') }}<div><b>{{ st.head }}</b><span>{{ st.line }}</span></div></div>
+    <div class="pr-insights">{% for insight in report.insights %}<article class="pr-insight pr-{{ insight.tone }}"><h3>{{ insight.title }}</h3><p>{{ insight.text }}</p></article>{% endfor %}</div>
+    <h3 class="pr-d-sec">Die Kontrolllampen</h3>
+    <div class="pr-d-list">{% for l in st.lamps %}
+      {% if l.dialog %}<a class="pr-drow" {{ opener(l.dialog) }}>{% else %}<div class="pr-drow">{% endif %}
+        <span class="pr-nm">{{ lamp(l.level) }}<span>{{ l.label }}<small>{{ l.value }}</small></span></span>{% if l.dialog %}{{ chev() }}</a>{% else %}</div>{% endif %}
+    {% endfor %}</div>
+    <p class="pr-d-expl">{{ report.conversation }} Grün heißt „läuft gut“, gelb „im Blick behalten“, rot „jetzt unterstützen“. Grau heißt: dazu gibt es noch nichts – das ist kein Misserfolg.</p>
+  {% endcall %}
+
+  {% call sheet('pr-d-days', 'Lerntage') %}
+    <div class="pr-kpis"><div><b>{{ report.active_days }}{% if report.mode != 'tag' %} von {{ report.elapsed_days }}{% endif %}</b><span>Tage mit Lernaktivität oder Zielmeldung</span></div></div>
+    <div class="pr-d-list">{% for d in report.strip if not report.mode == 'monat' or d.active or d.missed %}
+      <a class="pr-drow" data-report-link href="{{ d.href }}"><span class="pr-nm"><span>{{ d.label }}{% if d.answers or d.goal_minutes %}<small>{{ d.answers }} Antworten{% if d.goal_minutes %} · {{ d.goal_minutes }} Zielmin.{% endif %}</small>{% endif %}</span></span>
+        <span class="pr-rt">{% if d.future %}{{ badge('off', 'geplant' if d.planned else 'offen') }}{% elif d.active %}{{ badge('good', 'gelernt') }}{% elif d.missed %}{{ badge('warn', 'Plan verpasst') }}{% else %}{{ badge('off', 'frei') }}{% endif %}{{ chev() }}</span></a>
+    {% else %}<p class="pr-empty">Noch keine Lerntage in diesem Zeitraum.</p>{% endfor %}</div>
+    <p class="pr-d-expl">Aktive Tage enthalten Lernaktivitäten oder Zielmeldungen, nicht bloße Planung. Ein gelber Ring heißt: Es war etwas geplant, aber nichts gemeldet.</p>
+  {% endcall %}
+
+  {% call sheet('pr-d-answers', 'Richtig gelöst') %}
+    <div class="pr-kpis"><div><b>{{ report.answer_ten if report.answer_ten is not none else '–' }} von 10</b><span>richtig</span></div><div><b>{{ report.answers }}</b><span>bewertete Antworten</span></div><div><b>{{ report.retry }}</b><span>noch nicht richtig</span></div></div>
+    <p class="pr-d-expl">Von 10 Übungsaufgaben löst Ihr Kind im Schnitt {{ report.answer_ten if report.answer_ten is not none else '–' }} richtig. Antworten sind Übungsversuche, keine Schulnote. {{ report.personal_answers }} aus eigenen Themen, {{ report.exam_answers }} aus der Prüfungsvorbereitung.</p>
+    <h3 class="pr-d-sec">Nach Fach · eigene Themen</h3>
+    <div class="pr-d-list">{% for s in report.subjects %}<a class="pr-drow" {{ opener('pr-d-subj-' ~ s.key) }}><span class="pr-nm"><i class="pr-dot {{ s.key }}" aria-hidden="true"></i><span>{{ s.name }}</span></span><span class="pr-rt">{% if s.ten is not none %}{{ ten(s.ten) }} {{ s.right }}/{{ s.answers }}{% else %}–{% endif %}{{ chev() }}</span></a>{% endfor %}</div>
+    <h3 class="pr-d-sec">Hier lohnt sich ein Blick</h3>
+    <div class="pr-d-list">{% for t in report.practice %}<div class="pr-drow"><span class="pr-nm"><i class="pr-dot {{ t.subject }}" aria-hidden="true"></i><span>{{ t.label }}<small>{{ 'Prüfung' if t.scope == 'exam' else 'eigenes Thema' }} · {{ t.retry }} von {{ t.answers }} noch nicht richtig</small></span></span><span class="pr-rt">{{ ten(t.ten) }}</span></div>
+    {% else %}<p class="pr-empty">Nichts Auffälliges in diesem Zeitraum.</p>{% endfor %}</div>
+  {% endcall %}
+
+  {% call sheet('pr-d-checks', 'Neu sicher') %}
+    <div class="pr-kpis"><div><b>{{ report.all_checks }}</b><span>Lernchecks zum ersten Mal bestanden</span></div><div><b>{{ report.new_secure }}</b><span>davon eigene Themen</span></div></div>
+    <div class="pr-d-list">{% for c in report.check_rows %}<div class="pr-drow"><span class="pr-nm"><i class="pr-dot {{ c.subject }}" aria-hidden="true"></i><span>✓ {{ c.label }}<small>{{ c.subject|fachname }} · {{ 'Prüfung' if c.scope == 'exam' else 'eigenes Thema' }}</small></span></span><span class="pr-rt">{{ c.date }}</span></div>
+    {% else %}<p class="pr-empty">In diesem Zeitraum wurde kein Lerncheck zum ersten Mal bestanden. Üben ist bereits ein wichtiger Schritt.</p>{% endfor %}</div>
+    <p class="pr-d-expl">„Sicher“ heißt: Der adaptive Lerncheck in Karo wurde bestanden – nicht das manuelle Gelernt-Häkchen. Fragen Sie: „Was kannst du jetzt besser erklären?“</p>
+  {% endcall %}
+
+  {% call sheet('pr-d-goals', 'Ziele') %}
+    <div class="pr-kpis"><div><b>{{ report.goal_minutes }} Min.</b><span>selbst gemeldet</span></div><div><b>{{ report.goal_due_minutes }} Min.</b><span>bis heute geplant</span></div><div><b>{{ report.goal_done }} von {{ report.goal_due }}</b><span>Einheiten geschafft</span></div></div>
+    <div class="pr-d-list">{% for goal in report.goals %}<a class="pr-drow" {{ opener('pr-d-goal-' ~ goal.id) }}><span class="pr-nm"><span>„{{ goal.label }}“<small>{{ goal.reports }} Meldung{{ 'en' if goal.reports != 1 }} · {{ goal.minutes }} Min. · {{ goal.planned }} Einheiten geplant</small></span></span>{{ chev() }}</a>
+    {% else %}<p class="pr-empty">Keine Zielplanung oder Zielmeldung in diesem Zeitraum.</p>{% endfor %}</div>
+    <p class="pr-d-expl">Ziele und Zeiten legt Ihr Kind selbst fest. Minuten sind Selbstauskunft – keine gemessene Lernzeit, keine Konzentrationswerte, keine privaten Notizen.</p>
+  {% endcall %}
+
+  {% for goal in report.goals %}{% call sheet('pr-d-goal-' ~ goal.id, '„' ~ goal.label ~ '“') %}
+    <div class="pr-pips pr-pips-big" aria-hidden="true">{% for x in goal.sessions %}<i class="pr-pip {{ x.state if x.state != 'done' }}"></i>{% endfor %}</div>
+    <div class="pr-kpis"><div><b>{{ goal.done }} von {{ goal.due }}</b><span>fällige Einheiten geschafft</span></div><div><b>{{ goal.minutes }} Min.</b><span>gemeldet · {{ goal.planned_minutes }} geplant</span></div></div>
+    <div class="pr-d-list">{% for x in goal.sessions %}<a class="pr-drow" data-report-link href="{{ x.href }}"><span class="pr-nm"><span>{{ x.label }}<small>{{ x.minutes }} Min. geplant</small></span></span><span class="pr-rt">{{ badge({'done':'good','missed':'warn'}.get(x.state, 'off'), session_text[x.state]) }}{{ chev() }}</span></a>
+    {% else %}<p class="pr-empty">In diesem Zeitraum ist keine Einheit geplant.</p>{% endfor %}</div>
+    {% if goal.makeups %}<p class="pr-note">{{ goal.makeups }} Nachholmeldungen · am tatsächlichen Meldetag gezählt</p>{% endif %}
+  {% endcall %}{% endfor %}
+
+  {% for exam in report.exams %}{% call sheet('pr-d-exam-' ~ exam.id, exam.titel or (exam.subject|fachname) ~ ' · ' ~ exam.date_label) %}
+    <div class="pr-d-hero"><span class="pr-cdbox pr-l-{{ exam.verdict.level }}"><b>{{ exam.days if exam.days >= 0 else '–' }}</b><small>{{ 'Tag' if exam.days == 1 else 'Tage' }}</small></span><div><b>{{ exam.subject|fachname }} · {{ exam.weekday }}, {{ exam.date_label }}</b>{{ badge(exam.verdict.level, exam.verdict.text) }}</div></div>
+    <p class="pr-d-expl">{% if exam.verdict.text == 'Themen fehlen' %}Solange keine Themen eingetragen sind, kann Karo den Lernstand nicht zeigen. Bitten Sie Ihr Kind, die Themen einzutragen.{% elif exam.verdict.level == 'good' %}Die meisten Themen sind sicher. Weiter so.{% elif exam.verdict.level == 'crit' %}Die Zeit wird knapp und viele Themen sind noch nicht sicher. Schauen Sie gemeinsam auf die nächsten Tage.{% elif exam.verdict.text == 'Noch Zeit' %}Bis zur Prüfung ist noch Zeit.{% else %}Noch nicht alle Themen sitzen. Wichtig ist, dass die offenen Themen vor der Prüfung drankommen.{% endif %}</p>
+    {% if exam.total %}<h3 class="pr-d-sec">Themen · {{ exam.safe }} von {{ exam.total }} sicher</h3>
+    {{ mbar(exam.topic_rows|map(attribute='state')|list, 'pr-mbar-big') }}
+    <div class="pr-d-list">{% for t in exam.topic_rows %}<div class="pr-drow"><span class="pr-nm"><span>{{ t.label }}</span></span><span class="pr-rt">{{ badge({'sicher':'good','uebt':'off','offen':'warn'}[t.state], state_text[t.state]) }}</span></div>{% endfor %}</div>{% endif %}
+    <p class="pr-note">{{ exam.answers }} Antworten im gewählten Zeitraum · Lernstand {{ report.as_of }}</p>
+    <a class="pr-d-btn" href="/klassenarbeit/{{ exam.id }}">Klassenarbeit öffnen</a>
+  {% endcall %}{% endfor %}
+
+  {% if report.upcoming|length > 3 %}{% call sheet('pr-d-exams', 'Alle anstehenden Prüfungen') %}
+    <div class="pr-d-list">{% for exam in report.upcoming %}<a class="pr-drow" {{ opener('pr-d-exam-' ~ exam.id) }}><span class="pr-nm"><i class="pr-dot {{ exam.subject }}" aria-hidden="true"></i><span>{{ exam.titel or exam.subject|fachname }}<small>{{ exam.date_label }} · in {{ exam.days }} Tagen</small></span></span><span class="pr-rt">{{ badge(exam.verdict.level, exam.verdict.text) }}{{ chev() }}</span></a>{% endfor %}</div>
+  {% endcall %}{% endif %}
+
+  {% for s in report.subjects %}{% call sheet('pr-d-subj-' ~ s.key, s.name) %}
+    <div class="pr-kpis"><div><b>{{ s.ten if s.ten is not none else '–' }} von 10</b><span>richtig · {{ s.right }}/{{ s.answers }} Antworten</span></div><div><b>{{ s.safe_total }} von {{ s.mastery|length }}</b><span>eigene Themen sicher</span></div><div><b>{{ s.secure }}</b><span>neu sicher im Zeitraum</span></div></div>
+    {{ mbar(s.mastery, 'pr-mbar-big') }}
+    <h3 class="pr-d-sec">Im Zeitraum geübt</h3>
+    <div class="pr-d-list">{% for t in s.topics %}<div class="pr-drow"><span class="pr-nm"><span>{{ t.label }}</span></span><span class="pr-rt">{% if t.safe %}{{ badge('good', 'sicher') }}{% elif t.answers %}{{ ten((t.right / t.answers * 10)|round|int) }} {{ t.right }}/{{ t.answers }} richtig{% else %}{{ badge('off', 'in Arbeit') }}{% endif %}</span></div>
+    {% else %}<p class="pr-empty">In diesem Zeitraum wurde kein eigenes Thema geübt.</p>{% endfor %}</div>
+    {% if s.mastery_rows %}<h3 class="pr-d-sec">Alle eigenen Themen</h3>
+    <div class="pr-d-list">{% for t in s.mastery_rows %}<div class="pr-drow"><span class="pr-nm"><span>{{ t.label }}</span></span><span class="pr-rt">{{ badge({'sicher':'good','uebt':'off','offen':'off'}[t.state], state_text[t.state]) }}</span></div>{% endfor %}</div>{% endif %}
+    <p class="pr-d-expl">Ohne Prüfungsthemen. Lernstand zum {{ report.as_of }}. Wiederholte Antworten sind keine neuen sicheren Themen.</p>
+  {% endcall %}{% endfor %}
+
+  {% if report.mode != 'tag' %}{% call sheet('pr-d-table', 'Die Zahlen zum Verlauf') %}
+    <div class="pr-timeline-wrap"><table class="pr-timeline"><caption>{{ 'Woche' if report.mode == 'monat' else 'Tag' }} anklicken für Details</caption><thead><tr><th scope="col">Zeitraum</th>{% for g in report.groups %}<th scope="col"><a data-report-link href="{{ g.href }}">{{ g.label }}</a></th>{% endfor %}</tr></thead><tbody>
+      <tr><th scope="row">Richtig / Antworten</th>{% for g in report.groups %}<td>{{ g.right|string + '/' + g.total|string if g.total else '–' }}</td>{% endfor %}</tr>
+      <tr class="pr-check-row"><th scope="row">Neue Lernchecks ✓</th>{% for g in report.groups %}<td>{{ g.checks or '–' }}</td>{% endfor %}</tr>
+      <tr class="pr-goal-row"><th scope="row">Zielmin. gemeldet</th>{% for g in report.groups %}<td>{{ g.goal_minutes or '–' }}</td>{% endfor %}</tr>
+      <tr><th scope="row">Prüfungsmin. geplant</th>{% for g in report.groups %}<td>{{ g.exam_minutes or '–' }}</td>{% endfor %}</tr>
+    </tbody></table></div>
+    <p class="pr-d-expl">Antworten sind Übungsversuche, keine Schulnote. Unterschiedlich schwere Aufgaben sind nicht direkt vergleichbar. Zielminuten sind Selbstauskunft, Prüfungsminuten stammen aus der Planung.</p>
+  {% endcall %}{% endif %}
+
+  {% call sheet('pr-d-help', 'So lesen Sie den Bericht') %}
+    <p class="pr-d-lead">Oben sehen Sie auf einen Blick, wie es läuft. Alles andere öffnet sich erst, wenn Sie es antippen.</p>
+    <div class="pr-d-list pr-legend-list">
+      <div class="pr-drow"><span class="pr-nm">{{ lamp('good') }}<span>Grün – läuft gut</span></span></div>
+      <div class="pr-drow"><span class="pr-nm">{{ lamp('warn') }}<span>Gelb – im Blick behalten</span></span></div>
+      <div class="pr-drow"><span class="pr-nm">{{ lamp('crit') }}<span>Rot – jetzt unterstützen (nur bei naher Prüfung)</span></span></div>
+      <div class="pr-drow"><span class="pr-nm">{{ lamp('off') }}<span>Grau – noch keine Daten, kein Misserfolg</span></span></div>
+      <div class="pr-drow"><span class="pr-nm">{{ ten(7) }}<span>So viele von 10 Übungsaufgaben werden im Schnitt richtig gelöst</span></span></div>
+      <div class="pr-drow"><span class="pr-nm"><i class="pr-pip missed" aria-hidden="true"></i><span>Gelber Ring – geplant, aber nichts gemeldet</span></span></div>
+    </div>
+    <p class="pr-d-expl">Der Bericht liest gespeicherte Daten. Bewertete Antworten zählen tatsächliche Versuche im adaptiven Lernen und freigegebene Quizantworten, nicht automatische Vorbereitung. Bei Quiz-Korrekturen zählt eine Frage nur einmal. „Neu sicher“ zählt den ersten bestandenen adaptiven Lerncheck pro Thema, nicht das manuelle Gelernt-Häkchen.</p>
+    <p class="pr-d-expl">Für Themen und Prüfungen wird bisher keine verlässliche aktive Lernzeit gemessen. Deshalb zeigt der Verlauf Antworten, keine Minuten. Zielminuten sind selbst gemeldet; Prüfungsminuten stammen aus der Planung. Aktive Tage enthalten Lernaktivitäten oder Zielmeldungen, nicht bloße Planung. Alte Wochenvereinbarungen bleiben unter „Verwalten &amp; Einstellungen“.</p>
+  {% endcall %}
+</section>

@@ -1,41 +1,100 @@
 {% extends "base.html" %}
 {% block title %}Für Eltern – Karo{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="/static/parent-overview.css?v=1"><link rel="stylesheet" href="/static/parent-report.css?v=2"><script src="/static/parent-report.js?v=2" defer></script>{% endblock %}
+{% block mainclass %}parent-overview{% endblock %}
 {% block content %}
-<p class="eyebrow">GEMEINSAM VORBEREITEN</p><h1>Für Eltern</h1>
-<p class="sub">{{ 'Material vorbereiten und Karo einstellen.' if cfg.antworten_pruefen_kind else 'Material vorbereiten, Antworten prüfen und Karo einstellen.' }}</p>
-{% if reviews or offene_vorschlaege or offene_funde %}
-<section class="card"><h2>Das braucht Ihre Hilfe</h2><div class="simple-list">
-{% for q in reviews %}<a class="simple-list-link" href="/quiz/{{ q.id }}"><span><strong>Antworten prüfen</strong><small>{{ q.thema_label }}</small></span><span aria-hidden="true">→</span></a>{% endfor %}
-{% if offene_vorschlaege %}<a class="simple-list-link" href="/themen#themen-vorschlaege"><span><strong>{{ offene_vorschlaege }} Themen bestätigen</strong><small>Karo hat Themen auf den Schulblättern gefunden.</small></span><span aria-hidden="true">→</span></a>{% endif %}
-{% if offene_funde %}<a class="simple-list-link" href="/recherche"><span><strong>{{ offene_funde }} Internetquellen prüfen</strong><small>Sie entscheiden, was verwendet wird.</small></span><span aria-hidden="true">→</span></a>{% endif %}
-</div></section>{% endif %}
-{% include "woche/pilot_card.html" %}
-<section class="card"><h2>Meine Welt</h2>{% if begleiter %}<p>Der Begleiter Ihres Kindes heißt aktuell „{{ begleiter.name }}“.</p>{% else %}<p>Ihr Kind hat noch keinen eigenen Begleiter eingerichtet.</p>{% endif %}{% if begleiter_interesse %}<p>Interessiert sich gerade für: {{ begleiter_interesse.text }}</p>{% endif %}<a class="btn" href="/welten">Meine Welt ansehen</a></section>
-<div class="choice-grid parent-choices">
-{% if not cfg.schulblaetter_kind %}<a class="choice-card" href="/wissen"><h2>Schulblätter</h2><p>Fotos und PDFs hinzufügen und ansehen.</p></a>{% endif %}
-<a class="choice-card" href="/themen"><h2>Themen</h2><p>Themen bestätigen, benennen oder selbst anlegen.</p></a>
-{% if not cfg.klassenarbeit_kind %}<a class="choice-card" href="/klassenarbeit"><h2>Klassenarbeit</h2><p>Themenblatt einlesen, Lernplan und Ergebnisse.</p></a>{% endif %}
-<a class="choice-card" href="/messung/fortschritt#ausfuehrlich"><h2>Lernstand &amp; Export</h2><p>Entwicklung, Antworten und die Tabelle für Drive.</p></a>
-{% if cfg.adaptive_learning_enabled %}<a class="choice-card" href="/eltern/lernfortschritt"><h2>Denkfehler &amp; Fortschritt</h2><p>Woran Ihr Kind gerade arbeitet und was schon sitzt.</p></a>{% endif %}
-<a class="choice-card" href="/recherche"><h2>Internetquellen</h2><p>Fundstellen prüfen und erlaubte Seiten verwalten.</p></a>
-<a class="choice-card" href="/setup"><h2>Einstellungen</h2><p>Was darf Ihr Kind? Lernmaterial, Passwörter und Verbindungen.</p></a>
-</div>
-<details class="card disclosure" id="betrieb"><summary>Betrieb und Protokoll{% if fehler %} · {{ fehler|length }} Problem{{ 'e' if fehler|length != 1 }}{% endif %}</summary>
-<p>{{ counts.get('wartend', 0) + counts.get('laeuft', 0) }} Vorgänge werden gerade bearbeitet.</p>
-<div class="actions"><a class="btn ghost" href="/protokoll">Protokoll ansehen</a><a href="/hilfe">Alle Funktionen erklärt</a></div>
-<div id="verbindungen-widget" class="actions"><a class="status" id="status-claude" href="/setup#claude-verbindung">Claude</a>{% if cfg.legacy_lesson_generation_enabled %}<a class="status" id="status-notebooklm" href="/setup#notebooklm-verbindung">NotebookLM</a>{% endif %}</div>
-{% for j in fehler %}<div class="item"><strong>Ein Vorgang braucht Hilfe</strong><p>{{ j.last_error }}</p><details><summary>Technische Angaben</summary><code>{{ j.type }}</code></details><form method="post" action="/vorgang/{{ j.id }}/erneut">{{ csrf_input() }}<button class="ghost" type="submit">Erneut versuchen</button></form></div>{% endfor %}
-{% if einig.gesamt %}<p class="hint">Karo und Lernbegleitung waren sich bei {{ (einig.quote * 100)|round|int }} % der letzten {{ einig.gesamt }} Antworten einig.</p>{% endif %}
+{% include "_parent_report.html" %}
+<p id="report-status" class="sr-only" role="status" aria-live="polite"></p>
+{% set weekly_change = woche.plan and woche.plan.child_status == 'aendern' %}
+{% set needs_attention = reviews or offene_vorschlaege or offene_funde or ohne_fach_anzahl or grade_notices or woche.helps or weekly_change or counts.get('fehler', 0) %}
+<details class="card report-attention" {% if grade_notices %}open{% endif %}><summary>{{ 'Hinweise & offene Aufgaben' if needs_attention else 'Im Moment ist nichts zu erledigen' }}<span class="parent-badge">{{ 'Bitte ansehen' if needs_attention else 'Alles im Blick' }}</span></summary>
+<section class="card parent-attention" aria-labelledby="attention-title">
+  <div class="parent-section-heading"><h2 id="attention-title">{{ 'Das braucht Ihre Aufmerksamkeit' if needs_attention else 'Im Moment ist nichts zu erledigen' }}</h2>
+  <span class="parent-badge {{ 'has-tasks' if needs_attention else '' }}">{{ 'Offene Aufgaben' if needs_attention else 'Alles im Blick' }}</span></div>
+  {% if not needs_attention %}<p class="parent-muted">Hier erscheinen Hilfeanfragen und Inhalte, die Sie prüfen sollen.</p>{% endif %}
+  {% if reviews or offene_vorschlaege or offene_funde or ohne_fach_anzahl or woche.helps or weekly_change or counts.get('fehler', 0) %}
+  <div class="parent-task-list">
+    {% if ohne_fach_anzahl %}<a href="/eltern/ohne-fach"><span><strong>{{ ohne_fach_anzahl }} Inhalt{{ 'e' if ohne_fach_anzahl != 1 }} ohne gültiges Fach</strong><small>Bitte ein Fach zuordnen. Bis dahin sieht Ihr Kind diese Inhalte nicht.</small></span><span aria-hidden="true">→</span></a>{% endif %}
+    {% for q in reviews %}<a href="/quiz/{{ q.id }}"><span><strong>Antworten prüfen</strong><small>{{ q.thema_label }}</small></span><span aria-hidden="true">→</span></a>{% endfor %}
+    {% if offene_vorschlaege %}<a href="/themen#themen-vorschlaege"><span><strong>{{ offene_vorschlaege }} Themenvorschlag{{ 'e' if offene_vorschlaege != 1 }} prüfen</strong><small>Auf Schulblättern gefunden – Sie entscheiden, was übernommen wird.</small></span><span aria-hidden="true">→</span></a>{% endif %}
+    {% if offene_funde %}<a href="/recherche"><span><strong>{{ offene_funde }} Internetquelle{{ 'n' if offene_funde != 1 }} prüfen</strong><small>Sie entscheiden, welche Quellen verwendet werden dürfen.</small></span><span aria-hidden="true">→</span></a>{% endif %}
+    {% if weekly_change or woche.helps %}<a href="/woche/eltern"><span><strong>{{ 'Wochenvereinbarung besprechen' if weekly_change else 'Ihr Kind braucht Unterstützung' }}</strong><small>{% if weekly_change %}Ihr Kind bittet um eine Änderung. {% endif %}{% if woche.helps %}{{ woche.helps|length }} offene Hilfeanfrage{{ 'n' if woche.helps|length != 1 }} – auch bereits zugesagte Hilfe.{% endif %}</small></span><span aria-hidden="true">→</span></a>{% endif %}
+    {% if counts.get('fehler', 0) %}<a href="#betrieb"><span><strong>{{ counts.get('fehler', 0) }} Vorgang{{ 'e' if counts.get('fehler', 0) != 1 }} {{ 'braucht' if counts.get('fehler', 0) == 1 else 'brauchen' }} Hilfe</strong><small>Ein Hintergrundvorgang konnte nicht abgeschlossen werden. Technik &amp; Hilfe öffnen.</small></span><span aria-hidden="true">↓</span></a>{% endif %}
+  </div>{% endif %}
+  {% if grade_notices %}
+  <div class="parent-grade-notices"><h3>Neue Hinweise zum Lernen</h3>
+  {% for notice in grade_notices %}
+  <article class="parent-notice"><div><h4>{{ notice.topic_label }}</h4>
+    <p>Diese Lernreihe ist für Klasse {{ notice.grade_from }}{% if notice.grade_to != notice.grade_from %}–{{ notice.grade_to }}{% endif %} eingeordnet. Im Profil Ihres Kindes steht Klasse {{ notice.profile_grade }}. Ihr Kind hat bestätigt, trotzdem weiterzulernen.</p>
+    <p class="hint">{{ 'Prüfungsvorbereitung' if notice.area.startswith('/klassenarbeit/') else 'Meine Themen' }} · {{ notice.created_at[8:10] }}.{{ notice.created_at[5:7] }}.{{ notice.created_at[:4] }} · Die fachliche Einordnung bleibt unverändert.</p>
+  </div><form method="post" action="/eltern/klassenhinweis/{{ notice.id }}/gelesen">{{ csrf_input() }}<button class="ghost" type="submit">Gelesen</button></form></article>
+  {% endfor %}</div>{% endif %}
+</section>
+
 </details>
-<details class="card disclosure"><summary>Aussehen und Anmeldung</summary>
-<div class="row area-preferences"><div class="field">
-<label for="eltern-farbwelt">Elternbereich</label><select id="eltern-farbwelt" data-theme-picker="parent">
-{% for wert, name in [('schiefer','Schiefer & Petrol'),('sand','Sand & Braun'),('nacht','Nachtblau')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
-</div><div class="field">
-<label for="farbwelten-auswahl">Kinderbereich</label><select id="farbwelten-auswahl" data-theme-picker="child">
-{% for wert, name in [('lila','Lila'),('ozean','Blau'),('wiese','Grün'),('sonne','Orange'),('zuckerwatte','Rosa'),('lava','Rot'),('dunkel','Dunkel')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
-</div></div>
-<form method="post" action="/eltern/kind-modus" class="section-space"><p class="hint">Gerät ans Kind übergeben? Zurück geht es nur mit dem Eltern-Passwort.</p>{{ csrf_input() }}<button type="submit" class="ghost">Kind-Modus starten</button></form>
-<form method="post" action="/logout" class="section-space" data-logout>{{ csrf_input() }}<button type="submit" class="ghost">Abmelden</button></form>
+<details class="parent-management"><summary>Verwalten &amp; Einstellungen</summary>
+<section class="parent-learning" aria-labelledby="learning-title">
+  <h2 id="learning-title">So steht es gerade</h2>
+  <div class="parent-snapshot-grid">
+    <article class="card parent-snapshot">
+      <p class="parent-kicker">MEINE THEMEN</p>
+      <h3><span class="parent-number">{{ overview.personal_topics }}</span> aktive{{ 's Thema' if overview.personal_topics == 1 else ' Themen' }}</h3>
+      <p class="parent-muted">{{ 'Eigene Lernthemen, unabhängig von Klassenarbeiten.' if overview.personal_topics else 'Noch keine eigenen Lernthemen. Wählen Sie gemeinsam einen ersten Einstieg.' }}</p>
+      <a href="/themen" class="parent-text-link">Themen verwalten <span aria-hidden="true">→</span></a>
+    </article>
+    <article class="card parent-snapshot">
+      <p class="parent-kicker">PRÜFUNGSVORBEREITUNG</p>
+      <h3><span class="parent-number">{{ overview.upcoming_exams }}</span> anstehende Prüfung{{ 'en' if overview.upcoming_exams != 1 }}</h3>
+      {% if overview.next_exam %}<p class="parent-muted">Als Nächstes: <strong>{{ overview.next_exam.subject|fachname }}</strong> · {{ overview.next_exam.date_label }}{% if overview.next_exam.days == 0 %} · heute{% endif %}</p>
+      {% else %}<p class="parent-muted">Keine kommende Klassenarbeit eingetragen.</p>{% endif %}
+      <a href="/klassenarbeit" class="parent-text-link">Klassenarbeiten ansehen <span aria-hidden="true">→</span></a>
+    </article>
+  </div>
+</section>
+
+<section aria-labelledby="parent-actions-title" class="parent-shortcuts">
+  <h2 id="parent-actions-title">Was möchten Sie tun?</h2>
+  <div class="parent-shortcut-grid">
+    <a class="card parent-shortcut" href="/wissen"><span class="parent-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z M14 3v5h4 M10 12h5 M10 16h5"/></svg></span><span><strong>Schulmaterial hinzufügen</strong><small>Fotos, Arbeitsblätter und PDFs verwalten.</small></span><span aria-hidden="true">→</span></a>
+    <a class="card parent-shortcut" href="{{ '/eltern/lernfortschritt' if cfg.adaptive_learning_enabled else '/messung/fortschritt#ausfuehrlich' }}"><span class="parent-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4v16h16 M8 16v-4 M12 16V8 M16 16V5"/></svg></span><span><strong>Lernen besser verstehen</strong><small>{{ 'Fortschritte und Denkfehler nachvollziehen.' if cfg.adaptive_learning_enabled else 'Antworten und Entwicklung nachvollziehen.' }}</small></span><span aria-hidden="true">→</span></a>
+    <a class="card parent-shortcut" href="/setup"><span class="parent-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h6m4 0h6 M4 17h10m4 0h2"/><circle cx="12" cy="7" r="2"/><circle cx="16" cy="17" r="2"/></svg></span><span><strong>Karo einstellen</strong><small>Profil, Zugriffsrechte und Passwörter.</small></span><span aria-hidden="true">→</span></a>
+  </div>
+</section>
+
+<h2 class="parent-secondary-title">Weitere Möglichkeiten</h2>
+<details class="card disclosure parent-details" id="familie">
+  <summary><span>Wochenvereinbarung &amp; Meine Welt<small>Gemeinsame Absprachen, Rückmeldungen und Begleiter</small></span></summary>
+  <div class="parent-family-grid">
+    {% include "woche/pilot_card.html" %}
+    <section class="card"><h2>Meine Welt</h2>{% if begleiter %}<p>Der Begleiter Ihres Kindes heißt aktuell „{{ begleiter.name }}“.</p>{% else %}<p>Ihr Kind hat noch keinen eigenen Begleiter eingerichtet.</p>{% endif %}{% if begleiter_interesse %}<p>Interessiert sich gerade für: {{ begleiter_interesse.text }}</p>{% endif %}<a class="btn ghost" href="/welten">Meine Welt ansehen</a></section>
+  </div>
+</details>
+<details class="card disclosure parent-details">
+  <summary><span>Quellen, Lernstand &amp; Export<small>Material prüfen und die Entwicklung im Detail ansehen</small></span></summary>
+  <div class="parent-task-list">
+    <a href="/recherche"><span><strong>Internetquellen verwalten</strong><small>Fundstellen prüfen und erlaubte Seiten festlegen.</small></span><span aria-hidden="true">→</span></a>
+    <a href="/messung/fortschritt#ausfuehrlich"><span><strong>Lernstand &amp; Export</strong><small>Entwicklung, Antworten und die Tabelle für Drive.</small></span><span aria-hidden="true">→</span></a>
+  </div>
+</details>
+<details class="card disclosure parent-details" id="betrieb">
+  <summary><span>Technik &amp; Hilfe{% if counts.get('fehler', 0) %} · {{ counts.get('fehler', 0) }} Problem{{ 'e' if counts.get('fehler', 0) != 1 }}{% endif %}<small>Verbindungen, Hintergrundvorgänge und Protokoll</small></span></summary>
+  <p>{{ counts.get('wartend', 0) + counts.get('laeuft', 0) }} Vorgänge werden gerade bearbeitet.</p>
+  <div class="actions"><a class="btn ghost" href="/protokoll">Protokoll ansehen</a><a href="/hilfe">Alle Funktionen erklärt</a></div>
+  <div id="verbindungen-widget" class="actions"><a class="status" id="status-claude" href="/setup#claude-verbindung">Claude</a>{% if cfg.legacy_lesson_generation_enabled %}<a class="status" id="status-notebooklm" href="/setup#notebooklm-verbindung">NotebookLM</a>{% endif %}</div>
+  {% for j in fehler %}<div class="item"><strong>Ein Vorgang braucht Hilfe</strong><details><summary>Fehlerdetails ansehen</summary><p>{{ j.last_error }}</p><code>{{ j.type }}</code></details><form method="post" action="/vorgang/{{ j.id }}/erneut">{{ csrf_input() }}<button class="ghost" type="submit">Erneut versuchen</button></form></div>{% endfor %}
+  {% if einig.gesamt %}<p class="hint">Karo und Lernbegleitung waren sich bei {{ (einig.quote * 100)|round|int }} % der letzten {{ einig.gesamt }} Antworten einig. Das ist kein Lernfortschritt Ihres Kindes.</p>{% endif %}
+</details>
+<details class="card disclosure parent-details">
+  <summary><span>Aussehen &amp; Anmeldung<small>Farben wählen oder das Gerät ans Kind übergeben</small></span></summary>
+  <div class="row area-preferences"><div class="field">
+    <label for="eltern-farbwelt">Elternbereich</label><select id="eltern-farbwelt" data-theme-picker="parent">
+    {% for wert, name in [('schiefer','Schiefer & Petrol'),('sand','Sand & Braun'),('nacht','Nachtblau')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
+  </div><div class="field">
+    <label for="farbwelten-auswahl">Kinderbereich</label><select id="farbwelten-auswahl" data-theme-picker="child">
+    {% for wert, name in [('lila','Lila'),('ozean','Blau'),('wiese','Grün'),('sonne','Orange'),('zuckerwatte','Rosa'),('lava','Rot'),('dunkel','Dunkel')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
+  </div></div>
+  <form method="post" action="/eltern/kind-modus" class="section-space"><p class="hint">Gerät ans Kind übergeben? Zurück geht es nur mit dem Eltern-Passwort.</p>{{ csrf_input() }}<button type="submit" class="ghost">Kind-Modus starten</button></form>
+  <form method="post" action="/logout" class="section-space" data-logout>{{ csrf_input() }}<button type="submit" class="ghost">Abmelden</button></form>
+</details>
 </details>
 {% endblock %}
