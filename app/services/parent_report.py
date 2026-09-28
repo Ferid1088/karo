@@ -434,8 +434,12 @@ def build(mode: str = 'monat', raw_date: str = '', back: str = 'monat', base: st
             head = 'Noch nichts erfasst'
         else:
             head = HEADS[mode][0 if learning in ('good', 'off') else 1]
-        attention = [l['label'] for l in lamps if l['level'] == level and level in ('warn', 'crit')]
-        line = (f"{'Jetzt unterstützen' if level == 'crit' else 'Im Blick'}: {', '.join(attention)}" if attention
+        # At most two names on the tile (most actionable first); the dialog lists all lamps.
+        priority = ('exams', 'answers', 'days', 'goals')
+        attention = [l['label'] for l in sorted(lamps, key=lambda l: priority.index(l['key']))
+                     if l['level'] == level and level in ('warn', 'crit')]
+        named = ', '.join(attention[:2]) + (f' +{len(attention) - 2}' if len(attention) > 2 else '')
+        line = (f"{'Jetzt unterstützen' if level == 'crit' else 'Im Blick'}: {named}" if attention
                 else 'Alles im grünen Bereich' if level == 'good' else 'Keine Meldung ist kein Misserfolg')
     conversation = ('Dieser Zeitraum liegt noch vor uns. Geplant bedeutet nicht erledigt.' if start > today
                     else 'Keine Meldung ist kein Misserfolg. Gemeinsame Gespräche sagen mehr als eine Zahl.'
