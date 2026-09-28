@@ -472,7 +472,7 @@ def commit_material(quelle: Path, unterordner: str | None = SHEETS) -> str | Non
 # --------------------------------------------------------------------------
 
 def aufnehmen(daten: bytes, endung: str, rolle: str = "wissen",
-              themenname: str = "") -> dict:
+              themenname: str = "", subject: str | None = None) -> dict:
     """Nimmt ein einzelnes Bild auf, ohne den Eingangsordner zu benutzen.
 
     Fuer den Papierweg: das Foto des Antwortblattes wird direkt auf der Seite
@@ -487,7 +487,12 @@ def aufnehmen(daten: bytes, endung: str, rolle: str = "wissen",
     namen je Datei und laesst dieses Feld leer.
     """
     import hashlib as _h
+    from .faecher import pflicht
 
+    # Ein Schulblatt gehört immer zu genau einem Fach. Antwortblätter hängen
+    # an ihrer Fragerunde und damit schon an deren Thema.
+    if rolle == "wissen":
+        subject = pflicht(subject)
     if endung.lower() not in ALL_SUFFIXES:
         raise IngestError(f"Dateityp {endung or '(ohne)'} wird nicht unterstützt.")
     if len(daten) > MAX_SOURCE_BYTES:
@@ -520,10 +525,10 @@ def aufnehmen(daten: bytes, endung: str, rolle: str = "wissen",
         cur = c.execute(
             """INSERT INTO document
                    (sha256, source_name, stored_path, mime, rolle, captured_on,
-                    state, themenname, created_at)
-               VALUES (?, ?, ?, 'image/jpeg', ?, ?, 'neu', ?, ?)""",
+                    state, themenname, subject, created_at)
+               VALUES (?, ?, ?, 'image/jpeg', ?, ?, 'neu', ?, ?, ?)""",
             (digest, f"upload{endung.lower()}", str(stored), rolle,
-             db.today(), themenname.strip()[:200] or None, db.now()))
+             db.today(), themenname.strip()[:200] or None, subject, db.now()))
         doc_id = cur.lastrowid
 
     return {"document_id": doc_id, "status": "neu",

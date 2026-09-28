@@ -29,7 +29,7 @@ import logging
 import shutil
 from pathlib import Path
 
-from . import config, db, ingest, jobs, kb, prompts, quizzes, research, topics
+from . import config, db, ingest, jobs, kb, prompts, quizzes, research, topics, faecher
 from .domain import (
     ERROR_LABELS,
     Ausgabe,
@@ -236,7 +236,7 @@ def job_lesson_build(payload: dict) -> None:
     erklaerung = client().complete(
         purpose="lesson_write",
         prompt=prompts.lesson_prompt(
-            cfg.learner_grade, cfg.subject, thema["label"],
+            cfg.learner_grade, faecher.name(thema["subject"]), thema["label"],
             thema.get("beschreibung") or "", kb.geschwaerzt(quellen),
             runde["stufe"], fehlerbild, fundstellen,
             vorherige_folien=vorherige_folien, runde_nr=runde["nr"],
@@ -252,7 +252,7 @@ def job_lesson_build(payload: dict) -> None:
     # --- 3. Gegenprüfung -------------------------------------------------
     pruefung = client().complete(
         purpose="lesson_verify",
-        prompt=prompts.verify_prompt(cfg.learner_grade, cfg.subject,
+        prompt=prompts.verify_prompt(cfg.learner_grade, faecher.name(thema["subject"]),
                                      thema["label"], kb.geschwaerzt(quellen),
                                      folien),
         schema=prompts.VERIFY_SCHEMA,
@@ -634,7 +634,7 @@ def job_lesson_variant(payload: dict) -> None:
         erklaerung = client().complete(
             purpose="lesson_write",
             prompt=prompts.lesson_prompt(
-                cfg.learner_grade, cfg.subject, thema["label"],
+                cfg.learner_grade, faecher.name(thema["subject"]), thema["label"],
                 thema.get("beschreibung") or "", kb.geschwaerzt(quellen),
                 runde["stufe"], fehlerbild, fundstellen,
                 runde_nr=runde["nr"], wunsch=variante["wunsch"],
@@ -652,7 +652,7 @@ def job_lesson_variant(payload: dict) -> None:
         # darf niemals ungeprueftes Material an das Kind ausliefern.
         pruefung = client().complete(
             purpose="lesson_verify",
-            prompt=prompts.verify_prompt(cfg.learner_grade, cfg.subject,
+            prompt=prompts.verify_prompt(cfg.learner_grade, faecher.name(thema["subject"]),
                                          thema["label"], kb.geschwaerzt(quellen),
                                          folien),
             schema=prompts.VERIFY_SCHEMA,

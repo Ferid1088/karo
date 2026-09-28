@@ -8,6 +8,6 @@
 {% if cfg.schulblaetter_kind %}
 <section class="card">
   <h2>Schulblätter</h2>
-  <a href="/wissen">Deine Schulblätter ansehen oder ein Blatt hinzufügen →</a>
+  <a href="/wissen?fach={{ aktives_fach }}">Deine Schulblätter in {{ aktives_fach|fachname }} ansehen oder ein Blatt hinzufügen →</a>
 </section>
 {% endif %}

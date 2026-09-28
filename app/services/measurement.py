@@ -21,7 +21,7 @@ from pathlib import Path
 from fastapi import Request
 from starlette.concurrency import run_in_threadpool
 
-from .. import config, db, export, ingest, jobs
+from .. import config, db, export, ingest, jobs, faecher
 from ..routers.shared import flash, render, zurueck
 
 
@@ -121,7 +121,7 @@ def render_klassenarbeit(request: Request, monat: str = ""):
     from . import exam_calendar
     # Geloeschte Arbeiten stehen im Archiv unter "Erfolge".
     zeilen = [_exam_ansicht(dict(r)) for r in db.q(
-        "SELECT * FROM exam WHERE deleted_at IS NULL AND purged_at IS NULL "
+        f"SELECT * FROM exam WHERE deleted_at IS NULL AND purged_at IS NULL AND subject IN {faecher.SQL_FAECHER} "
         "ORDER BY exam_date DESC LIMIT 20")]
     # Parent and child use the same isolated process. The setting controls
     # access, not a second legacy workflow with shared personal topics.
@@ -158,7 +158,7 @@ def render_klassenarbeit_detail(request: Request, exam_id: int):
     """
     from fastapi import HTTPException
     from . import exam_calendar
-    row = db.q1("SELECT * FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL", exam_id)
+    row = db.q1(f"SELECT * FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL AND subject IN {faecher.SQL_FAECHER}", exam_id)
     if row is None:
         raise HTTPException(404, "Diese Klassenarbeit gibt es nicht.")
     return render(request, "klassenarbeit_detail.html", e=_exam_ansicht(dict(row)),

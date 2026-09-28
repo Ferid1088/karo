@@ -161,7 +161,9 @@ VERIFY_PING = {"ok": True}
 ALLE = {"kb": KB, "topics": TOPICS, "quiz": QUIZ, "check": CHECK_GEMISCHT,
         "lesson": LESSON, "verify": VERIFY_OK, "sheet": SHEET,
         "search_terms": SEARCH_TERMS, "search": SEARCH, "rank": RANK,
-        "verify_ping": VERIFY_PING}
+        "verify_ping": VERIFY_PING,
+        "klassenpruefung": {"klasse_von": 5, "klasse_bis": 7, "sicher": True,
+                            "begruendung": "Unabhängige curriculare Einordnung des Testkonzepts."}}
 
 
 # --------------------------------------------------------------------------
@@ -439,7 +441,7 @@ def test_upload_groesser_als_das_limit_wird_abgelehnt(
 
     seite = client.get("/wissen")
     r = client.post("/wissen/upload", data={"_csrf": csrf_from(seite.text),
-                                            "themenname": "Test"},
+                                            "themenname": "Test", "fach": "mathematik"},
                     files={"datei": ("blatt.jpg", b"x" * 1000, "image/jpeg")},
                     follow_redirects=True)
     assert r.status_code == 200
@@ -469,9 +471,11 @@ def test_kind_modus_beschraenkt_auf_kindbereiche(client, fake_llm, fake_cli, alt
         r = client.get(pfad, follow_redirects=False)
         assert r.status_code == 403, pfad
 
-    for pfad in ("/", "/lernen", "/lernzyklus", "/lernstand"):
+    for pfad in ("/", "/lernen/mathematik", "/lernzyklus", "/lernstand"):
         r = client.get(pfad, follow_redirects=False)
         assert r.status_code == 200, pfad
+    # /lernen öffnet das zuletzt gewählte Fach.
+    assert client.get("/lernen", follow_redirects=False).headers["location"].startswith("/lernen/")
 
     # Diese Pfade existieren fuer das Kind, auch wenn die konkrete ID fehlt —
     # die Rollensperre darf hier nicht dazwischenfunken (kein 403).
@@ -524,7 +528,7 @@ def test_eltern_koennen_alle_kind_routen_erreichen(
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
     topic_id = themen_freigeben(client, app_env)[0]
-    for pfad in ("/", "/lernen", "/lernzyklus", f"/lernzyklus/{topic_id}"):
+    for pfad in ("/", "/lernen/mathematik", "/lernzyklus", f"/lernzyklus/{topic_id}"):
         assert client.get(pfad, follow_redirects=False).status_code == 200, pfad
 
 
@@ -596,7 +600,7 @@ def test_vorbereitung_zeigt_dieselben_inhalte_wie_die_alten_seiten(
     seite = client.get("/vorbereitung/inhalte")
     client.post("/vorbereitung/inhalte/neu",
                data={"_csrf": csrf_from(seite.text), "label": "Dreisatz",
-                     "beschreibung": "Verhältnisse berechnen"})
+                     "beschreibung": "Verhältnisse berechnen", "fach": "mathematik"})
     assert "Dreisatz" in client.get("/themen").text
 
 
@@ -751,7 +755,7 @@ def test_wissen_upload_verlangt_themennamen(client, fake_llm, fake_cli, app_env)
     Image.new("RGB", (900, 1200), (245, 245, 245)).save(puffer, "JPEG")
 
     seite = client.get("/wissen")
-    r = client.post("/wissen/upload", data={"_csrf": csrf_from(seite.text)},
+    r = client.post("/wissen/upload", data={"_csrf": csrf_from(seite.text), "fach": "mathematik"},
                     files={"datei": ("blatt.jpg", puffer.getvalue(), "image/jpeg")},
                     follow_redirects=True)
     assert "Themennamen angeben" in r.text
@@ -773,7 +777,7 @@ def test_wissen_upload_gibt_themennamen_an_die_ki_weiter(
     seite = client.get("/wissen")
     r = client.post(
         "/wissen/upload",
-        data={"_csrf": csrf_from(seite.text), "themenname": "Bruchrechnung"},
+        data={"_csrf": csrf_from(seite.text), "themenname": "Bruchrechnung", "fach": "mathematik"},
         files={"datei": ("blatt.jpg", puffer.getvalue(), "image/jpeg")},
         follow_redirects=True)
     assert "wird jetzt für „Bruchrechnung“ gelesen" in r.text
@@ -1698,7 +1702,7 @@ def test_ohne_erklaermaterial_gibt_es_eine_klare_meldung(client, fake_llm,
     from app.teaching import TeachingError
 
     einrichten(client, fake_llm)
-    topic_id = topics.anlegen("Thema ohne Material")
+    topic_id = topics.anlegen("Thema ohne Material", subject="mathematik")
     assert topic_id is not None
 
     lesson_id = teaching.starten(topic_id, "html")
@@ -1923,7 +1927,7 @@ def test_ohne_eigenes_material_wird_freigegebene_quelle_zur_faktengrundlage(
     from app import quizzes, research, topics as topics_mod
 
     einrichten(client, fake_llm)
-    topic_id = topics_mod.anlegen("Thema ohne Material")
+    topic_id = topics_mod.anlegen("Thema ohne Material", subject="mathematik")
     assert topic_id is not None
 
     _uebungstag(app_env, topic_id, "2099-03-01", 0, fragen=1, richtig=False)
@@ -2039,7 +2043,7 @@ def test_thema_mit_nur_aufgaben_weist_auf_fehlendes_material_hin(
     from app import quizzes, topics as topics_mod
 
     einrichten(client, fake_llm)
-    topic_id = topics_mod.anlegen("Nur Aufgaben")
+    topic_id = topics_mod.anlegen("Nur Aufgaben", subject="mathematik")
     assert topic_id is not None
 
     with app_env.db.tx() as c:

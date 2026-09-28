@@ -2,7 +2,7 @@
 
 from fastapi import HTTPException
 
-from .. import db, topics
+from .. import db, topics, faecher
 
 
 def start(topic_id: int) -> None:
@@ -56,8 +56,9 @@ def groups(themen: list[dict]) -> dict:
 def exam_groups(themen: list[dict]) -> dict:
     from .learning_hub import exam_topics
     result = {'neu': [], 'bearbeitung': []}
-    for exam in db.q('''SELECT * FROM exam WHERE exam_date >= ?
-            AND deleted_at IS NULL AND purged_at IS NULL ORDER BY exam_date, id''', db.today()):
+    for exam in db.q(f'''SELECT * FROM exam WHERE exam_date >= ?
+            AND deleted_at IS NULL AND purged_at IS NULL AND subject IN {faecher.SQL_FAECHER}
+            ORDER BY exam_date, id''', db.today()):
         selected = exam_topics(exam['id'])
         grouped = {key: [t for t in selected if t['learning_status'] == key] for key in result}
         for key in result:

@@ -11,8 +11,8 @@ from .test_ui import Forms
 def prepare(client, fake_llm, app_env):
     from app import topics
     einrichten(client, fake_llm)
-    first = topics.anlegen('Brüche addieren')
-    second = topics.anlegen('Längen messen')
+    first = topics.anlegen('Brüche addieren', subject="mathematik")
+    second = topics.anlegen('Längen messen', subject="mathematik")
     kind_modus_aktivieren(client)
     return first, second
 
@@ -82,7 +82,8 @@ def test_gelernt_checkbox_refreshes_current_page_instead_of_opening_erfolge(
         f'/lernzyklus/{first}/gelernt', data={'_csrf': token, 'gelernt': 'ja'},
         headers={'referer': f'http://127.0.0.1:8080{seite}'})
     assert response.status_code == 200
-    assert response.request.url.path == '/lernen'
+    # /lernen führt ins aktive Fach; der Filter bleibt erhalten.
+    assert response.request.url.path == '/lernen/mathematik'
     assert 'status=bearbeitung' in str(response.request.url)
     assert card not in response.text
     # Ohne Referer (z. B. altes Formular) bleibt der bisherige Fallback.
@@ -109,7 +110,7 @@ def test_exam_topics_keep_separate_progress(client, fake_llm, fake_cli, app_env)
     app_env.config.update(klassenarbeit_kind=True)
     token = csrf_from(client.get('/lernen').text)
     created = exam.create_exam((date.today() + timedelta(days=10)).isoformat(),
-                              manual_topics='Brüche addieren')
+                              manual_topics='Brüche addieren', subject='mathematik')
     owned = learning_hub.exam_topics(created.exam_id)[0]
     assert owned['id'] not in (first, second)
     assert owned['learning_status'] == 'neu'

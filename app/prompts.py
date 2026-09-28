@@ -36,6 +36,11 @@ SYSTEM = (
 KB_SCHEMA = {
     "type": "object",
     "properties": {
+        "fach": {
+            "type": "string", "enum": ["deutsch", "mathematik", "englisch", "andere"],
+            "description": "Zu welchem Schulfach das Blatt tatsächlich gehört — "
+                           "unabhängig vom angegebenen Fach",
+        },
         "lesbarkeit": {"type": "string", "enum": ["gut", "teilweise", "schlecht"]},
         "dokumenttyp": {
             "type": "string",
@@ -125,6 +130,11 @@ TOPIC_SCHEMA = {
                         "type": "string",
                         "description": "Kurzcode in GROSSBUCHSTABEN mit Punkten, "
                                        "z. B. BR.ADD.UNGLEICH",
+                    },
+                    "fach": {
+                        "type": "string",
+                        "enum": ["deutsch", "mathematik", "englisch", "andere"],
+                        "description": "Schulfach dieses Themas",
                     },
                     "label": {
                         "type": "string",
@@ -1088,7 +1098,7 @@ LEKTION_SCHEMA = {
 }
 
 
-def lektion_prompt(grade: int, subject: str, thema: str) -> str:
+def lektion_prompt(grade: int | None, subject: str, thema: str) -> str:
     """Der Auftrag an Modell A: eine ganze Lektion zu einem Themennamen.
 
     Das Register wird als Metadaten mitgegeben — Bezeichnung, Zweck,
@@ -1100,7 +1110,14 @@ def lektion_prompt(grade: int, subject: str, thema: str) -> str:
 
     register = json.dumps(komponenten.fuer_modell(), ensure_ascii=False,
                           indent=2)
-    return f"""Du entwirfst eine Lernreihe für ein Kind der Klasse {grade} im Fach {subject}.
+    return f"""Du entwirfst eine fachlich eingeordnete Lernreihe im Fach {subject}.
+
+Die Klassenstufe des anfragenden Kindes bestimmt NICHT die Einordnung des Inhalts.
+Ordne klasse_von und klasse_bis nach dem tatsächlichen Konzept, seinen Voraussetzungen
+und dem üblichen curricularen Lernniveau ein. Bei geprüften Curriculum-Metadaten
+übernimm first_contact_grade und target_grade exakt. Ohne solche Metadaten bewerte
+die Einordnung unabhängig vom Nutzer; erfinde keine passende Klasse für dessen Wunsch.
+Die Lernreihe muss zum fachlichen Niveau passen, nicht zur Profilklasse.
 
 Thema: {thema}
 

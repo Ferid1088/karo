@@ -1,21 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Schulblätter – {{ companion_name }}{% endblock %}
 {% block content %}
-{% if cfg.schulblaetter_kind %}<a class="back-link" href="/lernen">← Lernen</a>{% endif %}
-<h1>Schulblätter</h1><p class="sub">{{ 'Füge' if cfg.schulblaetter_kind else 'Fügen Sie' }} Material aus dem Unterricht hinzu. Daraus entstehen passende Themen und Erklärungen.</p>
+{% if cfg.schulblaetter_kind %}<a class="back-link" href="/lernen/{{ fach }}">← {{ fach|fachname }}</a>{% endif %}
+{# Schulblätter gibt es nur je Fach: der Reiter bestimmt, was gezeigt wird
+   und in welches Fach ein neues Blatt kommt. #}
+<nav class="tabs" aria-label="Fach">
+  {% for key, label in faecher %}<a class="tab-btn{{ ' active' if key == fach }}" href="/wissen?fach={{ key }}" {{ 'aria-current=page' if key == fach }}>{{ label }}</a>{% endfor %}
+</nav>
+<h1>Schulblätter · {{ fach|fachname }}</h1><p class="sub">{{ 'Füge' if cfg.schulblaetter_kind else 'Fügen Sie' }} Material aus dem Unterricht hinzu. Daraus entstehen passende Themen und Erklärungen.</p>
 <section class="card"><h2>Ein Blatt hinzufügen</h2>
 <form method="post" action="/wissen/upload" enctype="multipart/form-data">
-{{ csrf_input() }}
+{{ csrf_input() }}<input type="hidden" name="fach" value="{{ fach }}">
 <div class="field"><label for="themenname">Worum geht es?</label><input id="themenname" name="themenname" required maxlength="200" placeholder="Zum Beispiel: Bruchrechnung"></div>
 <div class="field"><label for="datei">Foto oder PDF</label><input type="file" id="datei" name="datei" accept="image/*,application/pdf" required></div>
 <button type="submit">Blatt hinzufügen</button>
 </form>
 <details class="disclosure"><summary>Mehrere Blätter aus dem Ordner einlesen</summary>
 <p class="hint">Blätter in <code>{{ inbox_path }}</code> ablegen.</p>
-<form method="post" action="/wissen/einlesen">{{ csrf_input() }}<button class="ghost" type="submit">Ordner einlesen</button></form>
+<form method="post" action="/wissen/einlesen">{{ csrf_input() }}<input type="hidden" name="fach" value="{{ fach }}"><button class="ghost" type="submit">Ordner einlesen</button></form>
 </details></section>
 {% set offen = counts.get('wartend', 0) + counts.get('laeuft', 0) %}
-{% if offen %}<p class="quiet-note" role="status">{{ companion_name }} liest das Material. <a href="/wissen">Stand aktualisieren</a></p>{% endif %}
+{% if offen %}<p class="quiet-note" role="status">{{ companion_name }} liest das Material. <a href="/wissen?fach={{ fach }}">Stand aktualisieren</a></p>{% endif %}
 {% if offene_vorschlaege %}
 {% if role == 'child' %}<p class="quiet-note">Ein Erwachsener bestätigt noch die erkannten Themen. Danach erscheinen sie unter „Lernen“.</p>
 {% else %}<a class="simple-list-link card" href="/themen#themen-vorschlaege"><span><strong>{{ offene_vorschlaege }} neue Themen prüfen</strong><small>Bestätigte Themen erscheinen sofort im Lernbereich.</small></span><span aria-hidden="true">→</span></a>{% endif %}{% endif %}

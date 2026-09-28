@@ -25,8 +25,18 @@ class Forms(HTMLParser):
                 self.current["fields"][attrs["name"]] = attrs.get("value", "")
             elif tag == "input" and "checked" in attrs:
                 self.current["fields"][attrs["name"]] = attrs.get("value", "")
+            elif tag == "select":
+                # Wie ein Browser: die gewählte Option, sonst die erste.
+                self.select = attrs["name"]
+                self.select_chosen = False
+        if tag == "option" and self.current is not None and getattr(self, "select", None):
+            if "selected" in attrs or not self.select_chosen and self.select not in self.current["fields"]:
+                self.current["fields"][self.select] = attrs.get("value", "")
+                self.select_chosen = self.select_chosen or "selected" in attrs
 
     def handle_endtag(self, tag):
+        if tag == "select":
+            self.select = None
         if tag == "form":
             self.current = None
 
@@ -85,8 +95,8 @@ def test_upload_proposals_and_manual_topic_use_rendered_fields(client, fake_llm,
 def test_topic_and_lesson_ids_are_not_interchangeable(client, fake_llm, fake_cli, app_env, alter_generator):
     from app import teaching, topics
     einrichten(client, fake_llm)
-    topics.anlegen("Ein anderes Thema")
-    topic_id = topics.anlegen("Unser Thema")
+    topics.anlegen("Ein anderes Thema", subject="mathematik")
+    topic_id = topics.anlegen("Unser Thema", subject="mathematik")
     lesson_id = teaching.starten(topic_id)
     assert lesson_id != topic_id
     page = client.get(f"/lernzyklus/{topic_id}")

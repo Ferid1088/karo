@@ -134,9 +134,9 @@ def test_generation_wait_resume_and_database_reuse(client, fake_llm, fake_cli, a
     session = app_env.db.q1("SELECT id FROM lern_sitzung ORDER BY id DESC LIMIT 1")
     entry = store.eingabe(store.sitzung(session["id"])["eingabe_id"])
     assert entry["topic_id"] == tid
-    assert len(fake_llm.calls) == 1
+    assert len(fake_llm.calls) == 2  # Author and independent class review.
     client.post(base + "/start", data={"_csrf": token, "topic_id": tid})
-    assert len(fake_llm.calls) == 1
+    assert len(fake_llm.calls) == 2  # Reuse makes no additional model call.
     # Generated lessons without an explicit confirmation use another checked task.
     post(client, token, base, session["id"], "anker", "Würfel")
     post(client, token, base, session["id"], "diagnose", "8")
@@ -165,8 +165,12 @@ def test_create_exam_guides_to_own_plan_and_retains_invalid_form(client, fake_ll
                            "themen": "Brüche kürzen", "fach": "Mathematik"}, follow_redirects=False)
     assert re.fullmatch(r"/klassenarbeit/\d+#exam-calendar-title", response.headers["location"])
     page = client.post("/klassenarbeit", data={"_csrf": token, "exam_date": "2020-01-01",
+                       "themen": "Behaltenes Thema", "fach": "mathematik"})
+    assert "Behaltenes Thema" in page.text and 'value="mathematik" selected' in page.text
+    # Ein anderes Fach als die drei wird nicht angenommen; die Eingaben bleiben.
+    page = client.post("/klassenarbeit", data={"_csrf": token, "exam_date": "2026-11-03",
                        "themen": "Behaltenes Thema", "fach": "Biologie"})
-    assert "Behaltenes Thema" in page.text and 'value="Biologie"' in page.text
+    assert "Behaltenes Thema" in page.text and "Bitte wähle das Fach" in page.text
 
 
 def test_rehearsal_is_gated_scoped_and_idempotent(client, fake_llm, fake_cli, app_env, monkeypatch):
@@ -311,7 +315,7 @@ def test_exam_upload_to_confirmed_exam_stays_separate(client, fake_llm, fake_cli
     page = client.get('/klassenarbeit/neu')
     assert 'value="2026-10-15"' in page.text and 'Brüche addieren' in page.text
     assert client.get(f'/lernen/material/status?scan_id={scan}').status_code == 404
-    response = client.post('/klassenarbeit', data={'_csrf': token, 'scan_id': scan,
+    response = client.post('/klassenarbeit', data={"fach": "mathematik", '_csrf': token, 'scan_id': scan,
         'exam_date': '2026-10-15', 'themen': 'Brüche addieren', 'fach': 'Mathematik'})
     assert 'Wann möchtest du lernen?' in response.text
     eid = app_env.db.q1('SELECT id FROM exam ORDER BY id DESC LIMIT 1')['id']

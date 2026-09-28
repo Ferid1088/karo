@@ -19,7 +19,7 @@ import json
 import logging
 from pathlib import Path
 
-from . import config, db, ingest, jobs, pii, prompts, topics
+from . import config, db, ingest, jobs, pii, prompts, topics, faecher
 from .llm import ClaudeClient, ClaudeError
 
 log = logging.getLogger("karo.exam_plan")
@@ -178,7 +178,7 @@ def job_exam_plan_build(payload: dict) -> None:
     try:
         ergebnis = client().complete(
             purpose="exam_plan_build",
-            prompt=prompts.plan_prompt(cfg.learner_grade, cfg.subject, tage,
+            prompt=prompts.plan_prompt(cfg.learner_grade, faecher.name(exam["subject"]), tage,
                                        themen, _profil(themen)),
             schema=prompts.PLAN_SCHEMA,
             system=prompts.SYSTEM,

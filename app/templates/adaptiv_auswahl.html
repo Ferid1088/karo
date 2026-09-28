@@ -20,9 +20,9 @@
   <div class="simple-list">
   {% for lektion in lektionen %}
     <form method="post" action="{{ learning_base }}/start">{{ csrf_input() }}
-      <input type="hidden" name="thema" value="{{ lektion.konzept_key }}">
+      <input type="hidden" name="thema" value="{{ lektion.konzept_key }}"><input type="hidden" name="fach" value="{{ lektion.fach }}">
       <button type="submit" class="simple-list-link">
-        <span><strong>{{ lektion.label }}</strong><small>{{ lektion.fach|capitalize }}</small></span>
+        <span><strong>{{ lektion.label }}</strong><small>{{ lektion.fach|fachname }}</small></span>
       </button>
     </form>
   {% endfor %}
@@ -34,8 +34,8 @@
   <h2>Etwas anderes?</h2>
   <p>Schreib das Thema auf. Wenn es das noch nicht gibt, sagt Karo es dir —
      statt dir etwas anderes unterzuschieben.</p>
-  <form method="post" action="{{ learning_base }}/start">{{ csrf_input() }}
-    <input type="text" name="thema" placeholder="z. B. Brüche addieren"
+  <form method="post" action="{{ learning_base }}/start">{{ csrf_input() }}<input type="hidden" name="fach" value="{{ fach }}">
+    <input type="text" name="thema" aria-label="Thema in {{ fach|fachname }}" placeholder="Ein Thema in {{ fach|fachname }}"
            value="{{ thema }}">
     <button type="submit">Los</button>
   </form>

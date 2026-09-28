@@ -5,20 +5,30 @@ import hashlib
 import json
 import uuid
 
-from .. import config, db, topics
+from .. import db, faecher, topics
 from ..adaptiv import lektionen, store
 
 
-def create_topic(label: str, subject: str = "", grade: int | None = None,
-                 *, personal: bool = True, exam_id: int | None = None) -> int:
+def create_topic(label: str, subject: str, grade: int | None = None,
+                 *, personal: bool = True, exam_id: int | None = None,
+                 modell: bool = True) -> int:
+    """Legt ein Thema im Fach ``subject`` an — nie ohne und nie im falschen.
+
+    Fachfremdes wirft `faecher.SubjectMismatch` (SUBJECT_MISMATCH), bevor
+    irgendetwas gespeichert ist. ``modell=False`` prüft nur über Katalog und
+    Stichworte — für Listen von bis zu 20 Themen, bei denen ein Modellaufruf
+    je Name das Anlegen minutenlang aufhielte.
+    """
     label = " ".join(label.split())
-    cfg = config.load_safe()
-    subject = subject.strip() or cfg.subject
-    grade = grade or cfg.learner_grade
+    subject = faecher.pflicht(subject)
     if not label or len(label) > 200:
         raise ValueError("Beschreibe dein Thema bitte mit 1 bis 200 Zeichen.")
-    if len(subject) > 80 or not 1 <= int(grade) <= 13:
-        raise ValueError("Bitte ein Fach und eine Klasse von 1 bis 13 wählen.")
+    if grade is not None and not 1 <= int(grade) <= 13:
+        raise ValueError("Bitte eine Klasse von 1 bis 13 wählen.")
+    # The submitted class is context only, never a curricular classification.
+    lesson = lektionen.fuer_thema(label, subject)
+    concept = store.konzept(lesson['konzept_id']) if lesson else None
+    grade = concept['klasse_bis'] if concept else None
     # Ein eigenes Lernthema und ein Prüfungsthema sind zwei Dinge, auch wenn
     # sie gleich heissen: "Bruchrechnen" fuer die Arbeit am Freitag hat einen
     # anderen Stand als "Bruchrechnen", das aus Neugier laeuft. Deshalb
@@ -31,13 +41,13 @@ def create_topic(label: str, subject: str = "", grade: int | None = None,
     existing = next((t for t in topics.liste(topics.AKTIV)
                      if t['label'].casefold() == label.casefold()
                      and t['subject'].casefold() == subject.casefold()
-                     and (t.get('grade') or cfg.learner_grade) == grade
                      and bool(t.get('learning_visible', 1)) == personal
                      and not t.get('deleted_at') and not t.get('purged_at')
                      and not t.get('learned_at')
                      and (personal or t['id'] in members)), None)
     if existing:
         return existing['id']
+    faecher.pruefe(label, subject, modell=modell)
     key = hashlib.sha256(f'{subject.casefold()}:{grade}:{label.casefold()}'.encode()).hexdigest()[:16]
     with db.tx() as c:
         return c.execute('''INSERT INTO topic
@@ -47,13 +57,24 @@ def create_topic(label: str, subject: str = "", grade: int | None = None,
              db.now(), int(personal), grade)).lastrowid
 
 
-def link_exam(exam_id: int, names: list[str], subject: str) -> None:
+def link_exam(exam_id: int, names: list[str], subject: str) -> list[str]:
+    """Hängt Prüfungsthemen an. Gibt die Namen zurück, die zu einem anderen
+    Fach gehören und deshalb nicht angelegt wurden."""
+    subject = faecher.pflicht(subject)
     offset = db.q1('SELECT COALESCE(MAX(position),-1)+1 AS n FROM exam_topic WHERE exam_id=?', exam_id)['n']
-    for position, name in enumerate(names, start=offset):
-        topic_id = create_topic(name, subject, personal=False, exam_id=exam_id)
+    abgewiesen = []
+    position = offset
+    for name in names:
+        try:
+            topic_id = create_topic(name, subject, personal=False, exam_id=exam_id, modell=False)
+        except faecher.SubjectMismatch:
+            abgewiesen.append(name)
+            continue
         with db.tx() as c:
             c.execute('INSERT OR IGNORE INTO exam_topic VALUES(?,?,?)',
                       (exam_id, topic_id, position))
+        position += 1
+    return abgewiesen
 
 
 def migrate_exams() -> None:
@@ -88,12 +109,20 @@ def migrate_exams() -> None:
             names = json.loads(e['themen'] or '[]')
         except (ValueError, TypeError):
             continue
-        if isinstance(names, list):
+        # Arbeiten ohne gültiges Fach liegen im Elternordner und bekommen
+        # erst Themen, wenn dort ein Fach gewählt ist.
+        if isinstance(names, list) and faecher.schluessel(e['subject']):
             link_exam(e['id'], [n for n in names if isinstance(n, str) and n.strip()], e['subject'])
 
 
 def decorate(rows: list[dict]) -> list[dict]:
     for t in rows:
+        lesson = lektionen.fuer_thema(t['label'], t['subject'])
+        concept = store.konzept(lesson['konzept_id']) if lesson else None
+        t['content_level'] = (f"Klasse {concept['klasse_von']}" +
+            (f"–{concept['klasse_bis']}" if concept['klasse_von'] != concept['klasse_bis'] else '')) if concept else None
+        # Old topic.grade values came from a form, not a curriculum check.
+        t['grade'] = concept['klasse_bis'] if concept else None
         state = store.topic_mastery(t['id'])
         t['learning_status'] = ('sicher' if state == 'MASTERED' else
                                 'bearbeitung' if state or t.get('learning_started_at') else 'neu')
@@ -101,9 +130,12 @@ def decorate(rows: list[dict]) -> list[dict]:
     return rows
 
 
-def personal_topics() -> list[dict]:
+def personal_topics(fach: str | None = None) -> list[dict]:
+    """Eigene Themen — nur der drei Fächer, mit ``fach`` nur dieses einen."""
+    erlaubt = (faecher.pflicht(fach),) if fach else faecher.FAECHER
     return decorate([t for t in topics.liste(topics.AKTIV)
-                     if t.get('learning_visible', 1) and not t.get('deleted_at')
+                     if t['subject'] in erlaubt
+                     and t.get('learning_visible', 1) and not t.get('deleted_at')
                      and not t.get('purged_at') and not t.get('learned_at')])
 
 
@@ -118,6 +150,8 @@ def topic_in_scope(topic_id: int, exam_id: int | None = None) -> dict | None:
     topic = topics.get(topic_id)
     if not topic or topic['state'] != topics.AKTIV or topic.get('deleted_at') or topic.get('purged_at'):
         return None
+    if topic['subject'] not in faecher.FAECHER:
+        return None
     owner = db.q1('SELECT exam_id FROM exam_topic WHERE topic_id=?', topic_id)
     if exam_id is None:
         return topic if topic.get('learning_visible', 1) and not owner else None
@@ -125,8 +159,9 @@ def topic_in_scope(topic_id: int, exam_id: int | None = None) -> dict | None:
     return topic if exam and owner and owner['exam_id'] == exam_id and not topic.get('learning_visible') else None
 
 
-def catalog() -> list[dict]:
-    return lektionen.verfuegbar()
+def catalog(fach: str) -> list[dict]:
+    """Verfasste Lektionen nur des aktiven Fachs."""
+    return lektionen.verfuegbar(fach)
 
 
 def monitor(heute: str = "") -> dict:
@@ -203,8 +238,9 @@ def archiv_themen() -> list[dict]:
     eigenes Archiv — die beiden Dinge bleiben getrennt.
     """
     zeilen = [dict(r) for r in db.q(
-        """SELECT * FROM topic
+        f"""SELECT * FROM topic
             WHERE learning_visible = 1 AND purged_at IS NULL
+              AND subject IN {faecher.SQL_FAECHER}
               AND (deleted_at IS NOT NULL OR learned_at IS NOT NULL)
             ORDER BY COALESCE(deleted_at, learned_at) DESC""")]
     for t in zeilen:
@@ -227,8 +263,8 @@ def archiv_arbeiten() -> list[dict]:
     """Klassenarbeiten im Archiv: geschrieben (Termin vorbei) oder geloescht."""
     heute = db.today()
     zeilen = [dict(r) for r in db.q(
-        """SELECT * FROM exam
-            WHERE purged_at IS NULL
+        f"""SELECT * FROM exam
+            WHERE purged_at IS NULL AND subject IN {faecher.SQL_FAECHER}
               AND (deleted_at IS NOT NULL OR exam_date < ?)
             ORDER BY COALESCE(deleted_at, exam_date) DESC""", heute)]
     for e in zeilen:

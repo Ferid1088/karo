@@ -19,8 +19,8 @@ LEKTION = "Brüche addieren und subtrahieren"
 def _bereit(client, fake_llm, app_env, *labels):
     from app import topics
     einrichten(client, fake_llm)
-    app_env.config.update(adaptive_learning_enabled=True)
-    ids = {label: topics.anlegen(label) for label in labels}
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
+    ids = {label: topics.anlegen(label, subject="mathematik") for label in labels}
     kind_modus_aktivieren(client)
     return ids
 

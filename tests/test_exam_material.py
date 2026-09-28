@@ -14,7 +14,7 @@ def plan_anlegen(app_env, topic_id):
     topic = db.q1("SELECT * FROM topic WHERE id=?", topic_id)
     with db.tx() as c:
         exam_id = c.execute("INSERT INTO exam(subject, exam_date, themen, created_at) VALUES (?, ?, ?, ?)",
-                            ("Mathematik", "2026-10-01", json.dumps([topic["label"]]), db.now())).lastrowid
+                            ("mathematik", "2026-10-01", json.dumps([topic["label"]]), db.now())).lastrowid
         c.execute("INSERT INTO exam_plan(exam_id, state, tagesplan, created_at) VALUES (?, 'bereit', ?, ?)",
                   (exam_id, json.dumps([
                       {"tag": "Montag", "inhalt": "Brüche addieren", "topic_code": topic["code"], "minuten": 15},

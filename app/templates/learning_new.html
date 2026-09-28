@@ -1,10 +1,40 @@
 {% extends "learning_base.html" %}
 {% block title %}Neues Thema – {{ companion_name }}{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="/static/topic-picker.css?v=2"><script src="/static/topic-picker.js?v=2" defer></script>{% endblock %}
 {% block content %}
-<a class="back-link" href="/lernen">← Meine Lernthemen</a>
+<a class="back-link" href="/lernen/{{ fach }}">← {{ fach|fachname }}</a>
 <section class="learn-heading"><div><p class="eyebrow">NEUGIER IST EIN GUTER ANFANG</p><h1>Was möchtest du verstehen?</h1><p>Beschreibe dein Thema oder wähle eins aus.</p></div><img src="/static/karo-owl-book.png" alt="" width="110"></section>
 <div class="learn-two-col">
 <section class="card"><h2>Mein eigenes Thema</h2><form method="post" action="/lernen/neu" class="learn-form">{{ csrf_input() }}<label for="new-topic">Das möchte ich lernen</label><input id="new-topic" name="thema" placeholder="Zum Beispiel: Brüche addieren" maxlength="200" required>{% include 'learning_subject_fields.html' %}<button type="submit">Thema hinzufügen →</button></form></section>
-<section class="card"><h2>Ein Thema aussuchen</h2><p>Diese Lernreihen sind schon vorbereitet.</p><div class="catalog-list">{% for k in katalog %}<form method="post" action="/lernen/neu">{{ csrf_input() }}<input type="hidden" name="thema" value="{{ k.label }}"><input type="hidden" name="fach" value="{{ k.fach|capitalize }}"><input type="hidden" name="klasse" value="{{ cfg.learner_grade }}"><button type="submit" class="catalog-button"><span><strong>{{ k.label }}</strong><small>{{ k.fach|capitalize }}</small></span><span>+</span></button></form>{% else %}<p>Du kannst dein Thema links beschreiben.</p>{% endfor %}</div></section>
-</div><a class="learn-material-link" href="/lernen/material">Du hast ein Arbeitsblatt? Material hochladen →</a>
+<section class="card topic-catalog" aria-labelledby="catalog-heading">
+<h2 id="catalog-heading">Ein Thema aussuchen</h2>
+{% if katalog %}
+<form method="post" action="/lernen/neu" class="topic-picker" data-topic-picker>
+  {{ csrf_input() }}
+  <input type="hidden" name="fach" value="{{ fach }}">
+  <input type="hidden" name="klasse" value="{{ cfg.learner_grade }}">
+  <div data-topic-native><label for="catalog-topic">Thema auswählen</label>
+    <select id="catalog-topic" name="thema" required>
+      <option value="" disabled selected>Thema auswählen …</option>
+      {% for k in katalog %}<option value="{{ k.label }}">{{ k.label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="topic-dropdown" data-topic-dropdown hidden>
+    <button id="catalog-toggle" class="topic-dropdown-trigger" type="button" aria-expanded="false" aria-controls="catalog-panel" aria-label="Thema auswählen">
+      <span data-topic-value>Thema auswählen …</span><span aria-hidden="true">⌄</span>
+    </button>
+    <div id="catalog-panel" class="topic-dropdown-panel" hidden>
+      <div class="topic-dropdown-search">
+        <label for="catalog-search">Thema suchen</label>
+        <input type="search" id="catalog-search" role="combobox" placeholder="Tippen zum Suchen …" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="catalog-options" aria-describedby="catalog-results">
+      </div>
+      <div id="catalog-options" class="topic-dropdown-options" role="listbox" aria-label="Themen"></div>
+      <p id="catalog-results" class="topic-picker-hint" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+  <button id="catalog-add" type="submit">Ausgewähltes Thema hinzufügen →</button>
+</form>
+{% else %}<p>Noch kein vorbereitetes Thema in diesem Fach. Beschreibe dein eigenes Thema im Feld „Das möchte ich lernen“.</p>{% endif %}
+</section>
+</div><a class="learn-material-link" href="/lernen/material?fach={{ fach }}">Du hast ein Arbeitsblatt? Material hochladen →</a>
 {% endblock %}

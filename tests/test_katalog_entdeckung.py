@@ -39,7 +39,7 @@ def test_eine_nur_in_der_datenbank_stehende_lektion_wird_gefunden(
         stichworte=("wuerfel volumen", "volumen wuerfel"), geprueft=True)
 
     gefunden = {l["konzept_id"] for l in lektionen.verfuegbar()}
-    treffer = lektionen.fuer_thema("Würfel: Volumen")
+    treffer = lektionen.fuer_thema("Würfel: Volumen", "mathematik")
 
     assert konzept_id in gefunden
     assert treffer is not None and treffer["konzept_id"] == konzept_id
@@ -51,7 +51,7 @@ def test_ohne_stichworte_traegt_das_label(client, fake_llm, fake_cli, app_env):
     store.konzept_sichern("mathematik", "geometrie", "quader-volumen",
                           "Quader Volumen", 6, 8, geprueft=True)
 
-    treffer = lektionen.fuer_thema("Quader Volumen")
+    treffer = lektionen.fuer_thema("Quader Volumen", "mathematik")
 
     assert treffer is not None
     assert treffer["konzept_key"] == "quader-volumen"
@@ -62,12 +62,12 @@ def test_die_verfasste_bruchlektion_bleibt_unveraendert_auffindbar(
     """Die Umstellung darf die eine vorhandene Lektion nicht verlieren."""
     lektionen = _katalog(client, fake_llm)
 
-    treffer = lektionen.fuer_thema("Brüche addieren und subtrahieren")
+    treffer = lektionen.fuer_thema("Brüche addieren und subtrahieren", "mathematik")
 
     assert treffer is not None
     assert treffer["konzept_key"] == "ungleichnamig-addieren"
-    assert lektionen.fuer_thema("Brüche kürzen") is None
-    assert lektionen.fuer_thema("Photosynthese") is None
+    assert lektionen.fuer_thema("Brüche kürzen", "mathematik") is None
+    assert lektionen.fuer_thema("Photosynthese", "mathematik") is None
 
 
 # --------------------------------------------------------------------------
@@ -83,11 +83,11 @@ def test_ungeprueftes_konzept_wird_nicht_angeboten(client, fake_llm, fake_cli,
         stichworte=("prisma",), geprueft=False)
 
     assert konzept_id not in {l["konzept_id"] for l in lektionen.verfuegbar()}
-    assert lektionen.fuer_thema("Prisma") is None
+    assert lektionen.fuer_thema("Prisma", "mathematik") is None
 
     store.konzept_freigeben(konzept_id)
 
-    assert lektionen.fuer_thema("Prisma")["konzept_id"] == konzept_id
+    assert lektionen.fuer_thema("Prisma", "mathematik")["konzept_id"] == konzept_id
 
 
 def test_ungepruefter_fehlertyp_trifft_nicht(client, fake_llm, fake_cli,

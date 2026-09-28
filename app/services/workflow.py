@@ -478,24 +478,27 @@ def offene_schritte():
     return themen, schritte, reviews
 
 
-def render_lernen_uebersicht(request: Request):
-    """Die Lernuebersicht (/lernen) — auch der Einstiegspunkt fuer
+def render_lernen_uebersicht(request: Request, fach: str | None = None):
+    """Die Themen eines Fachs (/lernen/<fach>) — auch der Einstiegspunkt fuer
     /lernzyklus (Index), damit der Lernzyklus-Router nicht dashboard.py's
-    Routen-Funktion direkt aufrufen muss."""
+    Routen-Funktion direkt aufrufen muss.
+
+    Suche und Liste sehen nur das aktive Fach: „Brüche“ im Reiter Englisch
+    findet nichts, auch wenn es das Thema in Mathematik gibt.
+    """
     from . import learning_hub
-    themen = learning_hub.personal_topics()
+    from ..routers.shared import aktives_fach
+    fach = aktives_fach(request, fach or request.query_params.get('fach'))
+    themen = learning_hub.personal_topics(fach)
     query = request.query_params.get('q', '').strip()
-    fach = request.query_params.get('fach', '')
     status = request.query_params.get('status', '')
     selected = [t for t in themen if query.casefold() in t['label'].casefold()
-                and (not fach or t['subject'] == fach)
                 and (not status or t['learning_status'] == status)]
     next_topic = next((t for t in themen if t['learning_status'] == 'bearbeitung'), None)
     next_topic = next_topic or next((t for t in themen if t['learning_status'] == 'neu'), None)
     return render(request, 'lernen_start.html', themen=selected, alle_themen=themen,
                   reviews=offene_schritte()[2],
-                  faecher=sorted({t['subject'] for t in themen}), query=query,
-                  fach=fach, status=status, next_topic=next_topic,
+                  query=query, fach=fach, status=status, next_topic=next_topic,
                   safe_count=sum(t['learning_status'] == 'sicher' for t in themen),
                   active_count=sum(t['learning_status'] == 'bearbeitung' for t in themen),
                   nachfrage=request.query_params.get('weg', ''))
@@ -569,14 +572,21 @@ def next_action_display(action: NextAction) -> dict | None:
         return None
     if action.kind == 'review':
         q = action.context['quiz']
+        from .. import faecher
+        thema = topics.get(q['topic_id']) if q.get('topic_id') else None
         return {'titel': q['thema_label'], 'text': 'Die Antworten warten auf deine Freigabe.',
-                'url': action.url, 'button': 'Jetzt prüfen'}
+                'url': action.url, 'button': 'Jetzt prüfen',
+                'fach': faecher.name(thema['subject']) if thema else ''}
     if action.kind == 'new_topic':
         thema = action.context['thema']
         return {'titel': thema['label'], 'text': 'Ein kleiner Schritt für heute.',
                 'url': action.url, 'button': 'Los geht’s'}
     schritt = action.context['schritt']
-    return {**schritt, 'url': action.url, 'button': 'Weiterlernen'}
+    # Heute ist fachübergreifend: das Fach steht sichtbar dabei.
+    from .. import faecher
+    thema = topics.get(schritt['topic_id']) if schritt.get('topic_id') else None
+    return {**schritt, 'url': action.url, 'button': 'Weiterlernen',
+            'fach': faecher.name(thema['subject']) if thema else ''}
 
 
 def render_lernen_page(request: Request, lesson_id: int):

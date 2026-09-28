@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from .. import db, topics
+from .. import db, topics, faecher
 
 WEEKDAY_LABELS = {
     1: "Montag", 2: "Dienstag", 3: "Mittwoch", 4: "Donnerstag",
@@ -20,7 +20,7 @@ class ExamCalendarError(ValueError):
 
 
 def _exam(exam_id: int) -> dict:
-    row = db.q1("SELECT * FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL", exam_id)
+    row = db.q1(f"SELECT * FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL AND subject IN {faecher.SQL_FAECHER}", exam_id)
     if row is None:
         raise ExamCalendarError("Klassenarbeit nicht gefunden.")
     return dict(row)
@@ -210,8 +210,9 @@ def simulation_available(exam_id: int) -> bool:
 def today_task() -> dict | None:
     today = db.today()
     exams = [dict(row) for row in db.q(
-        """SELECT e.* FROM exam e
+        f"""SELECT e.* FROM exam e
            WHERE e.exam_date>? AND e.deleted_at IS NULL AND e.purged_at IS NULL
+             AND e.subject IN {faecher.SQL_FAECHER}
            ORDER BY e.exam_date,e.id""", today)]
     for exam in exams:
         task = next(
@@ -329,7 +330,7 @@ def monat(wunsch: str = "", heute: dt.date | None = None) -> dict:
     ende = letzter + dt.timedelta(days=7 - letzter.isoweekday())
 
     arbeiten = [dict(r) for r in db.q(
-        "SELECT id, subject, exam_date FROM exam WHERE deleted_at IS NULL AND purged_at IS NULL ORDER BY exam_date, id")]
+        f"SELECT id, subject, exam_date FROM exam WHERE deleted_at IS NULL AND purged_at IS NULL AND subject IN {faecher.SQL_FAECHER} ORDER BY exam_date, id")]
     for platz, arbeit in enumerate(arbeiten):
         arbeit["farbe"] = platz % 5
         arbeit["probe"] = simulation_date(arbeit["id"])

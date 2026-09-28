@@ -61,8 +61,8 @@ async def themen_entscheiden(request: Request):
 
 @router.post("/themen/neu")
 def themen_neu(request: Request, label: str = Form(""),
-               beschreibung: str = Form("")):
-    return preparation.handle_themen_neu(request, label, beschreibung)
+               beschreibung: str = Form(""), fach: str = Form("")):
+    return preparation.handle_themen_neu(request, label, beschreibung, fach)
 
 
 @router.post("/themen/{topic_id}/recherche")
@@ -112,4 +112,4 @@ def vorgang_erneut(request: Request, job_id: int):
     else:
         flash(request, "Dieser Vorgang läuft bereits oder ist abgeschlossen.",
               "warn")
-    return zurueck("/")
+    return zurueck("/eltern#betrieb")

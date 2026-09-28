@@ -23,7 +23,9 @@ def test_learning_pages_use_their_own_mascot(client, fake_llm, fake_cli, app_env
         assert 'src="/static/karo-owl-book.png"' in main
         assert 'karo-fox' not in main
         subnav = re.search(r'<nav class="sub-nav".*?</nav>', page, re.S).group()
-        assert 'class="learning-entry" href="/lernen"' in subnav
+        # "Meine Themen" ist ersetzt durch die drei Fächer.
+        assert [m for m in re.findall(r'href="(/lernen/[a-z]+)"', subnav)] == [
+            '/lernen/deutsch', '/lernen/mathematik', '/lernen/englisch']
         assert 'href="/klassenarbeit' not in subnav
         # Die Klassenarbeit ist ein eigener Hauptreiter rechts neben Lernen.
         mainnav = re.search(r'<nav class="simple-nav".*?</nav>', page, re.S).group()

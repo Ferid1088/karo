@@ -68,7 +68,7 @@ class Config:
     # --- Lernende Person ---------------------------------------------------
     learner_name: str = ""          # bleibt lokal, dient dem Schwärzen
     learner_grade: int = 7
-    subject: str = "Mathematik"
+    subject: str = "mathematik"     # Standardfach: deutsch | mathematik | englisch
 
     # --- Modellwahl --------------------------------------------------------
     model_vision: str = ""

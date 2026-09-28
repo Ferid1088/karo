@@ -15,32 +15,44 @@ from pathlib import Path
 from fastapi import Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-from .. import config, db, ingest, jobs, kb, quizzes, research, security, topics
+from .. import config, db, faecher, ingest, jobs, kb, quizzes, research, security, topics
 from ..domain import FLAG_ORDER
-from ..routers.shared import flash, render, zurueck
+from ..routers.shared import aktives_fach, flash, render, zurueck
 
 
 # --- Schulmaterial -----------------------------------------------------------
 
+def _wissen_ziel(fach: str) -> str:
+    return f"/wissen?fach={fach}"
+
+
 def render_wissen(request: Request):
+    """Schulblätter nur des aktiven Fachs."""
+    fach = aktives_fach(request, request.query_params.get("fach"))
     docu = [dict(r) for r in db.q(
         """SELECT d.*, (SELECT COUNT(*) FROM kb_chunk k
                    WHERE k.document_id=d.id) AS abschnitte
-           FROM document d WHERE d.rolle='wissen'
-           ORDER BY d.created_at DESC LIMIT 50""")]
-    return render(request, "wissen.html", blaetter=docu, counts=jobs.counts(),
+           FROM document d WHERE d.rolle='wissen' AND d.subject=?
+           ORDER BY d.created_at DESC LIMIT 50""", fach)]
+    return render(request, "wissen.html", blaetter=docu, counts=jobs.counts(), fach=fach,
                   kb_stat=kb.statistik(), drive_ok=ingest.drive_available(),
                   adult_page=not config.load().schulblaetter_kind,
                   inbox_path=ingest.inbox_path())
 
 
 async def handle_wissen_einlesen(request: Request, quelle: str):
+    formular = await request.form()
+    fach = aktives_fach(request, formular.get("fach"))
     if quelle == "drive":
         try:
             ergebnisse = await run_in_threadpool(ingest.scan_inbox)
             for ergebnis in ergebnisse:
                 if ergebnis.get("status") == "neu":
                     doc_id = ergebnis["document_id"]
+                    # Eingelesen im Fach-Reiter: das Blatt gehört zu diesem Fach.
+                    with db.tx() as c:
+                        c.execute("UPDATE document SET subject=? WHERE id=? AND subject IS NULL",
+                                  (fach, doc_id))
                     jobs.enqueue("kb_extract", {"document_id": doc_id},
                                  dedup_key=f"kb_extract:{doc_id}")
         except ingest.IngestError as exc:
@@ -48,7 +60,7 @@ async def handle_wissen_einlesen(request: Request, quelle: str):
         else:
             flash(request, "Drive wird gelesen." if ergebnisse else
                   "Kein Drive-Ordner eingerichtet oder nichts Neues darin.")
-    return zurueck("/wissen")
+    return zurueck(_wissen_ziel(fach))
 
 
 async def handle_wissen_upload(request: Request, rolle: str,
@@ -56,14 +68,26 @@ async def handle_wissen_upload(request: Request, rolle: str,
     if request.session.get("role") == "child":
         rolle = "wissen"
     formular = await request.form()
+    # Das Fach kommt aus dem Reiter, in dem hochgeladen wird — nie geraten.
+    fach = faecher.schluessel(formular.get("fach"))
+    if fach is None:
+        flash(request, "Bitte zuerst ein Fach wählen: Deutsch, Mathematik oder Englisch.", "err")
+        return zurueck("/wissen")
+    aktives_fach(request, fach)
+    ziel = _wissen_ziel(fach)
     datei = datei or formular.get("datei")
     themenname = str(formular.get("themenname") or "").strip()[:200]
     if datei is None or not getattr(datei, "filename", ""):
         flash(request, "Es wurde keine Datei ausgewählt.", "err")
-        return zurueck("/wissen")
+        return zurueck(ziel)
+    try:
+        faecher.pruefe(themenname, fach)
+    except faecher.SubjectMismatch as exc:
+        flash(request, str(exc), "err")
+        return zurueck(ziel)
     if not themenname:
         flash(request, "Bitte einen Themennamen angeben.", "err")
-        return zurueck("/wissen")
+        return zurueck(ziel)
 
     endung = Path(datei.filename).suffix.lower()
     puffer = bytearray()
@@ -71,11 +95,11 @@ async def handle_wissen_upload(request: Request, rolle: str,
         puffer.extend(stueck)
         if len(puffer) > security.MAX_UPLOAD_BYTES:
             flash(request, "Datei zu groß.", "err")
-            return zurueck("/wissen")
+            return zurueck(ziel)
 
     try:
         ergebnis = await run_in_threadpool(
-            ingest.aufnehmen, bytes(puffer), endung, rolle, themenname)
+            ingest.aufnehmen, bytes(puffer), endung, rolle, themenname, fach)
         if ergebnis["status"] == "neu":
             jobs.enqueue("kb_extract", {"document_id": ergebnis["document_id"]},
                          dedup_key=f"kb_extract:{ergebnis['document_id']}")
@@ -85,7 +109,7 @@ async def handle_wissen_upload(request: Request, rolle: str,
         flash(request, "Dieses Blatt ist bereits in der Sammlung." if
               ergebnis["status"] == "doppelt" else
               f"Datei eingereicht — sie wird jetzt für „{themenname}“ gelesen.")
-    return zurueck("/wissen")
+    return zurueck(ziel)
 
 
 def render_wissen_detail(request: Request, doc_id: int):
@@ -139,8 +163,12 @@ async def handle_themen_entscheiden(request: Request):
     return zurueck("/themen")
 
 
-def handle_themen_neu(request: Request, label: str, beschreibung: str):
-    neu = topics.anlegen(label, beschreibung)
+def handle_themen_neu(request: Request, label: str, beschreibung: str, fach: str = ""):
+    try:
+        neu = topics.anlegen(label, beschreibung, subject=fach)
+    except faecher.FachFehler as exc:
+        flash(request, str(exc), "err")
+        return zurueck("/themen")
     if neu is None:
         flash(request, "Dieses Thema gibt es schon oder der Name ist leer.", "warn")
     else:

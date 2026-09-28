@@ -15,7 +15,7 @@ PFAD = "/lernen/adaptiv"
 
 def _kind(client, fake_llm, app_env):
     einrichten(client, fake_llm)
-    app_env.config.update(adaptive_learning_enabled=True)
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get(PFAD).text)
     # Es gibt keinen stillen Einstieg mehr: erst die Lektion wählen.
@@ -476,7 +476,7 @@ def test_einstieg_zeigt_die_vorhandenen_lernreihen(client, fake_llm, fake_cli,
                                                    app_env):
     """Ohne Themenwahl startet nichts von selbst."""
     einrichten(client, fake_llm)
-    app_env.config.update(adaptive_learning_enabled=True)
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
     kind_modus_aktivieren(client)
 
     seite = client.get(PFAD)
@@ -493,15 +493,20 @@ def test_unbekanntes_thema_startet_nicht_heimlich_die_bruchlektion(
     gemeint war. Das sah nach einem allgemeinen System aus und war keines.
     """
     einrichten(client, fake_llm)
-    app_env.config.update(adaptive_learning_enabled=True)
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get(PFAD).text)
 
     seite = client.post(f"{PFAD}/start",
-                        data={"_csrf": token, "thema": "Photosynthese"})
+                        data={"_csrf": token, "thema": "Würfel: Volumen", "fach": "mathematik"})
 
     assert "noch keine Lernreihe" in seite.text
-    assert "Photosynthese" in seite.text
+    assert "Würfel: Volumen" in seite.text
+    # Ein Thema aus keinem der drei Fächer wird gar nicht erst gesucht:
+    # das Kind erfährt, warum (SUBJECT_MISMATCH).
+    fremd = client.post(f"{PFAD}/start",
+                        data={"_csrf": token, "thema": "Photosynthese", "fach": "mathematik"})
+    assert "Das gehört zu keinem deiner Fächer" in fremd.text
     # Vor allem: keine Sitzung, kein Anker, keine Brüche.
     assert app_env.db.q("SELECT * FROM lern_sitzung") == []
     assert "1/2 + 1/3" not in seite.text
@@ -516,7 +521,7 @@ def test_passendes_thema_startet_die_richtige_lernreihe(client, fake_llm,
     benennen jetzt das Konzept (siehe `lektionen.STICHWORTE`).
     """
     einrichten(client, fake_llm)
-    app_env.config.update(adaptive_learning_enabled=True)
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get(PFAD).text)
 
@@ -532,7 +537,7 @@ def test_das_eingetippte_thema_wird_festgehalten(client, fake_llm, fake_cli,
                                                  app_env):
     """§13: Die Eingabe ist der Anfang der Kette, nicht nur ein Klick."""
     einrichten(client, fake_llm)
-    app_env.config.update(adaptive_learning_enabled=True)
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get(PFAD).text)
     client.post(f"{PFAD}/start", data={"_csrf": token, "thema": "Brüche addieren"})

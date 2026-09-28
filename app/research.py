@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 from urllib.parse import urlparse
 
-from . import config, db, jobs, prompts, topics
+from . import config, db, jobs, prompts, topics, faecher
 from .domain import ERROR_LABELS
 from .llm import ClaudeClient, ClaudeError
 
@@ -202,7 +202,7 @@ def job_research(payload: dict) -> None:
 
     begriffe = client().complete(
         purpose="research_terms",
-        prompt=prompts.search_prompt(cfg.learner_grade, cfg.subject,
+        prompt=prompts.search_prompt(cfg.learner_grade, faecher.name(thema["subject"]),
                                      thema["label"], fehlerbild),
         schema=prompts.SEARCH_SCHEMA,
         system=prompts.SYSTEM,
@@ -396,9 +396,10 @@ def job_research_fetch(payload: dict) -> None:
         return
 
     cfg = config.load()
+    fach_row = db.q1("SELECT subject FROM topic WHERE id = ?", hit["topic_id"])
     prompt = f"""Rufe die folgende Seite auf und gib ihren fachlichen
 Lerninhalt wieder — Klassenstufe {cfg.learner_grade} in Deutschland, Fach
-{cfg.subject}:
+{faecher.name(fach_row["subject"] if fach_row else None)}:
 
 {hit['url']}
 

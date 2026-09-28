@@ -67,3 +67,6 @@
   .topics-search select { flex: 1; min-width: 0; width: auto; }
   .topics-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Schulblätter gehören zum Fach und stehen deshalb unter seinem Titel. */
+.topics-sheets { display: inline-block; margin-top: .45rem; color: #3558b8; font-weight: 700; font-size: .92rem; }

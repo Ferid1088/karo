@@ -55,7 +55,7 @@ def test_brueche_addieren_findet_die_bruchlektion(client, fake_llm, fake_cli,
     from app.adaptiv import lektionen
     einrichten(client, fake_llm)
 
-    lektion = lektionen.fuer_thema("Brüche addieren und subtrahieren")
+    lektion = lektionen.fuer_thema("Brüche addieren und subtrahieren", "mathematik")
 
     assert lektion is not None
     assert lektion["konzept_key"] == "ungleichnamig-addieren"
@@ -65,7 +65,7 @@ def test_das_kind_landet_in_der_lektion_statt_in_der_absage(
         client, fake_llm, fake_cli, app_env):
     """Derselbe Weg, den das Kind wirklich geht."""
     einrichten(client, fake_llm)
-    app_env.config.update(adaptive_learning_enabled=True)
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get(PFAD).text)
 
@@ -92,8 +92,8 @@ def test_ein_fremdes_thema_trifft_weiterhin_nicht(client, fake_llm, fake_cli,
     from app.adaptiv import lektionen
     einrichten(client, fake_llm)
 
-    assert lektionen.fuer_thema("Photosynthese") is None
-    assert lektionen.fuer_thema("Wurzeln ziehen") is None
+    assert lektionen.fuer_thema("Photosynthese", "mathematik") is None
+    assert lektionen.fuer_thema("Wurzeln ziehen", "mathematik") is None
 
 
 # --------------------------------------------------------------------------

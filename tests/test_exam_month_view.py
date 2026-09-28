@@ -6,11 +6,16 @@ import re
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
+def _schluessel(subject):
+    from app import faecher
+    return faecher.schluessel(subject) or subject
+
+
 def _exam(app_env, subject, exam_date):
     with app_env.db.tx() as connection:
         return connection.execute(
             "INSERT INTO exam(subject,exam_date,themen,created_at) VALUES(?,?,?,?)",
-            (subject, exam_date, "[]", app_env.db.now()),
+            (_schluessel(subject), exam_date, "[]", app_env.db.now()),
         ).lastrowid
 
 
@@ -19,6 +24,8 @@ def _render(calendar, weekdays):
         loader=FileSystemLoader(Path(__file__).parents[1] / "app/templates"),
         autoescape=select_autoescape(),
     )
+    from app import faecher
+    env.filters["fachname"] = faecher.name
     return str(env.get_template("_exam_monat.html").module.exam_monat(
         calendar, weekdays, lambda: ""))
 

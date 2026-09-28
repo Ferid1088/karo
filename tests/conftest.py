@@ -138,6 +138,7 @@ def _install_fake_anthropic() -> types.ModuleType:
 
 #: Pflichtfelder -> Name der Antwort in `fake_llm.responses`
 SCHEMA_KEYS = {
+    frozenset({'klasse_von', 'klasse_bis', 'sicher', 'begruendung'}): 'klassenpruefung',
     frozenset({"lesbarkeit", "dokumenttyp", "themen", "abschnitte"}): "kb",
     frozenset({"themen"}): "topics",
     frozenset({"hinweis", "fragen"}): "quiz",
@@ -153,6 +154,7 @@ SCHEMA_KEYS = {
     frozenset({"ok"}): "verify_ping",
     frozenset({"erreichbar", "inhalt"}): "research_fetch",
     frozenset({"ideen"}): "welten_ideas",
+    frozenset({"fach"}): "fach",
     frozenset({"konzept", "erstkontakt", "fehlertypen", "hilfe",
                "faq"}): "lektion",
 }

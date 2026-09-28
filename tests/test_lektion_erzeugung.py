@@ -173,14 +173,16 @@ def test_zwei_gleiche_fehlerschluessel_werden_abgewiesen(app_env):
 # Der Auftrag an Modell A
 # --------------------------------------------------------------------------
 
-def test_der_auftrag_nennt_thema_und_klasse(app_env):
+def test_der_auftrag_nennt_thema_aber_keine_profilklasse(app_env):
     from app import prompts
 
     text = prompts.lektion_prompt(grade=6, subject="Mathematik",
                                   thema="Würfel: Volumen")
 
     assert "Würfel: Volumen" in text
-    assert "6" in text
+    assert "Kind der Klasse 6" not in text
+    assert "bestimmt NICHT die Einordnung" in text
+    assert text == prompts.lektion_prompt(grade=1, subject='Mathematik', thema='Würfel: Volumen')
 
 
 def test_der_auftrag_zeigt_nur_metadaten_der_komponenten(app_env):

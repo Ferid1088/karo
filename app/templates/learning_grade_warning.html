@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Dein Thema kurz prüfen – Karo{% endblock %}
+{% block content %}
+<section class="card learning-session" aria-labelledby="grade-warning-title">
+  <p class="eyebrow">{{ learning_area }}</p>
+  <h1 id="grade-warning-title">Möchtest du dieses Thema ausprobieren?</h1>
+  <h2>{{ guidance.thema }}</h2>
+  <p>In deinem Profil steht <strong>Klasse {{ guidance.profile_grade }}</strong>.
+     Diese Lernreihe ist für <strong>{{ guidance.level }}</strong> eingeordnet.</p>
+  {% if guidance.profile_grade < guidance.grade_from %}
+  <p>Du lernst das normalerweise erst später. Vielleicht brauchst du vorher noch ein paar Grundlagen.</p>
+  {% else %}
+  <p>Du lernst das normalerweise schon früher. Du kannst es hier noch einmal üben.</p>
+  {% endif %}
+  <p>Wenn du weitermachst, bekommen deine Eltern einen Hinweis im Elternbereich.</p>
+  <form method="post" action="{{ learning_base }}/klasse-bestaetigen">
+    {{ csrf_input() }}
+    <input type="hidden" name="confirmation" value="{{ confirmation }}">
+    <div class="actions"><button type="submit">Ja, trotzdem lernen →</button>
+    <a class="btn ghost" href="{{ learning_back }}">Zurück</a></div>
+  </form>
+</section>
+{% endblock %}

@@ -18,7 +18,7 @@ import logging
 from pathlib import Path
 from typing import TypedDict
 
-from . import config, db, jobs, kb, pii, prompts, topics
+from . import config, db, jobs, kb, pii, prompts, topics, faecher
 from .domain import (
     ERROR_LABELS,
     Answer,
@@ -133,7 +133,7 @@ def job_quiz_build(payload: dict) -> None:
 
     quellen = kb.geschwaerzt(
         kb.suche(f"{thema['label']} {thema.get('beschreibung') or ''}",
-                 limit=8, topic_id=quiz["topic_id"]))
+                 thema["subject"], limit=8, topic_id=quiz["topic_id"]))
 
     fehlerbild = ERROR_LABELS.get(thema.get("haupt_fehler") or "")
     beschreibung = thema.get("beschreibung") or ""
@@ -151,7 +151,7 @@ def job_quiz_build(payload: dict) -> None:
     ergebnis = client().complete(
         purpose=f"quiz_{quiz['anlass']}",
         prompt=prompts.quiz_prompt(
-            cfg.learner_grade, cfg.subject, thema["label"],
+            cfg.learner_grade, faecher.name(thema["subject"]), thema["label"],
             pii.scrub(beschreibung, cfg.learner_name), quellen, quiz["anlass"],
             anzahl=anzahl, bekannte_fehler=fehlerbild),
         schema=prompts.QUIZ_SCHEMA,
@@ -289,7 +289,7 @@ def job_quiz_check(payload: dict) -> None:
 
     ergebnis = client().complete(
         purpose="quiz_check",
-        prompt=prompts.check_prompt(cfg.learner_grade, cfg.subject,
+        prompt=prompts.check_prompt(cfg.learner_grade, faecher.name(thema["subject"]),
                                     thema["label"], paare),
         schema=prompts.CHECK_SCHEMA,
         system=prompts.SYSTEM,
@@ -432,9 +432,10 @@ def job_quiz_read_sheet(payload: dict) -> None:
         return
 
     cfg = config.load()
+    thema = topics.get(quiz["topic_id"]) or {}
     liste = "\n".join(f"  {f['position']}. {f['frage'][:200]}" for f in fragen)
     prompt = f"""Auf dem Bild ist ein bearbeiteter Fragebogen aus dem Fach
-{cfg.subject}, Klassenstufe {cfg.learner_grade} in Deutschland.
+{faecher.name(thema.get("subject"))}, Klassenstufe {cfg.learner_grade} in Deutschland.
 
 Diese Fragen stehen darauf:
 {liste}

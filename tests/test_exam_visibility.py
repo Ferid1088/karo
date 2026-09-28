@@ -5,11 +5,13 @@ from .conftest import csrf_from, make_jpeg, run_jobs
 from .test_app import einrichten, kind_modus_aktivieren, _bis_rot
 
 
-def test_exam_plan_moves_between_parent_and_child_sections(client, fake_llm, fake_cli, app_env):
+def test_exam_plan_stays_available_to_parents_and_child_access_is_configurable(client, fake_llm, fake_cli, app_env):
     einrichten(client, fake_llm)
     for enabled in (False, True, False):
         app_env.config.update(klassenarbeit_kind=enabled)
-        assert ('href="/klassenarbeit"' in client.get('/eltern').text) is not enabled
+        # The compact parent dashboard keeps management links regardless of
+        # whether the same feature is also enabled for the child.
+        assert 'href="/klassenarbeit"' in client.get('/eltern').text
         # Eltern dürfen die Prüfungen immer über den Lernbereich öffnen.
         for path in ('/lernen', '/lernzyklus'):
             assert 'href="/klassenarbeit"' in client.get(path).text
@@ -65,7 +67,7 @@ def test_child_can_create_use_and_update_exam_with_setting(
     run_jobs(app_env, fake_llm)
     scan = app_env.db.q1('SELECT * FROM exam_scan ORDER BY id DESC LIMIT 1')
     assert client.get(f"/klassenarbeit/themenblatt/status?scan_id={scan['id']}").json()['signatur'] == 'gelesen'
-    assert client.post('/klassenarbeit', data={
+    assert client.post('/klassenarbeit', data={"fach": "mathematik", 
         '_csrf': token, 'exam_date': exam_date, 'scan_id': scan['id']}).status_code == 200
     run_jobs(app_env, fake_llm)
     exam = app_env.db.q1('SELECT * FROM exam ORDER BY id DESC LIMIT 1')

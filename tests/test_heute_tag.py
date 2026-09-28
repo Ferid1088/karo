@@ -34,7 +34,7 @@ def test_streak_and_success_appear_on_today(client, fake_llm, fake_cli, app_env,
     from app import topics
     from .test_app import einrichten
     einrichten(client, fake_llm)
-    tid = topics.anlegen("Dezimalzahlen")
+    tid = topics.anlegen("Dezimalzahlen", subject="mathematik")
     with app_env.db.tx() as c:
         c.execute("UPDATE topic SET state='aktiv', learned_at=? WHERE id=?", (app_env.db.now(), tid))
     monkeypatch.setattr(today, "activity_days", lambda: {
@@ -49,7 +49,7 @@ def test_success_line_moved_to_erfolge(client, fake_llm, fake_cli):
     from app import topics
     from .test_app import einrichten
     einrichten(client, fake_llm)
-    topics.anlegen("Brüche addieren")
+    topics.anlegen("Brüche addieren", subject="mathematik")
     assert "Themen sicher" not in client.get("/").text
     assert "Themen sicher" in client.get("/lernstand").text
 
@@ -72,7 +72,7 @@ def test_old_success_and_missed_units_stay_quiet(client, fake_llm, fake_cli, app
     from .test_app import einrichten
     einrichten(client, fake_llm)
     monkeypatch.setattr(plaene, "today", lambda now=None: date(2026, 9, 28))
-    tid = topics.anlegen("Dezimalzahlen")
+    tid = topics.anlegen("Dezimalzahlen", subject="mathematik")
     with app_env.db.tx() as c:
         c.execute("UPDATE topic SET state='aktiv', learned_at='2026-09-01T10:00:00+00:00' WHERE id=?", (tid,))
     # Verpasst am Sonntag; heute (Montag) nichts geplant: Nachholen wird angeboten.

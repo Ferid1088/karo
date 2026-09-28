@@ -66,12 +66,12 @@ def test_der_auftrag_erzeugt_prueft_und_gibt_frei(client, fake_llm, fake_cli,
 
     run_jobs(app_env, fake_llm)
 
-    lektion = lektionen.fuer_thema(THEMA)
+    lektion = lektionen.fuer_thema(THEMA, "mathematik")
     assert lektion is not None
     konzept = store.konzept(lektion["konzept_id"])
     assert konzept["quelle"] == "erzeugt"
     assert konzept["geprueft_am"], "ohne Freigabe erreicht es kein Kind"
-    assert len(fake_llm.calls) == 1
+    assert len(fake_llm.calls) == 2  # Author plus independent class review.
 
 
 def test_danach_ist_es_ein_treffer_ohne_modell(client, fake_llm, fake_cli,
@@ -118,7 +118,7 @@ def test_eine_unbrauchbare_ausgabe_hinterlaesst_nichts(client, fake_llm,
     # Was zählt, ist nicht der Auftragszustand — Wiederholungen sind
     # Sache der Warteschlange —, sondern dass nichts davon ein Kind
     # erreicht und der Grund festgehalten ist.
-    assert lektionen.fuer_thema(THEMA) is None
+    assert lektionen.fuer_thema(THEMA, "mathematik") is None
     assert app_env.db.q("SELECT id FROM lern_konzept WHERE quelle='erzeugt'") == []
     auftrag = app_env.db.q1("SELECT * FROM job WHERE type='lektion_erzeugen'")
     assert auftrag["state"] != "fertig"

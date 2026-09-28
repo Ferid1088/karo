@@ -10,12 +10,12 @@ def _exam_with_topic(app_env):
     from app import topics
     app_env.config.update(learner_grade=6)
     app_env.db.init()
-    topic_id = topics.anlegen("Brüche addieren")
+    topic_id = topics.anlegen("Brüche addieren", subject="mathematik")
     topic = topics.get(topic_id)
     with app_env.db.tx() as c:
         exam_id = c.execute(
             "INSERT INTO exam(subject,exam_date,themen,created_at) VALUES(?,?,?,?)",
-            ("Mathematik", "2026-10-02", json.dumps(["Brüche addieren"]), app_env.db.now()),
+            ("mathematik", "2026-10-02", json.dumps(["Brüche addieren"]), app_env.db.now()),
         ).lastrowid
         c.execute(
             """INSERT INTO exam_plan(exam_id,state,tagesplan,created_at)
@@ -183,15 +183,15 @@ def test_exam_plan_stays_on_topic_until_adaptive_mastery(app_env, monkeypatch):
     from app.services import exam_calendar
 
     app_env.db.init()
-    first_id = topics.anlegen("Brüche addieren")
-    second_id = topics.anlegen("Brüche kürzen")
+    first_id = topics.anlegen("Brüche addieren", subject="mathematik")
+    second_id = topics.anlegen("Brüche kürzen", subject="mathematik")
     first = topics.get(first_id)
     second = topics.get(second_id)
 
     with app_env.db.tx() as c:
         exam_id = c.execute(
             "INSERT INTO exam(subject,exam_date,themen,created_at) VALUES(?,?,?,?)",
-            ("Mathematik", "2026-10-05",
+            ("mathematik", "2026-10-05",
              json.dumps(["Brüche addieren", "Brüche kürzen"]), app_env.db.now()),
         ).lastrowid
         c.execute(

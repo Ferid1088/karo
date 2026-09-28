@@ -14,8 +14,8 @@ from .test_app import einrichten
 def _themen(client, fake_llm, app_env, *labels):
     from app import topics
     einrichten(client, fake_llm)
-    app_env.config.update(adaptive_learning_enabled=True)
-    return [topics.anlegen(label) for label in labels]
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
+    return [topics.anlegen(label, subject="mathematik") for label in labels]
 
 
 def test_thema_mit_lernreihe_bekommt_einen_knopf(client, fake_llm, fake_cli,
@@ -92,7 +92,7 @@ def test_ohne_den_schalter_bleibt_die_karte_wie_bisher(client, fake_llm,
                                                        fake_cli, app_env):
     from app import topics
     einrichten(client, fake_llm)
-    topics.anlegen("Brüche addieren und subtrahieren")
+    topics.anlegen("Brüche addieren und subtrahieren", subject="mathematik")
 
     seite = client.get("/lernen?status=neu").text
 

@@ -259,6 +259,7 @@ DOC_STATE_LABELS = {
     "leer": "nichts erkannt",
     "freigegeben": "freigegeben",
     "verworfen": "verworfen",
+    "fach_falsch": "falsches Fach",
 }
 
 DOC_STATE_HINTS = {
@@ -267,6 +268,8 @@ DOC_STATE_HINTS = {
                "steht der Grund im Eingang unter „Fehlgeschlagene Vorgänge“.",
     "leer": "Auf dem Bild war nichts erkennbar — meist liegt es an der "
             "Bildqualität.",
+    "fach_falsch": "Dieses Blatt gehört zu einem anderen Fach und wurde deshalb "
+                   "nicht übernommen. Lade es im richtigen Fach hoch.",
 }
 
 DOKUMENT_ROLLEN = {

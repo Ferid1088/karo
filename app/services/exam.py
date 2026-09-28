@@ -60,19 +60,32 @@ def create_exam(exam_date: str, scan_id: str = '', manual_topics: str = '', subj
     except ValueError:
         raise ExamError("Ungültiges Datum.")
 
-    cfg = config.load_safe()
+    from .. import faecher
+    fach = faecher.schluessel(subject)
+    if fach is None:
+        raise ExamError("Bitte wähle das Fach der Klassenarbeit: Deutsch, Mathematik oder Englisch.")
+    # SUBJECT_MISMATCH: eine Mathearbeit mit „present perfect“ wird nicht
+    # angelegt — lieber die Liste korrigieren als falsch lernen.
+    fremd = []
+    for name in liste_themen:
+        try:
+            faecher.pruefe(name, fach, modell=False)
+        except faecher.SubjectMismatch:
+            fremd.append(name)
+    if fremd:
+        raise ExamError(f"Diese Themen gehören nicht zu {faecher.NAMEN[fach]}: "
+                        + ", ".join(fremd) + ". Bitte entferne sie oder wähle das richtige Fach.")
     with db.tx() as c:
         cur = c.execute(
             "INSERT INTO exam (subject, exam_date, themen, created_at) "
             "VALUES (?,?,?,?)",
-            ((subject.strip() or cfg.subject)[:80], exam_date, json.dumps(liste_themen, ensure_ascii=False),
-             db.now()))
+            (fach, exam_date, json.dumps(liste_themen, ensure_ascii=False), db.now()))
         exam_id = cur.lastrowid
 
     # Erst nach dem Commit: beides loest eigene Hintergrund-Jobs aus und
     # braucht die gerade angelegte Klassenarbeit/den Scan bereits sichtbar.
     from .learning_hub import link_exam
-    link_exam(exam_id, liste_themen, subject.strip() or cfg.subject)
+    link_exam(exam_id, liste_themen, fach)
     if scan_id:
         exam_plan.scan_uebernehmen(int(scan_id))
     return ExamCreated(exam_id=exam_id, themen_eingefroren=0)
@@ -119,7 +132,8 @@ def request_exam_questions(material_id: int) -> int:
 
 def get_next_exam() -> dict | None:
     """Die naechste bevorstehende Klassenarbeit — fuer die "Heute"-Anzeige."""
-    row = db.q1("SELECT * FROM exam WHERE exam_date >= ? AND deleted_at IS NULL AND purged_at IS NULL ORDER BY exam_date LIMIT 1",
+    from .. import faecher
+    row = db.q1(f"SELECT * FROM exam WHERE exam_date >= ? AND deleted_at IS NULL AND purged_at IS NULL AND subject IN {faecher.SQL_FAECHER} ORDER BY exam_date LIMIT 1",
                db.today())
     return dict(row) if row else None
 

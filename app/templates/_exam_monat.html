@@ -32,8 +32,8 @@
       <div class="exam-month-events">
       {% for eintrag in tag.eintraege %}
         {# A calendar entry opens only its exam, never a personal topic or an early simulation. #}
-        <a class="exam-month-event kind-{{ eintrag.art }} color-{{ eintrag.farbe }}" href="/klassenarbeit/{{ eintrag.exam_id }}{% if eintrag.art != 'arbeit' %}#exam-calendar-title{% endif %}" aria-label="{{ eintrag.subject }}, Prüfung am {{ eintrag.exam_date[8:10] }}.{{ eintrag.exam_date[5:7] }}.: {% if eintrag.art == 'arbeit' %}Prüfungstag{% else %}{{ eintrag.minutes }} Minuten {{ 'Generalprobe' if eintrag.art == 'probe' else 'Lernzeit' }} am {{ tag.date_label }}{% endif %}. Lernplan öffnen">
-          <strong>{{ eintrag.subject }}</strong>
+        <a class="exam-month-event kind-{{ eintrag.art }} color-{{ eintrag.farbe }}" href="/klassenarbeit/{{ eintrag.exam_id }}{% if eintrag.art != 'arbeit' %}#exam-calendar-title{% endif %}" aria-label="{{ eintrag.subject|fachname }}, Prüfung am {{ eintrag.exam_date[8:10] }}.{{ eintrag.exam_date[5:7] }}.: {% if eintrag.art == 'arbeit' %}Prüfungstag{% else %}{{ eintrag.minutes }} Minuten {{ 'Generalprobe' if eintrag.art == 'probe' else 'Lernzeit' }} am {{ tag.date_label }}{% endif %}. Lernplan öffnen">
+          <strong>{{ eintrag.subject|fachname }}</strong>
           <span class="exam-month-event-status">
             {% if eintrag.art == 'arbeit' %}<i aria-hidden="true">★</i> Prüfung
             {% elif eintrag.art == 'geschafft' %}<i aria-hidden="true">✓</i> {{ eintrag.minutes }} Min. · gelernt

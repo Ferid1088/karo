@@ -518,6 +518,36 @@ def ereignis_schreiben(sitzung_id: int, anlass: str, von_zustand=None,
              anlass, json.dumps(nutzdaten or {}, ensure_ascii=False), db.now()))
 
 
+def parent_report_events(since: str, until: str) -> list[dict]:
+    """Read-only report projection, deliberately without answers or payloads.
+
+    Earlier mastery events are needed to count a topic's first successful check
+    once, not again on every repetition. Timestamp bounds are UTC ISO strings.
+    """
+    return [dict(r) for r in db.q('''SELECT e.id, e.created_at, e.anlass,
+        e.nach_zustand, i.topic_id
+        FROM lern_ereignis e JOIN lern_sitzung s ON s.id=e.sitzung_id
+        JOIN lern_eingabe i ON i.id=s.eingabe_id
+        WHERE s.child_key=? AND i.child_key=? AND i.topic_id IS NOT NULL
+          AND julianday(e.created_at)<julianday(?)
+          AND (julianday(e.created_at)>=julianday(?) OR e.nach_zustand='MASTERED')
+        ORDER BY e.id''', CHILD_KEY, CHILD_KEY, until, since)]
+
+
+def parent_report_states(until: str) -> dict[int, str | None]:
+    """Topic states as of a reporting cutoff, not today's state in old reports."""
+    rows = db.q('''SELECT i.topic_id, s.id,
+        COALESCE((SELECT e.nach_zustand FROM lern_ereignis e
+          WHERE e.sitzung_id=s.id AND e.nach_zustand IS NOT NULL
+            AND julianday(e.created_at)<julianday(?) ORDER BY e.id DESC LIMIT 1),
+          CASE WHEN julianday(s.updated_at)<julianday(?) THEN s.zustand END) AS state
+        FROM lern_sitzung s JOIN lern_eingabe i ON i.id=s.eingabe_id
+        WHERE s.child_key=? AND i.child_key=? AND i.topic_id IS NOT NULL
+          AND julianday(s.created_at)<julianday(?) ORDER BY s.id''',
+        until, until, CHILD_KEY, CHILD_KEY, until)
+    return {r['topic_id']: r['state'] for r in rows}
+
+
 def ereignisse(sitzung_id: int) -> list[dict]:
     eintraege = [dict(r) for r in db.q(
         "SELECT * FROM lern_ereignis WHERE sitzung_id=? ORDER BY id", sitzung_id)]

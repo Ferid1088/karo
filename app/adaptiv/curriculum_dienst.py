@@ -38,7 +38,7 @@ def format_spec() -> dict:
     return {"id": FORMAT_ID, "schema": prompts.LEKTION_SCHEMA,
             "registry": komponenten.fuer_modell(),
             "instructions": prompts.lektion_prompt(
-                grade="aus der Anfrage", subject="aus der Anfrage",
+                grade=None, subject="aus der Anfrage",
                 thema="das angefragte Konzept")}
 
 
@@ -87,17 +87,27 @@ def _export_id(result: dict) -> int:
     return value
 
 
-def _checked(result: dict, thema: str, grade: int) -> dict:
+def _checked(result: dict, thema: str, grade: int, fach: str) -> dict:
     from . import lektionen
     from .normalisierung import normalisiere_thema
+    from ..faecher import schluessel
+    # Nur das Curriculum des aktiven Fachs: eine Antwort aus einem anderen
+    # Fach wird nicht importiert, auch wenn das Thema zufällig passt.
+    geliefert = result.get("subject")
+    if geliefert is not None and schluessel(geliefert) != fach:
+        raise schemas.InhaltUngueltig("Die Lernreihe gehört zu einem anderen Fach.")
     if result.get("format") != FORMAT_ID or not result.get("concept_id") or not result.get("concept_version"):
         raise schemas.InhaltUngueltig("Format oder Inhaltsversion fehlt.")
     lesson = schemas.pruefe_lektion(result.get("lesson"))
     if "erstkontakt" not in lesson:
         raise schemas.InhaltUngueltig("Einstieg in die Lernreihe fehlt.")
     concept = lesson["konzept"]
-    if not 1 <= concept["klasse_von"] <= grade <= concept["klasse_bis"] <= 13:
-        raise schemas.InhaltUngueltig("Die Lernreihe passt nicht zur Klassenstufe.")
+    classification = result.get('classification') or {}
+    lo, hi = classification.get('first_contact_grade'), classification.get('target_grade')
+    if (type(lo) is not int or type(hi) is not int or not 1 <= lo <= hi <= 13
+            or classification.get('source') != 'approved_curriculum'
+            or (concept['klasse_von'], concept['klasse_bis']) != (lo, hi)):
+        raise schemas.InhaltUngueltig('Die Klasseneinordnung stimmt nicht mit dem geprüften Curriculum überein.')
     if not lektionen._trifft(normalisiere_thema(thema), concept):
         raise schemas.InhaltUngueltig("Die Lernreihe passt nicht zum angefragten Thema.")
     # Repeated numerical practice would make apparent success meaningless.
@@ -111,11 +121,12 @@ def _checked(result: dict, thema: str, grade: int) -> dict:
 
 def import_lesson(cfg, result: dict, thema: str, fach: str, grade: int) -> int:
     from . import erzeugung
-    lesson = _checked(result, thema, grade)
+    lesson = _checked(result, thema, grade, fach)
     eid = _export_id(result)
     provenance = {"service": settings(cfg)[0], "export_id": eid,
                   "concept_id": result["concept_id"], "version": result["concept_version"],
-                  "grade": grade, "subject": fach, "format": FORMAT_ID, "lesson": lesson}
+                  "classification": result['classification'],
+                  "subject": fach, "format": FORMAT_ID, "lesson": lesson}
     fingerprint = hashlib.sha256(json.dumps(provenance, sort_keys=True,
                                             ensure_ascii=False).encode()).hexdigest()
     previous = store.curriculum_import(fingerprint)
@@ -130,6 +141,8 @@ def import_lesson(cfg, result: dict, thema: str, fach: str, grade: int) -> int:
 
 
 def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
+    from ..faecher import pflicht
+    fach = pflicht(fach)
     payload = dict(payload)
     payload.update(fach=fach, klasse=grade)
     # Pin routing for resumed jobs. A configuration change cannot send an old ID
@@ -146,8 +159,9 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
         result = request(cfg, "GET", f"/v1/lessons/{int(payload['curriculum_export'])}")
     else:
         result = request(cfg, "POST", "/v1/lessons", {
-            "subject": pii.scrub(fach, cfg.learner_name), "grade": grade,
-            "topic": safe_topic, "format": format_spec()})
+            # Nur der Schlüssel des aktiven Fachs: der Dienst sucht in genau
+            # diesem Curriculum. Mehr verlässt die App nicht.
+            "subject": fach, "grade": grade, "topic": safe_topic, "format": format_spec()})
     status = result.get("status")
     if status == "unavailable":
         raise jobs.PermanentFailure("Das Material ist noch nicht freigegeben oder derzeit nicht verfügbar.")

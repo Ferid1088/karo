@@ -1,1 +1,5 @@
-<div class="learn-two-col compact"><div class="field"><label for="new-subject">Fach</label><select name="fach" id="new-subject">{% for f in [cfg.subject, 'Mathematik','Deutsch','Englisch','Biologie','Physik','Chemie','Geschichte','Erdkunde','Französisch','Sachunterricht','Informatik']|unique %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select></div><div class="field"><label for="new-grade">Klasse</label><select name="klasse" id="new-grade">{% for n in range(1,14) %}<option value="{{ n }}" {{ 'selected' if n == cfg.learner_grade }}>{{ n }}. Klasse</option>{% endfor %}</select></div></div>
+{# Das Fach kommt aus dem Reiter, in dem das Kind gerade ist — es wird nicht
+   gewählt, damit nichts im falschen Fach landet. #}
+<input type="hidden" name="fach" value="{{ fach|default(aktives_fach) }}">
+<div class="learn-two-col compact"><div class="field"><span class="field-label">Fach</span><p class="learn-fach"><b>{{ fach|default(aktives_fach)|fachname }}</b></p></div><div class="field"><span class="field-label">Deine Profilklasse</span><p><b>{{ cfg.learner_grade }}. Klasse</b></p><input type="hidden" name="klasse" value="{{ cfg.learner_grade }}"></div></div>
+<p class="hint">Karo prüft, für welche Klassen das Thema geeignet ist. Deine Profilklasse ändert die Einordnung nicht.</p>

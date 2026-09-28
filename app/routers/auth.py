@@ -7,7 +7,7 @@ import sqlite3
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from .. import config, connections, export, ingest, jobs, quizzes, security, materials, profile, teaching
+from .. import config, connections, export, ingest, jobs, quizzes, security, materials, profile, teaching, faecher
 from ..config import ConfigUnreadable
 from ..domain import Ausgabe
 from ..llm import BACKENDS, ClaudeClient, ClaudeError, models_for
@@ -171,7 +171,7 @@ def setup_form(request: Request):
 def setup_credentials(request: Request, backend: str = Form("abo"),
                       token: str = Form(""), api_key: str = Form(""),
                       learner_name: str = Form(""), grade: str = Form("7"),
-                      subject: str = Form("Mathematik")):
+                      subject: str = Form("mathematik")):
     cfg = config.load_safe()
 
     def zurueck_setup(meldung: str):
@@ -214,7 +214,8 @@ def setup_credentials(request: Request, backend: str = Form("abo"),
         anthropic_api_key=api_key.strip() if backend == "api" else "",
         learner_name=learner_name.strip()[:60],
         learner_grade=klasse,
-        subject=subject.strip()[:60] or "Mathematik",
+        # Nur eines der drei Fächer; es ist der Reiter, mit dem Lernen öffnet.
+        subject=faecher.schluessel(subject) or "mathematik",
         model_text=_waehle(modelle, "haiku") or modelle[0]["id"],
         model_vision=_waehle(modelle, "sonnet") or modelle[0]["id"],
     )

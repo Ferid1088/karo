@@ -14,7 +14,7 @@
     {% if scan and scan.state == 'gelesen' %}<input type="hidden" name="scan_id" value="{{ scan.id }}">{% endif %}
     <div class="learn-two-col compact">
       <div class="field"><label for="exam_date">Termin</label><input type="date" id="exam_date" name="exam_date" min="{{ today }}" value="{{ draft.get('exam_date', scan.exam_date if scan and scan.state == 'gelesen' else '') or '' }}" required></div>
-      <div class="field"><label for="exam_subject">Fach</label><input id="exam_subject" name="fach" value="{{ draft.get('fach', cfg.subject) }}" maxlength="80" required></div>
+      <div class="field"><label for="exam_subject">Fach</label><select id="exam_subject" name="fach" required>{% set gewaehlt = draft.get('fach') or aktives_fach %}{% for key, label in faecher %}<option value="{{ key }}" {{ 'selected' if key == gewaehlt }}>{{ label }}</option>{% endfor %}</select></div>
     </div>
     <label for="exam_topics">Prüfungsthemen <small>(ein Thema pro Zeile oder mit Komma)</small></label>
     <textarea id="exam_topics" name="themen" rows="4" required placeholder="Brüche addieren

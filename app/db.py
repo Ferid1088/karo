@@ -106,12 +106,14 @@ def init() -> None:
     c = conn()
     c.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     _migrate(c)
+    _faecher_vereinheitlichen(c)
     from .woche.pilot_store import init as init_woche
     init_woche()
     from .welten.store import init as init_welten
     init_welten()
     from .adaptiv.store import init as init_adaptiv
     init_adaptiv()
+    _faecher_vereinheitlichen(c)
     # Verfasste Lektionen gehoeren beim Hochfahren in den Katalog, nicht beim
     # ersten Klick: seit `/lernen` die adaptive Schicht nicht mehr anfasst,
     # haenge der Katalog sonst davon ab, welche Seite zuerst besucht wird.
@@ -156,11 +158,45 @@ _ADDED_COLUMNS = [
     ("lesson", "abbruch_grund", "TEXT"),
     ("lesson", "prompt_wunsch", "TEXT"),
     ("document", "themenname", "TEXT"),
+    ("document", "subject", "TEXT"),
     ("research_hit", "inhalt", "TEXT"),
     ("research_hit", "inhalt_geholt_am", "TEXT"),
     ("lesson_round", "notebooklm_quelle_pfad", "TEXT"),
     ("lesson_round_variant", "notebooklm_quelle_pfad", "TEXT"),
 ]
+
+
+def _faecher_vereinheitlichen(c: sqlite3.Connection) -> None:
+    """Fachangaben auf die drei Schlüssel bringen — idempotent.
+
+    „Mathe“ und „Mathematik“ werden `mathematik`. Was keinem der drei Fächer
+    entspricht (etwa „Biologie“), bleibt unverändert stehen: es ist für das
+    Kind unsichtbar und liegt im Elternordner, bis jemand ein Fach wählt.
+    Ein Schulblatt ohne Fach erbt es, wenn alle seine Themen dasselbe haben.
+    """
+    from .faecher import schluessel
+    for table, column in (("topic", "subject"), ("exam", "subject"),
+                          ("learning_upload", "subject"), ("lern_konzept", "fach")):
+        try:
+            werte = [r[0] for r in c.execute(f"SELECT DISTINCT {column} FROM {table}")]
+        except sqlite3.Error:
+            continue
+        for wert in werte:
+            key = schluessel(wert)
+            if key and key != wert:
+                c.execute(f"UPDATE {table} SET {column}=? WHERE {column}=?", (key, wert))
+    try:
+        offen = [r[0] for r in c.execute("SELECT id FROM document WHERE subject IS NULL")]
+    except sqlite3.Error:
+        return
+    for doc_id in offen:
+        faecher = {r[0] for r in c.execute(
+            """SELECT DISTINCT t.subject FROM kb_chunk k JOIN topic t ON t.id=k.topic_id
+                WHERE k.document_id=?
+               UNION SELECT subject FROM topic WHERE quelle_doc=?""", (doc_id, doc_id))}
+        if len(faecher) == 1 and schluessel(next(iter(faecher))):
+            c.execute("UPDATE document SET subject=? WHERE id=?",
+                      (schluessel(next(iter(faecher))), doc_id))
 
 
 def _migrate(c: sqlite3.Connection) -> None:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import datetime as dt
 from zoneinfo import ZoneInfo
 
-from .. import config, db
+from .. import config, db, faecher
 from ..woche import plaene, plaene_store
 
 WOCHENTAGE = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
@@ -52,6 +52,11 @@ def _goal_items(today: dt.date) -> list[dict]:
         if row["goal_status"] == "active" and row["status"] != "cancelled"]
 
 
+def _exam_fach(exam_id: int) -> str | None:
+    row = db.q1("SELECT subject FROM exam WHERE id=?", exam_id)
+    return row["subject"] if row else None
+
+
 def _exam_item(today: dt.date) -> dict | None:
     from . import exam_calendar
     task = exam_calendar.today_task()
@@ -68,7 +73,8 @@ def _exam_item(today: dt.date) -> dict | None:
         "minutes": task["minutes"],
         "done": done,
         "task": task,
-        "tag": "Klassenarbeit",
+        # Heute ist fachübergreifend, zeigt das Fach aber immer mit an.
+        "tag": f"Klassenarbeit · {faecher.name(_exam_fach(task['exam_id']))}",
     }
 
 
@@ -126,7 +132,7 @@ def next_exam(today: dt.date) -> dict | None:
     when = "heute" if days == 0 else "morgen" if days == 1 else f"in {days} Tagen"
     subject = (item.get("subject") or "").strip()
     return {**item, "days_left": days, "when": when,
-            "name": f"{subject}-Arbeit" if subject else "Klassenarbeit"}
+            "name": f"{faecher.name(subject)}-Arbeit" if subject else "Klassenarbeit"}
 
 
 def missed_goal(today: dt.date) -> dict | None:

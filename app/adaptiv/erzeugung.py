@@ -53,13 +53,15 @@ def _aufgabe_schreiben(fehlertyp_id: int, rolle: str, aufgabe: dict,
         quelle=quelle, geprueft=False)
 
 
-def speichern(rohdaten: dict, fach: str = "mathematik", *, quelle: str = QUELLE) -> int:
+def speichern(rohdaten: dict, fach: str, *, quelle: str = QUELLE) -> int:
     """Prüft den Vorschlag und schreibt ihn in den Katalog. Gibt die
     Konzept-Id zurück.
 
     Wirft `schemas.InhaltUngueltig`, bevor irgendetwas geschrieben wurde —
     ein abgewiesener Vorschlag hinterlässt keinen halben Eintrag.
     """
+    from ..faecher import pflicht
+    fach = pflicht(fach)
     lektion = schemas.pruefe_lektion(rohdaten)
     konzept = lektion["konzept"]
     existing = store.konzept_nach_key(fach, konzept['thema_key'], konzept['konzept_key'])
@@ -132,27 +134,33 @@ def _freigeben(konzept_id: int, fehlertyp_ids: list) -> None:
 # Auf Anfrage erzeugen (§5 Modell A, §6 Tier 3, §15 Latenz)
 # --------------------------------------------------------------------------
 
-def auftrag_schluessel(thema: str, fach: str | None = None, klasse: int | None = None) -> str:
+def auftrag_schluessel(thema: str, fach: str, klasse: int | None = None) -> str:
     """Ein Thema, ein Auftrag. Zweimal klicken erzeugt nicht zweimal."""
     return f"lektion:{normalisiere(thema)}" + (f':{normalisiere(fach or "")}:{klasse or ""}' if fach or klasse else '')
 
 
-def anfordern(thema: str, fach: str | None = None, klasse: int | None = None) -> int | None:
-    """Reiht die Erzeugung ein. Gibt None zurück, wenn schon eine läuft."""
+def anfordern(thema: str, fach: str, klasse: int | None = None) -> int | None:
+    """Reiht die Erzeugung ein. Gibt None zurück, wenn schon eine läuft.
+
+    Nur mit Fach: der Curriculum-Agent und das Modell bekommen ausschließlich
+    das aktive Fach, nie einen Vorgabewert aus den Einstellungen.
+    """
     import time
     from .. import config, jobs
+    from ..faecher import pflicht
     from . import curriculum_dienst
     cfg = config.load()
+    fach = pflicht(fach)
     payload = {"thema": thema, 'fach': fach, 'klasse': klasse}
     if curriculum_dienst.configured(cfg):
         payload.update(curriculum_service=curriculum_dienst.settings(cfg)[0],
                        curriculum_started=time.time(),
-                       fach=fach or cfg.subject, klasse=klasse or cfg.learner_grade)
+                       klasse=klasse or cfg.learner_grade)
     return jobs.enqueue("lektion_erzeugen", payload,
                         dedup_key=auftrag_schluessel(thema, fach, klasse))
 
 
-def laeuft(thema: str, fach: str | None = None, klasse: int | None = None) -> bool:
+def laeuft(thema: str, fach: str | None, klasse: int | None = None) -> bool:
     from .. import db
     return bool(db.q1(
         "SELECT 1 FROM job WHERE dedup_key=? AND state IN ('wartend','laeuft')",
@@ -180,10 +188,13 @@ def _handler_anmelden():
         if not thema:
             return {"uebersprungen": "kein Thema"}
         cfg = config.load()
-        fach = payload.get('fach') or cfg.subject
+        from ..faecher import NAMEN, schluessel
+        fach = schluessel(payload.get('fach'))
+        if fach is None:
+            raise jobs.PermanentFailure("Ohne Fach wird keine Lernreihe erzeugt.")
         klasse = payload.get('klasse') or cfg.learner_grade
         from . import lektionen
-        existing = lektionen.fuer_thema(thema, fach, klasse)
+        existing = lektionen.fuer_thema(thema, fach)
         if existing:
             return {'konzept_id': existing['konzept_id'], 'thema': thema}
         from . import curriculum_dienst
@@ -197,14 +208,16 @@ def _handler_anmelden():
             model=cfg.model_vision or None,
             max_tokens=MAX_TOKENS,
             prompt=prompts.lektion_prompt(
-                klasse, fach,
+                None, NAMEN[fach],
                 pii.scrub(thema, cfg.learner_name)),
             schema=prompts.LEKTION_SCHEMA,
             system=prompts.SYSTEM,
         )
         checked = schemas.pruefe_lektion(ergebnis.data)
-        if not checked['konzept']['klasse_von'] <= klasse <= checked['konzept']['klasse_bis']:
-            raise schemas.InhaltUngueltig('Die Lernreihe passt nicht zur angefragten Klassenstufe.')
+        # A second, independent classification sees the concept/tasks but never
+        # the child's profile class or the author's proposed grade labels.
+        from . import klassenpruefung
+        klassenpruefung.pruefen(checked, fach, cfg)
         from .normalisierung import normalisiere_thema
         if not lektionen._trifft(normalisiere_thema(thema), checked['konzept']):
             raise schemas.InhaltUngueltig('Die Lernreihe passt nicht zum angefragten Thema.')

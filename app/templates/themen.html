@@ -105,6 +105,10 @@ lassen sich ändern; abgelehnte Themen kommen nicht wieder.</p>
       <input type="text" id="label" name="label" maxlength="200"
              placeholder="Brüche mit verschiedenen Nennern addieren" required>
     </div>
+    <div class="field" style="flex:1 1 160px">
+      <label for="fach">Fach</label>
+      <select id="fach" name="fach" required>{% for key, label in faecher %}<option value="{{ key }}" {{ 'selected' if key == aktives_fach }}>{{ label }}</option>{% endfor %}</select>
+    </div>
     <div class="field" style="flex:2 1 280px">
       <label for="beschreibung">Was das Kind können muss</label>
       <input type="text" id="beschreibung" name="beschreibung" maxlength="500">

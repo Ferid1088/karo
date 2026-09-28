@@ -42,14 +42,20 @@ def job_topic_propose(payload: dict) -> None:
     if not quellen:
         return
 
+    from .faecher import NAMEN, erkenne, schluessel
+    doc = db.q1("SELECT themenname, subject FROM document WHERE id = ?", doc_id)
+    fach = schluessel(doc["subject"]) if doc else None
+    if fach is None:
+        return
     cfg = config.load()
+    # Nur Themen desselben Fachs zählen als „schon vorhanden“.
     vorhanden = [dict(r) for r in db.q(
-        "SELECT code, label FROM topic WHERE state != ? ORDER BY sort", ABGELEHNT)]
-    doc = db.q1("SELECT themenname FROM document WHERE id = ?", doc_id)
+        "SELECT code, label FROM topic WHERE state != ? AND subject = ? ORDER BY sort",
+        ABGELEHNT, fach)]
 
     ergebnis = client().complete(
         purpose="topic_propose",
-        prompt=prompts.topic_prompt(cfg.learner_grade, cfg.subject,
+        prompt=prompts.topic_prompt(cfg.learner_grade, NAMEN[fach],
                                     kb.geschwaerzt(quellen), vorhanden,
                                     themenname=doc["themenname"] if doc else None),
         schema=prompts.TOPIC_SCHEMA,
@@ -69,6 +75,12 @@ def job_topic_propose(payload: dict) -> None:
             if code in bekannt:
                 uebersprungen.append(label)
                 continue
+            # SUBJECT_MISMATCH: ein Thema aus einem anderen Fach wird nicht
+            # im Fach dieses Blatts angelegt.
+            erkannt = schluessel(roh.get("fach")) or erkenne(label)
+            if erkannt and erkannt != fach:
+                uebersprungen.append(f"{label} (gehört nicht zu {NAMEN[fach]})")
+                continue
             aehnlich = naechstes_duplikat(label, bekannte_labels)
             if aehnlich:
                 uebersprungen.append(f"{label} (ähnlich zu „{aehnlich}“)")
@@ -79,7 +91,7 @@ def job_topic_propose(payload: dict) -> None:
                 """INSERT INTO topic (subject, code, label, beschreibung, state,
                                       quelle_doc, sort, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (cfg.subject, code, label[:200],
+                (fach, code, label[:200],
                  (roh.get("beschreibung") or "")[:500] or None,
                  VORSCHLAG, doc_id, _sortwert(roh), db.now()))
 
@@ -268,7 +280,7 @@ def zuordnen(topic_id: int) -> int:
     if thema is None:
         return 0
     treffer = kb.suche(f"{thema['label']} {thema.get('beschreibung') or ''}",
-                       limit=30)
+                       thema["subject"], limit=30)
     n = 0
     with db.tx() as c:
         for t in treffer:
@@ -279,12 +291,17 @@ def zuordnen(topic_id: int) -> int:
     return n
 
 
-def anlegen(label: str, beschreibung: str = "") -> int | None:
-    """Thema von Hand anlegen — für alles, was Claude nicht vorgeschlagen hat."""
+def anlegen(label: str, beschreibung: str = "", *, subject: str) -> int | None:
+    """Thema von Hand anlegen — für alles, was Claude nicht vorgeschlagen hat.
+
+    Wirft `faecher.FachFehler`/`SubjectMismatch`, wenn das Fach fehlt oder
+    das Thema in ein anderes Fach gehört.
+    """
+    from .faecher import pruefe
     label = label.strip()[:200]
     if not label:
         return None
-    cfg = config.load_safe()
+    subject = pruefe(label, subject)
     code = normalize_code(label)
     if not code:
         return None
@@ -298,7 +315,7 @@ def anlegen(label: str, beschreibung: str = "") -> int | None:
             """INSERT INTO topic (subject, code, label, beschreibung, state,
                                   sort, created_at)
                VALUES (?, ?, ?, ?, ?, 500, ?)""",
-            (cfg.subject, code, label, beschreibung.strip()[:500] or None,
+            (subject, code, label, beschreibung.strip()[:500] or None,
              AKTIV, db.now()))
         neu = cur.lastrowid
     zuordnen(neu)

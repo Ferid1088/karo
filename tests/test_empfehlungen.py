@@ -22,8 +22,8 @@ def test_fremdes_thema_bekommt_keinen_vorschlag(client, fake_llm, fake_cli,
                                                 app_env):
     lektionen = _bereit(client, fake_llm)
 
-    assert lektionen.empfehlungen("Würfel: Volumen") == []
-    assert lektionen.empfehlungen("Photosynthese") == []
+    assert lektionen.empfehlungen("Würfel: Volumen", "mathematik") == []
+    assert lektionen.empfehlungen("Photosynthese", "mathematik") == []
 
 
 def test_verwandtes_thema_bekommt_die_passende_lernreihe(client, fake_llm,
@@ -32,7 +32,7 @@ def test_verwandtes_thema_bekommt_die_passende_lernreihe(client, fake_llm,
     ist der Verweis auf die Bruchlektion sinnvoll."""
     lektionen = _bereit(client, fake_llm)
 
-    vorschlaege = lektionen.empfehlungen("Brüche kürzen")
+    vorschlaege = lektionen.empfehlungen("Brüche kürzen", "mathematik")
 
     assert [l["konzept_key"] for l in vorschlaege] == ["ungleichnamig-addieren"]
 
@@ -44,7 +44,7 @@ def test_fuellwoerter_stiften_keine_verwandtschaft(client, fake_llm, fake_cli,
     keine Verwandtschaft, das ist Grammatik."""
     lektionen = _bereit(client, fake_llm)
 
-    assert lektionen.empfehlungen("Volumen bei verschiedenen Maßeinheiten") == []
+    assert lektionen.empfehlungen("Volumen bei verschiedenen Maßeinheiten", "mathematik") == []
 
 
 def test_die_seite_bietet_nichts_unpassendes_an(client, fake_llm, fake_cli,

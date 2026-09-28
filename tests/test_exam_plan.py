@@ -24,7 +24,7 @@ def test_klassenarbeit_ohne_gelesenes_themenblatt_wird_nicht_angelegt(
         client, fake_llm, fake_cli, app_env):
     einrichten(client, fake_llm)
     seite = client.get("/klassenarbeit")
-    r = client.post("/klassenarbeit", data={
+    r = client.post("/klassenarbeit", data={"fach": "mathematik", 
         "_csrf": csrf_from(seite.text),
         "exam_date": "2026-10-01",
         "themen": "",
@@ -83,7 +83,7 @@ def test_klassenarbeit_uebernimmt_scan_und_plant_erst_nach_kalendereingabe(
 
     fake_llm.responses["plan"] = PLAN_ANTWORT
     seite = client.get("/klassenarbeit")
-    r = client.post("/klassenarbeit", data={
+    r = client.post("/klassenarbeit", data={"fach": "mathematik", 
         "_csrf": csrf_from(seite.text),
         "exam_date": "2026-10-01",
         "themen": "Brüche addieren, Brüche kürzen",
@@ -154,7 +154,7 @@ def test_exam_uebernimmt_keine_persoenlichen_prognosen(
     scan = _themenblatt_scan(client, fake_llm, app_env, tmp_path, ["Brüche addieren"])
     assert scan["state"] == "gelesen"
 
-    ergebnis = exam_service.create_exam("2026-10-01", str(scan["id"]))
+    ergebnis = exam_service.create_exam("2026-10-01", str(scan["id"]), subject="mathematik")
 
     vorhergesagt = {r["topic_id"] for r in app_env.db.q(
         "SELECT topic_id FROM prediction WHERE exam_id=?", ergebnis.exam_id)}
@@ -179,7 +179,7 @@ def test_exam_hat_keine_duplikate_bei_doppelt_genanntem_thema(
     scan = _themenblatt_scan(client, fake_llm, app_env, tmp_path,
                              ["Brüche addieren", "Brüche addieren"])
 
-    ergebnis = exam_service.create_exam("2026-10-01", str(scan["id"]))
+    ergebnis = exam_service.create_exam("2026-10-01", str(scan["id"]), subject="mathematik")
 
     from app.services import learning_hub
     owned = learning_hub.exam_topics(ergebnis.exam_id)
@@ -203,7 +203,7 @@ def test_unbekanntes_thema_auf_dem_blatt_laesst_die_erstellung_nicht_abstuerzen(
     scan = _themenblatt_scan(client, fake_llm, app_env, tmp_path,
                              ["Völlig unbekanntes Thema XYZ"])
 
-    ergebnis = exam_service.create_exam("2026-10-01", str(scan["id"]))
+    ergebnis = exam_service.create_exam("2026-10-01", str(scan["id"]), subject="mathematik")
 
     vorhergesagt = {r["topic_id"] for r in app_env.db.q(
         "SELECT topic_id FROM prediction WHERE exam_id=?", ergebnis.exam_id)}
@@ -218,7 +218,7 @@ def test_klassenarbeit_kann_mit_manuellen_themen_angelegt_werden(
         client, fake_llm, fake_cli, app_env):
     einrichten(client, fake_llm)
     page = client.get('/klassenarbeit/neu')
-    response = client.post('/klassenarbeit', data={
+    response = client.post('/klassenarbeit', data={"fach": "mathematik", 
         '_csrf': csrf_from(page.text), 'exam_date': '2099-01-01',
         'themen': 'Brüche addieren', 'fach': 'Mathematik'}, follow_redirects=False)
     exam = app_env.db.q1('SELECT * FROM exam')

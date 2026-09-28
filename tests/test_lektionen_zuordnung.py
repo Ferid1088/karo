@@ -28,7 +28,7 @@ def test_andere_bruchthemen_bekommen_keine_additionslektion(
     einrichten(client, fake_llm)
 
     for thema in ANDERE_BRUCHTHEMEN:
-        assert lektionen.fuer_thema(thema) is None, thema
+        assert lektionen.fuer_thema(thema, "mathematik") is None, thema
 
 
 def test_das_addieren_selbst_trifft_weiterhin(client, fake_llm, fake_cli,
@@ -41,6 +41,6 @@ def test_das_addieren_selbst_trifft_weiterhin(client, fake_llm, fake_cli,
                   "Brüche addieren",
                   "ungleichnamige Brüche",
                   "Ungleichnamige Brüche addieren"):
-        lektion = lektionen.fuer_thema(thema)
+        lektion = lektionen.fuer_thema(thema, "mathematik")
         assert lektion is not None, thema
         assert lektion["konzept_key"] == "ungleichnamig-addieren", thema

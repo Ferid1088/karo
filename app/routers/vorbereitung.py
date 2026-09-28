@@ -55,8 +55,8 @@ async def inhalte_entscheiden(request: Request):
 
 @router.post("/inhalte/neu")
 def inhalte_neu(request: Request, label: str = Form(""),
-                beschreibung: str = Form("")):
-    return preparation.handle_themen_neu(request, label, beschreibung)
+                beschreibung: str = Form(""), fach: str = Form("")):
+    return preparation.handle_themen_neu(request, label, beschreibung, fach)
 
 
 # --- Recherche / Quellen (== /recherche) -----------------------------------

@@ -27,8 +27,7 @@
       </div>
       <div class="field">
         <label for="subject">Fach</label>
-        <input type="text" id="subject" name="subject" maxlength="60"
-               value="{{ cfg.subject }}" required>
+        <select id="subject" name="subject">{% for key, label in faecher %}<option value="{{ key }}" {{ 'selected' if key == (cfg.subject|lower) or label == cfg.subject }}>{{ label }}</option>{% endfor %}</select>
       </div>
     </div>
   </div>

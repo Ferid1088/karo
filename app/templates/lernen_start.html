@@ -1,38 +1,37 @@
 {% extends "learning_base.html" %}
-{% block title %}Meine Themen – {{ companion_name }}{% endblock %}
+{% block title %}{{ fach|fachname }} – {{ companion_name }}{% endblock %}
 {% block page_styles %}<link rel="stylesheet" href="/static/meine-themen.css?v={{ asset_version|default('0') }}">{% endblock %}
 {% block content %}
 <div class="topics-page">
   <header class="topics-header">
     <img src="/static/karo-owl-book.png" alt="" width="88" height="88">
     <div class="topics-intro">
-      <h1>Meine Themen</h1>
-      <p>Wähle ein Thema. Karo begleitet dich Schritt für Schritt.</p>
+      <h1>{{ fach|fachname }}</h1>
+      <p>Deine Themen in {{ fach|fachname }}. Karo begleitet dich Schritt für Schritt.</p>
+      {% if cfg.schulblaetter_kind %}<a class="topics-sheets" href="/wissen?fach={{ fach }}">Schulblätter in {{ fach|fachname }} →</a>{% endif %}
     </div>
-    <a class="topics-primary" href="/lernen/neu"><span aria-hidden="true">+</span> Neues Thema</a>
+    <a class="topics-primary" href="/lernen/neu?fach={{ fach }}"><span aria-hidden="true">+</span> Neues Thema</a>
   </header>
 
   {% if alle_themen %}
   <section class="topics-library" aria-label="Deine Themen finden">
     <nav class="topics-status" aria-label="Themen nach Lernstand filtern">
       {% for key, label, count in [('', 'Alle', alle_themen|length), ('bearbeitung', 'Am Lernen', active_count), ('neu', 'Neu', alle_themen|length - active_count - safe_count), ('sicher', 'Sicher', safe_count)] %}
-      <a href="/lernen?q={{ query|urlencode }}&amp;fach={{ fach|urlencode }}&amp;status={{ key }}" class="topics-status-link {{ key or 'alle' }}" {% if status == key %}aria-current="true"{% endif %}>{{ label }} <span>{{ count }}</span></a>
+      <a href="/lernen/{{ fach }}?q={{ query|urlencode }}&amp;status={{ key }}" class="topics-status-link {{ key or 'alle' }}" {% if status == key %}aria-current="true"{% endif %}>{{ label }} <span>{{ count }}</span></a>
       {% endfor %}
     </nav>
-    <form class="topics-search" method="get" action="/lernen" role="search">
+    <form class="topics-search" method="get" action="/lernen/{{ fach }}" role="search">
       <input type="hidden" name="status" value="{{ status }}">
       <div class="topics-search-field">
         <label class="sr" for="topic-search">Thema suchen</label>
         <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
         <input id="topic-search" name="q" value="{{ query }}" placeholder="Welches Thema suchst du?" type="search">
       </div>
-      <label class="sr" for="subject-filter">Fach</label>
-      <select id="subject-filter" name="fach"><option value="">Alle Fächer</option>{% for f in faecher %}<option value="{{ f }}" {{ 'selected' if fach == f }}>{{ f }}</option>{% endfor %}</select>
       <button class="topics-search-submit quiet" type="submit">Suchen</button>
     </form>
     <div class="topics-results">
-      <p>{{ themen|length }} {{ 'Thema' if themen|length == 1 else 'Themen' }}{% if query or fach or status %} gefunden{% else %} für dich{% endif %}</p>
-      {% if query or fach or status %}<a href="/lernen">Filter zurücksetzen</a>{% endif %}
+      <p>{{ themen|length }} {{ 'Thema' if themen|length == 1 else 'Themen' }}{% if query or status %} gefunden{% else %} in {{ fach|fachname }}{% endif %}</p>
+      {% if query or status %}<a href="/lernen/{{ fach }}">Filter zurücksetzen</a>{% endif %}
     </div>
   </section>
   {% endif %}
@@ -46,11 +45,11 @@
         {% if nachfrage != t.id|string %}
         <details class="topics-menu">
           <summary aria-label="Optionen für {{ t.label }}"><span aria-hidden="true">···</span></summary>
-          <div><a href="/lernen?q={{ query|urlencode }}&amp;fach={{ fach|urlencode }}&amp;status={{ status|urlencode }}&amp;weg={{ t.id }}#topic-title-{{ t.id }}">Thema weglegen</a></div>
+          <div><a href="/lernen/{{ fach }}?q={{ query|urlencode }}&amp;status={{ status|urlencode }}&amp;weg={{ t.id }}#topic-title-{{ t.id }}">Thema weglegen</a></div>
         </details>
         {% endif %}
       </div>
-      <p class="topics-subject">{{ t.subject }}{% if t.grade %} · {{ t.grade }}. Klasse{% endif %}</p>
+      <p class="topics-subject">{{ t.subject|fachname }}{% if t.content_level %} · {{ t.content_level }}{% endif %}</p>
       <h2 id="topic-title-{{ t.id }}">{{ t.label }}</h2>
       <p class="topics-hint">{% if t.learning_status == 'sicher' %}Das kannst du schon. Wiederholen hält dich fit.{% elif t.learning_status == 'bearbeitung' %}Mach in deinem Tempo weiter.{% else %}Entdecke das Thema mit Karo.{% endif %}</p>
       {% if nachfrage == t.id|string %}
@@ -59,7 +58,7 @@
         <small>Du findest es unter „Erfolge“ und kannst es dort zurückholen.</small>
         <div class="karte-nachfrage-wege">
           <form method="post" action="/lernen/{{ t.id }}/loeschen">{{ csrf_input() }}<button class="loeschen-echt" type="submit">Ja, weglegen</button></form>
-          <a class="quiet btn" href="/lernen?q={{ query|urlencode }}&amp;fach={{ fach|urlencode }}&amp;status={{ status|urlencode }}">Behalten</a>
+          <a class="quiet btn" href="/lernen/{{ fach }}?q={{ query|urlencode }}&amp;status={{ status|urlencode }}">Behalten</a>
         </div>
       </div>
       {% else %}
@@ -75,14 +74,14 @@
     {% else %}
     <section class="topics-empty">
       <img src="/static/karo-owl-book.png" alt="" width="100" height="100">
-      {% if query or fach or status %}
+      {% if query or status %}
       <h2>Hier ist noch kein Thema</h2>
-      <p>Versuche einen anderen Suchbegriff oder zeige wieder alle Themen.</p>
-      <a class="topics-primary" href="/lernen">Alle Themen zeigen</a>
+      <p>Versuche einen anderen Suchbegriff oder zeige wieder alle Themen in {{ fach|fachname }}.</p>
+      <a class="topics-primary" href="/lernen/{{ fach }}">Alle Themen zeigen</a>
       {% else %}
-      <h2>Was möchtest du verstehen?</h2>
+      <h2>Was möchtest du in {{ fach|fachname }} verstehen?</h2>
       <p>Erstelle dein erstes Thema. Du kannst auch ein Arbeitsblatt dafür hochladen.</p>
-      <a class="topics-primary" href="/lernen/neu">Erstes Thema erstellen <span aria-hidden="true">→</span></a>
+      <a class="topics-primary" href="/lernen/neu?fach={{ fach }}">Erstes Thema erstellen <span aria-hidden="true">→</span></a>
       {% endif %}
     </section>
     {% endfor %}

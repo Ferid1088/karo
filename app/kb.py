@@ -45,10 +45,15 @@ def job_kb_extract(payload: dict) -> None:
     if doc["state"] not in ("neu",):
         return
 
+    from .faecher import NAMEN, schluessel
+    fach = schluessel(doc["subject"])
+    if fach is None:
+        # Ohne Fach wird nichts erschlossen: das Blatt wartet im Elternordner.
+        return
     cfg = config.load()
     ergebnis = client().complete(
         purpose="kb_extract",
-        prompt=prompts.kb_prompt(cfg.learner_grade, cfg.subject,
+        prompt=prompts.kb_prompt(cfg.learner_grade, NAMEN[fach],
                                  themenname=doc["themenname"]),
         schema=prompts.KB_SCHEMA,
         image_path=Path(doc["stored_path"]),
@@ -56,6 +61,17 @@ def job_kb_extract(payload: dict) -> None:
     )
     daten = ergebnis.data
     abschnitte = daten.get("abschnitte") or []
+    # SUBJECT_MISMATCH: ein Englischblatt im Reiter Mathematik wird nicht
+    # erschlossen — seine Abschnitte würden sonst Mathe-Erklärungen speisen.
+    erkannt = schluessel(daten.get("fach")) or (
+        "andere" if str(daten.get("fach") or "").lower() == "andere" else None)
+    if erkannt and erkannt != fach:
+        ziel = NAMEN.get(erkannt, "keinem der drei Fächer")
+        with db.tx() as c:
+            c.execute("UPDATE document SET state='fach_falsch', note=? WHERE id=?",
+                      (f"SUBJECT_MISMATCH: Das Blatt gehört zu {ziel}, nicht zu "
+                       f"{NAMEN[fach]}. Bitte im richtigen Fach hochladen.", doc_id))
+        return
 
     with db.tx() as c:
         # Ein Blatt wird nur erschlossen, solange nichts daran hängt.
@@ -124,13 +140,18 @@ def _fts_query(text: str) -> str:
     return " OR ".join(f'"{w}"' for w in worte[:8])
 
 
-def suche(text: str, limit: int = 12, arten: tuple[str, ...] | None = None,
+def suche(text: str, fach: str, limit: int = 12, arten: tuple[str, ...] | None = None,
           topic_id: int | None = None) -> list[dict]:
-    """Findet Abschnitte in der Wissensbasis.
+    """Findet Abschnitte in der Wissensbasis — nur auf Blättern des Fachs.
 
     Erst nach Thema, dann per Volltext — ein zugeordneter Abschnitt ist immer
-    relevanter als ein Volltexttreffer.
+    relevanter als ein Volltexttreffer. Ein Blatt aus Englisch taucht nie in
+    einer Mathematikerklärung auf, auch wenn ein Wort zufällig passt.
     """
+    from .faecher import schluessel
+    fach = schluessel(fach)
+    if fach is None:
+        return []
     treffer: list[dict] = []
     gesehen: set[int] = set()
 
@@ -138,8 +159,9 @@ def suche(text: str, limit: int = 12, arten: tuple[str, ...] | None = None,
         for r in db.q(
             """SELECT k.*, d.source_name FROM kb_chunk k
                  JOIN document d ON d.id = k.document_id
-                WHERE k.topic_id = ? ORDER BY k.art, k.id LIMIT ?""",
-                topic_id, limit):
+                WHERE k.topic_id = ? AND d.subject = ?
+                ORDER BY k.art, k.id LIMIT ?""",
+                topic_id, fach, limit):
             treffer.append(dict(r))
             gesehen.add(r["id"])
 
@@ -151,9 +173,9 @@ def suche(text: str, limit: int = 12, arten: tuple[str, ...] | None = None,
                     """SELECT k.*, d.source_name FROM kb_fts f
                          JOIN kb_chunk k ON k.id = f.rowid
                          JOIN document d ON d.id = k.document_id
-                        WHERE kb_fts MATCH ?
+                        WHERE kb_fts MATCH ? AND d.subject = ?
                         ORDER BY bm25(kb_fts) LIMIT ?""",
-                    abfrage, limit * 2)
+                    abfrage, fach, limit * 2)
             except Exception as exc:            # pragma: no cover
                 log.warning("Volltextsuche fehlgeschlagen: %s", exc)
                 rows = []
@@ -173,15 +195,20 @@ def suche(text: str, limit: int = 12, arten: tuple[str, ...] | None = None,
     return treffer[:limit]
 
 
+def _fach_von(topic_id: int) -> str | None:
+    row = db.q1("SELECT subject FROM topic WHERE id=?", topic_id)
+    return row["subject"] if row else None
+
+
 def lehrmaterial(topic_id: int, label: str, limit: int = 10) -> list[dict]:
-    """Nur das, was tatsächlich etwas erklärt."""
-    alles = suche(label, limit=limit * 2, arten=LEHR_ARTEN, topic_id=topic_id)
+    """Nur das, was tatsächlich etwas erklärt — aus dem Fach des Themas."""
+    alles = suche(label, _fach_von(topic_id), limit=limit * 2, arten=LEHR_ARTEN, topic_id=topic_id)
     lehr = [a for a in alles if a["art"] in LEHR_ARTEN]
     return (lehr or alles)[:limit]
 
 
 def aufgaben(topic_id: int, label: str, limit: int = 8) -> list[dict]:
-    alles = suche(label, limit=limit * 2, arten=("aufgabe",), topic_id=topic_id)
+    alles = suche(label, _fach_von(topic_id), limit=limit * 2, arten=("aufgabe",), topic_id=topic_id)
     return [a for a in alles if a["art"] == "aufgabe"][:limit] or alles[:limit]
 
 

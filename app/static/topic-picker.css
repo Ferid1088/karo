@@ -1,0 +1,24 @@
+/* Scoped, expanding dropdown with search as its first row. */
+.topic-catalog{align-self:start;min-width:0}
+.topic-picker{display:grid;gap:1rem;min-width:0}
+.topic-picker [hidden]{display:none!important}
+.topic-picker label{display:block;margin-bottom:.35rem;color:#312e81;font-weight:700}
+.topic-picker :is(input[type=search],select){display:block;width:100%;max-width:100%;min-width:0;min-height:48px;padding:.7rem .8rem;border:1px solid #b5afd9;border-radius:10px;background:#fff;color:#252256;font:inherit}
+.topic-picker :is(input,select,button):focus-visible{outline:3px solid #5145e8;outline-offset:3px}
+.topic-picker button{width:100%;min-height:48px;white-space:normal}
+.topic-picker #catalog-toggle{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.8rem 1rem;text-align:left;border:1px solid #b5afd9;border-radius:12px;background:#fff;color:#312e81;box-shadow:none;transform:none;font-weight:600;cursor:pointer}
+.topic-dropdown-trigger [data-topic-value]{min-width:0;overflow-wrap:anywhere}
+.topic-dropdown-trigger>span:last-child{flex:none}
+.topic-picker #catalog-toggle:hover{background:#f6f4ff;border-color:#6556d9}
+.topic-picker #catalog-toggle[aria-expanded=true]{border-radius:12px 12px 0 0;border-color:#6556d9}
+.topic-dropdown-panel{border:1px solid #6556d9;border-top:0;border-radius:0 0 12px 12px;background:#fff;overflow:hidden}
+.topic-dropdown-search{padding:.8rem;background:#f7f5ff;border-bottom:1px solid #e4dff7}
+.topic-dropdown-search label{font-size:.85rem}
+.topic-dropdown-options{max-height:16rem;overflow-y:auto;overscroll-behavior:contain}
+.topic-dropdown-options [role=option]{display:flex;align-items:center;min-height:48px;padding:.7rem 1rem;color:#312e81;line-height:1.4;overflow-wrap:anywhere;cursor:pointer;border-bottom:1px solid #efecf8}
+.topic-dropdown-options [role=option]:hover,.topic-dropdown-options .is-active{background:#ede9ff;box-shadow:inset 3px 0 #6556d9}
+.topic-dropdown-options [aria-selected=true]{font-weight:800;background:#f5f2ff}
+.topic-picker .topic-picker-hint{margin:0;padding:.7rem 1rem;color:#4e4973;font-size:.85rem;line-height:1.5;background:#faf9ff}
+form.topic-picker #catalog-add{background:#5746e8;color:#fff;-webkit-text-fill-color:currentColor;opacity:1}
+form.topic-picker #catalog-add:hover{background:#4837cf}
+form.topic-picker #catalog-add:disabled{background:#eeecf7;color:#514b68;-webkit-text-fill-color:#514b68;opacity:1;box-shadow:none;border:1px solid #bdb6d4;cursor:not-allowed}

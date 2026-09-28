@@ -26,17 +26,20 @@ def saee_alle() -> None:
         modul.saeen()
 
 
-def verfuegbar() -> list[dict]:
+def verfuegbar(fach: str | None = None) -> list[dict]:
     """Alle auslieferbaren Lektionen — aus dem Katalog, nicht aus `MODULE`.
 
     `MODULE` sagt nur noch, was gesaet wird. Was es *gibt*, steht in
     `lern_konzept`: sonst waere eine Lektion, die niemand als Python-Modul
     geschrieben hat, grundsaetzlich unauffindbar.
     """
+    from ..faecher import pflicht
     saee_alle()
+    nur = pflicht(fach) if fach else None
     return [{"konzept_id": k["id"], "label": k["label"], "fach": k["fach"],
              "konzept_key": k["konzept_key"], "stichworte": k["stichworte"]}
-            for k in store.konzepte_verfuegbar()]
+            for k in store.konzepte_verfuegbar()
+            if nur is None or k["fach"] == nur]
 
 
 def _trifft(gesucht: str, lektion: dict) -> bool:
@@ -53,19 +56,20 @@ def _trifft(gesucht: str, lektion: dict) -> bool:
     return gesucht in normalisiere_thema(lektion["label"])
 
 
-def fuer_thema(thema_text: str | None, fach: str | None = None, klasse: int | None = None) -> dict | None:
+def fuer_thema(thema_text: str | None, fach: str | None, klasse: int | None = None) -> dict | None:
     """Die passende Lektion — oder None, und dann wird das auch gesagt.
 
     Bewusst ein simpler Stichwortabgleich: eine echte Zuordnung beliebiger
     Themen braucht die Zerlegung aus Meilenstein 4. Was hier nicht trifft,
     darf nicht heimlich in der Bruchlektion landen.
     """
+    from ..faecher import schluessel
     gesucht = normalisiere_thema(thema_text)
-    if not gesucht:
+    # Ohne Fach gibt es keine Lektion: sonst fände „Brüche“ aus Englisch
+    # heraus die Mathematiklektion.
+    if not gesucht or not schluessel(fach):
         return None
-    for lektion in verfuegbar():
-        if fach and normalisiere_thema(lektion['fach']) != normalisiere_thema(fach):
-            continue
+    for lektion in verfuegbar(fach):
         konzept = store.konzept(lektion['konzept_id']) or {}
         if klasse and not konzept.get('klasse_von', 1) <= klasse <= konzept.get('klasse_bis', 13):
             continue
@@ -91,7 +95,7 @@ def _sinnwoerter(text: str | None) -> set:
             if len(w) > 2 and w not in _FUELLWOERTER}
 
 
-def empfehlungen(thema_text: str | None, hoechstens: int = 3) -> list[dict]:
+def empfehlungen(thema_text: str | None, fach: str, hoechstens: int = 3) -> list[dict]:
     """Verfasste Lektionen, die zum gefragten Thema gehören.
 
     Ein Vorschlag ist nur dann einer, wenn er mit der Frage zu tun hat.
@@ -105,11 +109,12 @@ def empfehlungen(thema_text: str | None, hoechstens: int = 3) -> list[dict]:
     Heuristik. Solange sie fehlt, ist „gemeinsames Stichwort" das Ehrlichste,
     was sich ohne Erfindung sagen lässt.
     """
+    from ..faecher import schluessel
     gesucht = _sinnwoerter(thema_text)
-    if not gesucht:
+    if not gesucht or not schluessel(fach):
         return []
     bewertet = []
-    for lektion in verfuegbar():
+    for lektion in verfuegbar(fach):
         woerter = _sinnwoerter(lektion["label"])
         for wort in lektion.get("stichworte") or ():
             woerter |= _sinnwoerter(wort)

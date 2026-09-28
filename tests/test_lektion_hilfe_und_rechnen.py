@@ -70,7 +70,7 @@ def test_die_hilfe_erreicht_das_kind(client, fake_llm, fake_cli, app_env):
     from app.adaptiv import erzeugung, inhalt_store, sitzung
     einrichten(client, fake_llm)
 
-    konzept_id = erzeugung.speichern(_lektion())
+    konzept_id = erzeugung.speichern(_lektion(), "mathematik")
 
     for phase in sitzung.PHASEN:
         hilfe = inhalt_store.hilfe_fuer_phase(konzept_id, phase)
@@ -84,7 +84,7 @@ def test_die_hilfe_ruft_kein_modell(client, fake_llm, fake_cli, app_env):
     """A3: Hilfe ist ein Lookup, kein Aufruf im Moment der Ratlosigkeit."""
     from app.adaptiv import erzeugung, inhalt_store, sitzung
     einrichten(client, fake_llm)
-    konzept_id = erzeugung.speichern(_lektion())
+    konzept_id = erzeugung.speichern(_lektion(), "mathematik")
     fake_llm.calls.clear()
 
     inhalt_store.hilfe_fuer_phase(konzept_id, sitzung.RULE)

@@ -120,7 +120,7 @@ def test_legacy_repair_preserves_results_and_redirects_empty_duplicates(client, 
     with app_env.db.tx() as c:
         c.execute("UPDATE topic SET label='multiplikation' WHERE id=?", (topic_id,))
         c.execute("UPDATE quiz SET state='ausgewertet' WHERE id=?", (result_id,))
-        duplicate = c.execute("INSERT INTO topic(subject,code,label,state,created_at) VALUES ('Mathematik','DUPLICATE','multiplication','aktiv',?)", (app_env.db.now(),)).lastrowid
+        duplicate = c.execute("INSERT INTO topic(subject,code,label,state,created_at) VALUES ('mathematik','DUPLICATE','multiplication','aktiv',?)", (app_env.db.now(),)).lastrowid
         blank = c.execute("INSERT INTO quiz(topic_id,anlass,state,created_at) VALUES (?,'evaluation','bereit',?)", (duplicate, app_env.db.now())).lastrowid
         repair(c)
         repair(c)

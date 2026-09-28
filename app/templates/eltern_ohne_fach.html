@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Ohne Fach – Karo{% endblock %}
+{% block content %}
+{# Der Ordner für alles, was keinem der drei Fächer gehört. Nichts wird hier
+   gelöscht: Eltern wählen ein Fach, oder der Eintrag bleibt liegen. #}
+<p class="eyebrow">ORDNER</p><h1>Ohne Fach</h1>
+<p class="sub">Karo lernt nur Deutsch, Mathematik und Englisch. Diese Inhalte haben ein anderes oder gar kein Fach. Ihr Kind sieht sie nicht, bis Sie ein Fach wählen.</p>
+{% set titel = {'thema': 'Themen', 'arbeit': 'Klassenarbeiten', 'blatt': 'Schulblätter'} %}
+{% for art, zeilen in ordner.items() %}{% if zeilen %}
+<section class="card"><h2>{{ titel[art] }}</h2>
+  <div class="simple-list">
+  {% for z in zeilen %}
+    <form method="post" action="/eltern/ohne-fach/zuordnen" class="row ohne-fach-zeile">
+      {{ csrf_input() }}<input type="hidden" name="art" value="{{ art }}"><input type="hidden" name="eintrag_id" value="{{ z.id }}">
+      <span class="grow"><strong>{{ z.titel|datum if art == 'arbeit' else z.titel }}</strong><small> · bisher: {{ z.subject or 'kein Fach' }}</small></span>
+      <label class="sr" for="fach-{{ art }}-{{ z.id }}">Fach für {{ z.titel }}</label>
+      <select id="fach-{{ art }}-{{ z.id }}" name="fach" required><option value="">Fach wählen …</option>{% for key, label in faecher %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+      <button type="submit" class="ghost">Zuordnen</button>
+    </form>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}{% else %}{% endfor %}
+{% if not ordner.thema and not ordner.arbeit and not ordner.blatt %}<p class="empty">Der Ordner ist leer. Alle Inhalte gehören zu einem der drei Fächer.</p>{% endif %}
+{% endblock %}

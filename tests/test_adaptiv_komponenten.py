@@ -148,7 +148,7 @@ def test_gezeichnete_komponenten_sind_vorlesbar(client, fake_llm, fake_cli,
     import re
 
     einrichten(client, fake_llm)
-    app_env.config.update(adaptive_learning_enabled=True)
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get("/lernen/adaptiv").text)
     client.post("/lernen/adaptiv/start", data={"_csrf": token, "thema": "brueche"})
@@ -167,7 +167,7 @@ def test_gezeichnete_komponenten_sind_vorlesbar(client, fake_llm, fake_cli,
 
 def _kind_lernt(client, fake_llm, app_env):
     einrichten(client, fake_llm)
-    app_env.config.update(adaptive_learning_enabled=True)
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get("/lernen/adaptiv").text)
     client.post("/lernen/adaptiv/start", data={"_csrf": token, "thema": "brueche"})

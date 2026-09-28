@@ -5,20 +5,23 @@ from .conftest import csrf_from, make_jpeg, run_jobs
 from .test_app import einrichten, kind_modus_aktivieren
 
 
-def test_school_material_moves_between_sections(client, fake_llm, fake_cli, app_env):
+def test_school_material_stays_available_to_parents_and_child_access_is_configurable(client, fake_llm, fake_cli, app_env):
     einrichten(client, fake_llm)
     for enabled in (False, True, False):
         app_env.config.update(schulblaetter_kind=enabled)
-        assert ('<h2>Schulblätter</h2>' in client.get('/eltern').text) is not enabled
+        parent_page = client.get('/eltern').text
+        assert 'href="/wissen"' in parent_page
+        assert 'Schulmaterial hinzufügen' in parent_page
         # "Heute" bleibt beim Tag; die Schulblätter stehen unter Lernen.
         assert '<h2>Schulblätter</h2>' not in client.get('/').text
         for path in ('/lernen?status=neu', '/lernzyklus?status=neu'):
             assert ('<h2>Schulblätter</h2>' in client.get(path).text) is enabled
     kind_modus_aktivieren(client)
-    assert 'href="/wissen"' not in client.get('/').text
+    assert 'href="/wissen' not in client.get('/').text
     app_env.config.update(schulblaetter_kind=True)
     for path in ('/lernen?status=neu', '/lernzyklus?status=neu'):
-        assert 'href="/wissen"' in client.get(path).text
+        # Schulblätter gibt es nur je Fach: der Link führt ins aktive Fach.
+        assert 'href="/wissen?fach=mathematik"' in client.get(path).text
 
 
 @pytest.mark.parametrize('index,upload,scan,detail', [
@@ -41,17 +44,18 @@ def test_child_can_use_school_material_only_when_enabled(
     assert page.status_code == 200
     assert 'Deine Sammlung' in page.text
     assert 'href="/eltern"' not in page.text
-    assert 'href="/lernen"' in page.text
+    assert 'href="/lernen/mathematik"' in page.text
     assert client.post(upload, data={'_csrf': 'invalid'}).status_code == 403
     assert client.post(scan, data={'_csrf': 'invalid'}).status_code == 403
     jpeg = make_jpeg(tmp_path / 'bruchrechnung.jpg')
     response = client.post(upload, data={
-        '_csrf': token, 'themenname': 'Bruchrechnung', 'rolle': 'bearbeitet',
+        '_csrf': token, 'themenname': 'Bruchrechnung', 'rolle': 'bearbeitet', 'fach': 'mathematik',
     }, files={'datei': ('bruchrechnung.jpg', jpeg.read_bytes(), 'image/jpeg')})
     assert response.status_code == 200
     doc = app_env.db.q1('SELECT * FROM document')
     assert doc['rolle'] == 'wissen'
     assert doc['themenname'] == 'Bruchrechnung'
+    assert doc['subject'] == 'mathematik'
     run_jobs(app_env, fake_llm)
     page = client.get(index)
     assert 'href="/themen' not in page.text

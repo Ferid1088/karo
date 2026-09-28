@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 from urllib.parse import urlencode
+from itsdangerous import URLSafeTimedSerializer, BadSignature
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from .. import config, topics, db
 from ..adaptiv import erzeugung, lektionen, sitzung as zustand, store, unterricht
-from ..services import learning_hub
-from .shared import render, zurueck
+from ..services import learning_hub, grade_guidance
+from .shared import flash, render, zurueck
 
 router = APIRouter(prefix="/lernen/adaptiv", tags=["adaptiv"])
 exam_router = APIRouter(prefix="/klassenarbeit/{exam_id}/lernen", tags=["exam-learning"])
@@ -25,7 +26,8 @@ def _context(request: Request) -> dict:
     raw = request.path_params.get("exam_id")
     eid = int(raw) if raw is not None and str(raw).isdigit() else None
     if raw is not None and (eid is None or not db.q1(
-            "SELECT id FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL", eid)):
+            "SELECT id FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL"
+            " AND subject IN ('deutsch','mathematik','englisch')", eid)):
         raise HTTPException(404, "Diese Klassenarbeit gibt es nicht.")
     return {
         "learning_exam_id": eid,
@@ -57,9 +59,12 @@ def _owns(request: Request, session: dict) -> bool:
 
 def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
     ctx = _context(request)
-    request.session["learning_session:" + ctx["learning_base"]] = sitzung["id"]
     entry = store.eingabe(sitzung["eingabe_id"]) or {}
     concept = store.konzept(sitzung["konzept_id"]) or {}
+    warning = _grade_gate(request, concept, entry.get('thema_text', ''), entry.get('topic_id'))
+    if warning is not None:
+        return warning
+    request.session["learning_session:" + ctx["learning_base"]] = sitzung["id"]
     screen = unterricht.bildschirm(sitzung)
     steps = {"anker": 1, "diagnose": 1, "vorhersage": 2, "haken": 2,
              "regel": 2, "beispiel": 3, "anders": 2, "transfer": 6, "geschafft": 6}
@@ -67,6 +72,46 @@ def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
     return render(request, "adaptiv.html", sitzung=sitzung, schirm=screen,
                   learning_title=entry.get("thema_text") or concept.get("label", "Dein Thema"),
                   learning_step=step, **ctx)
+
+
+def _grade_signer():
+    return URLSafeTimedSerializer(config.session_secret(), salt='learning-grade-confirmation-v1')
+
+
+def _grade_gate(request: Request, concept: dict, thema: str, topic_id: int | None):
+    ctx = _context(request)
+    info = grade_guidance.guidance(concept, ctx['learning_base'], topic_id, thema)
+    if not info['mismatch'] or info['acknowledged']:
+        return None
+    token = _grade_signer().dumps(dict(key=info['key'], concept_id=concept['id'],
+        topic_id=topic_id, thema=thema, area=ctx['learning_base'], csrf=request.session.get('csrf')))
+    return render(request, 'learning_grade_warning.html', guidance=info, confirmation=token, **ctx)
+
+
+@router.post('/klasse-bestaetigen', response_class=HTMLResponse)
+@exam_router.post('/klasse-bestaetigen', response_class=HTMLResponse)
+def klasse_bestaetigen(request: Request, confirmation: str = Form('')):
+    ctx = _context(request)
+    if _aus():
+        return _auswahl(request)
+    try:
+        proof = _grade_signer().loads(confirmation, max_age=1800)
+    except BadSignature:
+        raise HTTPException(400, 'Der Hinweis ist abgelaufen. Bitte öffne dein Thema erneut.')
+    if proof.get('area') != ctx['learning_base'] or proof.get('csrf') != request.session.get('csrf'):
+        raise HTTPException(403, 'Diese Bestätigung gehört nicht zu diesem Lernbereich.')
+    topic = _topic(request, str(proof.get('topic_id') or ''))
+    concept = store.konzept(proof['concept_id'])
+    if not concept or not concept.get('aktiv') or not concept.get('geprueft_am'):
+        raise HTTPException(409, 'Die Lernreihe muss erneut geprüft werden.')
+    if topic and (topic['label'] != proof['thema'] or topic['subject'] != concept['fach']):
+        raise HTTPException(409, 'Das Thema wurde geändert. Bitte öffne es erneut.')
+    info = grade_guidance.guidance(concept, ctx['learning_base'], (topic or {}).get('id'), proof['thema'])
+    if proof['key'] != info['key']:
+        return _grade_gate(request, concept, proof['thema'], (topic or {}).get('id')) or zurueck(ctx['learning_back'])
+    grade_guidance.acknowledge(info)
+    previous = store.letzte_fuer_thema((topic or {}).get('id'), concept['id'])
+    return _zeige(request, previous or unterricht.starte(concept['id'], proof['thema'], (topic or {}).get('id')))
 
 
 def _laufende(request: Request) -> dict | None:
@@ -93,19 +138,28 @@ def _laufende(request: Request) -> dict | None:
     return session if session and _owns(request, session) else None
 
 
-def _auswahl(request: Request, thema: str = "", nichts_gefunden: bool = False):
+def _fach(request: Request, topic: dict | None, wert: str = "") -> str:
+    """Das Fach eines Lernwegs: das des Themas, sonst das aktive."""
+    from .shared import aktives_fach
+    return aktives_fach(request, (topic or {}).get("subject") or wert)
+
+
+def _auswahl(request: Request, thema: str = "", nichts_gefunden: bool = False, fach: str = ""):
     ctx = _context(request)
     if ctx["learning_exam_id"] or _aus():
         return render(request, "learning_unavailable.html", thema=thema,
                       disabled=_aus(), **ctx)
-    suggestions = lektionen.empfehlungen(thema) if nichts_gefunden else lektionen.verfuegbar()
+    fach = _fach(request, None, fach)
+    # Vorschläge nur aus dem aktiven Fach — nie die Bruchlektion im Reiter Englisch.
+    suggestions = (lektionen.empfehlungen(thema, fach) if nichts_gefunden
+                   else lektionen.verfuegbar(fach))
     return render(request, "adaptiv_auswahl.html", lektionen=suggestions, thema=thema,
-                  nichts_gefunden=nichts_gefunden, **ctx)
+                  nichts_gefunden=nichts_gefunden, fach=fach, **ctx)
 
 
-def _wartet(request: Request, thema: str, topic_id: int | None = None):
+def _wartet(request: Request, thema: str, topic_id: int | None = None, fach: str = ""):
     ctx = _context(request)
-    query = urlencode({"thema": thema, "topic_id": topic_id or ""})
+    query = urlencode({"thema": thema, "topic_id": topic_id or "", "fach": fach})
     return render(request, "adaptiv_wartet.html", thema=thema, topic_id=topic_id,
                   status_url=ctx["learning_base"] + "/status?" + query,
                   resume_url=ctx["learning_base"] + "/wartet?" + query, **ctx)
@@ -123,7 +177,8 @@ def start(request: Request):
 @router.post("/start", response_class=HTMLResponse)
 @exam_router.post("/start", response_class=HTMLResponse)
 def start_thema(request: Request, thema: str = Form(""),
-                topic_id: str = Form(""), posted_exam_id: str = Form("", alias="exam_id")):
+                topic_id: str = Form(""), posted_exam_id: str = Form("", alias="exam_id"),
+                fach: str = Form("")):
     ctx = _context(request)
     # A posted exam_id must never turn a personal URL into an exam journey.
     if posted_exam_id and str(ctx["learning_exam_id"]) != str(posted_exam_id):
@@ -135,46 +190,60 @@ def start_thema(request: Request, thema: str = Form(""),
         thema = topic["label"]
     if not thema.strip() or len(thema) > 200:
         return _auswahl(request)
-    fach, grade = (topic or {}).get("subject"), (topic or {}).get("grade")
+    fach, grade = _fach(request, topic, fach), config.load_safe().learner_grade
+    if topic is None:
+        # Freier Text: gehört er zum aktiven Fach? Sonst SUBJECT_MISMATCH.
+        from .. import faecher
+        try:
+            faecher.pruefe(thema, fach)
+        except faecher.SubjectMismatch as exc:
+            flash(request, str(exc), "warn")
+            return zurueck(f"/lernen/{fach}")
     tid = (topic or {}).get("id")
     previous = store.offene_fuer_thema(tid) if tid else None
     if previous:
         return _zeige(request, previous)
-    lesson = lektionen.fuer_thema(thema, fach, grade)
+    lesson = lektionen.fuer_thema(thema, fach)
     if lesson is None:
         from ..adaptiv import curriculum_dienst
         cfg = config.load_safe()
         if curriculum_dienst.configured(cfg) or getattr(cfg, "llm_error_creation_enabled", False):
             erzeugung.anfordern(thema, fach=fach, klasse=grade)
-            return _wartet(request, thema, tid)
-        return _auswahl(request, thema=thema, nichts_gefunden=True)
-    previous = store.letzte_fuer_thema(tid, lesson["konzept_id"])
-    return _zeige(request, previous or unterricht.starte(lesson["konzept_id"], thema, tid))
+            return _wartet(request, thema, tid, fach)
+        return _auswahl(request, thema=thema, nichts_gefunden=True, fach=fach)
+    previous = store.letzte_fuer_thema(tid, lesson['konzept_id'])
+    if previous:
+        return _zeige(request, previous)
+    warning = _grade_gate(request, store.konzept(lesson['konzept_id']), thema, tid)
+    if warning is not None:
+        return warning
+    return _zeige(request, unterricht.starte(lesson["konzept_id"], thema, tid))
 
 
 @router.get("/status")
 @exam_router.get("/status")
-def erzeugung_status(request: Request, thema: str = "", topic_id: str = ""):
+def erzeugung_status(request: Request, thema: str = "", topic_id: str = "", fach: str = ""):
     topic = _topic(request, topic_id)
     if _aus():
         return {"fertig": False, "laeuft": False}
     thema = (topic or {}).get("label", thema)
-    fach, grade = (topic or {}).get("subject"), (topic or {}).get("grade")
-    return {"fertig": lektionen.fuer_thema(thema, fach, grade) is not None,
+    fach, grade = _fach(request, topic, fach), config.load_safe().learner_grade
+    return {"fertig": lektionen.fuer_thema(thema, fach) is not None,
             "laeuft": erzeugung.laeuft(thema, fach=fach, klasse=grade), "thema": thema}
 
 
 @router.get("/wartet", response_class=HTMLResponse)
 @exam_router.get("/wartet", response_class=HTMLResponse)
-def wartet(request: Request, thema: str = "", topic_id: str = ""):
+def wartet(request: Request, thema: str = "", topic_id: str = "", fach: str = ""):
     topic = _topic(request, topic_id)
     if _aus():
         return _auswahl(request)
     thema = (topic or {}).get("label", thema)
-    lesson = lektionen.fuer_thema(thema, (topic or {}).get("subject"), (topic or {}).get("grade"))
+    fach = _fach(request, topic, fach)
+    lesson = lektionen.fuer_thema(thema, fach)
     if lesson:
-        return start_thema(request, thema=thema, topic_id=topic_id, posted_exam_id="")
-    return _wartet(request, thema, (topic or {}).get("id"))
+        return start_thema(request, thema=thema, topic_id=topic_id, posted_exam_id="", fach=fach)
+    return _wartet(request, thema, (topic or {}).get("id"), fach)
 
 
 @router.post("/neu", response_class=HTMLResponse)
@@ -188,6 +257,10 @@ def neu(request: Request):
     if active["zustand"] not in zustand.ENDZUSTAENDE:
         return _zeige(request, active)
     entry = store.eingabe(active["eingabe_id"]) or {}
+    warning = _grade_gate(request, store.konzept(active['konzept_id']),
+                          entry.get('thema_text', ''), entry.get('topic_id'))
+    if warning is not None:
+        return warning
     return _zeige(request, unterricht.starte(active["konzept_id"],
         entry.get("thema_text", ""), entry.get("topic_id")))
 
@@ -198,6 +271,11 @@ def _answer(request: Request, action: str, answer: str = ""):
     active = _laufende(request)
     if active is None:
         return zurueck(_context(request)["learning_base"])
+    entry = store.eingabe(active['eingabe_id']) or {}
+    warning = _grade_gate(request, store.konzept(active['konzept_id']),
+                          entry.get('thema_text', ''), entry.get('topic_id'))
+    if warning is not None:
+        return warning
     screen = unterricht.bildschirm(active)
     expected = {"anker": {"anker"}, "diagnose": {"diagnose"},
                 "vorhersage": {"vorhersage"}, "transfer": {"transfer"},

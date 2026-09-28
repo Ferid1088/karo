@@ -3,7 +3,8 @@
 <a class="back-link" href="/lernen">← Meine Themen</a>
 <section class="card learning-session">
 <p class="eyebrow">DEIN THEMA IST GESPEICHERT</p>
-<h1>{{ topic.label }}</h1><p>{{ topic.subject }} · {{ topic.grade or cfg.learner_grade }}. Klasse</p>
+<h1>{{ topic.label }}</h1><p>{{ topic.subject|fachname }} · {{ topic.content_level or 'Klasseneinordnung wird geprüft' }}</p>
+<p class="hint">Deine Profilklasse: {{ cfg.learner_grade }}. Falls die Lernreihe anders eingeordnet ist, fragt Karo dich vor dem Start.</p>
 <h2>So geht es weiter</h2>
 <ol><li>Mit einer kleinen Aufgabe schauen wir, was du schon kannst.</li><li>Wenn etwas schwer ist, erklärt Karo es dir mit einem Beispiel.</li><li>Du übst selbst und prüfst zum Schluss, ob es sicher sitzt.</li></ol>
 <p>{{ 'Die geprüfte Lernreihe ist schon da.' if ready else 'Karo sucht zuerst in der Datenbank. Fehlende Aufgaben werden vorbereitet und geprüft.' }} Dein Fortschritt wird gespeichert.</p>

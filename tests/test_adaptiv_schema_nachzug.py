@@ -49,7 +49,7 @@ def test_die_lektion_laesst_sich_danach_wieder_saeen(client, fake_llm,
     store.init()
     lektionen.saee_alle()
 
-    assert lektionen.fuer_thema("Brüche addieren") is not None
+    assert lektionen.fuer_thema("Brüche addieren", "mathematik") is not None
 
 
 def test_topic_id_wird_in_bestehender_datenbank_nachgezogen(

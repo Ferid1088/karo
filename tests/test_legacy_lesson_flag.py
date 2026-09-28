@@ -23,7 +23,7 @@ def _kind_mit_thema(client, fake_llm, app_env, label="Brüche vergleichen"):
     """Ein aktives Thema im Kindbereich — der Ausgangspunkt der Themenkarte."""
     from app import topics
     einrichten(client, fake_llm)
-    topic_id = topics.anlegen(label)
+    topic_id = topics.anlegen(label, subject="mathematik")
     kind_modus_aktivieren(client)
     return topic_id
 
@@ -79,7 +79,7 @@ def test_die_elterntuer_in_den_generator_ist_zu(client, fake_llm, fake_cli,
     kommen dort hin, Kinder nicht — der Schalter gilt für beide."""
     from app import topics
     einrichten(client, fake_llm)
-    topic_id = topics.anlegen("Brüche vergleichen")
+    topic_id = topics.anlegen("Brüche vergleichen", subject="mathematik")
     token = csrf_from(client.get("/themen").text)
 
     r = client.post(f"/themen/{topic_id}/lernen", data={"_csrf": token},
@@ -123,7 +123,7 @@ def test_keine_toten_verweise_in_erfolgen_und_themenliste(client, fake_llm,
     """`/lernstand` und die Elternliste verlinkten denselben Bildschirm."""
     from app import topics
     einrichten(client, fake_llm)
-    topic_id = topics.anlegen("Brüche vergleichen")
+    topic_id = topics.anlegen("Brüche vergleichen", subject="mathematik")
     token = csrf_from(client.get("/lernen").text)
     client.post(f"/lernzyklus/{topic_id}/gelernt",
                 data={"_csrf": token, "gelernt": "ja"})
@@ -151,7 +151,7 @@ def test_fragerunden_und_lernstand_bleiben_erreichbar(client, fake_llm,
     der „gelernt"-Haken und die Übersichten hängen nicht daran."""
     from app import topics
     einrichten(client, fake_llm)
-    topic_id = topics.anlegen("Brüche vergleichen")
+    topic_id = topics.anlegen("Brüche vergleichen", subject="mathematik")
     token = csrf_from(client.get("/themen").text)
 
     r = client.post(f"/themen/{topic_id}/pruefen",

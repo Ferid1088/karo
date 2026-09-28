@@ -8,7 +8,7 @@ from .test_app import einrichten
 def test_today_start_works_without_adaptive_feature(client, fake_llm, fake_cli, app_env):
     from app import topics
     einrichten(client, fake_llm)
-    tid = topics.anlegen('Brüche addieren')
+    tid = topics.anlegen('Brüche addieren', subject="mathematik")
     assert not app_env.config.load().adaptive_learning_enabled
     page = client.get('/')
     action = f'/lernzyklus/{tid}/quiz/starten'
@@ -27,7 +27,7 @@ def test_exam_quizzes_are_not_personal_next_steps(client, fake_llm, fake_cli, ap
     from app.services import exam, learning_hub, workflow
     einrichten(client, fake_llm)
     app_env.config.update(antworten_pruefen_kind=True)
-    eid = exam.create_exam('2099-01-01', manual_topics='Nur in dieser Prüfung').exam_id
+    eid = exam.create_exam('2099-01-01', manual_topics='Nur in dieser Prüfung', subject='mathematik').exam_id
     tid = learning_hub.exam_topics(eid)[0]['id']
     with app_env.db.tx() as c:
         qid = c.execute("INSERT INTO quiz(topic_id,state,created_at,anlass) VALUES(?,?,?,'evaluation')",
@@ -44,9 +44,9 @@ def test_historical_exam_quiz_does_not_hide_personal_quiz(client, fake_llm, fake
     from app import topics
     from app.services import workflow, topic_workflow
     einrichten(client, fake_llm)
-    tid = topics.anlegen('Brüche addieren')
+    tid = topics.anlegen('Brüche addieren', subject="mathematik")
     with app_env.db.tx() as c:
-        eid = c.execute("INSERT INTO exam(subject,exam_date,themen,created_at) VALUES('Mathematik','2099-01-01','[]',?)",
+        eid = c.execute("INSERT INTO exam(subject,exam_date,themen,created_at) VALUES('mathematik','2099-01-01','[]',?)",
                         (app_env.db.now(),)).lastrowid
         lid = c.execute("INSERT INTO lesson(topic_id,state,ausgabe,created_at) VALUES(?,'wartet','html',?)",
                         (tid, app_env.db.now())).lastrowid

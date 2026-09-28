@@ -45,21 +45,23 @@ def _tabelle_da(name: str) -> bool:
         return False
 
 
-def karo_fach() -> str:
-    """Das eine Fach, das Karo abdeckt — oder ''."""
+def karo_fach(fach_name: str = "") -> str:
+    """Der Schlüssel des Fachs (deutsch/mathematik/englisch) — oder ''.
+
+    Karo deckt drei Fächer ab. Ohne Angabe gilt das Fach aus den
+    Einstellungen, wie vor der Trennung.
+    """
+    from ..faecher import schluessel
     try:
-        return (config.load_safe().subject or "").strip()
+        return (schluessel(fach_name) or schluessel(config.load_safe().subject) or "")
     except Exception:                                  # pragma: no cover
         return ""
 
 
 def zustaendig(fach_name: str) -> bool:
-    """Deckt Karo dieses Fach ab?"""
-    k = karo_fach().lower()
-    f = (fach_name or "").strip().lower()
-    if not k or not f:
-        return False
-    return k == f or k.startswith(f[:4]) or f.startswith(k[:4])
+    """Deckt Karo dieses Fach ab? Nur Deutsch, Mathematik und Englisch."""
+    from ..faecher import schluessel
+    return schluessel(fach_name) is not None
 
 
 def aktiv(fach_name: str = "") -> bool:
@@ -95,7 +97,7 @@ def luecken(fach_name: str, grenze: int = 3) -> list[dict]:
             "WHERE t.subject = ? AND t.state = 'aktiv' AND f.flag IN (?, ?) "
             "ORDER BY CASE f.flag WHEN 'rot' THEN 0 ELSE 1 END, "
             "         COALESCE(f.letzte_uebung, '') "
-            "LIMIT ?", karo_fach(), LUECKE[0], LUECKE[1], grenze)
+            "LIMIT ?", karo_fach(fach_name), LUECKE[0], LUECKE[1], grenze)
     except sqlite3.Error as exc:                        # pragma: no cover
         log.debug("Brücke: Lücken nicht lesbar (%s)", exc)
         return []
@@ -110,7 +112,7 @@ def naechste_arbeit(fach_name: str) -> dict | None:
     try:
         z = db.q1("SELECT exam_date, titel, themen FROM exam "
                   "WHERE subject = ? AND exam_date >= ? "
-                  "ORDER BY exam_date LIMIT 1", karo_fach(), db.today())
+                  "ORDER BY exam_date LIMIT 1", karo_fach(fach_name), db.today())
     except sqlite3.Error:                               # pragma: no cover
         return None
     if z is None:

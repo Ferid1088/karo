@@ -59,7 +59,7 @@ def test_lesson_quiz_does_not_replace_initial_topic_check(client, fake_llm, fake
     from app import quizzes, topics
     from app.services import learning_content
     einrichten(client, fake_llm)
-    topic_id = topics.anlegen('Neue Geometrie')
+    topic_id = topics.anlegen('Neue Geometrie', subject="mathematik")
     quiz_id = quizzes.anfordern(topic_id, anlass='lernrunde')
     with app_env.db.tx() as c:
         c.execute("UPDATE quiz SET state='freigegeben' WHERE id=?", (quiz_id,))

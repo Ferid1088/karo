@@ -25,12 +25,30 @@ def bridge(app_env, monkeypatch):
 def ready(version=1):
     return {"status": "ready", "export_id": 17, "format": "karo-adaptiv-v1",
             "concept_id": "MA.GEO.WUERFEL", "concept_version": version,
+            "classification": {"source": "approved_curriculum", "first_contact_grade": 5, "target_grade": 7},
             "lesson": _lektion()}
 
 
 def enqueue():
     from app.adaptiv import erzeugung
     return erzeugung.anfordern(TOPIC, "Mathematik", 6)
+
+
+def test_profile_one_import_keeps_canonical_range(app_env, bridge):
+    from app.adaptiv import store
+    cid = bridge.import_lesson(app_env.config.load(), ready(), TOPIC, 'mathematik', 1)
+    c = store.konzept(cid)
+    assert (c['klasse_von'], c['klasse_bis']) == (5, 7)
+    assert bridge.import_lesson(app_env.config.load(), ready(), TOPIC, 'mathematik', 6) == cid
+
+
+def test_plausible_schema_but_wrong_classification_is_rejected(app_env, bridge):
+    from app.adaptiv import schemas
+    bad = ready()
+    bad['lesson']['konzept'].update(klasse_von=1, klasse_bis=1)
+    with pytest.raises(schemas.InhaltUngueltig, match='Curriculum'):
+        bridge.import_lesson(app_env.config.load(), bad, TOPIC, 'mathematik', 1)
+    assert not app_env.db.q("SELECT * FROM lern_konzept WHERE quelle='curriculum'")
 
 
 def job(app_env, jid):
@@ -238,7 +256,7 @@ def test_personal_and_exam_resume_separately_after_remote_generation(
 def test_job_pins_grade_before_config_changes(app_env, bridge):
     from app.adaptiv import erzeugung
     app_env.config.update(learner_grade=5)
-    jid = erzeugung.anfordern(TOPIC)
+    jid = erzeugung.anfordern(TOPIC, "mathematik")
     app_env.config.update(learner_grade=7)
     assert json.loads(job(app_env, jid)["payload"])["klasse"] == 5
 

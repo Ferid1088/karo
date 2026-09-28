@@ -26,7 +26,7 @@
     <article class="archiv-zeile{{ ' ist-geloescht' if t['gelöscht'] }}">
       <div class="archiv-text">
         <h3>{{ t.label }}</h3>
-        <p>{{ t.subject }}{% if t.grade %} · {{ t.grade }}. Klasse{% endif %}
+        <p>{{ t.subject|fachname }}{% if t.grade %} · {{ t.grade }}. Klasse{% endif %}
           {%- if t['gelöscht'] %} · <b class="geloescht-marke">gelöscht</b>{% else %} · <span class="learn-status sicher">gelernt</span>{% endif %}</p>
       </div>
       {% if nachfrage == 'thema-' ~ t.id %}
@@ -56,7 +56,7 @@
     {% for e in archiv_arbeiten %}
     <article class="archiv-zeile{{ ' ist-geloescht' if e['gelöscht'] }}">
       <div class="archiv-text">
-        <h3>{{ e.subject }}</h3>
+        <h3>{{ e.subject|fachname }}</h3>
         <p>{{ e.exam_date|datum }}
           {%- if e['gelöscht'] %} · <b class="geloescht-marke">gelöscht</b>{% else %} · geschrieben{% endif %}
           {%- if e.themen_zahl %} · {{ e.sicher_zahl }} von {{ e.themen_zahl }} Themen sicher{% endif %}</p>

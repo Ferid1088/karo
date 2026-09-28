@@ -7,7 +7,7 @@
 <article class="exam-overview-card{{ ' is-written' if past }}" id="exam-{{ e.id }}" aria-labelledby="exam-title-{{ e.id }}">
   <header class="exam-overview-card-head">
     <div class="exam-overview-title">
-      <h3 id="exam-title-{{ e.id }}"><a href="/klassenarbeit/{{ e.id }}">{{ e.subject }}</a></h3>
+      <h3 id="exam-title-{{ e.id }}"><a href="/klassenarbeit/{{ e.id }}">{{ e.subject|fachname }}</a></h3>
       <p><time datetime="{{ e.exam_date }}">{{ e.exam_date|datum }}</time>{% if past %} · geschrieben{% endif %}</p>
     </div>
     <dl class="exam-overview-stats">
@@ -26,7 +26,7 @@
     <p class="exam-overview-countdown">{% if past %}<span aria-hidden="true">✓</span> Geschrieben{% elif e.days_left == 0 %}<strong>Heute ist die Prüfung</strong>{% else %}Tage zur Prüfung: <strong>{{ e.days_left }}</strong>{% endif %}</p>
     <div class="exam-overview-actions">
       <a class="exam-overview-open" href="/klassenarbeit/{{ e.id }}">{% if past %}Ansehen{% elif not e.topics %}Themen ansehen{% else %}Lernplan öffnen{% endif %} <span aria-hidden="true">→</span></a>
-      {% if nachfrage != e.id|string %}<a class="exam-overview-archive" href="/klassenarbeit?weg={{ e.id }}#exam-{{ e.id }}" aria-label="{{ e.subject }} vom {{ e.exam_date|datum }} weglegen">weglegen</a>{% endif %}
+      {% if nachfrage != e.id|string %}<a class="exam-overview-archive" href="/klassenarbeit?weg={{ e.id }}#exam-{{ e.id }}" aria-label="{{ e.subject|fachname }} vom {{ e.exam_date|datum }} weglegen">weglegen</a>{% endif %}
     </div>
   </div>
   {% if nachfrage == e.id|string %}
@@ -41,7 +41,7 @@
   {% endif %}
   {% if not past and e.calendar %}
   {% set days = e.calendar[:10] %}
-  <section class="exam-overview-calendar" aria-label="Lerntage für {{ e.subject }} am {{ e.exam_date|datum }}">
+  <section class="exam-overview-calendar" aria-label="Lerntage für {{ e.subject|fachname }} am {{ e.exam_date|datum }}">
     <div class="exam-overview-calendar-head"><strong>{{ 'Nächste 10 Tage' if days|length == 10 else 'Bis zur Prüfung' }}</strong><span>{{ days[0].date[8:10] }}.{{ days[0].date[5:7] }}. – {{ days[-1].date[8:10] }}.{{ days[-1].date[5:7] }}.</span></div>
     <div class="exam-overview-days">
       {% for item in days %}

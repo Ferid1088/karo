@@ -23,9 +23,9 @@ def test_eine_geprueufte_lektion_landet_vollstaendig_im_katalog(
     from app.adaptiv import erzeugung, inhalt_store, lektionen, store, schemas
     einrichten(client, fake_llm)
 
-    konzept_id = erzeugung.speichern(_lektion())
+    konzept_id = erzeugung.speichern(_lektion(), "mathematik")
 
-    lektion = lektionen.fuer_thema("Würfel: Volumen")
+    lektion = lektionen.fuer_thema("Würfel: Volumen", "mathematik")
     assert lektion is not None and lektion["konzept_id"] == konzept_id
     fehlertypen = store.fehlertypen(konzept_id)
     assert [f["fehler_key"] for f in fehlertypen] == ["kanten-addiert"]
@@ -39,7 +39,7 @@ def test_tier_eins_erkennt_die_erzeugte_fehlvorstellung(client, fake_llm,
     """Der Zweck des Ganzen: beim nächsten Kind trifft der Katalog."""
     from app.adaptiv import erzeugung, katalog
     einrichten(client, fake_llm)
-    konzept_id = erzeugung.speichern(_lektion())
+    konzept_id = erzeugung.speichern(_lektion(), "mathematik")
 
     treffer = katalog.identifiziere(konzept_id, "9")
 
@@ -51,7 +51,7 @@ def test_das_ausliefern_ruft_kein_modell(client, fake_llm, fake_cli, app_env):
     """A3: einmal erzeugt, danach reiner Lookup — das ganze Kostenmodell."""
     from app.adaptiv import erzeugung, katalog
     einrichten(client, fake_llm)
-    konzept_id = erzeugung.speichern(_lektion())
+    konzept_id = erzeugung.speichern(_lektion(), "mathematik")
     fake_llm.calls.clear()
 
     treffer = katalog.identifiziere(konzept_id, "9")
@@ -67,7 +67,7 @@ def test_erzeugtes_ist_als_erzeugt_erkennbar(client, fake_llm, fake_cli,
     auch wenn beide ausgeliefert werden."""
     from app.adaptiv import erzeugung, store
     einrichten(client, fake_llm)
-    konzept_id = erzeugung.speichern(_lektion())
+    konzept_id = erzeugung.speichern(_lektion(), "mathematik")
 
     konzept = store.konzept(konzept_id)
     assert konzept["quelle"] == "erzeugt"
@@ -84,7 +84,7 @@ def test_eine_ungueltige_lektion_hinterlaesst_nichts(client, fake_llm,
     del kaputt["fehlertypen"][0]["aufgaben"]["transfer"]
 
     with pytest.raises(schemas.InhaltUngueltig):
-        erzeugung.speichern(kaputt)
+        erzeugung.speichern(kaputt, "mathematik")
 
     assert store.konzept_nach_key("mathematik", "geometrie",
                                   "wuerfel-volumen") is None
@@ -95,8 +95,8 @@ def test_zweimal_speichern_verdoppelt_nichts(client, fake_llm, fake_cli,
     from app.adaptiv import erzeugung, inhalt_store, store
     einrichten(client, fake_llm)
 
-    erster = erzeugung.speichern(_lektion())
-    zweiter = erzeugung.speichern(_lektion())
+    erster = erzeugung.speichern(_lektion(), "mathematik")
+    zweiter = erzeugung.speichern(_lektion(), "mathematik")
 
     assert erster == zweiter
     fehlertypen = store.fehlertypen(erster)
@@ -110,12 +110,12 @@ def test_eine_erzeugte_lektion_verdraengt_keine_verfasste(client, fake_llm,
     from app.adaptiv import erzeugung, lektionen, store
     einrichten(client, fake_llm)
 
-    erzeugung.speichern(_lektion())
+    erzeugung.speichern(_lektion(), "mathematik")
 
     brueche = store.konzept_nach_key("mathematik", "brueche",
                                      "ungleichnamig-addieren")
     assert brueche["quelle"] == "kuratiert"
-    assert lektionen.fuer_thema("Brüche addieren")["konzept_id"] == brueche["id"]
+    assert lektionen.fuer_thema("Brüche addieren", "mathematik")["konzept_id"] == brueche["id"]
 
 
 def test_ein_abbruch_mitten_im_schreiben_bleibt_unsichtbar(
@@ -139,11 +139,11 @@ def test_ein_abbruch_mitten_im_schreiben_bleibt_unsichtbar(
     monkeypatch.setattr(inhalt_store, "aufgabe_sichern", bricht_ab)
 
     with pytest.raises(RuntimeError):
-        erzeugung.speichern(_lektion())
+        erzeugung.speichern(_lektion(), "mathematik")
 
     # Die Zeilen sind da — aber nichts davon erreicht ein Kind.
     halb = store.konzept_nach_key("mathematik", "geometrie", "wuerfel-volumen")
     assert halb is not None
     assert halb["geprueft_am"] is None
-    assert lektionen.fuer_thema("Würfel: Volumen") is None
+    assert lektionen.fuer_thema("Würfel: Volumen", "mathematik") is None
     assert store.fehlertypen(halb["id"]) == []
