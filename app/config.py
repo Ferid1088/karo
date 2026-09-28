@@ -25,6 +25,7 @@ CONFIG_PATH = DATA_DIR / "config.json"
 _SESSION_SECRET_PATH = DATA_DIR / "session.key"
 
 SECRET_FIELDS = ("anthropic_api_key", "claude_oauth_token",
+                 "curriculum_key",
                  "app_password_hash", "app_password_salt",
                  "child_password_hash", "child_password_salt")
 
@@ -54,6 +55,9 @@ class Config:
     # --- Zugangsdaten (geheim) --------------------------------------------
     claude_oauth_token: str = ""    # aus `claude setup-token`
     anthropic_api_key: str = ""
+    # Optionaler zentraler Inhaltsdienst. Kein stiller KI-Fallback bei Ausfall.
+    curriculum_url: str = ""
+    curriculum_key: str = ""
 
     # --- Zugang zur App ---------------------------------------------------
     app_password_hash: str = ""

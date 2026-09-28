@@ -28,7 +28,7 @@ ENDZUSTAENDE = (MASTERED, ESCALATED)
 UEBERGAENGE: dict[str, tuple[str, ...]] = {
     INPUT_RECEIVED: (MATERIAL_ANALYZED,),
     MATERIAL_ANALYZED: (DIAGNOSING,),
-    DIAGNOSING: (ERROR_IDENTIFIED, MASTERED),
+    DIAGNOSING: (ERROR_IDENTIFIED, MASTERED, ESCALATED),
     ERROR_IDENTIFIED: (TEACHING,),
     TEACHING: (DIAGNOSING, MASTERED, ESCALATED),
     MASTERED: (),
@@ -163,7 +163,8 @@ def runde_gescheitert(sitzung_id: int, antwort: str | None = None,
                              nutzdaten={"runde": runden})
     if sitzung["konzept_id"]:
         store.fortschritt_buchen(sitzung["konzept_id"], sitzung["fehlertyp_id"],
-                                 versuch=True, wiederholung=True)
+                                 versuch=True, wiederholung=True,
+                                 child_key=store.fortschritt_scope(sitzung))
 
     if runden >= max_runden(cfg):
         return eskalieren(sitzung_id)
@@ -184,7 +185,8 @@ def eskalieren(sitzung_id: int) -> dict:
     ergebnis = wechsle(sitzung_id, ESCALATED, "nach erfolglosen Runden eskaliert")
     if sitzung["konzept_id"]:
         store.fortschritt_buchen(sitzung["konzept_id"], sitzung["fehlertyp_id"],
-                                 mastery="braucht_mensch", braucht_mensch=True)
+                                 mastery="braucht_mensch", braucht_mensch=True,
+                                 child_key=store.fortschritt_scope(sitzung))
     return ergebnis
 
 
@@ -214,19 +216,22 @@ def antwort_richtig(sitzung_id: int, antwort: str | None = None, cfg=None,
     erfolge = 0
     if sitzung["konzept_id"]:
         store.fortschritt_buchen(sitzung["konzept_id"], sitzung["fehlertyp_id"],
-                                 versuch=True, erfolg=True)
-        stand = store.fortschritt(sitzung["konzept_id"], sitzung["fehlertyp_id"])
+                                 versuch=True, erfolg=True,
+                                 child_key=store.fortschritt_scope(sitzung))
+        stand = store.fortschritt(sitzung["konzept_id"], sitzung["fehlertyp_id"],
+                                 child_key=store.fortschritt_scope(sitzung))
         erfolge = (stand or {}).get("erfolge", 0)
 
     if beherrscht(erfolge, cfg) and darf_abschliessen:
         if sitzung["konzept_id"]:
             store.fortschritt_buchen(sitzung["konzept_id"],
-                                     sitzung["fehlertyp_id"], mastery="sicher")
+                                     sitzung["fehlertyp_id"], mastery="sicher",
+                                     child_key=store.fortschritt_scope(sitzung))
         return wechsle(sitzung_id, MASTERED, "Beherrschung erreicht")
 
     if sitzung["konzept_id"]:
         store.fortschritt_buchen(sitzung["konzept_id"], sitzung["fehlertyp_id"],
-                                 mastery="im_aufbau")
+                                 mastery="im_aufbau", child_key=store.fortschritt_scope(sitzung))
     return store.sitzung(sitzung_id)
 
 

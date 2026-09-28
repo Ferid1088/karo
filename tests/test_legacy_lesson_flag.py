@@ -186,8 +186,8 @@ def test_mit_gesetztem_schalter_ist_der_alte_weg_unveraendert(
     assert seite.status_code == 200
     assert "Brüche vergleichen" in seite.text
     karte = client.get("/lernen?tab=neu").text
-    assert f'action="/lernzyklus/{topic_id}/beginnen"' in karte
-    assert "Thema anfangen" in karte
+    assert f'action="/lernzyklus/{topic_id}/quiz/starten"' in karte
+    assert 'aria-label="Starten: Brüche vergleichen"' in karte
 
     # Die Erzeugung selbst bleibt hinter der Themenprüfung — aber sie ist
     # wieder erreichbar, statt am Schalter abzuprallen.
@@ -228,7 +228,7 @@ def test_klassenarbeit_erzeugt_kein_material_mehr(client, fake_llm, fake_cli,
                     follow_redirects=False)
 
     assert r.status_code == 303
-    assert r.headers["location"] == "/lernen"
+    assert r.headers["location"] == f"/klassenarbeit/{exam_id}#exam-next-step"
     assert len(app_env.db.q("SELECT id FROM lesson")) == vorher
     assert not app_env.db.q("SELECT id FROM exam_material")
 
@@ -242,9 +242,9 @@ def test_lernplan_zeigt_keine_format_auswahl_mehr(client, fake_llm, fake_cli,
     topic_id = _bis_rot(client, fake_llm, app_env)
     exam_id, _ = plan_anlegen(app_env, topic_id)
 
-    seite = client.get("/klassenarbeit").text
+    seite = client.get(f"/klassenarbeit/{exam_id}").text
 
-    assert "Montag" in seite                      # Der Plan bleibt sichtbar.
+    assert "Lernkalender" in seite
     assert "Neues Lernmaterial erstellen" not in seite
     assert "NotebookLM-Video" not in seite
     assert f'action="/klassenarbeit/{exam_id}/lerntag"' not in seite

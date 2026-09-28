@@ -8,16 +8,18 @@
 
 <section class="card">
   <h1><img class="pruefung-zeichen" src="/static/pruefung-symbol.svg" alt="" aria-hidden="true">Neue Klassenarbeit</h1>
-  <p class="hint">Trage Termin und Themen selbst ein — oder lade das Blatt hoch, das die Arbeit ankündigt.</p>
+  <p class="hint">1. Termin und Themen → 2. Lerntage wählen → 3. Vorbereiten</p>
+  {% if scan and scan.state == 'gelesen' %}<p class="msg">Die Themen wurden erkannt. Prüfe sie und den Termin, bevor du die Arbeit anlegst.</p>{% endif %}
   <form method="post" action="/klassenarbeit" class="learn-form exam-create-form">{{ csrf_input() }}
+    {% if scan and scan.state == 'gelesen' %}<input type="hidden" name="scan_id" value="{{ scan.id }}">{% endif %}
     <div class="learn-two-col compact">
-      <div class="field"><label for="exam_date">Termin</label><input type="date" id="exam_date" name="exam_date" min="{{ today }}" required></div>
-      <div class="field"><label for="exam_subject">Fach</label><input id="exam_subject" name="fach" value="{{ cfg.subject }}"></div>
+      <div class="field"><label for="exam_date">Termin</label><input type="date" id="exam_date" name="exam_date" min="{{ today }}" value="{{ draft.get('exam_date', scan.exam_date if scan and scan.state == 'gelesen' else '') or '' }}" required></div>
+      <div class="field"><label for="exam_subject">Fach</label><input id="exam_subject" name="fach" value="{{ draft.get('fach', cfg.subject) }}" maxlength="80" required></div>
     </div>
     <label for="exam_topics">Prüfungsthemen <small>(ein Thema pro Zeile oder mit Komma)</small></label>
     <textarea id="exam_topics" name="themen" rows="4" required placeholder="Brüche addieren
 Brüche kürzen
-Textaufgaben"></textarea>
+Textaufgaben">{{ draft.get('themen', scan.themen_liste|join('\n') if scan and scan.state == 'gelesen' else '') }}</textarea>
     <button type="submit">Klassenarbeit anlegen →</button>
   </form>
 </section>
@@ -35,5 +37,6 @@ Textaufgaben"></textarea>
   <p class="msg">{{ companion_name }} liest das Blatt gerade ein … die Seite geht von selbst weiter.</p>
   <script>karoAutoRefresh("/klassenarbeit/themenblatt/status?scan_id={{ scan.id }}", "{{ scan.state }}");</script>
   {% endif %}
+  {% if scan and scan.state == 'fehler' %}<p class="msg warn">Das Blatt konnte nicht gelesen werden. Lade ein deutlicheres Foto hoch oder trage die Themen oben selbst ein.</p>{% endif %}
 </section>
 {% endblock %}

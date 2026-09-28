@@ -10,13 +10,17 @@ def test_exam_plan_moves_between_parent_and_child_sections(client, fake_llm, fak
     for enabled in (False, True, False):
         app_env.config.update(klassenarbeit_kind=enabled)
         assert ('href="/klassenarbeit"' in client.get('/eltern').text) is not enabled
-        for path in ('/', '/lernen', '/lernzyklus'):
-            assert ('href="/klassenarbeit"' in client.get(path).text) is enabled
+        # Eltern dürfen die Prüfungen immer über den Lernbereich öffnen.
+        for path in ('/lernen', '/lernzyklus'):
+            assert 'href="/klassenarbeit"' in client.get(path).text
+        assert client.get('/klassenarbeit').status_code == 200
     kind_modus_aktivieren(client)
     for enabled in (False, True, False):
         app_env.config.update(klassenarbeit_kind=enabled)
-        for path in ('/', '/lernen', '/lernzyklus'):
+        for path in ('/lernen', '/lernzyklus'):
             assert ('href="/klassenarbeit"' in client.get(path).text) is enabled
+        # Ohne angelegte Arbeit gibt es auf Heute keinen leeren Prüfungsauftrag.
+        assert 'href="/klassenarbeit"' not in client.get('/').text
         for path in ('/klassenarbeit', '/messung/examen'):
             page = client.get(path)
             assert page.status_code == (200 if enabled else 403)
@@ -27,8 +31,8 @@ def test_exam_plan_moves_between_parent_and_child_sections(client, fake_llm, fak
 
 
 def test_child_can_create_use_and_update_exam_with_setting(
-        client, fake_llm, fake_cli, app_env, tmp_path, alter_generator):
-    from app import exam_plan
+        client, fake_llm, fake_cli, app_env, tmp_path):
+    from app.services import learning_hub, exam_calendar
     topic_id = _bis_rot(client, fake_llm, app_env)
     topic = app_env.db.q1('SELECT * FROM topic WHERE id=?', topic_id)
     exam_date = (date.today() + timedelta(days=14)).isoformat()
@@ -48,7 +52,8 @@ def test_child_can_create_use_and_update_exam_with_setting(
     for path in ('/klassenarbeit/1/plan/status', '/klassenarbeit/themenblatt/status?scan_id=1'):
         assert client.get(path).status_code == 403
 
-    app_env.config.update(klassenarbeit_kind=True)
+    # Die mitgelieferte, geprüfte Bruchlektion gehört zur 6. Klasse.
+    app_env.config.update(klassenarbeit_kind=True, adaptive_learning_enabled=True, learner_grade=6)
     for path in posts:
         assert client.post(path, data={'_csrf': 'invalid'}).status_code == 403
     jpeg = make_jpeg(tmp_path / 'themenblatt.jpg', size=(1000, 1300))
@@ -62,27 +67,37 @@ def test_child_can_create_use_and_update_exam_with_setting(
     run_jobs(app_env, fake_llm)
     exam = app_env.db.q1('SELECT * FROM exam ORDER BY id DESC LIMIT 1')
     exam_id = exam['id']
-    assert client.get(f'/klassenarbeit/{exam_id}/plan/status').json()['signatur'] == 'bereit'
+    own = learning_hub.exam_topics(exam_id)[0]
+    assert own['id'] != topic_id
+    assert own['learning_status'] == 'neu'
+    assert not exam_calendar.get_days(exam_id)
     page = client.get('/messung/examen')
-    assert 'Ergebnis der Klassenarbeit eintragen' in page.text
+    assert f'href="/klassenarbeit/{exam_id}"' in page.text
     assert 'Für Eltern:' not in page.text
-    tag = exam_plan.holen_plan(exam_id)['tagesplan_liste'][0]
-    material = client.post(f'/klassenarbeit/{exam_id}/lerntag', data={
-        '_csrf': token, 'row_key': tag['row_key'], 'ausgabe': 'html',
-    }, headers={'accept': 'application/json'})
-    assert material.status_code == 200
-    run_jobs(app_env, fake_llm)
-    material_url = material.json()['url']
-    assert client.get(material_url + '/status').json()['state'] == 'bereit'
-    assert '<iframe' in client.get(material_url).text
-    assert 'href="/eltern"' not in client.get(material_url).text
-    assert client.post(material_url + '/fragen', data={'_csrf': token}).status_code == 200
+    today = app_env.db.today()
+    last_day = (date.fromisoformat(exam_date) - timedelta(days=1)).isoformat()
+    calendar = client.post(f'/klassenarbeit/{exam_id}/kalender', data={
+        '_csrf': token, f'minutes_{today}': '15', f'minutes_{last_day}': '20'})
+    assert calendar.status_code == 200
+    assert exam_calendar.get_days(exam_id)[today] == 15
+    assert f'action="/klassenarbeit/{exam_id}/lernen/start"' in calendar.text
+    start = client.post(f'/klassenarbeit/{exam_id}/lernen/start', data={
+        '_csrf': token, 'topic_id': own['id']})
+    assert start.status_code == 200
+    session = app_env.db.q1('SELECT * FROM lern_sitzung ORDER BY id DESC LIMIT 1')
+    entry = app_env.db.q1('SELECT * FROM lern_eingabe WHERE id=?', session['eingabe_id'])
+    assert entry['topic_id'] == own['id']
+    assert session['zustand'] == 'DIAGNOSING'
+    assert '/lernen/adaptiv' not in start.text
+    assert client.post('/lernen/adaptiv/start', data={'_csrf': token, 'topic_id': own['id']}).status_code == 404
+    # Alte Ergebnisfelder dürfen den persönlichen Lernstand nicht beschreiben.
     assert client.post(f'/klassenarbeit/{exam_id}/ergebnis', data={
         '_csrf': token, f'ist_{topic_id}': 'gruen'}).status_code == 200
-    assert app_env.db.q1('SELECT tatsaechlich FROM prediction WHERE exam_id=? AND topic_id=?',
-                        exam_id, topic_id)['tatsaechlich'] == 'gruen'
-    assert client.post(f'/klassenarbeit/{exam_id}/plan/neu', data={'_csrf': token}).status_code == 200
-    assert client.get(f'/klassenarbeit/{exam_id}/plan/status').json()['signatur'] == 'offen'
+    assert not app_env.db.q('SELECT * FROM prediction WHERE exam_id=?', exam_id)
+    before = len(app_env.db.q('SELECT * FROM job'))
+    plan = client.post(f'/klassenarbeit/{exam_id}/plan/neu', data={'_csrf': token}, follow_redirects=False)
+    assert plan.headers['location'] == f'/klassenarbeit/{exam_id}#exam-calendar-title'
+    assert len(app_env.db.q('SELECT * FROM job')) == before
     for path in ('/setup', '/eltern', '/wissen', '/themen', '/messung/fortschritt', '/protokoll'):
         assert client.get(path).status_code == 403
     assert client.post('/setup/finish', data={'_csrf': token, 'klassenarbeit_kind': 'ja'}).status_code == 403

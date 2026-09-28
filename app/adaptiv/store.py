@@ -78,6 +78,16 @@ def _json(wert: str | None, standard):
 # Konzepte und Fehlertypen (§2)
 # --------------------------------------------------------------------------
 
+def curriculum_import(fingerprint: str) -> dict | None:
+    return _zeile(db.q1("SELECT * FROM lern_curriculum_import WHERE fingerprint=?", fingerprint))
+
+
+def curriculum_import_sichern(fingerprint: str, konzept_id: int, provenance: dict) -> None:
+    with db.tx() as c:
+        c.execute("INSERT OR IGNORE INTO lern_curriculum_import "
+                  "(fingerprint, konzept_id, provenance, created_at) VALUES (?, ?, ?, ?)",
+                  (fingerprint, konzept_id, json.dumps(provenance, ensure_ascii=False), db.now()))
+
 def konzept_sichern(fach: str, thema_key: str, konzept_key: str, label: str,
                     klasse_von: int = 1, klasse_bis: int = 13, *,
                     stichworte=(), quelle: str = "kuratiert",
@@ -453,6 +463,15 @@ def sitzung(sitzung_id: int) -> dict | None:
         db.q1("SELECT * FROM lern_sitzung WHERE id=?", sitzung_id))
 
 
+def offene_fuer_thema(topic_id: int) -> dict | None:
+    """Resume an in-progress topic on its pinned content version."""
+    return _sitzung_aufbereiten(db.q1('''SELECT s.* FROM lern_sitzung s
+        JOIN lern_eingabe e ON e.id=s.eingabe_id
+        WHERE s.child_key=? AND e.topic_id=?
+        AND s.zustand NOT IN ('MASTERED','ESCALATED')
+        ORDER BY s.id DESC LIMIT 1''', CHILD_KEY, topic_id))
+
+
 def letzte_fuer_thema(topic_id: int | None, konzept_id: int) -> dict | None:
     return _sitzung_aufbereiten(db.q1('''SELECT s.* FROM lern_sitzung s
         JOIN lern_eingabe e ON e.id=s.eingabe_id
@@ -524,6 +543,13 @@ def fortschritt(konzept_id: int, fehlertyp_id: int | None = None,
         child_key, konzept_id, fehlertyp_id))
 
 
+def fortschritt_scope(sitzung: dict) -> str:
+    """Shared curriculum does not mean shared evidence of mastery."""
+    entry = eingabe(sitzung.get("eingabe_id")) or {}
+    base = sitzung.get("child_key", CHILD_KEY)
+    return f"{base}:topic:{entry['topic_id']}" if entry.get("topic_id") else base
+
+
 def fortschritt_buchen(konzept_id: int, fehlertyp_id: int | None, *,
                        versuch: bool = False, erfolg: bool = False,
                        wiederholung: bool = False, mastery: str | None = None,
@@ -532,10 +558,13 @@ def fortschritt_buchen(konzept_id: int, fehlertyp_id: int | None, *,
     jetzt = db.now()
     with db.tx() as c:
         c.execute(
-            """INSERT OR IGNORE INTO lern_fortschritt
+            """INSERT INTO lern_fortschritt
                    (child_key, konzept_id, fehlertyp_id, created_at, updated_at)
-               VALUES (?,?,?,?,?)""",
-            (child_key, konzept_id, fehlertyp_id, jetzt, jetzt))
+               SELECT ?,?,?,?,? WHERE NOT EXISTS (
+                 SELECT 1 FROM lern_fortschritt
+                 WHERE child_key=? AND konzept_id=? AND fehlertyp_id IS ?)""",
+            (child_key, konzept_id, fehlertyp_id, jetzt, jetzt,
+             child_key, konzept_id, fehlertyp_id))
         bedingung = ("fehlertyp_id IS NULL" if fehlertyp_id is None
                      else "fehlertyp_id = ?")
         params: list = [1 if versuch else 0, 1 if erfolg else 0,
@@ -566,5 +595,5 @@ def fortschritt_uebersicht(child_key: str = CHILD_KEY) -> list[dict]:
              FROM lern_fortschritt p
              JOIN lern_konzept k ON k.id = p.konzept_id
              LEFT JOIN lern_fehlertyp f ON f.id = p.fehlertyp_id
-            WHERE p.child_key = ?
-            ORDER BY p.letzte_aktivitaet DESC, p.id DESC""", child_key)]
+            WHERE (p.child_key = ? OR p.child_key LIKE ?)
+            ORDER BY p.letzte_aktivitaet DESC, p.id DESC""", child_key, child_key + ':topic:%')]

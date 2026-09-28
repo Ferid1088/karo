@@ -553,7 +553,10 @@ am Simulationstag
 → Simulation freischalten / erzeugen
 ```
 
-Dadurch kann das Kind die Fragen nicht vorher lernen.
+Die konkrete Generalprobe wird vorher weder angelegt noch angezeigt. Die
+aktuelle Umsetzung verwendet geprüfte Kontrollaufgaben aus dem Curriculum;
+einzelne Aufgaben können dem Kind aus dem Lernen bekannt sein. Eine
+vollständig neue Prüfungsvariante wird damit nicht versprochen.
 
 ---
 
@@ -849,3 +852,47 @@ KARO CURRICULUM
 = geprüfte Konzepte, Fehlertypen, Fragen, Erklärungen und Übungen
 = fehlende Inhalte werden einmal erzeugt, geprüft, gespeichert und danach wiederverwendet
 ```
+
+## 21. Verbindliche Datentrennung und Weiterführung (27.09.2026)
+
+- Ein persönliches Thema und jedes Prüfungsthema besitzen eine eigene lokale
+  Themen-ID. Auch zwei Prüfungen mit gleichem Thema teilen keine Themen-ID.
+  Nur die geprüften fachlichen Inhalte des Curriculums werden wiederverwendet.
+- Antworten, Sitzungen und Lernfortschritt gehören zur jeweiligen Themen-ID.
+  Erfolge in „Meine Themen“ machen kein Prüfungsthema automatisch sicher.
+- Persönliches Lernen verwendet `/lernen/adaptiv/...`; Prüfungsvorbereitung
+  verwendet `/klassenarbeit/{id}/lernen/...`. Start, Hilfe, Fortsetzen und
+  Zurück bleiben innerhalb des jeweiligen Bereichs. Die übergeordneten Tabs
+  erlauben weiterhin den bewussten Wechsel; Lernaufgaben öffnen keinen fremden Tab.
+- Fremde Themen- und Sitzungs-IDs werden serverseitig abgewiesen. Das gilt
+  auch für mehrere offene Tabs, Archivaktionen und ältere Material-URLs.
+- Nach dem Anlegen führt ein persönliches Thema zur eigenen Einstiegsseite;
+  eine Prüfung führt zum eigenen Kalender. Leere Prüfungen fordern zuerst
+  die fehlenden Prüfungsthemen an.
+- Die Prüfungskarte zeigt die nächsten zehn Tage. Der bearbeitbare Kalender
+  enthält alle Tage bis zum Prüfungstermin. Nicht übermittelte Tage bleiben
+  beim Speichern erhalten; ein ausdrücklich leeres Feld oder 0 entfernt nur
+  die Lernzeit dieses Tages.
+- Der Plan wird aus gespeicherten Zeiten und dem Lernstand genau dieser
+  Prüfung berechnet. Das erste unsichere Thema bleibt aktiv, bis es sitzt.
+  Minuten sind ein Zeitbudget, kein automatischer Nachweis des Lernens.
+- Eine um einen Tag vorgezogene Generalprobe erscheint auch dann im
+  Monatskalender, wenn für diesen Tag keine Minuten eingetragen wurden.
+- Datenbanktreffer berücksichtigen Fach und Klassenstufe. Fehlende Lernreihen
+  werden über den bestehenden Erzeugungs- und Prüfprozess ergänzt. Während
+  der Vorbereitung bleibt die Themen-ID erhalten; anschließend wird genau
+  dieses Thema fortgesetzt. Bei Fehlern gibt es einen Rückweg und erneuten Versuch.
+- Die Generalprobe speichert eine eigene Aufgabenauswahl und eigene Ergebnisse.
+  Sie startet frühestens am Simulationstag, enthält geprüfte selbstständige
+  und Transferaufgaben und verändert keinen persönlichen Lernstand.
+- Historisch gemeinsam benutzte Prüfungsthemen werden in getrennte Einträge
+  überführt. Nicht eindeutig zuordenbare alte Lernspuren bleiben unverändert
+  mit dokumentierter Zuordnung erhalten; sie werden keiner Prüfung zugerechnet.
+  Alte gespeicherte Prüfungsmedien bleiben innerhalb des Prüfungsbereichs lesbar.
+- „Meine Welt“ und „Ziele planen“ sind nicht Teil dieser Änderung.
+
+Automatisierte Ablaufprüfungen: `tests/test_separate_learning_journeys.py`.
+Sie prüfen Isolation, Diagnose–Erklärung–Übung–Abschluss, gespeicherte und
+erzeugte Inhalte, Kalender, Generalprobe, Archivschutz und Migration mit
+Testdaten und einem simulierten Modell. Sie ersetzen keine fachliche Prüfung
+sämtlicher neu erzeugter Lerninhalte.

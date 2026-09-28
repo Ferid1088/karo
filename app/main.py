@@ -76,7 +76,7 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
         path in {"/klassenarbeit", "/klassenarbeit/neu",
                  "/klassenarbeit/kalender", "/messung/examen",
                  "/klassenarbeit/themenblatt", "/klassenarbeit/themenblatt/status"}
-        or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|loeschen|simulation(?:/[0-9]+)?))?", path)
+        or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|themen|loeschen|lernen(?:/(?:start|status|wartet|neu|anker|diagnose|weiter|aufgabe|vorhersage|transfer|tipp))?|simulation(?:/[0-9]+(?:/antworten)?)?))?", path)
     ):
         return True
     if schulblaetter_kind and (
@@ -125,6 +125,7 @@ app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(lernzyklus.router)
 app.include_router(adaptiv.router)
+app.include_router(adaptiv.exam_router)
 app.include_router(adaptiv.eltern_router)
 app.include_router(eltern.router)
 app.include_router(kind.router)
@@ -184,6 +185,13 @@ class Gate:
                         path, cfg.antworten_pruefen_kind, cfg.schulblaetter_kind,
                         cfg.klassenarbeit_kind):
                     return await self._send(send, scope, self._kind_gesperrt())
+
+        if authed and not oeffentlich and cfg.setup_complete:
+            from .services.learning_scope import exam_resource_on_personal_path
+            if exam_resource_on_personal_path(path):
+                return await self._send(send, scope, HTMLResponse(
+                    '<h1>Nicht in diesem Lernbereich</h1><p>Dieses Material gehört '
+                    'zu einer Prüfung und kann hier nicht geöffnet werden.</p>', status_code=404))
 
         if request.method in security.SAFE_METHODS:
             return await self.app(scope, receive, send)

@@ -35,7 +35,8 @@ def test_content_creation_moves_to_child_topic_after_first_check(
     assert action not in client.get('/lernen?tab=bearbeitung').text
     assert action not in client.get(f'/lernzyklus/{topic_id}').text
     quiz_freigeben(client, app_env, quiz['id'])
-    page = client.get('/lernen?tab=bearbeitung')
+    assert action not in client.get('/lernen?status=bearbeitung').text
+    page = client.get(f'/lernzyklus/{topic_id}')
     assert action in page.text
     assert 'Lerninhalte erstellen' in page.text
     assert f'action="/lernzyklus/{other}/start"' not in page.text
@@ -44,7 +45,7 @@ def test_content_creation_moves_to_child_topic_after_first_check(
     # Auch bei grün ist die Funktion verfügbar: entscheidend ist die Prüfung.
     with app_env.db.tx() as c:
         c.execute("UPDATE topic_flag SET flag='gruen' WHERE topic_id=?", (topic_id,))
-    assert action in client.get('/lernen?tab=bearbeitung').text
+    assert action in client.get(f'/lernzyklus/{topic_id}').text
     assert client.post(f'/lernzyklus/{topic_id}/start', data={'_csrf': 'bad'}).status_code == 403
     response = client.post(f'/lernzyklus/{topic_id}/start', data={
         '_csrf': token, 'ausgabe': 'html'}, follow_redirects=False)

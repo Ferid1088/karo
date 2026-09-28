@@ -1,51 +1,92 @@
 {% extends "learning_base.html" %}
 {% block title %}Meine Themen – {{ companion_name }}{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="/static/meine-themen.css?v={{ asset_version|default('0') }}">{% endblock %}
 {% block content %}
-{# "Lernen" zeigt die Themen und sonst nichts: der naechste Schritt steht auf
-   "Heute", die Wege zu Neues Thema, Arbeitsblatt und Klassenarbeit stehen in
-   der Unterzeile. Vorher stand beides hier noch einmal als Karte. #}
-<div class="learn-dashboard">
-  <header class="themen-kopf">
-    <div>
+<div class="topics-page">
+  <header class="topics-header">
+    <img src="/static/karo-owl-book.png" alt="" width="88" height="88">
+    <div class="topics-intro">
       <h1>Meine Themen</h1>
-      <p>{{ alle_themen|length }} {{ 'Lernkarte' if alle_themen|length == 1 else 'Lernkarten' }}{% if active_count %} · {{ active_count }} in Bewegung{% endif %}{% if safe_count %} · {{ safe_count }} sicher{% endif %}</p>
+      <p>Wähle ein Thema. Karo begleitet dich Schritt für Schritt.</p>
     </div>
-    <a class="learn-primary-action" href="/lernen/neu">+ Neues Thema</a>
+    <a class="topics-primary" href="/lernen/neu"><span aria-hidden="true">+</span> Neues Thema</a>
   </header>
 
-  <form class="themen-filter" method="get" action="/lernen">
-    <label class="sr" for="topic-search">Thema suchen</label>
-    <input id="topic-search" name="q" value="{{ query }}" placeholder="Thema suchen …" type="search">
-    <label class="sr" for="subject-filter">Fach</label>
-    <select id="subject-filter" name="fach"><option value="">Alle Fächer</option>{% for f in faecher %}<option value="{{ f }}" {{ 'selected' if fach == f }}>{{ f }}</option>{% endfor %}</select>
-    <label class="sr" for="status-filter">Status</label>
-    <select id="status-filter" name="status"><option value="">Alle Stände</option>{% for key, label in [('neu','Neu'),('bearbeitung','In Bewegung'),('sicher','Sicher')] %}<option value="{{ key }}" {{ 'selected' if status == key }}>{{ label }}</option>{% endfor %}</select>
-    <button class="quiet" type="submit">Zeigen</button>
-  </form>
+  {% if alle_themen %}
+  <section class="topics-library" aria-label="Deine Themen finden">
+    <nav class="topics-status" aria-label="Themen nach Lernstand filtern">
+      {% for key, label, count in [('', 'Alle', alle_themen|length), ('bearbeitung', 'Am Lernen', active_count), ('neu', 'Neu', alle_themen|length - active_count - safe_count), ('sicher', 'Sicher', safe_count)] %}
+      <a href="/lernen?q={{ query|urlencode }}&amp;fach={{ fach|urlencode }}&amp;status={{ key }}" class="topics-status-link {{ key or 'alle' }}" {% if status == key %}aria-current="true"{% endif %}>{{ label }} <span>{{ count }}</span></a>
+      {% endfor %}
+    </nav>
+    <form class="topics-search" method="get" action="/lernen" role="search">
+      <input type="hidden" name="status" value="{{ status }}">
+      <div class="topics-search-field">
+        <label class="sr" for="topic-search">Thema suchen</label>
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+        <input id="topic-search" name="q" value="{{ query }}" placeholder="Welches Thema suchst du?" type="search">
+      </div>
+      <label class="sr" for="subject-filter">Fach</label>
+      <select id="subject-filter" name="fach"><option value="">Alle Fächer</option>{% for f in faecher %}<option value="{{ f }}" {{ 'selected' if fach == f }}>{{ f }}</option>{% endfor %}</select>
+      <button class="topics-search-submit quiet" type="submit">Suchen</button>
+    </form>
+    <div class="topics-results">
+      <p>{{ themen|length }} {{ 'Thema' if themen|length == 1 else 'Themen' }}{% if query or fach or status %} gefunden{% else %} für dich{% endif %}</p>
+      {% if query or fach or status %}<a href="/lernen">Filter zurücksetzen</a>{% endif %}
+    </div>
+  </section>
+  {% endif %}
 
-  <div class="topic-grid">
+  <div class="topics-grid">
     {% for t in themen %}
-    <article class="topic-tile tone-{{ loop.index0 % 4 }}">
-      <div class="topic-tile-top"><div class="topic-symbol" aria-hidden="true">{% if t.subject|lower == 'mathematik' %}½{% elif t.subject|lower in ['deutsch','englisch','französisch'] %}Aa{% else %}✦{% endif %}</div><span class="learn-status {{ t.learning_status }}">{{ t.status_label }}</span></div>
-      <h2>{{ t.label }}</h2>
-      <p>{{ t.subject }}{% if t.grade %} · {{ t.grade }}. Klasse{% endif %}</p>
+    <article class="topics-card state-{{ t.learning_status }}" aria-labelledby="topic-title-{{ t.id }}" data-topic-id="{{ t.id }}">
+      <div class="topics-card-top">
+        <span class="topics-symbol" aria-hidden="true">{% if t.subject|lower == 'mathematik' %}½{% elif t.subject|lower in ['deutsch','englisch','französisch'] %}Aa{% else %}<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v15M12 5C8 2 4 3 2 4v15c4-2 7-1 10 1 3-2 6-3 10-1V4c-2-1-6-2-10 1Z"/></svg>{% endif %}</span>
+        <span class="topics-badge">{% if t.learning_status == 'sicher' %}<span aria-hidden="true">✓</span> Sicher{% elif t.learning_status == 'bearbeitung' %}Am Lernen{% else %}Neu{% endif %}</span>
+        {% if nachfrage != t.id|string %}
+        <details class="topics-menu">
+          <summary aria-label="Optionen für {{ t.label }}"><span aria-hidden="true">···</span></summary>
+          <div><a href="/lernen?q={{ query|urlencode }}&amp;fach={{ fach|urlencode }}&amp;status={{ status|urlencode }}&amp;weg={{ t.id }}#topic-title-{{ t.id }}">Thema weglegen</a></div>
+        </details>
+        {% endif %}
+      </div>
+      <p class="topics-subject">{{ t.subject }}{% if t.grade %} · {{ t.grade }}. Klasse{% endif %}</p>
+      <h2 id="topic-title-{{ t.id }}">{{ t.label }}</h2>
+      <p class="topics-hint">{% if t.learning_status == 'sicher' %}Das kannst du schon. Wiederholen hält dich fit.{% elif t.learning_status == 'bearbeitung' %}Mach in deinem Tempo weiter.{% else %}Entdecke das Thema mit Karo.{% endif %}</p>
       {% if nachfrage == t.id|string %}
       <div class="karte-nachfrage">
-        <b>Wirklich weglegen?</b>
-        <small>Es kommt zu deinen Erfolgen. Dort kannst du es zurückholen — oder endgültig löschen.</small>
+        <b>Dieses Thema weglegen?</b>
+        <small>Du findest es unter „Erfolge“ und kannst es dort zurückholen.</small>
         <div class="karte-nachfrage-wege">
           <form method="post" action="/lernen/{{ t.id }}/loeschen">{{ csrf_input() }}<button class="loeschen-echt" type="submit">Ja, weglegen</button></form>
-          <a class="quiet btn" href="/lernen">Abbrechen</a>
+          <a class="quiet btn" href="/lernen?q={{ query|urlencode }}&amp;fach={{ fach|urlencode }}&amp;status={{ status|urlencode }}">Behalten</a>
         </div>
       </div>
       {% else %}
-      <form method="post" action="{{ '/lernen/adaptiv/start' if cfg.adaptive_learning_enabled|default(false) else '/lernzyklus/' ~ t.id ~ '/quiz/starten' }}" class="topic-tile-action">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ t.id }}"><input type="hidden" name="thema" value="{{ t.label }}"><input type="hidden" name="modus" value="bildschirm"><button class="quiet" type="submit">{{ 'Weiterlernen' if t.learning_status == 'bearbeitung' else 'Noch einmal' if t.learning_status == 'sicher' else 'Starten' }} <span aria-hidden="true">→</span></button></form>
-      <p class="topic-tile-weg"><a href="/lernen?weg={{ t.id }}">weglegen</a></p>
+      <form method="post" action="{{ '/lernen/adaptiv/start' if cfg.adaptive_learning_enabled|default(false) else '/lernzyklus/' ~ t.id ~ '/quiz/starten' }}" class="topics-start">
+        {{ csrf_input() }}
+        <input type="hidden" name="topic_id" value="{{ t.id }}">
+        <input type="hidden" name="thema" value="{{ t.label }}">
+        <input type="hidden" name="modus" value="bildschirm">
+        <button class="quiet" type="submit" aria-label="{{ 'Weiterlernen' if t.learning_status == 'bearbeitung' else 'Wiederholen' if t.learning_status == 'sicher' else 'Starten' }}: {{ t.label }}">{{ 'Weiterlernen' if t.learning_status == 'bearbeitung' else 'Wiederholen' if t.learning_status == 'sicher' else 'Starten' }} <span aria-hidden="true">→</span></button>
+      </form>
       {% endif %}
     </article>
     {% else %}
-    <section class="learn-empty"><img src="/static/karo-fox-star.png" alt="" width="96" height="96"><h2>{{ 'Nichts gefunden' if query or fach or status else 'Noch keine Lernkarte' }}</h2><p>{{ 'Ändere die Suche oder lege ein neues Thema an.' if query or fach or status else 'Starte mit einer Frage, die dich gerade interessiert.' }}</p><a class="learn-primary-action" href="/lernen/neu">Neues Thema</a></section>
+    <section class="topics-empty">
+      <img src="/static/karo-owl-book.png" alt="" width="100" height="100">
+      {% if query or fach or status %}
+      <h2>Hier ist noch kein Thema</h2>
+      <p>Versuche einen anderen Suchbegriff oder zeige wieder alle Themen.</p>
+      <a class="topics-primary" href="/lernen">Alle Themen zeigen</a>
+      {% else %}
+      <h2>Was möchtest du verstehen?</h2>
+      <p>Erstelle dein erstes Thema. Du kannst auch ein Arbeitsblatt dafür hochladen.</p>
+      <a class="topics-primary" href="/lernen/neu">Erstes Thema erstellen <span aria-hidden="true">→</span></a>
+      {% endif %}
+    </section>
     {% endfor %}
   </div>
 </div>
+{% include '_learning_support.html' %}
 {% endblock %}

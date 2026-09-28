@@ -431,7 +431,9 @@ def render_material_variante_notebooklm_quelle(variant_id: int):
 def offene_schritte():
     """Alle offenen Lernschritte, dringlichste zuerst — fuer die Uebersichten
     unter /lernen und /eltern sowie als Basis fuer `get_next_action()`."""
-    themen = [t for t in topics.liste(topics.AKTIV) if not t.get('learned_at')]
+    from . import learning_hub
+    personal_ids = {t['id'] for t in learning_hub.personal_topics()}
+    themen = [t for t in topics.liste(topics.AKTIV) if t['id'] in personal_ids]
     themen.sort(key=lambda t: (FLAG_ORDER.index(t['flag']), t['sort']))
     quizze = quizzes.offene()
     # Auch bei älteren Mehrfacheinträgen zeigt jedes Thema nur einen Einstieg.
@@ -456,6 +458,8 @@ def offene_schritte():
                          'topic_id': q['topic_id'], 'bereit': q['state'] == 'bereit'})
     quiz_themen = {q['topic_id'] for q in quizze}
     for l in lessons:
+        if not config.load().legacy_lesson_generation_enabled or l['id'] in material:
+            continue
         if l['topic_id'] not in offene_ids:
             continue
         if l['topic_id'] in quiz_themen:
@@ -479,8 +483,6 @@ def render_lernen_uebersicht(request: Request):
     /lernzyklus (Index), damit der Lernzyklus-Router nicht dashboard.py's
     Routen-Funktion direkt aufrufen muss."""
     from . import learning_hub
-    if request.query_params.get('tab') == 'klassenarbeit':
-        return zurueck('/klassenarbeit')
     themen = learning_hub.personal_topics()
     query = request.query_params.get('q', '').strip()
     fach = request.query_params.get('fach', '')
@@ -491,6 +493,7 @@ def render_lernen_uebersicht(request: Request):
     next_topic = next((t for t in themen if t['learning_status'] == 'bearbeitung'), None)
     next_topic = next_topic or next((t for t in themen if t['learning_status'] == 'neu'), None)
     return render(request, 'lernen_start.html', themen=selected, alle_themen=themen,
+                  reviews=offene_schritte()[2],
                   faecher=sorted({t['subject'] for t in themen}), query=query,
                   fach=fach, status=status, next_topic=next_topic,
                   safe_count=sum(t['learning_status'] == 'sicher' for t in themen),

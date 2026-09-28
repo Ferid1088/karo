@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "learning_base.html" %}
 {% block title %}Lernen mit {{ companion_name }}{% endblock %}
 {% block content %}
 {% set h = schirm.hilfe %}
@@ -78,7 +78,7 @@
 
 <div class="adaptiv learning-session">
 <header class="session-header">
-  <div><a class="session-back" href="{{ learning_back }}">Lernplatz verlassen</a><p class="eyebrow">DEINE LERNREISE</p><h1>{{ learning_title }}</h1></div>
+  <div><a class="session-back" href="{{ learning_back }}">← {{ learning_area }}</a><p class="eyebrow">{{ learning_area|upper }}</p><h1>{{ learning_title }}</h1></div>
   <div class="session-progress" aria-label="Schritt {{ learning_step }} von 6"><span>Schritt {{ learning_step }} von 6</span><div class="session-dots">{% for i in range(1,7) %}<i class="{{ 'current' if i == learning_step else 'done' if i < learning_step else '' }}"></i>{% endfor %}</div></div>
 </header>
 
@@ -87,8 +87,8 @@
 {% if schirm.art == 'anker' %}
 <section class="card">
   <p>{{ schirm.text }}</p>
-  <form method="post" action="/lernen/adaptiv/anker">{{ csrf_input() }}
-    <input type="text" name="antwort" placeholder="z. B. die Hälfte" autofocus>
+  <form method="post" action="{{ learning_base }}/anker?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+    <input type="text" name="antwort" aria-label="Deine Idee" placeholder="Deine Idee …" maxlength="1000" autofocus>
     <button type="submit">Weiter</button>
   </form>
 </section>
@@ -97,8 +97,8 @@
 <section class="card">
   {% if schirm.hinweis %}<p>{{ schirm.hinweis }}</p>{% endif %}
   <p><strong>{{ schirm.frage }}</strong></p>
-  <form method="post" action="/lernen/adaptiv/diagnose">{{ csrf_input() }}
-    <input type="text" name="antwort" placeholder="z. B. 5/6" autofocus>
+  <form method="post" action="{{ learning_base }}/diagnose?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+    <input type="text" name="antwort" aria-label="Deine Antwort" placeholder="Deine Antwort …" maxlength="1000" autofocus>
     <button type="submit">Prüfen</button>
   </form>
 </section>
@@ -108,7 +108,7 @@
   <p>{{ schirm.inhalt.get('haken', '') }}</p>
   {{ komponente(schirm.bild) }}
   <p><strong>{{ schirm.aufgabe.frage }}</strong></p>
-  <form method="post" action="/lernen/adaptiv/vorhersage">{{ csrf_input() }}
+  <form method="post" action="{{ learning_base }}/vorhersage?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <div class="actions">
       {% for wert, beschriftung in schirm.aufgabe.optionen %}
       <button type="submit" name="antwort" value="{{ wert }}">{{ beschriftung }}</button>
@@ -125,7 +125,7 @@
   <p>Deine Antwort war {{ schirm.eigene_antwort }}.</p>
   {% endif %}
   {{ komponente(schirm.bild) }}
-  <form method="post" action="/lernen/adaptiv/weiter">{{ csrf_input() }}
+  <form method="post" action="{{ learning_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <button type="submit">Weiter</button>
   </form>
 </section>
@@ -133,7 +133,7 @@
 {% elif schirm.art == 'transfer' %}
 <section class="card">
   <p><strong>{{ schirm.aufgabe.frage }}</strong></p>
-  <form method="post" action="/lernen/adaptiv/transfer">{{ csrf_input() }}
+  <form method="post" action="{{ learning_base }}/transfer?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <div class="actions">
       {% for wert, beschriftung in schirm.aufgabe.optionen %}
       <button type="submit" name="antwort" value="{{ wert }}">{{ beschriftung }}</button>
@@ -147,7 +147,7 @@
   <p>{{ schirm.inhalt.get('regel', '') }}</p>
   {{ komponente(schirm.bild) }}
   <p>{{ schirm.inhalt.get('bild', {}).get('bleibt_gleich', '') }}</p>
-  <form method="post" action="/lernen/adaptiv/weiter">{{ csrf_input() }}
+  <form method="post" action="{{ learning_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <button type="submit">Zeig mir ein Beispiel</button>
   </form>
 </section>
@@ -159,7 +159,7 @@
   <p>{{ schritt.text }}</p>
   {% if schritt.bild %}{{ streifen(schritt.bild[0], schritt.bild[1]) }}{% endif %}
   {% endfor %}
-  <form method="post" action="/lernen/adaptiv/weiter">{{ csrf_input() }}
+  <form method="post" action="{{ learning_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <button type="submit">Jetzt versuche ich es selbst</button>
   </form>
 </section>
@@ -168,12 +168,12 @@
 <section class="card">
   <p><strong>{{ schirm.aufgabe.frage }}</strong></p>
   {{ komponente(schirm.bild) }}
-  <form method="post" action="/lernen/adaptiv/aufgabe">{{ csrf_input() }}
-    <input type="text" name="antwort" placeholder="Antwort" autofocus>
+  <form method="post" action="{{ learning_base }}/aufgabe?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+    <input type="text" name="antwort" aria-label="Deine Antwort" placeholder="Deine Antwort …" maxlength="1000" autofocus>
     <button type="submit">Prüfen</button>
   </form>
   {% if schirm.tipp_offen %}
-  <form method="post" action="/lernen/adaptiv/tipp">{{ csrf_input() }}
+  <form method="post" action="{{ learning_base }}/tipp?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <button type="submit" class="ghost">Tipp</button>
   </form>
   {% endif %}
@@ -185,7 +185,7 @@
   <p>Schauen wir es sonst einmal anders an.</p>
   {{ komponente(schirm.bild) }}
   <p>{{ schirm.inhalt.get('bild', {}).get('bleibt_gleich', '') }}</p>
-  <form method="post" action="/lernen/adaptiv/weiter">{{ csrf_input() }}
+  <form method="post" action="{{ learning_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <button type="submit">Nochmal probieren</button>
   </form>
 </section>
@@ -196,17 +196,16 @@
   <p>Diese Aufgabe schaut ihr euch am besten zu zweit an. Karo hat sich
      gemerkt, worum es ging.</p>
   <div class="actions">
-    <a class="btn" href="/lernen">Etwas anderes lernen</a>
+    <a class="btn" href="{{ learning_back }}">Etwas anderes lernen</a>
   </div>
 </section>
 
 {% else %}
 <section class="card">
-  <p>Du hast es verstanden: Brüche lassen sich erst zusammenzählen, wenn die
-     Stücke gleich groß sind.</p>
+  <p>Gut gemacht! Du hast „{{ learning_title }}“ verstanden und sicher gelöst.</p>
   <div class="actions">
-    <form method="post" action="/lernen/adaptiv/neu">{{ csrf_input() }}<button type="submit">Noch einmal</button></form>
-    <a class="btn ghost" href="/lernen">Zurück</a>
+    <form method="post" action="{{ learning_base }}/neu?sitzung={{ sitzung.id }}">{{ csrf_input() }}<button type="submit">Noch einmal</button></form>
+    <a class="btn ghost" href="{{ learning_back }}">Zurück</a>
   </div>
 </section>
 {% endif %}

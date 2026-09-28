@@ -1,53 +1,57 @@
-{# Alle Klassenarbeiten in einem Monat: je Tag, fuer welche Arbeit wie lange
-   geplant ist. Aufbau nach dem Entwurf: volle Wochentagsnamen, hohe Zellen,
-   je Eintrag ein Streifen mit farbigem Balken links, zwei Zeilen (Fach, dann
-   Zeichen und Angabe). Unten links die Zeichenerklaerung, rechts die Summe. #}
 {% macro exam_monat(kalender, weekday_labels, csrf_input) %}
-<section class="monat-karte" aria-labelledby="monat-titel">
-  <header class="monat-kopf">
-    <h2 id="monat-titel">{{ kalender.titel }}</h2>
-    <nav class="monat-blaettern" aria-label="Monat wechseln">
-      <a href="/klassenarbeit/kalender?monat={{ kalender.vorher }}" aria-label="Vorheriger Monat">‹</a>
-      <a class="monat-heute-knopf" href="/klassenarbeit/kalender?monat={{ kalender.jetzt }}">Heute</a>
-      <a href="/klassenarbeit/kalender?monat={{ kalender.nachher }}" aria-label="Nächster Monat">›</a>
+<section class="exam-month" aria-labelledby="exam-month-title">
+  <header class="exam-month-head">
+    <div><p class="exam-month-kicker">DEIN MONAT IM BLICK</p><h2 id="exam-month-title">{{ kalender.titel }}</h2></div>
+    <nav class="exam-month-nav" aria-label="Monat wechseln">
+      <a href="/klassenarbeit/kalender?monat={{ kalender.vorher }}" aria-label="Vorheriger Monat"><span aria-hidden="true">‹</span></a>
+      <a class="exam-month-today" href="/klassenarbeit/kalender?monat={{ kalender.jetzt }}">Heute</a>
+      <a href="/klassenarbeit/kalender?monat={{ kalender.nachher }}" aria-label="Nächster Monat"><span aria-hidden="true">›</span></a>
     </nav>
   </header>
-
-  <ol class="monat-tage">
-    {% for nummer in [1, 2, 3, 4, 5, 6, 7] %}
-    <li class="monat-wochentag{{ ' wochenende' if nummer >= 6 }}"><span>{{ weekday_labels[nummer] }}</span><abbr title="{{ weekday_labels[nummer] }}">{{ weekday_labels[nummer][:2] }}</abbr></li>
+  <ul class="exam-month-summary" aria-label="In diesem Monat">
+    <li><strong>{{ kalender.pruefungen }}</strong> {{ 'Prüfung' if kalender.pruefungen == 1 else 'Prüfungen' }}</li>
+    <li><strong>{{ kalender.lerntage }}</strong> {{ 'Lerntag' if kalender.lerntage == 1 else 'Lerntage' }}</li>
+    <li><strong>{{ kalender.lernminuten }} Min.</strong> Lernzeit geplant</li>
+  </ul>
+  <p class="exam-month-help">Tippe auf einen Eintrag, um die zugehörige Klassenarbeit und ihren Lernplan zu öffnen.</p>
+  {% if not kalender.arbeiten %}
+  <div class="exam-month-empty"><strong>Hier ist noch Platz für deine Pläne.</strong><p>In diesem Monat sind keine Prüfungen oder Lernzeiten eingetragen.</p><a href="/klassenarbeit">Klassenarbeiten ansehen →</a></div>
+  {% endif %}
+  {% if kalender.arbeiten %}<p class="exam-month-list-label">Deine Termine in diesem Monat</p>{% endif %}
+  <ol class="exam-month-grid" aria-label="{{ kalender.titel }}">
+    {% for nummer in [1,2,3,4,5,6,7] %}
+    <li class="exam-month-weekday"><abbr title="{{ weekday_labels[nummer] }}">{{ weekday_labels[nummer][:2] }}</abbr></li>
     {% endfor %}
     {% for woche in kalender.wochen %}{% for tag in woche %}
-    <li class="monat-tag{{ ' fremd' if not tag.im_monat }}{{ ' heute' if tag.heute }}{{ ' wochenende' if loop.index0 >= 5 }}">
-      <p class="monat-tag-kopf"><b>{{ tag.nummer }}{% if tag.monat_kurz %} {{ tag.monat_kurz }}{% endif %}</b>{% if tag.heute %}<span>Heute</span>{% endif %}</p>
+    <li class="exam-month-day{{ ' is-outside' if not tag.im_monat }}{{ ' is-today' if tag.heute }}{{ ' is-weekend' if loop.index0 >= 5 }}{{ ' has-events' if tag.eintraege }}" {% if tag.heute %}aria-current="date"{% endif %}>
+      <div class="exam-month-day-head">
+        <time datetime="{{ tag.date }}" aria-label="{{ tag.weekday }}, {{ tag.date_label }}"><span class="exam-month-mobile-weekday">{{ tag.weekday[:2] }} · </span><b>{{ tag.nummer }}</b><span>{{ tag.monat_kurz }}</span></time>
+        {% if tag.heute %}<span class="exam-month-today-label">Heute</span>{% endif %}
+        {% if tag.lernminuten and tag.eintraege|length > 1 %}<small class="exam-month-day-total">{{ tag.lernminuten }} Min. gesamt</small>{% endif %}
+      </div>
+      <div class="exam-month-events">
       {% for eintrag in tag.eintraege %}
-      {% set inhalt %}<b>{{ eintrag.subject }}</b><small>
-          {%- if eintrag.art == 'arbeit' %}<i>★</i>Arbeit
-          {%- elif eintrag.art == 'geschafft' %}<i>✓</i>{{ eintrag.minutes }} Min gelernt
-          {%- elif eintrag.art == 'verpasst' %}<i>✗</i>{{ eintrag.minutes }} Min ausgefallen
-          {%- elif eintrag.art == 'probe' %}<i>◎</i>Generalprobe · {{ eintrag.minutes }} Min
-          {%- else %}<i>◔</i>{{ eintrag.minutes }} Min{% endif %}</small>{% endset %}
-      {% if eintrag.art == 'probe' %}
-      <a class="monat-chip farbe-{{ eintrag.farbe }} {{ eintrag.art }}" href="/klassenarbeit/{{ eintrag.exam_id }}/simulation" title="Generalprobe öffnen">{{ inhalt }}</a>
-      {% elif eintrag.art == 'arbeit' or not eintrag.thema_id %}
-      <a class="monat-chip farbe-{{ eintrag.farbe }} {{ eintrag.art }}" href="/klassenarbeit/{{ eintrag.exam_id }}" title="{{ eintrag.subject }} ansehen">{{ inhalt }}</a>
-      {% else %}
-      <form method="post" action="/lernen/adaptiv/start" class="monat-chip-form">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ eintrag.thema_id }}"><input type="hidden" name="exam_id" value="{{ eintrag.exam_id }}"><input type="hidden" name="thema" value="{{ eintrag.thema }}"><input type="hidden" name="modus" value="bildschirm"><button class="monat-chip farbe-{{ eintrag.farbe }} {{ eintrag.art }}" type="submit" title="{{ eintrag.thema }} jetzt lernen">{{ inhalt }}</button></form>
-      {% endif %}
+        {# A calendar entry opens only its exam, never a personal topic or an early simulation. #}
+        <a class="exam-month-event kind-{{ eintrag.art }} color-{{ eintrag.farbe }}" href="/klassenarbeit/{{ eintrag.exam_id }}{% if eintrag.art != 'arbeit' %}#exam-calendar-title{% endif %}" aria-label="{{ eintrag.subject }}, Prüfung am {{ eintrag.exam_date[8:10] }}.{{ eintrag.exam_date[5:7] }}.: {% if eintrag.art == 'arbeit' %}Prüfungstag{% else %}{{ eintrag.minutes }} Minuten {{ 'Generalprobe' if eintrag.art == 'probe' else 'Lernzeit' }} am {{ tag.date_label }}{% endif %}. Lernplan öffnen">
+          <strong>{{ eintrag.subject }}</strong>
+          <span class="exam-month-event-status">
+            {% if eintrag.art == 'arbeit' %}<i aria-hidden="true">★</i> Prüfung
+            {% elif eintrag.art == 'geschafft' %}<i aria-hidden="true">✓</i> {{ eintrag.minutes }} Min. · gelernt
+            {% elif eintrag.art == 'verpasst' %}<i aria-hidden="true">–</i> {{ eintrag.minutes }} Min. · verpasst
+            {% elif eintrag.art == 'probe' %}<i aria-hidden="true">◎</i> {% if eintrag.minutes %}{{ eintrag.minutes }} Min. · {% endif %}Generalprobe
+            {% else %}<i aria-hidden="true">◷</i> {{ eintrag.minutes }} Min. lernen{% endif %}
+          </span>
+          {% if eintrag.art != 'arbeit' %}<small>für {{ eintrag.exam_date[8:10] }}.{{ eintrag.exam_date[5:7] }}.</small>{% endif %}
+        </a>
       {% endfor %}
+      {% if tag.heute and not tag.eintraege %}<span class="exam-month-free">Heute ist nichts geplant.</span>{% endif %}
+      </div>
     </li>
     {% endfor %}{% endfor %}
   </ol>
-
-  <footer class="monat-fuss">
-    <ul class="monat-erklaerung">
-      <li><i class="zeichen arbeit">★</i>Arbeit</li>
-      <li><i class="zeichen geplant">◔</i>Lernzeit</li>
-      <li><i class="zeichen geschafft">✓</i>gelernt</li>
-      <li><i class="zeichen verpasst">✗</i>ausgefallen</li>
-      <li><i class="zeichen probe">◎</i>Generalprobe</li>
-    </ul>
-    <small>{% if kalender.arbeiten %}{{ kalender.lernminuten }} Minuten in diesem Monat geplant{% else %}In diesem Monat ist nichts geplant.{% endif %}</small>
+  <footer class="exam-month-footer">
+    <ul aria-label="Zeichenerklärung"><li><i class="exam-month-legend-exam" aria-hidden="true">★</i> Prüfung</li><li><i aria-hidden="true">◷</i> Lernzeit</li><li><i aria-hidden="true">✓</i> gelernt</li><li><i aria-hidden="true">–</i> verpasst</li><li><i aria-hidden="true">◎</i> Generalprobe</li></ul>
+    <p>Lernzeiten änderst du im Plan der jeweiligen Klassenarbeit.</p>
   </footer>
 </section>
 {% endmacro %}

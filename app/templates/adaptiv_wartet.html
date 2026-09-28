@@ -1,21 +1,21 @@
-{% extends "base.html" %}
+{% extends "learning_base.html" %}
 {% block title %}{{ thema }} – {{ companion_name }}{% endblock %}
 {% block content %}
 <div style="max-width:36rem;margin:0 auto">
-<a class="back-link" href="/lernen">← Zurück</a>
+<a class="back-link" href="{{ learning_back }}">← Zurück</a>
 <h1>{{ companion_name }} bereitet das gerade vor</h1>
 
 <section class="card" data-wartet data-thema="{{ thema }}">
-  <p>Zu „{{ thema }}“ gibt es noch keine Lernreihe. {{ companion_name }}
-     schreibt gerade eine.</p>
+  <p>Für „{{ thema }}“ wird passendes Lernmaterial gesucht und, falls nötig,
+     erstellt und geprüft.</p>
   <p class="hint">Das dauert einen Moment. Du kannst hier warten — die Seite
      geht von selbst weiter — oder später noch einmal schauen.</p>
   <p class="hint" data-meldung role="status" aria-live="polite">Wird vorbereitet …</p>
 </section>
 
-<section class="card">
+<section class="card"><form method="post" action="{{ learning_base }}/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ topic_id or '' }}"><input type="hidden" name="thema" value="{{ thema }}"><button type="submit">Erneut versuchen</button></form>
   <h2>Solange etwas anderes?</h2>
-  <a class="btn ghost" href="/lernen">Zu deinen Themen</a>
+  <a class="btn ghost" href="{{ learning_back }}">Zurück zu {{ learning_area }}</a>
 </section>
 </div>
 
@@ -28,20 +28,25 @@
   var versuche = 0;
   function schau() {
     versuche += 1;
-    fetch('/lernen/adaptiv/status?thema=' + encodeURIComponent(thema))
+    fetch({{ status_url|tojson }})
       .then(function (a) { return a.json(); })
       .then(function (stand) {
-        if (stand.fertig) { window.location.href = '/lernen/adaptiv'; return; }
+        if (stand.fertig) { window.location.href = {{ resume_url|tojson }}; return; }
         if (!stand.laeuft) {
           meldung.textContent = 'Das hat diesmal nicht geklappt. '
-            + 'Probier es später noch einmal oder wähle ein anderes Thema.';
+            + 'Dein Lernstand bleibt erhalten. Probier es später noch einmal '
+            + 'oder bitte einen Erwachsenen um Hilfe.';
           return;
         }
-        if (versuche < 60) setTimeout(schau, 2000);
+        if (versuche < 240) setTimeout(schau, 5000);
         else meldung.textContent = 'Das dauert heute ungewöhnlich lange. '
           + 'Schau später noch einmal vorbei.';
       })
-      .catch(function () { if (versuche < 60) setTimeout(schau, 4000); });
+      .catch(function () {
+        if (versuche < 240) setTimeout(schau, 5000);
+        else meldung.textContent = 'Die Verbindung ist gerade unterbrochen. '
+          + 'Dein Lernstand bleibt erhalten. Schau später wieder vorbei.';
+      });
   }
   setTimeout(schau, 1500);
 })();

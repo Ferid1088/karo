@@ -99,6 +99,12 @@ def _exam_ansicht(e: dict) -> dict:
     e["schedule"] = exam_calendar.get(e["id"])
     e["simulation_early"] = exam_calendar.simulation_early(e["id"])
     e["calendar"] = exam_calendar.calendar(e["id"])
+    e["today_task"] = next((d for d in e["calendar"] if d["today"]
+                            and (d["is_learning_day"] or d["is_simulation"])), None)
+    e["sessions"] = [dict(r) for r in db.q("""SELECT s.id, s.zustand, i.thema_text
+        FROM lern_sitzung s JOIN lern_eingabe i ON i.id=s.eingabe_id
+        JOIN exam_topic x ON x.topic_id=i.topic_id WHERE x.exam_id=?
+        ORDER BY s.id DESC LIMIT 20""", e["id"])]
     e["woche"] = exam_calendar.woche(e["id"])
     e["calendar_leading_blanks"] = (
         (dt.date.fromisoformat(e["calendar"][0]["date"]).isoweekday() - 1)
@@ -114,8 +120,9 @@ def render_klassenarbeit(request: Request, monat: str = ""):
     zeilen = [_exam_ansicht(dict(r)) for r in db.q(
         "SELECT * FROM exam WHERE deleted_at IS NULL AND purged_at IS NULL "
         "ORDER BY exam_date DESC LIMIT 20")]
-    template = "klassenarbeit_kind.html" if config.load_safe().klassenarbeit_kind else "klassenarbeit.html"
-    return render(request, template, zeilen=zeilen,
+    # Parent and child use the same isolated process. The setting controls
+    # access, not a second legacy workflow with shared personal topics.
+    return render(request, "klassenarbeit_kind.html", zeilen=zeilen,
                   adult_page=not config.load().klassenarbeit_kind,
                   scan=exam_plan.offene_scan(), counts=jobs.counts(),
                   kalender=exam_calendar.monat(monat),
@@ -132,12 +139,12 @@ def render_klassenarbeit_kalender(request: Request, monat: str = ""):
                   weekday_labels=exam_calendar.WEEKDAY_LABELS)
 
 
-def render_klassenarbeit_neu(request: Request):
+def render_klassenarbeit_neu(request: Request, draft: dict | None = None):
     """Beide Wege zu einer neuen Arbeit: selbst eintragen oder Blatt hochladen."""
     from .. import exam_plan
     return render(request, "klassenarbeit_neu.html",
                   adult_page=not config.load().klassenarbeit_kind,
-                  scan=exam_plan.offene_scan())
+                  scan=exam_plan.offene_scan(), draft=draft or {})
 
 
 def render_klassenarbeit_detail(request: Request, exam_id: int):
@@ -148,7 +155,7 @@ def render_klassenarbeit_detail(request: Request, exam_id: int):
     """
     from fastapi import HTTPException
     from . import exam_calendar
-    row = db.q1("SELECT * FROM exam WHERE id=?", exam_id)
+    row = db.q1("SELECT * FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL", exam_id)
     if row is None:
         raise HTTPException(404, "Diese Klassenarbeit gibt es nicht.")
     return render(request, "klassenarbeit_detail.html", e=_exam_ansicht(dict(row)),

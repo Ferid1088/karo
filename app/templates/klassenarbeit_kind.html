@@ -1,43 +1,85 @@
 {% extends "learning_base.html" %}
 {% block title %}Klassenarbeit – {{ companion_name }}{% endblock %}
 {% block content %}
-{% from '_exam_week.html' import exam_metrics %}
-<h1 class="sr">Klassenarbeit</h1>
+{% set upcoming = zeilen|selectattr('days_left', 'ge', 0)|sort(attribute='exam_date')|list %}
+{% set written = zeilen|selectattr('days_left', 'lt', 0)|list %}
+{% macro exam_card(e, past=false) %}
+<article class="exam-overview-card{{ ' is-written' if past }}" id="exam-{{ e.id }}" aria-labelledby="exam-title-{{ e.id }}">
+  <header class="exam-overview-card-head">
+    <div class="exam-overview-title">
+      <h3 id="exam-title-{{ e.id }}"><a href="/klassenarbeit/{{ e.id }}">{{ e.subject }}</a></h3>
+      <p><time datetime="{{ e.exam_date }}">{{ e.exam_date|datum }}</time>{% if past %} · geschrieben{% endif %}</p>
+    </div>
+    <dl class="exam-overview-stats">
+      <div class="readiness"><dt>Sicher</dt><dd>{% if e.topics %}{{ e.mastered }}<small> / {{ e.topics|length }}</small>{% else %}–{% endif %}</dd><span>{{ 'Themen' if e.topics else 'Themen fehlen' }}</span></div>
+      <div class="minutes"><dt>Lernzeit</dt><dd>{{ e.woche.planned_minutes }}<small> Min.</small></dd><span>geplant</span></div>
+    </dl>
+  </header>
+  {% if not past %}
+  {% if e.topics %}
+  {% set percent = (100 * e.mastered / e.topics|length)|round|int %}
+  <div class="exam-overview-progress" role="progressbar" aria-label="Sichere Prüfungsthemen" aria-valuemin="0" aria-valuemax="{{ e.topics|length }}" aria-valuenow="{{ e.mastered }}" aria-valuetext="{{ e.mastered }} von {{ e.topics|length }} Themen sicher"><span style="width:{{ percent }}%"></span></div>
+  {% endif %}
+  <p class="exam-overview-hint">{% if not e.topics %}Die Prüfungsthemen sind noch nicht hinterlegt.{% elif not e.woche.planned_minutes %}Plane deine Lerntage und Minuten.{% elif e.mastered == e.topics|length %}<span aria-hidden="true">✓</span> Alle Themen sicher. Zeit zum Wiederholen!{% else %}{{ e.topics|length - e.mastered }} {{ 'Thema wartet' if e.topics|length - e.mastered == 1 else 'Themen warten' }} noch auf dich.{% endif %}</p>
+  {% endif %}
+  <div class="exam-overview-action-row">
+    <p class="exam-overview-countdown">{% if past %}<span aria-hidden="true">✓</span> Geschrieben{% elif e.days_left == 0 %}<strong>Heute ist die Prüfung</strong>{% else %}Tage zur Prüfung: <strong>{{ e.days_left }}</strong>{% endif %}</p>
+    <div class="exam-overview-actions">
+      <a class="exam-overview-open" href="/klassenarbeit/{{ e.id }}">{% if past %}Ansehen{% elif not e.topics %}Themen ansehen{% else %}Lernplan öffnen{% endif %} <span aria-hidden="true">→</span></a>
+      {% if nachfrage != e.id|string %}<a class="exam-overview-archive" href="/klassenarbeit?weg={{ e.id }}#exam-{{ e.id }}" aria-label="{{ e.subject }} vom {{ e.exam_date|datum }} weglegen">weglegen</a>{% endif %}
+    </div>
+  </div>
+  {% if nachfrage == e.id|string %}
+  <div class="karte-nachfrage">
+    <b>Diese Klassenarbeit weglegen?</b>
+    <small>Du findest sie unter „Erfolge“ und kannst sie dort zurückholen.</small>
+    <div class="karte-nachfrage-wege">
+      <form method="post" action="/klassenarbeit/{{ e.id }}/loeschen">{{ csrf_input() }}<button class="loeschen-echt" type="submit">Ja, weglegen</button></form>
+      <a class="quiet btn" href="/klassenarbeit#exam-{{ e.id }}">Behalten</a>
+    </div>
+  </div>
+  {% endif %}
+  {% if not past and e.calendar %}
+  {% set days = e.calendar[:10] %}
+  <section class="exam-overview-calendar" aria-label="Lerntage für {{ e.subject }} am {{ e.exam_date|datum }}">
+    <div class="exam-overview-calendar-head"><strong>{{ 'Nächste 10 Tage' if days|length == 10 else 'Bis zur Prüfung' }}</strong><span>{{ days[0].date[8:10] }}.{{ days[0].date[5:7] }}. – {{ days[-1].date[8:10] }}.{{ days[-1].date[5:7] }}.</span></div>
+    <div class="exam-overview-days">
+      {% for item in days %}
+      <a class="exam-overview-day{{ ' is-today' if item.today }}{{ ' is-exam' if item.is_exam }}{{ ' is-planned' if item.is_learning_day }}" href="/klassenarbeit/{{ e.id }}#exam-calendar-{{ item.date }}" {% if item.today %}aria-current="date"{% endif %} aria-label="{{ item.date_label }}: {{ 'Prüfung' if item.is_exam else (item.minutes|string ~ ' Minuten geplant') if item.is_learning_day else 'kein Lernen geplant' }}{{ ', Generalprobe' if item.is_simulation }}">
+        <span>{{ 'Heute' if item.today else item.weekday[:2] }}</span>
+        <time datetime="{{ item.date }}">{{ item.date[8:10] }}</time>
+        <small>{% if item.is_exam %}Prüf.{% elif item.is_learning_day %}{{ item.minutes }}′{% else %}frei{% endif %}</small>
+      </a>
+      {% endfor %}
+    </div>
+    <p class="exam-overview-calendar-note">Grün = Lernzeit · Zahlen mit ′ = Minuten</p>
+  </section>
+  {% endif %}
+  {% if e.simulation_available and not past %}<a class="exam-overview-simulation" href="/klassenarbeit/{{ e.id }}/simulation">Deine Generalprobe ist bereit <span aria-hidden="true">→</span></a>{% endif %}
+</article>
+{% endmacro %}
 
-<a class="exam-start neue-arbeit" href="/klassenarbeit/neu">+ Neue Klassenarbeit</a>
-
-<section class="exam-panel">
-  <header class="exam-panel-head"><h2>Deine Klassenarbeiten</h2><p>{{ zeilen|length }} {{ 'Arbeit' if zeilen|length == 1 else 'Arbeiten' }} im Blick.</p></header>
-  <div class="exam-grid">{% for e in zeilen %}
-    <article class="exam-card exam-card-compact" id="exam-{{ e.id }}">
-      <h3><a href="/klassenarbeit/{{ e.id }}">{{ e.subject }}</a></h3>
-      <p class="exam-when">{{ e.exam_date|datum }}{% if e.days_left >= 0 %} · noch {{ e.days_left }} Tage{% else %} · vorbei{% endif %}</p>
-      {% if e.days_left < 0 %}<div class="exam-flags"><span class="status-pill done">✓ Geschrieben</span></div>
-      {% elif e.topics and e.mastered == e.topics|length %}<div class="exam-flags"><span class="status-pill done">✓ Alles sicher</span></div>{% endif %}
-      {{ exam_metrics(e) }}
-      <div class="exam-card-actions">
-        {% if e.next_topic %}<a class="exam-start" href="/klassenarbeit/{{ e.id }}">Lernplan öffnen →</a>
-        {% elif e.topics %}<p class="exam-done-note">Alle Themen sitzen. Schön.</p>
-        {% else %}<a class="exam-start" href="/klassenarbeit/{{ e.id }}">Themen ansehen →</a>{% endif %}
-        {% if e.simulation_available %}<a class="exam-secondary" href="/klassenarbeit/{{ e.id }}/simulation">Generalprobe starten →</a>{% endif %}
-        {% if nachfrage == e.id|string %}
-        <div class="karte-nachfrage">
-          <b>Wirklich weglegen?</b>
-          <small>Sie kommt zu deinen Erfolgen. Dort kannst du sie zurücknehmen — oder endgültig löschen.</small>
-          <div class="karte-nachfrage-wege">
-            <form method="post" action="/klassenarbeit/{{ e.id }}/loeschen">{{ csrf_input() }}<button class="loeschen-echt" type="submit">Ja, weglegen</button></form>
-            <a class="quiet btn" href="/klassenarbeit{{ '?monat=' ~ monat if monat }}">Abbrechen</a>
-          </div>
-        </div>
-        {% else %}
-        <p class="exam-weg"><a href="/klassenarbeit?{{ 'monat=' ~ monat ~ '&amp;' if monat }}weg={{ e.id }}">weglegen</a></p>
-        {% endif %}
-      </div>
-      {% if e.calendar %}<div class="exam-card-calendar" aria-label="Lernkalender für {{ e.subject }}"><div class="exam-card-calendar-title">Nächste 7 Lerntage <small>mehr im Lernplan</small></div><div class="exam-card-calendar-days">{% for item in e.calendar[:7] %}<a class="exam-mini-day {{ 'today' if item.today }} {{ 'exam' if item.is_exam }} {{ 'planned' if item.is_learning_day }}" href="/klassenarbeit/{{ e.id }}#exam-calendar-{{ item.date }}"><span>{{ item.weekday[:2] }}</span><i>{{ item.date[8:10] }}</i>{% if item.is_learning_day and item.minutes %}<small>{{ item.minutes }}′</small>{% endif %}</a>{% endfor %}</div></div>{% endif %}
-    </article>
-  {% else %}
-    <section class="learn-empty"><h2>Noch keine Klassenarbeit</h2><p>Lege Termin und Themen an, dann entsteht dein eigener Lernplan.</p></section>
-  {% endfor %}</div>
-</section>
-
+<div class="exam-overview">
+  <header class="exam-overview-header">
+    <div><h1>Deine Klassenarbeiten</h1><p>Dein Termin. Deine Lerntage. Schritt für Schritt vorbereitet.</p></div>
+    <a class="exam-overview-new neue-arbeit" href="/klassenarbeit/neu">+ Neue Klassenarbeit</a>
+  </header>
+  <section aria-labelledby="upcoming-exams">
+    <div class="exam-overview-section-head"><h2 id="upcoming-exams">Als Nächstes <span>{{ upcoming|length }}</span></h2><a href="/klassenarbeit/kalender">Monatskalender <span aria-hidden="true">→</span></a></div>
+    <div class="exam-overview-grid">
+      {% for e in upcoming %}{{ exam_card(e) }}
+      {% else %}
+      <div class="exam-overview-empty"><img src="/static/karo-fox-star.png" alt="" width="80" height="80"><h3>{{ 'Alles erledigt!' if written else 'Deine erste Klassenarbeit' }}</h3><p>{{ 'Aktuell steht keine Prüfung an. Deine geschriebenen Arbeiten findest du unten.' if written else 'Lege eine Prüfung an, sammle die Prüfungsthemen und plane deine Lernzeit.' }}</p><a href="/klassenarbeit/neu">Neue Klassenarbeit anlegen →</a></div>
+      {% endfor %}
+    </div>
+  </section>
+  {% if written %}
+  {% set archive = namespace(open=false) %}
+  {% for e in written %}{% if nachfrage == e.id|string %}{% set archive.open = true %}{% endif %}{% endfor %}
+  <details class="exam-overview-written" {{ 'open' if archive.open or not upcoming }}>
+    <summary>Bereits geschrieben <span>{{ written|length }}</span></summary>
+    <div class="exam-overview-grid">{% for e in written %}{{ exam_card(e, true) }}{% endfor %}</div>
+  </details>
+  {% endif %}
+</div>
 {% endblock %}

@@ -1,0 +1,29 @@
+{% extends "learning_base.html" %}
+{% block title %}Generalprobe · {{ topic.label }}{% endblock %}
+{% block content %}
+<div class="learning-session">
+<a class="back-link" href="/klassenarbeit/{{ exam_id }}/simulation">← Deine Generalprobe</a>
+<p class="eyebrow">PRÜFUNGSVORBEREITUNG · GENERALPROBE</p>
+<h1>{{ topic.label }}</h1>
+{% if attempt.finished_at %}
+<section class="card"><h2>{{ attempt.result|select|list|length }} von {{ attempt.questions|length }} richtig</h2>
+<p>Schau dir in Ruhe an, was schon klappt und was du noch üben möchtest.</p></section>
+{% for q in attempt.questions %}<section class="card"><h2>Aufgabe {{ loop.index }}</h2>
+<p>{{ q.frage }}</p><p>Deine Antwort: {{ attempt.answers[loop.index0|string] }}</p>
+<p>{{ '✓ Richtig' if attempt.result[loop.index0] else 'Noch einmal anschauen' }}</p>
+{% if not attempt.result[loop.index0] %}<p>Richtige Antwort: {{ q.loesung }}</p>{% endif %}</section>{% endfor %}
+<a class="btn" href="/klassenarbeit/{{ exam_id }}/simulation">Zur Übersicht der Generalprobe →</a>
+{% else %}
+<p>Arbeite in deinem Tempo, diesmal ohne Tipps. Deine Ergebnisse siehst du nach der Abgabe.</p>
+<form method="post" action="/klassenarbeit/{{ exam_id }}/simulation/{{ topic.id }}/antworten">
+{{ csrf_input() }}
+{% for q in attempt.questions %}{% set index = loop.index0 %}<section class="card">
+<label for="answer-{{ index }}"><strong>{{ loop.index }}. {{ q.frage }}</strong></label>
+{% if q.optionen %}<select id="answer-{{ index }}" name="answer_{{ index }}" required><option value="">Bitte wählen</option>{% for option in q.optionen %}<option value="{{ option[0] }}" {{ 'selected' if (attempt.answers or {}).get(index|string) == option[0] }}>{{ option[1] }}</option>{% endfor %}</select>
+{% else %}<input id="answer-{{ index }}" name="answer_{{ index }}" value="{{ (attempt.answers or {}).get(index|string, '') }}" maxlength="1000" autocomplete="off" required>{% endif %}
+</section>{% endfor %}
+<button type="submit">Generalprobe abgeben →</button>
+</form>
+{% endif %}
+</div>
+{% endblock %}

@@ -8,9 +8,11 @@
   <script src="/static/themes.js?v={{ asset_version|default('0') }}"></script>
   <link rel="stylesheet" href="/static/karo.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/simple.css?v={{ asset_version|default('0') }}">
-  <link rel="stylesheet" href="/static/areas.css?v={{ asset_version|default('0') }}">
-  {% if learning_ui|default(false) %}<link rel="stylesheet" href="/static/learning.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/learning-exam.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/learning-session.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/exam-detail.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/exam-overview-calendar.css?v={{ asset_version|default('0') }}">{% endif %}
+  <link rel="stylesheet" href="/static/areas.css?v={{ asset_version|default('0') }}-nav-spacing2">
+  <link rel="stylesheet" href="/static/learning-mascot.css?v=2">
+  {% if learning_ui|default(false) %}<link rel="stylesheet" href="/static/learning.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/learning-exam.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/learning-session.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/exam-detail.css?v={{ asset_version|default('0') }}-journeys3"><link rel="stylesheet" href="/static/exam-overview-calendar.css?v={{ asset_version|default('0') }}-2">{% endif %}
   {% if world_page|default(false) %}<link rel="stylesheet" href="/static/meine-welt.css?v={{ asset_version|default('0') }}">{% endif %}
+  {% block page_styles %}{% endblock %}
   <script src="/static/simple.js?v={{ asset_version|default('0') }}" defer></script>
   <script src="/static/drafts.js?v={{ asset_version|default('0') }}" defer></script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📐</text></svg>">
@@ -36,7 +38,7 @@
   }
 </script>
 </head>
-<body{% if learning_ui|default(false) %} class="learning-ui"{% endif %}>
+<body{% if learning_ui|default(false) %} class="learning-ui{% if path.startswith('/klassenarbeit') %} exam-page{% endif %}"{% endif %}>
 {% macro csrf_input() -%}
 <input type="hidden" name="{{ csrf_field }}" value="{{ csrf }}">
 {%- endmacro %}
@@ -68,7 +70,7 @@
     <a href="/setup" {{ 'aria-current=page' if path.startswith('/setup') }}>Einstellungen</a>
     {% else %}
     <a href="/" {{ 'aria-current=page' if path == '/' }}>Heute</a>
-    <a href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/material')) }}>Lernen</a>
+    <a class="learning-entry" href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/material')) }}><img src="/static/karo-owl-book.png" alt="" aria-hidden="true" width="28" height="28"><span>Lernen</span></a>
     <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>
     <a class="welten-entry zweite-gruppe" href="/welten" {{ 'aria-current=page' if path.startswith('/welten') }}><img src="/static/welt-biene.svg" alt="" aria-hidden="true"><span>Meine Welt</span></a>
     <a class="plans-entry" href="/woche" {{ 'aria-current=page' if path.startswith('/woche') }}><img src="/static/karo-fox-wave.png" alt="" aria-hidden="true"><span>Ziele planen</span></a>
@@ -113,7 +115,7 @@
 {% endif %}
 {% if unterpunkte %}
 <nav class="sub-nav" aria-label="{{ 'Lernbereich' if learning_ui|default(false) else ('Meine Welt' if world_page|default(false) else 'Ziele planen') }}">
-  {% for ziel, text in unterpunkte %}{% if text %}<a class="{{ 'pruefung-tab' if ziel == '/klassenarbeit' }}" href="{{ ziel }}" {{ 'aria-current=page' if path == ziel or (ziel not in ('/lernen', '/welten', '/woche') and path == ziel) }}>{% if ziel == '/klassenarbeit' %}<img src="/static/pruefung-symbol.svg" alt="" aria-hidden="true">{% endif %}{{ text }}</a>{% else %}<span class="exam-nav-pair"><a class="kalender-tab" href="{{ ziel }}" title="Prüfungskalender" aria-label="Prüfungskalender" {{ 'aria-current=page' if path.startswith(ziel) }}><img src="/static/pruefungskalender.png" alt="" aria-hidden="true"></a>{% if path.startswith('/klassenarbeit') %}<img class="exam-nav-banner" src="/static/pruefung-duo.jpg" alt="Prüfungen" aria-hidden="true">{% endif %}</span>{% endif %}{% endfor %}
+  {% for ziel, text in unterpunkte %}{% if text %}<a class="{{ 'pruefung-tab' if ziel == '/klassenarbeit' else 'learning-entry' if ziel == '/lernen' else '' }}" href="{{ ziel }}" {{ 'aria-current=page' if path == ziel or (ziel not in ('/lernen', '/welten', '/woche') and path == ziel) }}>{% if ziel == '/klassenarbeit' %}<img src="/static/pruefung-duo.jpg" alt="" aria-hidden="true" width="56" height="28">{% elif ziel == '/lernen' %}<img src="/static/karo-owl-book.png" alt="" aria-hidden="true" width="24" height="24">{% endif %}{{ text }}</a>{% else %}<span class="exam-nav-pair"><a class="kalender-tab" href="{{ ziel }}" title="Prüfungskalender" aria-label="Prüfungskalender" {{ 'aria-current=page' if path.startswith(ziel) }}><img src="/static/pruefungskalender-v2.png" alt="" aria-hidden="true"></a>{% if path.startswith('/klassenarbeit') %}<img class="exam-nav-banner" src="/static/pruefung-duo.jpg" alt="Prüfungen" aria-hidden="true">{% endif %}</span>{% endif %}{% endfor %}
 </nav>
 {% endif %}
 {% endif %}

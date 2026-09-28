@@ -1,0 +1,13 @@
+{# Freigegebene Hilfen bleiben erreichbar, ohne Themen und Prüfungen zu vermischen. #}
+{% if cfg.antworten_pruefen_kind and reviews %}
+<section class="card" aria-label="Antworten prüfen">
+  <h2>Antworten prüfen</h2>
+  {% for review in reviews %}<p><a href="/quiz/{{ review.id }}">{{ review.thema_label }} – Jetzt prüfen →</a></p>{% endfor %}
+</section>
+{% endif %}
+{% if cfg.schulblaetter_kind %}
+<section class="card">
+  <h2>Schulblätter</h2>
+  <a href="/wissen">Deine Schulblätter ansehen oder ein Blatt hinzufügen →</a>
+</section>
+{% endif %}

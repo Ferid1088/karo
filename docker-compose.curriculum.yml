@@ -1,0 +1,12 @@
+# Ergänzung: docker compose -f docker-compose.yml -f docker-compose.curriculum.yml up -d
+services:
+  karo:
+    environment:
+      KARO_CURRICULUM_URL: http://curriculum-api:8088
+      KARO_CURRICULUM_KEY: ${KARO_CURRICULUM_KEY:?Curriculum-Schlüssel in .env setzen}
+    networks: [default, karo-net]
+
+networks:
+  karo-net:
+    external: true
+    name: karo-net

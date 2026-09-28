@@ -1,0 +1,12 @@
+{% extends "learning_base.html" %}
+{% block content %}
+<div class="learning-session">
+<a class="back-link" href="{{ learning_back }}">← {{ learning_area }}</a>
+<section class="card">
+  <h1>{{ 'Der Lernweg ist noch ausgeschaltet' if disabled else 'Diese Lernreihe ist noch nicht bereit' }}</h1>
+  <p>{% if disabled %}Bitte deine Eltern, den adaptiven Lernweg in den Einstellungen freizuschalten.{% else %}Für „{{ thema }}“ fehlt noch eine geprüfte Lernreihe. Bitte deine Eltern, die Erstellung fehlender Lernreihen freizuschalten.{% endif %}</p>
+  <p>Dein Thema und dein Plan bleiben gespeichert.</p>
+  <a class="btn" href="{{ learning_back }}">Zurück zu {{ learning_area }}</a>
+</section>
+</div>
+{% endblock %}

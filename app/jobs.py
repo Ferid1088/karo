@@ -30,6 +30,32 @@ _stop = threading.Event()
 _thread: threading.Thread | None = None
 
 
+class Deferred(Exception):
+    """Externer Auftrag läuft noch: dauerhaft parken, keinen Versuch verbrauchen."""
+
+    def __init__(self, payload: dict, seconds: int = 15):
+        self.payload = payload
+        self.seconds = max(5, min(int(seconds), 300))
+
+
+class PermanentFailure(Exception):
+    """Erneutes automatisches Probieren würde denselben gesperrten Auftrag wiederholen."""
+
+
+def _defer(job_id: int, deferred: Deferred) -> None:
+    with db.tx() as c:
+        c.execute("UPDATE job SET state='wartend', payload=?, not_before=?, "
+                  "attempts=MAX(0, attempts-1), last_error=NULL WHERE id=?",
+                  (json.dumps(deferred.payload, ensure_ascii=False),
+                   _in(deferred.seconds), job_id))
+
+
+def _fail_permanently(job_id: int, error: str) -> None:
+    with db.tx() as c:
+        c.execute("UPDATE job SET state='fehler', last_error=?, finished_at=?, "
+                  "not_before=NULL WHERE id=?", (error[:500], db.now(), job_id))
+
+
 def handler(job_type: str):
     def deco(fn):
         HANDLERS[job_type] = fn
@@ -128,6 +154,10 @@ def run_once() -> bool:
 
     try:
         fn(payload)
+    except Deferred as deferred:
+        _defer(job["id"], deferred)
+    except PermanentFailure as exc:
+        _fail_permanently(job["id"], str(exc))
     except Exception as exc:
         log.warning("Job %s (%s) fehlgeschlagen: %s", job["id"], job["type"], exc)
         log.debug("%s", traceback.format_exc())
@@ -195,6 +225,7 @@ def run_now(job_id: int) -> tuple[str, object]:
     Gibt (status, ergebnis) zurueck. status ist:
       'done'    — erfolgreich verarbeitet; `ergebnis` ist der Rueckgabewert
                   des Handlers.
+      'pending' — externer Auftrag läuft; nächster Abruf ist dauerhaft geplant.
       'failed'  — der Handler hat eine Ausnahme geworfen (oder Payload/Typ
                   waren ungueltig); der Job wurde wie ueblich fuer eine
                   spaetere Wiederholung vorgemerkt. `ergebnis` ist None.
@@ -226,6 +257,12 @@ def run_now(job_id: int) -> tuple[str, object]:
 
     try:
         ergebnis = fn(payload)
+    except Deferred as deferred:
+        _defer(job_id, deferred)
+        return ("pending", None)
+    except PermanentFailure as exc:
+        _fail_permanently(job_id, str(exc))
+        return ("failed", None)
     except Exception as exc:
         log.warning("Job %s (%s) fehlgeschlagen: %s", job_id, job["type"], exc)
         log.debug("%s", traceback.format_exc())

@@ -1,4 +1,4 @@
-"""Materialzeile, getrennte Einheiten, Archivumzug und echte Lernkontrolle."""
+"""Historische Prüfungsmaterialien bleiben lesbar; neue Runden bleiben getrennt."""
 import json
 from pathlib import Path
 
@@ -23,31 +23,31 @@ def plan_anlegen(app_env, topic_id):
     return exam_id, exam_plan.holen_plan(exam_id)["tagesplan_liste"]
 
 
-def erstellen(client, exam_id, tag, **extra):
-    return client.post(f"/klassenarbeit/{exam_id}/lerntag", headers={"accept": "application/json"},
-                       data={"_csrf": csrf_from(client.get("/klassenarbeit").text),
-                             "row_key": tag["row_key"], "ausgabe": "html", **extra})
+def historisches_material(exam_id, tag, ausgabe='html'):
+    """Den früheren Datenbestand nachbilden, nicht den stillgelegten HTTP-Weg öffnen."""
+    from app import exam_learning
+    return exam_learning.status(exam_learning.starten(exam_id, tag['row_key'], ausgabe))
 
 
 def test_material_in_zeile_archiviert_und_in_eigenem_tab(client, fake_llm, fake_cli, app_env, alter_generator):
     from app import materials, exam_plan
     topic_id = _bis_rot(client, fake_llm, app_env)
     exam_id, tage = plan_anlegen(app_env, topic_id)
-    r = erstellen(client, exam_id, tage[0])
-    assert r.status_code == 200
-    m = r.json()
+    m = historisches_material(exam_id, tage[0])
     assert m["state"] == "offen"
-    assert erstellen(client, exam_id, tage[0]).json()["id"] == m["id"]
+    assert historisches_material(exam_id, tage[0])["id"] == m["id"]
     waiting = client.get(m["url"])
-    assert "DOMContentLoaded" in waiting.text
+    assert 'Material ist nicht verfügbar' in waiting.text
+    assert f'href="/klassenarbeit/{exam_id}"' in waiting.text
     run_jobs(app_env, fake_llm)
     m = client.get(m["url"] + "/status").json()
     assert m["state"] == "bereit"
     page = client.get(m["url"])
     assert '<iframe' in page.text
-    assert 'Verständnis prüfen' in page.text
-    plan = client.get("/klassenarbeit")
-    assert f'href="{m["url"]}" target="_blank" rel="noopener"' in plan.text
+    assert 'Verständnis prüfen' not in page.text
+    assert 'früheren Prüfungsvorbereitung' in page.text
+    plan = client.get(f"/klassenarbeit/{exam_id}")
+    assert f'href="{m["url"]}"' in plan.text
     assert exam_plan.holen_plan(exam_id)["tagesplan_liste"][0]["materialien"][0]["id"] == m["id"]
     archive = materials.holen("runde", m["round_id"])
     assert "Brüche" in archive["titel"]
@@ -56,7 +56,7 @@ def test_material_in_zeile_archiviert_und_in_eigenem_tab(client, fake_llm, fake_
     assert archive["inhalt"]
     path = app_env.db.q1("SELECT material_pfad FROM lesson_round WHERE id=?", m["round_id"])["material_pfad"]
     Path(path).unlink()
-    restored = client.get(f'/material/{m["round_id"]}')
+    restored = client.get(m['url'] + '/inhalt')
     assert restored.status_code == 200
     assert restored.content == archive["inhalt"]
 
@@ -66,22 +66,29 @@ def test_zeilen_und_neues_material_bleiben_getrennt(client, fake_llm, fake_cli, 
     topic_id = _bis_rot(client, fake_llm, app_env)
     existing = teaching.starten(topic_id, "html", "Eine andere Lernrunde")
     exam_id, tage = plan_anlegen(app_env, topic_id)
-    first = erstellen(client, exam_id, tage[0]).json()
-    second = erstellen(client, exam_id, tage[1]).json()
+    first = historisches_material(exam_id, tage[0])
+    second = historisches_material(exam_id, tage[1])
     assert len({existing, first["lesson_id"], second["lesson_id"]}) == 3
     run_jobs(app_env, fake_llm)
-    third = erstellen(client, exam_id, tage[0]).json()
+    third = historisches_material(exam_id, tage[0])
     assert third["id"] != first["id"]
     assert app_env.db.q1("SELECT prompt_wunsch FROM lesson WHERE id=?", second["lesson_id"])[0] == tage[1]["inhalt"]
     paths = app_env.db.q("SELECT material_pfad FROM lesson_round WHERE material_pfad IS NOT NULL")
     assert len({r[0] for r in paths}) == 2
 
 
-def test_ungueltige_zeile_und_ausgabe_erzeugen_keine_einheit(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_alte_lerntag_route_erzeugt_auch_mit_legacy_schalter_keine_einheit(client, fake_llm, fake_cli, app_env, alter_generator):
     topic_id = _bis_rot(client, fake_llm, app_env)
     exam_id, tage = plan_anlegen(app_env, topic_id)
-    assert erstellen(client, exam_id, {"row_key": "fremde-zeile"}).status_code == 400
-    assert erstellen(client, exam_id, tage[0], ausgabe="ungueltig").status_code == 400
+    before = len(app_env.db.q('SELECT id FROM job'))
+    for row_key, ausgabe in [('fremde-zeile', 'html'), (tage[0]['row_key'], 'ungueltig'),
+                             (tage[0]['row_key'], 'html')]:
+        response = client.post(f'/klassenarbeit/{exam_id}/lerntag', data={
+            '_csrf': csrf_from(client.get('/klassenarbeit').text),
+            'row_key': row_key, 'ausgabe': ausgabe}, follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers['location'] == f'/klassenarbeit/{exam_id}#exam-next-step'
+    assert len(app_env.db.q('SELECT id FROM job')) == before
     assert not app_env.db.q("SELECT * FROM exam_material")
 
 
@@ -91,10 +98,12 @@ def test_fehlende_quellen_zeigen_einen_handlungsweg(client, fake_llm, fake_cli, 
     exam_id, tage = plan_anlegen(app_env, topic_id)
     monkeypatch.setattr(kb, "lehrmaterial", lambda *a, **kw: [])
     monkeypatch.setattr(research, "material_fuer", lambda *a, **kw: [])
-    m = erstellen(client, exam_id, tage[0]).json()
+    m = historisches_material(exam_id, tage[0])
     assert m["state"] == "wartet"
-    assert "Quellen ergänzen und Erstellung starten" in client.get(m["url"]).text
-    assert erstellen(client, exam_id, tage[0]).json()["id"] == m["id"]
+    page = client.get(m['url']).text
+    assert 'Material ist nicht verfügbar' in page
+    assert f'href="/klassenarbeit/{exam_id}"' in page
+    assert historisches_material(exam_id, tage[0])["id"] == m["id"]
 
 
 def test_video_aus_archiv_unterstuetzt_spulen(client, fake_llm, fake_cli, app_env, tmp_path, monkeypatch, alter_generator):
@@ -104,13 +113,13 @@ def test_video_aus_archiv_unterstuetzt_spulen(client, fake_llm, fake_cli, app_en
     video = tmp_path / 'test.mp4'
     video.write_bytes(b'0123456789' * 100)
     monkeypatch.setattr(teaching, '_render_material', lambda *a, **kw: (str(video), '', None))
-    m = erstellen(client, exam_id, tage[0], ausgabe='notebooklm').json()
+    m = historisches_material(exam_id, tage[0], ausgabe='notebooklm')
     run_jobs(app_env, fake_llm)
     m = client.get(m['url'] + '/status').json()
     assert m['mime'] == 'video/mp4'
     assert '<video' in client.get(m['url']).text
     video.unlink()
-    response = client.get(f'/material/{m["round_id"]}', headers={'Range': 'bytes=10-19'})
+    response = client.get(m['url'] + '/inhalt', headers={'Range': 'bytes=10-19'})
     assert response.status_code == 206
     assert response.content == b'0123456789'
     assert 'inline' in response.headers['content-disposition']
@@ -121,7 +130,7 @@ def test_materialdatenbank_umziehen_und_vorhandenes_ziel_schuetzen(client, fake_
     from app import materials
     topic_id = _bis_rot(client, fake_llm, app_env)
     exam_id, tage = plan_anlegen(app_env, topic_id)
-    m = erstellen(client, exam_id, tage[0]).json()
+    m = historisches_material(exam_id, tage[0])
     run_jobs(app_env, fake_llm)
     m = client.get(m["url"] + "/status").json()
     vorher = materials.holen("runde", m["round_id"])
@@ -145,32 +154,35 @@ def test_materialdatenbank_umziehen_und_vorhandenes_ziel_schuetzen(client, fake_
     assert materials.pfad() == ziel
 
 
-def test_lernkontrolle_misst_bestaetigte_antworten_und_kehrt_zum_material_zurueck(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_historische_lernkontrolle_bleibt_lesbar_ohne_neues_persoenliches_quiz(client, fake_llm, fake_cli, app_env, alter_generator):
     from app import exam_learning
     topic_id = _bis_rot(client, fake_llm, app_env)
     exam_id, tage = plan_anlegen(app_env, topic_id)
-    m = erstellen(client, exam_id, tage[0]).json()
+    m = historisches_material(exam_id, tage[0])
     vorher = m["vorher"]
     assert vorher and vorher["gesamt"] > 0
     run_jobs(app_env, fake_llm)
-    page = client.get(m["url"])
-    r = client.post(m["url"] + "/fragen", data={"_csrf": csrf_from(page.text)}, follow_redirects=False)
-    quiz_id = int(r.headers["location"].rsplit("/", 1)[-1])
-    assert client.post(m["url"] + "/fragen", data={"_csrf": csrf_from(page.text)}, follow_redirects=False).headers["location"] == f"/quiz/{quiz_id}"
+    token = csrf_from(client.get(f'/klassenarbeit/{exam_id}').text)
+    r = client.post(m["url"] + "/fragen", data={"_csrf": token}, follow_redirects=False)
+    assert r.headers['location'] == f'/klassenarbeit/{exam_id}#exam-next-step'
+    assert exam_learning.status(m['id'])['quiz'] is None
+    # Eine bereits vorhandene alte Lernkontrolle als Datenbestand nachbilden.
+    quiz_id = exam_learning.fragen_anfordern(m['id'])
     run_jobs(app_env, fake_llm)
     assert exam_learning.auswertung(exam_learning.status(m["id"]))["nachher"] is None
     questions = app_env.db.q("SELECT * FROM question WHERE quiz_id=?", quiz_id)
-    data = {"_csrf": csrf_from(page.text), "frage_id": [str(q["id"]) for q in questions]}
-    data.update({f'urteil_{q["id"]}': 'ja' for q in questions})
-    result = client.post(f"/quiz/{quiz_id}/freigabe", data=data, follow_redirects=False)
-    assert result.headers["location"] == m["url"]
+    from app import quizzes
+    quizzes.freigeben(quiz_id, [{'frage_id': q['id'], 'richtig': True} for q in questions])
     m = exam_learning.status(m["id"])
     assert m["vorher"] == vorher  # Der Ausgangswert wird nicht nachträglich verändert.
     evaluation = exam_learning.auswertung(m)
     assert evaluation["nachher"]["richtig"] == len(questions)
     assert evaluation["differenz"] > 0
-    assert "Lernzuwachs" in client.get(m["url"]).text
-    assert "Lernzuwachs" in client.get("/klassenarbeit").text
+    before = len(app_env.db.q('SELECT id FROM quiz'))
+    response = client.post(m['url'] + '/fragen', data={'_csrf': token}, follow_redirects=False)
+    assert response.headers['location'] == f'/klassenarbeit/{exam_id}#exam-next-step'
+    assert len(app_env.db.q('SELECT id FROM quiz')) == before
+    assert 'href="/quiz/' not in client.get(m['url']).text
 
 
 @pytest.mark.parametrize('before,after,expected', [

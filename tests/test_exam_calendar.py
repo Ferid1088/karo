@@ -8,6 +8,7 @@ from .test_app import einrichten, kind_modus_aktivieren
 
 def _exam_with_topic(app_env):
     from app import topics
+    app_env.config.update(learner_grade=6)
     app_env.db.init()
     topic_id = topics.anlegen("Brüche addieren")
     topic = topics.get(topic_id)
@@ -24,7 +25,11 @@ def _exam_with_topic(app_env):
                  "minuten": 20, "topic_code": topic["code"]},
             ]), app_env.db.now()),
         )
-    return exam_id, topic_id
+    from app.services import learning_hub
+    learning_hub.link_exam(exam_id, [topic['label']], 'Mathematik')
+    owned = learning_hub.exam_topics(exam_id)
+    assert owned[0]['id'] != topic_id
+    return exam_id, owned[0]['id']
 
 
 def test_exam_calendar_saves_different_minutes_for_each_day(app_env, monkeypatch):
@@ -107,10 +112,11 @@ def test_child_can_save_calendar_and_today_starts_adaptive_topic(
     assert exam_calendar.get_days(exam_id)["2026-09-30"] == 29
 
     today = client.get("/")
-    assert "HEUTE · KLASSENARBEIT" in today.text
+    assert "Klassenarbeit" in today.text
     assert "Brüche addieren" in today.text
     assert "23 Minuten" in today.text
-    assert 'action="/lernen/adaptiv/start"' in today.text
+    assert f'action="/klassenarbeit/{exam_id}/lernen/start"' in today.text
+    assert 'action="/lernen/adaptiv/start"' not in today.text
     assert f'name="topic_id" value="{topic_id}"' in today.text
 
 
@@ -157,7 +163,7 @@ def test_simulation_questions_are_gated_until_simulation_day(
     monkeypatch.setattr("app.db.today", lambda: "2026-10-01")
     page = client.get(f"/klassenarbeit/{exam_id}/simulation")
     assert page.status_code == 200
-    assert "Wiederholung + Prüfungssimulation" in page.text
+    assert "Deine Generalprobe" in page.text
     assert "Brüche addieren" in page.text
 
     response = client.post(
@@ -166,7 +172,9 @@ def test_simulation_questions_are_gated_until_simulation_day(
         follow_redirects=False,
     )
     assert response.status_code == 303
-    assert response.headers["location"].startswith("/quiz/")
+    assert response.headers["location"] == f"/klassenarbeit/{exam_id}/simulation/{topic_id}"
+    assert client.get(response.headers['location']).status_code == 200
+    assert not app_env.db.q('SELECT id FROM quiz')
 
 
 def test_exam_plan_stays_on_topic_until_adaptive_mastery(app_env, monkeypatch):
@@ -197,6 +205,11 @@ def test_exam_plan_stays_on_topic_until_adaptive_mastery(app_env, monkeypatch):
             ]), app_env.db.now()),
         )
 
+    from app.services import learning_hub
+    learning_hub.link_exam(exam_id, [first['label'], second['label']], 'Mathematik')
+    owned = learning_hub.exam_topics(exam_id)
+    assert not {first_id, second_id} & {t['id'] for t in owned}
+    first_id, second_id = [t['id'] for t in owned]
     monkeypatch.setattr("app.db.today", lambda: "2026-09-27")
     exam_calendar.save_days(exam_id, {
         "2026-09-28": 20,
@@ -258,11 +271,11 @@ def test_child_exam_page_hides_legacy_plan_and_shows_guided_flow(
     })
 
     kind_modus_aktivieren(client)
-    page = client.get("/klassenarbeit")
+    page = client.get(f"/klassenarbeit/{exam_id}")
     assert page.status_code == 200
-    assert "SO BEGLEITET DICH KARO" in page.text
-    assert "1 · Prüfen" in page.text
-    assert "3 · Begleiten" in page.text
-    assert "4 · Sicher werden" in page.text
-    assert "Prüfen &amp; lernen" in page.text
+    assert "SO LERNST DU HIER" in page.text
+    for step in ('Prüfen', 'Verstehen', 'Üben', 'Sicher werden'):
+        assert f'<strong>{step}</strong>' in page.text
+    assert f'action="/klassenarbeit/{exam_id}/lernen/start"' in page.text
+    assert 'action="/lernen/adaptiv/start"' not in page.text
     assert "<th>Tag</th><th>Thema und Lernreihe</th>" not in page.text

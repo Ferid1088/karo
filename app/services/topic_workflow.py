@@ -16,6 +16,7 @@ def canonical_topic_id(topic_id: int) -> int:
 def pending_quiz(topic_id: int):
     row = db.q1('''SELECT q.* FROM quiz q WHERE q.topic_id=?
         AND q.state!='freigegeben' AND q.finished_at IS NULL AND q.superseded_by IS NULL
+        AND NOT EXISTS (SELECT 1 FROM exam_material em WHERE em.lesson_id=q.lesson_id)
         AND (q.lesson_id IS NULL OR EXISTS (SELECT 1 FROM lesson l WHERE l.id=q.lesson_id
              AND l.state NOT IN ('gelernt','abgebrochen')))
         ORDER BY CASE q.state WHEN 'ausgewertet' THEN 0 WHEN 'beantwortet' THEN 1

@@ -461,7 +461,7 @@
 
 /* Heute, Lernen und Erfolge gehoeren zusammen; Meine Welt und Ziele planen
    sind eigene Welten und stehen nach einem Abstand, beide mit Bild. */
-[data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: 2.4rem; }
+[data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: 4.4rem; }
 [data-ui-area="child"] .simple-nav a.welten-entry {
   gap: .45rem; padding-block: .35rem; padding-left: .5rem;
   color: #4a2f9c; border: 1px solid #d5c9f7; background: #f3efff;

@@ -40,7 +40,8 @@ TIMEOUT_SEKUNDEN = 900
 _ALS_AUSWAHL = {"vorhersage", "transfer"}
 
 
-def _aufgabe_schreiben(fehlertyp_id: int, rolle: str, aufgabe: dict) -> None:
+def _aufgabe_schreiben(fehlertyp_id: int, rolle: str, aufgabe: dict,
+                      quelle: str = QUELLE) -> None:
     inhalt_store.aufgabe_sichern(
         fehlertyp_id, rolle, aufgabe["frage"], aufgabe["loesung"],
         tipps=aufgabe.get("tipps"), schritte=aufgabe.get("schritte"),
@@ -49,10 +50,10 @@ def _aufgabe_schreiben(fehlertyp_id: int, rolle: str, aufgabe: dict) -> None:
                      else inhalt_store.BRUCH),
         optionen=aufgabe.get("optionen"),
         aufloesung=aufgabe.get("aufloesung"),
-        quelle=QUELLE, geprueft=False)
+        quelle=quelle, geprueft=False)
 
 
-def speichern(rohdaten: dict, fach: str = "mathematik") -> int:
+def speichern(rohdaten: dict, fach: str = "mathematik", *, quelle: str = QUELLE) -> int:
     """Prüft den Vorschlag und schreibt ihn in den Katalog. Gibt die
     Konzept-Id zurück.
 
@@ -61,21 +62,29 @@ def speichern(rohdaten: dict, fach: str = "mathematik") -> int:
     """
     lektion = schemas.pruefe_lektion(rohdaten)
     konzept = lektion["konzept"]
+    existing = store.konzept_nach_key(fach, konzept['thema_key'], konzept['konzept_key'])
+    concept_key = konzept['konzept_key']
+    if existing and (existing['quelle'] != quelle or
+            (existing['klasse_von'], existing['klasse_bis']) !=
+            (konzept['klasse_von'], konzept['klasse_bis'])):
+        # A generated grade-specific variant must not overwrite curated
+        # content or leave its old grade limits in place and become unfindable.
+        concept_key += f"-erzeugt-{konzept['klasse_von']}-{konzept['klasse_bis']}"
 
     konzept_id = store.konzept_sichern(
-        fach, konzept["thema_key"], konzept["konzept_key"], konzept["label"],
+        fach, konzept["thema_key"], concept_key, konzept["label"],
         konzept["klasse_von"], konzept["klasse_bis"],
-        stichworte=konzept["stichworte"], quelle=QUELLE, geprueft=False)
+        stichworte=konzept["stichworte"], quelle=quelle, geprueft=False)
 
     fehlertyp_ids = []
     for fehler in lektion["fehlertypen"]:
         fehlertyp_id = store.fehlertyp_sichern(
             konzept_id, fehler["key"], fehler["label"],
-            fehler["beschreibung"], quelle=QUELLE, geprueft=False)
+            fehler["beschreibung"], quelle=quelle, geprueft=False)
         fehlertyp_ids.append(fehlertyp_id)
 
         for antwort in fehler["antworten"]:
-            store.alias_sichern(fehlertyp_id, normalisiere(antwort), QUELLE)
+            store.alias_sichern(fehlertyp_id, normalisiere(antwort), quelle)
 
         if not store.beste_erklaerung(fehlertyp_id, konzept["klasse_bis"]):
             store.erklaerung_anlegen(
@@ -83,10 +92,10 @@ def speichern(rohdaten: dict, fach: str = "mathematik") -> int:
                 visualisierung=fehler["visualisierung"],
                 visualisierung_alternativ=fehler.get(
                     "visualisierung_alternativ"),
-                quelle=QUELLE, geprueft=False)
+                quelle=quelle, geprueft=False)
 
         for rolle, aufgabe in fehler["aufgaben"].items():
-            _aufgabe_schreiben(fehlertyp_id, rolle, aufgabe)
+            _aufgabe_schreiben(fehlertyp_id, rolle, aufgabe, quelle)
 
     for phase, hilfe in lektion["hilfe"].items():
         inhalt_store.hilfe_sichern(
@@ -101,7 +110,7 @@ def speichern(rohdaten: dict, fach: str = "mathematik") -> int:
     if erstkontakt and not store.erstkontakt(konzept_id):
         store.erstkontakt_anlegen(
             konzept_id, erstkontakt["anker"], erstkontakt["erste_aufgabe"],
-            erstkontakt["benennung"], quelle=QUELLE, geprueft=False)
+            erstkontakt["benennung"], quelle=quelle, geprueft=False)
 
     _freigeben(konzept_id, fehlertyp_ids)
     return konzept_id
@@ -130,8 +139,16 @@ def auftrag_schluessel(thema: str, fach: str | None = None, klasse: int | None =
 
 def anfordern(thema: str, fach: str | None = None, klasse: int | None = None) -> int | None:
     """Reiht die Erzeugung ein. Gibt None zurück, wenn schon eine läuft."""
-    from .. import jobs
-    return jobs.enqueue("lektion_erzeugen", {"thema": thema, 'fach': fach, 'klasse': klasse},
+    import time
+    from .. import config, jobs
+    from . import curriculum_dienst
+    cfg = config.load()
+    payload = {"thema": thema, 'fach': fach, 'klasse': klasse}
+    if curriculum_dienst.configured(cfg):
+        payload.update(curriculum_service=curriculum_dienst.settings(cfg)[0],
+                       curriculum_started=time.time(),
+                       fach=fach or cfg.subject, klasse=klasse or cfg.learner_grade)
+    return jobs.enqueue("lektion_erzeugen", payload,
                         dedup_key=auftrag_schluessel(thema, fach, klasse))
 
 
@@ -169,6 +186,9 @@ def _handler_anmelden():
         existing = lektionen.fuer_thema(thema, fach, klasse)
         if existing:
             return {'konzept_id': existing['konzept_id'], 'thema': thema}
+        from . import curriculum_dienst
+        if curriculum_dienst.configured(cfg) or "curriculum_service" in payload:
+            return curriculum_dienst.prepare(cfg, payload, thema, fach, klasse)
         # §5: Modell A schreibt Didaktik und ist das starke Modell. Ohne
         # ausdrückliche Wahl nähme `complete()` das kleine Textmodell —
         # das schrieb Komponentenparameter, die die Prüfung verwarf.
@@ -182,7 +202,13 @@ def _handler_anmelden():
             schema=prompts.LEKTION_SCHEMA,
             system=prompts.SYSTEM,
         )
-        konzept_id = speichern(ergebnis.data, fach=fach)
+        checked = schemas.pruefe_lektion(ergebnis.data)
+        if not checked['konzept']['klasse_von'] <= klasse <= checked['konzept']['klasse_bis']:
+            raise schemas.InhaltUngueltig('Die Lernreihe passt nicht zur angefragten Klassenstufe.')
+        from .normalisierung import normalisiere_thema
+        if not lektionen._trifft(normalisiere_thema(thema), checked['konzept']):
+            raise schemas.InhaltUngueltig('Die Lernreihe passt nicht zum angefragten Thema.')
+        konzept_id = speichern(checked, fach=fach)
         return {"konzept_id": konzept_id, "thema": thema}
 
     return job_lektion_erzeugen

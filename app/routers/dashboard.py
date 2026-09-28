@@ -24,7 +24,7 @@ def dashboard(request: Request):
         'child', themen, schritte, reviews,
         antworten_pruefen_kind=config.load().antworten_pruefen_kind)
     naechstes = workflow.next_action_display(aktion)
-    return render(request, 'dashboard.html', naechstes=naechstes, reviews=reviews,
+    return render(request, 'dashboard.html', naechstes=naechstes, next_action_kind=aktion.kind, reviews=reviews,
                   hat_erfolge=bool(db.q1("SELECT id FROM topic WHERE state='aktiv' AND learned_at IS NOT NULL LIMIT 1")),
                   themen=themen, kb_stat=kb.statistik(), exam=exam.get_next_exam(),
                   exam_today=exam_calendar.today_task() if config.load().klassenarbeit_kind else None,
@@ -43,12 +43,24 @@ def neues_thema(request: Request):
 def thema_anlegen(request: Request, thema: str = Form(''), fach: str = Form(''), klasse: int = Form(6)):
     from ..services import learning_hub
     try:
-        learning_hub.create_topic(thema, fach, klasse)
+        topic_id = learning_hub.create_topic(thema, fach, klasse)
     except ValueError as exc:
         flash(request, str(exc), 'warn')
         return zurueck('/lernen/neu')
     flash(request, 'Dein Thema ist da. Los geht’s, wenn du bereit bist.')
-    return zurueck('/lernen')
+    return zurueck(f'/lernen/thema/{topic_id}')
+
+
+@router.get('/lernen/thema/{topic_id}', response_class=HTMLResponse)
+def thema_einstieg(request: Request, topic_id: int):
+    from fastapi import HTTPException
+    from ..services import learning_hub
+    from ..adaptiv import lektionen
+    topic = learning_hub.topic_in_scope(topic_id)
+    if topic is None:
+        raise HTTPException(404, "Dieses Thema gehört nicht zu deinen Lernthemen.")
+    ready = lektionen.fuer_thema(topic['label'], topic['subject'], topic.get('grade'))
+    return render(request, 'learning_topic_intro.html', topic=topic, ready=bool(ready))
 
 
 @router.post('/lernen/{topic_id}/loeschen')
@@ -146,6 +158,9 @@ async def material_hochladen(request: Request, datei: UploadFile, fach: str = Fo
 
 @router.get('/lernen/material/status')
 def material_status(scan_id: int):
+    if not db.q1('SELECT 1 FROM learning_upload WHERE scan_id=?', scan_id):
+        from fastapi import HTTPException
+        raise HTTPException(404, 'Dieses Blatt gehört nicht zu deinen Lernthemen.')
     return {'signatur': exam.get_exam_topic_scan_status(scan_id)}
 
 

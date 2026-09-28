@@ -43,7 +43,7 @@ def test_new_navigation_and_empty_pages(client, fake_llm, fake_cli):
                   else ("Heute", "Lernen", "Erfolge", "Für Eltern"))
         for label in labels:
             assert label in response.text
-    assert "Erstes Blatt hinzufügen" in client.get("/").text
+    assert "Ein Thema entdecken" in client.get("/").text
     client.cookies.clear()
     assert client.get("/eltern", follow_redirects=False).status_code == 303
 
@@ -157,12 +157,12 @@ def test_source_buttons_and_exam_fields_match_endpoints(client, fake_llm, fake_c
     action = next(key for key in form["fields"] if key.startswith("hit_"))
     client.post(form["action"], data={"_csrf": form["fields"]["_csrf"], action: "freigegeben"})
     assert research.freigegebene(topic_id)
-    # Exam creation still requires the reviewed topics from an uploaded scan.
+    # The separate creation page accepts the reviewed topics from a scan.
     import json
     with app_env.db.tx() as c:
         scan_id = c.execute("INSERT INTO exam_scan(document_id, state, themen, created_at) VALUES (?, 'gelesen', ?, ?)",
                             (app_env.db.q1('SELECT id FROM document')[0], json.dumps(['Brüche']), app_env.db.now())).lastrowid
-    page = client.get('/klassenarbeit')
+    page = client.get('/klassenarbeit/neu')
     form = next(f for f in Forms(page.text).forms if f['action'] == '/klassenarbeit')
     response = client.post(form['action'], data={**form['fields'], 'exam_date': '2099-01-01', 'scan_id': str(scan_id)})
     assert response.status_code == 200
@@ -174,13 +174,17 @@ def test_child_navigation_includes_week_and_parent_features_remain(client, fake_
     einrichten(client, fake_llm)
     page = client.get('/')
     nav = re.search(r'<nav class="simple-nav".*?</nav>', page.text, re.S).group()
-    assert re.findall(r'href="([^"]+)"', nav) == ['/', '/lernen', '/woche', '/welten', '/lernstand']
+    assert re.findall(r'href="([^"]+)"', nav) == ['/', '/lernen', '/lernstand', '/welten', '/woche']
     assert 'verbindung-popup-slot' not in page.text
     parent = client.get('/eltern').text
     for path in ('/wissen', '/themen', '/klassenarbeit', '/messung/fortschritt#ausfuehrlich', '/recherche', '/setup', '/protokoll', '/hilfe'):
         assert f'href="{path}"' in parent
     for path in ('/', '/lernen', '/lernstand', '/klassenarbeit', '/themen', '/wissen', '/recherche', '/hilfe'):
-        assert 'class="tab-btn"' not in client.get(path).text
+        page = client.get(path)
+        assert page.status_code == 200
+        # Die Hauptnavigation bleibt stabil; lokale Archiv-Tabs sind erlaubt.
+        main_nav = re.search(r'<nav class="simple-nav".*?</nav>', page.text, re.S).group()
+        assert 'class="tab-btn"' not in main_nav
 
 
 def test_topic_start_immediately_builds_existing_material(client, fake_llm, fake_cli, app_env, alter_generator):

@@ -1,0 +1,28 @@
+/* Eule = Lernen; Fuchs und Biene behalten ihre eigenen Bereiche. */
+.simple-nav a.learning-entry,
+.sub-nav a.learning-entry { gap: .4rem; }
+.simple-nav a.learning-entry img {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  object-fit: contain;
+  margin-block: -4px;
+}
+.sub-nav a.learning-entry img {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  object-fit: contain;
+  margin-block: -3px;
+}
+.sub-nav a.pruefung-tab img {
+  width: 56px;
+  height: 28px;
+  flex: 0 0 56px;
+  object-fit: contain;
+  border-radius: 4px;
+  margin-block: -4px;
+}
+@media (max-width: 600px) {
+  .simple-nav a.learning-entry img { width: 24px; height: 24px; flex-basis: 24px; }
+}

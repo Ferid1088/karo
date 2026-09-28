@@ -626,7 +626,10 @@ def test_messung_zeigt_dieselben_inhalte_wie_die_alten_seiten(
 
 def test_heute_zeigt_keinen_naechsten_schritt_ohne_themen(client, fake_llm, fake_cli):
     einrichten(client, fake_llm)
-    assert "DEIN NÄCHSTER SCHRITT" not in client.get("/").text
+    page = client.get('/').text
+    assert 'Worauf bist du neugierig?' in page
+    assert 'href="/lernen/neu"' in page
+    assert 'name="topic_id"' not in page
 
 
 def test_heute_schlaegt_ein_bestaetigtes_thema_zum_start_vor(
@@ -636,7 +639,7 @@ def test_heute_schlaegt_ein_bestaetigtes_thema_zum_start_vor(
     topic_id = themen_freigeben(client, app_env)[0]
     r = client.get("/")
     assert "DEIN NÄCHSTER SCHRITT" in r.text
-    assert f'href="/lernzyklus/{topic_id}"' in r.text
+    assert f'action="/lernzyklus/{topic_id}/quiz/starten"' in r.text
     assert "Los geht" in r.text
 
 

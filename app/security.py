@@ -110,6 +110,8 @@ def eigene_seite(referer: str | None, host: str) -> str | None:
 REDACTED = "***redigiert***"
 
 _PATTERNS = [
+    # Karo Curriculum client keys (also redact bare values, not only headers).
+    re.compile(r"\bkc_[A-Za-z0-9_\-]{16,}"),
     # Anthropic
     re.compile(r"sk-ant-[A-Za-z0-9_\-]{8,}"),
     # OpenAI-artige und generische lange Schluessel

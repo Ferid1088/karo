@@ -223,7 +223,7 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
     assert month_page.text.index("month-motivation") < month_page.text.index("month-progress")
 
     goals_page = client.get("/woche/ziele")
-    assert 'href="/" title="Zurück zu Karo"' in goals_page.text
+    assert 'href="/" aria-label="Karo – Startseite"' in goals_page.text
     assert 'data-plans-clock' in goals_page.text
     assert 'data-clock-date>22.09.2026<' in goals_page.text
     assert 'data-clock-time>--:-- Uhr<' in goals_page.text

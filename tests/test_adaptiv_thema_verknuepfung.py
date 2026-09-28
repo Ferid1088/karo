@@ -27,7 +27,7 @@ def _bereit(client, fake_llm, app_env, *labels):
 
 def test_der_knopf_merkt_sich_das_thema(client, fake_llm, fake_cli, app_env):
     ids = _bereit(client, fake_llm, app_env, LEKTION)
-    token = csrf_from(client.get("/lernen?tab=neu").text)
+    token = csrf_from(client.get("/lernen?status=neu").text)
 
     client.post("/lernen/adaptiv/start",
                 data={"_csrf": token, "thema": LEKTION,
@@ -42,7 +42,7 @@ def test_ein_getipptes_thema_bleibt_ohne_themen_id(client, fake_llm, fake_cli,
                                                    app_env):
     """Nicht jede Sitzung kommt von einer Karte — das darf nichts brechen."""
     _bereit(client, fake_llm, app_env, LEKTION)
-    token = csrf_from(client.get("/lernen?tab=neu").text)
+    token = csrf_from(client.get("/lernen?status=neu").text)
 
     client.post("/lernen/adaptiv/start",
                 data={"_csrf": token, "thema": "Brüche addieren"})
@@ -55,8 +55,8 @@ def test_laufende_sitzung_setzt_das_thema_auf_in_bearbeitung(
         client, fake_llm, fake_cli, app_env):
     """Der eigentliche Punkt: der Reiter zeigt echten Sitzungszustand."""
     ids = _bereit(client, fake_llm, app_env, LEKTION, "Brüche kürzen")
-    token = csrf_from(client.get("/lernen?tab=neu").text)
-    assert LEKTION in client.get("/lernen?tab=neu").text
+    token = csrf_from(client.get("/lernen?status=neu").text)
+    assert LEKTION in client.get("/lernen?status=neu").text
 
     client.post("/lernen/adaptiv/start",
                 data={"_csrf": token, "thema": LEKTION,
@@ -64,20 +64,22 @@ def test_laufende_sitzung_setzt_das_thema_auf_in_bearbeitung(
 
     sitzung = app_env.db.q1("SELECT zustand FROM lern_sitzung ORDER BY id DESC LIMIT 1")
     assert sitzung["zustand"] == "DIAGNOSING"
-    assert LEKTION in client.get("/lernen?tab=bearbeitung").text
-    assert LEKTION not in client.get("/lernen?tab=neu").text
+    assert LEKTION in client.get("/lernen?status=bearbeitung").text
+    assert LEKTION not in client.get("/lernen?status=neu").text
     # Ein unberührtes Thema wandert nicht mit.
-    assert "Brüche kürzen" in client.get("/lernen?tab=neu").text
+    assert "Brüche kürzen" in client.get("/lernen?status=neu").text
 
 
 def test_fremdes_topic_id_wird_nicht_uebernommen(client, fake_llm, fake_cli,
                                                  app_env):
     """Die ID kommt aus dem Formular — sie muss ein echtes aktives Thema sein."""
     _bereit(client, fake_llm, app_env, LEKTION)
-    token = csrf_from(client.get("/lernen?tab=neu").text)
+    token = csrf_from(client.get("/lernen?status=neu").text)
 
-    client.post("/lernen/adaptiv/start",
-                data={"_csrf": token, "thema": LEKTION, "topic_id": "999999"})
+    response = client.post("/lernen/adaptiv/start",
+                           data={"_csrf": token, "thema": LEKTION, "topic_id": "999999"})
 
     eingabe = app_env.db.q1("SELECT * FROM lern_eingabe ORDER BY id DESC LIMIT 1")
-    assert eingabe["topic_id"] is None
+    assert response.status_code == 404
+    assert eingabe is None
+    assert app_env.db.q("SELECT * FROM lern_sitzung") == []

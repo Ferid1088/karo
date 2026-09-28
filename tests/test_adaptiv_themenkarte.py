@@ -22,9 +22,9 @@ def test_thema_mit_lernreihe_bekommt_einen_knopf(client, fake_llm, fake_cli,
                                                  app_env):
     _themen(client, fake_llm, app_env, "Brüche addieren und subtrahieren")
 
-    seite = client.get("/lernen?tab=neu").text
+    seite = client.get("/lernen?status=neu").text
 
-    assert "Mit Karo üben" in seite
+    assert "Starten" in seite
     assert 'action="/lernen/adaptiv/start"' in seite
     assert 'value="Brüche addieren und subtrahieren"' in seite
 
@@ -35,7 +35,7 @@ def test_jede_karte_hat_einen_aktiven_knopf(client, fake_llm, fake_cli,
     Karten sieht aus wie eine kaputte App, nicht wie eine ehrliche."""
     _themen(client, fake_llm, app_env, "Brüche kürzen", "Würfel: Volumen")
 
-    seite = client.get("/lernen?tab=neu").text
+    seite = client.get("/lernen?status=neu").text
 
     assert seite.count('action="/lernen/adaptiv/start"') == 2
     assert "disabled" not in seite
@@ -50,7 +50,7 @@ def test_ohne_lernreihe_sagt_das_die_naechste_seite(client, fake_llm,
     from .test_app import kind_modus_aktivieren
     (topic_id,) = _themen(client, fake_llm, app_env, "Würfel: Volumen")
     kind_modus_aktivieren(client)
-    token = csrf_from(client.get("/lernen?tab=neu").text)
+    token = csrf_from(client.get("/lernen?status=neu").text)
 
     seite = client.post("/lernen/adaptiv/start",
                         data={"_csrf": token, "thema": "Würfel: Volumen",
@@ -77,7 +77,7 @@ def test_der_knopf_startet_wirklich_den_diagnoseweg(client, fake_llm,
     from .test_app import kind_modus_aktivieren
     _themen(client, fake_llm, app_env, "Brüche addieren und subtrahieren")
     kind_modus_aktivieren(client)
-    token = csrf_from(client.get("/lernen?tab=neu").text)
+    token = csrf_from(client.get("/lernen?status=neu").text)
 
     seite = client.post("/lernen/adaptiv/start",
                         data={"_csrf": token,
@@ -94,7 +94,7 @@ def test_ohne_den_schalter_bleibt_die_karte_wie_bisher(client, fake_llm,
     einrichten(client, fake_llm)
     topics.anlegen("Brüche addieren und subtrahieren")
 
-    seite = client.get("/lernen?tab=neu").text
+    seite = client.get("/lernen?status=neu").text
 
     assert "Mit Karo üben" not in seite
     assert "noch keine Lernreihe" not in seite
@@ -109,10 +109,10 @@ def test_kein_globaler_verweis_mehr_ueber_dem_raster(client, fake_llm,
     _themen(client, fake_llm, app_env, "Brüche addieren und subtrahieren")
     kind_modus_aktivieren(client)
 
-    seite = client.get("/lernen?tab=neu").text
+    seite = client.get("/lernen?status=neu").text
 
     assert "Brüche üben mit Karo" not in seite
-    assert "Mit Karo üben" in seite
+    assert "Starten" in seite
 
 
 def test_der_knopf_erscheint_auch_fuer_eltern(client, fake_llm, fake_cli,
@@ -121,19 +121,22 @@ def test_der_knopf_erscheint_auch_fuer_eltern(client, fake_llm, fake_cli,
     Sonst sucht man als Elternteil wieder vergeblich nach dem Einstieg."""
     _themen(client, fake_llm, app_env, "Brüche addieren und subtrahieren")
 
-    seite = client.get("/lernen?tab=neu")
+    seite = client.get("/lernen?status=neu")
 
     assert "Für Eltern" in seite.text          # also eine Elternsitzung
-    assert "Mit Karo üben" in seite.text
+    assert "Starten" in seite.text
 
 
 def test_der_knopf_traegt_die_handlungsfarbe(client, fake_llm, fake_cli,
                                              app_env):
     _themen(client, fake_llm, app_env, "Brüche addieren und subtrahieren")
 
-    seite = client.get("/lernen?tab=neu").text
+    seite = client.get("/lernen?status=neu").text
 
-    assert '<button type="submit" class="btn">Mit Karo üben' in seite
+    assert 'aria-label="Starten: Brüche addieren und subtrahieren"' in seite
+    assert 'class="topics-start"' in seite
+    css = client.get('/static/meine-themen.css').text
+    assert '.topics-start' in css
 
 
 def test_die_lektionszeile_traegt_keine_eigene_gestaltung(client, fake_llm,

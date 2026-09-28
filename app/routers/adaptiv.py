@@ -1,253 +1,268 @@
-"""Routen des adaptiven Lernens — dünne HTTP-Schicht über `app/adaptiv`.
-
-Der Zustand liegt in der Datenbank, nicht in der Session: der Browser schickt
-nur Antworten, nie eine Phase. Alles hier hängt am Schalter
-`adaptive_learning_enabled` (§16) und nutzt die bestehende Anmeldung,
-CSRF-Prüfung und Kinderrolle unverändert.
-"""
-
+"""Two strictly scoped HTTP journeys using the same checked teaching engine."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, Request
+from urllib.parse import urlencode
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from .. import config, topics, db
-from ..adaptiv import (erzeugung, lektionen, sitzung as zustand,
-                       store, unterricht)
+from ..adaptiv import erzeugung, lektionen, sitzung as zustand, store, unterricht
+from ..services import learning_hub
 from .shared import render, zurueck
 
 router = APIRouter(prefix="/lernen/adaptiv", tags=["adaptiv"])
-
-#: Elternsicht. Eigener Router, weil `/eltern/...` nicht in
-#: CHILD_ALLOWED_PREFIXES steht und damit für Kinder gesperrt bleibt.
+exam_router = APIRouter(prefix="/klassenarbeit/{exam_id}/lernen", tags=["exam-learning"])
 eltern_router = APIRouter(prefix="/eltern/lernfortschritt", tags=["adaptiv"])
-
-#: §18: beobachtbare Lernsignale, in Worten statt in Kürzeln.
-STAND_LABELS = {
-    "offen": "noch offen",
-    "im_aufbau": "im Aufbau",
-    "sicher": "sitzt",
-    "braucht_mensch": "braucht Begleitung",
-}
+STAND_LABELS = {"offen": "noch offen", "im_aufbau": "im Aufbau",
+                "sicher": "sitzt", "braucht_mensch": "braucht Begleitung"}
 
 
 def _aus() -> bool:
     return not getattr(config.load_safe(), "adaptive_learning_enabled", False)
 
 
+def _context(request: Request) -> dict:
+    raw = request.path_params.get("exam_id")
+    eid = int(raw) if raw is not None and str(raw).isdigit() else None
+    if raw is not None and (eid is None or not db.q1(
+            "SELECT id FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL", eid)):
+        raise HTTPException(404, "Diese Klassenarbeit gibt es nicht.")
+    return {
+        "learning_exam_id": eid,
+        "learning_base": f"/klassenarbeit/{eid}/lernen" if eid else "/lernen/adaptiv",
+        "learning_back": f"/klassenarbeit/{eid}" if eid else "/lernen",
+        "learning_area": "Prüfungsvorbereitung" if eid else "Meine Themen",
+        "learning_ui": True, "show_nav": False, "adult_page": False,
+    }
+
+
+def _topic(request: Request, raw: str) -> dict | None:
+    ctx = _context(request)
+    if not raw:
+        if ctx["learning_exam_id"]:
+            raise HTTPException(400, "Wähle ein Prüfungsthema aus deinem Lernplan.")
+        return None
+    topic = learning_hub.topic_in_scope(int(raw), ctx["learning_exam_id"]) if raw.isdigit() else None
+    if topic is None:
+        raise HTTPException(404, "Dieses Thema gehört nicht zu diesem Lernbereich.")
+    return topic
+
+
+def _owns(request: Request, session: dict) -> bool:
+    entry = store.eingabe(session.get("eingabe_id")) or {}
+    eid = _context(request)["learning_exam_id"]
+    tid = entry.get("topic_id")
+    return (bool(learning_hub.topic_in_scope(tid, eid)) if tid else eid is None)
+
+
 def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
-    request.session['learning_session_id'] = sitzung['id']
-    entry = store.eingabe(sitzung['eingabe_id']) if sitzung.get('eingabe_id') else {}
-    concept = store.konzept(sitzung['konzept_id']) or {}
+    ctx = _context(request)
+    request.session["learning_session:" + ctx["learning_base"]] = sitzung["id"]
+    entry = store.eingabe(sitzung["eingabe_id"]) or {}
+    concept = store.konzept(sitzung["konzept_id"]) or {}
     screen = unterricht.bildschirm(sitzung)
-    steps = {'anker': 1, 'diagnose': 1, 'vorhersage': 2, 'haken': 2,
-             'regel': 2, 'beispiel': 3, 'anders': 2, 'transfer': 6, 'geschafft': 6}
-    step = steps.get(screen['art'], 5 if sitzung.get('phase') == 'INDEPENDENT_TASK' else 4)
-    return render(request, "adaptiv.html", sitzung=sitzung,
-                  schirm=screen, learning_title=(entry or {}).get('thema_text') or concept.get('label', 'Dein Thema'),
-                  learning_step=step, learning_back=request.session.get('learning_back', '/lernen'))
+    steps = {"anker": 1, "diagnose": 1, "vorhersage": 2, "haken": 2,
+             "regel": 2, "beispiel": 3, "anders": 2, "transfer": 6, "geschafft": 6}
+    step = steps.get(screen["art"], 5 if sitzung.get("phase") == "INDEPENDENT_TASK" else 4)
+    return render(request, "adaptiv.html", sitzung=sitzung, schirm=screen,
+                  learning_title=entry.get("thema_text") or concept.get("label", "Dein Thema"),
+                  learning_step=step, **ctx)
 
 
 def _laufende(request: Request) -> dict | None:
-    selected = request.session.get('learning_session_id')
-    sitzung = store.sitzung(selected) if selected else zustand.laufende()
-    return sitzung
+    ctx = _context(request)
+    selected = request.query_params.get("sitzung") or request.session.get("learning_session:" + ctx["learning_base"])
+    if selected:
+        session = store.sitzung(int(selected)) if str(selected).isdigit() else None
+        if session and _owns(request, session):
+            return session
+        if request.query_params.get("sitzung"):
+            raise HTTPException(404, "Diese Lernrunde gehört nicht zu diesem Lernbereich.")
+    # Resume after login, scoped in SQL; never resume the other area's last session.
+    eid = ctx["learning_exam_id"]
+    if eid:
+        row = db.q1("""SELECT s.id FROM lern_sitzung s JOIN lern_eingabe i ON i.id=s.eingabe_id
+            JOIN exam_topic x ON x.topic_id=i.topic_id WHERE x.exam_id=?
+            AND s.zustand NOT IN ('MASTERED','ESCALATED') ORDER BY s.id DESC LIMIT 1""", eid)
+    else:
+        row = db.q1("""SELECT s.id FROM lern_sitzung s JOIN lern_eingabe i ON i.id=s.eingabe_id
+            LEFT JOIN topic t ON t.id=i.topic_id WHERE (i.topic_id IS NULL OR
+            (t.learning_visible=1 AND NOT EXISTS(SELECT 1 FROM exam_topic x WHERE x.topic_id=t.id)))
+            AND s.zustand NOT IN ('MASTERED','ESCALATED') ORDER BY s.id DESC LIMIT 1""")
+    session = store.sitzung(row["id"]) if row else None
+    return session if session and _owns(request, session) else None
 
 
 def _auswahl(request: Request, thema: str = "", nichts_gefunden: bool = False):
-    """Was es gibt — und ehrlich, was es noch nicht gibt.
-
-    Nach einem vergeblichen Thema zeigt die Seite nur noch Lektionen, die
-    damit zu tun haben. Der ganze Katalog waere hier kein Vorschlag,
-    sondern ein Inhaltsverzeichnis. Ohne Thema (der Einstieg) steht
-    weiterhin alles zur Wahl.
-    """
-    vorschlaege = (lektionen.empfehlungen(thema) if nichts_gefunden
-                   else lektionen.verfuegbar())
-    return render(request, "adaptiv_auswahl.html",
-                  lektionen=vorschlaege, thema=thema,
-                  nichts_gefunden=nichts_gefunden)
-
-
-@router.get("", response_class=HTMLResponse)
-def start(request: Request):
-    if _aus():
-        return zurueck("/lernen")
-    laufend = _laufende(request)
-    if laufend:
-        return _zeige(request, laufend)
-    # Kein stilles Zurückfallen auf die eine vorhandene Lektion: erst wählen.
-    return _auswahl(request)
-
-
-def _geprueftes_thema(topic_id: str) -> int | None:
-    """Die Themen-ID kommt aus dem Formular und wird deshalb nachgeschlagen.
-
-    Nur ein aktives Thema zaehlt; alles andere wird stillschweigend zu
-    „keine Themen-ID" — die Sitzung selbst haengt am Konzept, nicht daran.
-    """
-    if not topic_id.isdigit():
-        return None
-    thema = topics.get(int(topic_id))
-    return thema["id"] if thema and thema["state"] == topics.AKTIV else None
+    ctx = _context(request)
+    if ctx["learning_exam_id"] or _aus():
+        return render(request, "learning_unavailable.html", thema=thema,
+                      disabled=_aus(), **ctx)
+    suggestions = lektionen.empfehlungen(thema) if nichts_gefunden else lektionen.verfuegbar()
+    return render(request, "adaptiv_auswahl.html", lektionen=suggestions, thema=thema,
+                  nichts_gefunden=nichts_gefunden, **ctx)
 
 
 def _wartet(request: Request, thema: str, topic_id: int | None = None):
-    """§15: Das Kind sieht, dass Karo arbeitet — kein Spinner ohne Worte."""
-    return render(request, "adaptiv_wartet.html", thema=thema, topic_id=topic_id)
+    ctx = _context(request)
+    query = urlencode({"thema": thema, "topic_id": topic_id or ""})
+    return render(request, "adaptiv_wartet.html", thema=thema, topic_id=topic_id,
+                  status_url=ctx["learning_base"] + "/status?" + query,
+                  resume_url=ctx["learning_base"] + "/wartet?" + query, **ctx)
+
+
+@router.get("", response_class=HTMLResponse)
+@exam_router.get("", response_class=HTMLResponse)
+def start(request: Request):
+    if _aus():
+        return zurueck(_context(request)["learning_back"])
+    active = _laufende(request)
+    return _zeige(request, active) if active else _auswahl(request)
 
 
 @router.post("/start", response_class=HTMLResponse)
+@exam_router.post("/start", response_class=HTMLResponse)
 def start_thema(request: Request, thema: str = Form(""),
-                topic_id: str = Form(""), exam_id: str = Form("")):
-    tid = _geprueftes_thema(topic_id)
-    if topic_id and tid is None:
-        return zurueck('/lernen')
-    # The adaptive pilot may be switched off. A topic card must still have a
-    # useful, visible destination instead of looking like it did nothing.
+                topic_id: str = Form(""), posted_exam_id: str = Form("", alias="exam_id")):
+    ctx = _context(request)
+    # A posted exam_id must never turn a personal URL into an exam journey.
+    if posted_exam_id and str(ctx["learning_exam_id"]) != str(posted_exam_id):
+        raise HTTPException(404, "Bitte öffne den Lernplan deiner Klassenarbeit.")
+    topic = _topic(request, str(topic_id))
     if _aus():
-        return zurueck(f"/lernzyklus/{tid}" if tid else "/lernen")
-    topic = topics.get(tid) if tid else None
-    if exam_id:
-        if not exam_id.isdigit() or not db.q1('SELECT 1 FROM exam_topic WHERE exam_id=? AND topic_id=?', int(exam_id), tid):
-            return zurueck('/klassenarbeit')
-        request.session['learning_back'] = f'/klassenarbeit#exam-{exam_id}'
-    else:
-        request.session['learning_back'] = '/lernen'
+        return _auswahl(request, thema=(topic or {}).get("label", thema))
     if topic:
-        thema = topic['label']
-    fach = (topic or {}).get('subject')
-    grade = (topic or {}).get('grade')
-    lektion = lektionen.fuer_thema(thema, fach, grade)
-    if lektion is None:
-        gefragt = bool(thema.strip())
-        # §6: Katalog zuerst. Erst wenn dort nichts steht, schreibt Modell A
-        # eine Lektion — im Hintergrund, und genau einmal pro Thema.
-        if gefragt and getattr(config.load_safe(),
-                               "llm_error_creation_enabled", False):
+        thema = topic["label"]
+    if not thema.strip() or len(thema) > 200:
+        return _auswahl(request)
+    fach, grade = (topic or {}).get("subject"), (topic or {}).get("grade")
+    tid = (topic or {}).get("id")
+    previous = store.offene_fuer_thema(tid) if tid else None
+    if previous:
+        return _zeige(request, previous)
+    lesson = lektionen.fuer_thema(thema, fach, grade)
+    if lesson is None:
+        from ..adaptiv import curriculum_dienst
+        cfg = config.load_safe()
+        if curriculum_dienst.configured(cfg) or getattr(cfg, "llm_error_creation_enabled", False):
             erzeugung.anfordern(thema, fach=fach, klasse=grade)
-            request.session['learning_pending'] = {'thema': thema, 'topic_id': tid, 'exam_id': exam_id}
             return _wartet(request, thema, tid)
-        return _auswahl(request, thema=thema, nichts_gefunden=gefragt)
-    previous = store.letzte_fuer_thema(tid, lektion['konzept_id'])
-    return _zeige(request, previous or unterricht.starte(lektion['konzept_id'], thema, tid))
+        return _auswahl(request, thema=thema, nichts_gefunden=True)
+    previous = store.letzte_fuer_thema(tid, lesson["konzept_id"])
+    return _zeige(request, previous or unterricht.starte(lesson["konzept_id"], thema, tid))
 
 
 @router.get("/status")
-def erzeugung_status(request: Request, thema: str = ""):
-    """Womit die Warteseite fragt, ob es losgehen kann."""
+@exam_router.get("/status")
+def erzeugung_status(request: Request, thema: str = "", topic_id: str = ""):
+    topic = _topic(request, topic_id)
     if _aus():
         return {"fertig": False, "laeuft": False}
-    pending = request.session.get('learning_pending', {})
-    topic = topics.get(pending['topic_id']) if pending.get('topic_id') else {}
-    fach, grade = (topic or {}).get('subject'), (topic or {}).get('grade')
-    fertig = lektionen.fuer_thema(thema, fach, grade) is not None
-    return {"fertig": fertig, "laeuft": erzeugung.laeuft(thema, fach=fach, klasse=grade),
-            "thema": thema}
+    thema = (topic or {}).get("label", thema)
+    fach, grade = (topic or {}).get("subject"), (topic or {}).get("grade")
+    return {"fertig": lektionen.fuer_thema(thema, fach, grade) is not None,
+            "laeuft": erzeugung.laeuft(thema, fach=fach, klasse=grade), "thema": thema}
 
 
 @router.get("/wartet", response_class=HTMLResponse)
-def wartet(request: Request, thema: str = ""):
-    """Damit ein Neuladen der Warteseite nicht ins Leere führt (A6)."""
+@exam_router.get("/wartet", response_class=HTMLResponse)
+def wartet(request: Request, thema: str = "", topic_id: str = ""):
+    topic = _topic(request, topic_id)
     if _aus():
-        return zurueck("/lernen")
-    if lektionen.fuer_thema(thema):
-        return _auswahl(request, thema=thema)
-    return _wartet(request, thema)
+        return _auswahl(request)
+    thema = (topic or {}).get("label", thema)
+    lesson = lektionen.fuer_thema(thema, (topic or {}).get("subject"), (topic or {}).get("grade"))
+    if lesson:
+        return start_thema(request, thema=thema, topic_id=topic_id, posted_exam_id="")
+    return _wartet(request, thema, (topic or {}).get("id"))
 
 
 @router.post("/neu", response_class=HTMLResponse)
+@exam_router.post("/neu", response_class=HTMLResponse)
 def neu(request: Request):
     if _aus():
-        return zurueck("/lernen")
-    laufend = _laufende(request)
-    konzept_id = (laufend or {}).get("konzept_id")
-    if konzept_id is None:
         return _auswahl(request)
-    if laufend['zustand'] not in zustand.ENDZUSTAENDE:
-        return _zeige(request, laufend)
-    entry = store.eingabe(laufend['eingabe_id']) or {}
-    return _zeige(request, unterricht.starte(konzept_id, entry.get('thema_text', ''), entry.get('topic_id')))
+    active = _laufende(request)
+    if not active:
+        return _auswahl(request)
+    if active["zustand"] not in zustand.ENDZUSTAENDE:
+        return _zeige(request, active)
+    entry = store.eingabe(active["eingabe_id"]) or {}
+    return _zeige(request, unterricht.starte(active["konzept_id"],
+        entry.get("thema_text", ""), entry.get("topic_id")))
 
 
-@router.post("/anker", response_class=HTMLResponse)
+def _answer(request: Request, action: str, answer: str = ""):
+    if _aus():
+        return _auswahl(request)
+    active = _laufende(request)
+    if active is None:
+        return zurueck(_context(request)["learning_base"])
+    screen = unterricht.bildschirm(active)
+    expected = {"anker": {"anker"}, "diagnose": {"diagnose"},
+                "vorhersage": {"vorhersage"}, "transfer": {"transfer"},
+                "aufgabe": {"aufgabe"}, "tipp": {"aufgabe"},
+                "weiter": {"haken", "regel", "beispiel", "anders"}}
+    # Stale forms cannot skip phases or award additional successes.
+    if screen["art"] not in expected[action]:
+        return _zeige(request, active)
+    if action == "weiter":
+        result = (unterricht.weiter_nach_adaptation(active)
+                  if active["phase"] == zustand.ADAPTATION else unterricht.weiter(active))
+    elif action == "tipp":
+        result = unterricht.tipp(active)
+    else:
+        result = getattr(unterricht, action + "_beantwortet")(active, answer)
+    return _zeige(request, result)
+
+
+@router.post("/anker")
+@exam_router.post("/anker")
 def anker(request: Request, antwort: str = Form("")):
-    if _aus():
-        return zurueck("/lernen")
-    sitzung = _laufende(request)
-    if sitzung is None:
-        return zurueck("/lernen/adaptiv")
-    return _zeige(request, unterricht.anker_beantwortet(sitzung, antwort))
+    return _answer(request, "anker", antwort)
 
 
-@router.post("/diagnose", response_class=HTMLResponse)
+@router.post("/diagnose")
+@exam_router.post("/diagnose")
 def diagnose(request: Request, antwort: str = Form("")):
-    if _aus():
-        return zurueck("/lernen")
-    sitzung = _laufende(request)
-    if sitzung is None:
-        return zurueck("/lernen/adaptiv")
-    return _zeige(request, unterricht.diagnose_beantwortet(sitzung, antwort))
+    return _answer(request, "diagnose", antwort)
 
 
-@router.post("/weiter", response_class=HTMLResponse)
+@router.post("/weiter")
+@exam_router.post("/weiter")
 def weiter(request: Request):
-    if _aus():
-        return zurueck("/lernen")
-    sitzung = _laufende(request)
-    if sitzung is None:
-        return zurueck("/lernen/adaptiv")
-    if sitzung["phase"] == zustand.ADAPTATION:
-        return _zeige(request, unterricht.weiter_nach_adaptation(sitzung))
-    return _zeige(request, unterricht.weiter(sitzung))
+    return _answer(request, "weiter")
 
 
-@router.post("/aufgabe", response_class=HTMLResponse)
+@router.post("/aufgabe")
+@exam_router.post("/aufgabe")
 def aufgabe(request: Request, antwort: str = Form("")):
-    if _aus():
-        return zurueck("/lernen")
-    sitzung = _laufende(request)
-    if sitzung is None:
-        return zurueck("/lernen/adaptiv")
-    return _zeige(request, unterricht.aufgabe_beantwortet(sitzung, antwort))
+    return _answer(request, "aufgabe", antwort)
 
 
-@router.post("/vorhersage", response_class=HTMLResponse)
+@router.post("/vorhersage")
+@exam_router.post("/vorhersage")
 def vorhersage(request: Request, antwort: str = Form("")):
-    if _aus():
-        return zurueck("/lernen")
-    sitzung = _laufende(request)
-    if sitzung is None:
-        return zurueck("/lernen/adaptiv")
-    return _zeige(request, unterricht.vorhersage_beantwortet(sitzung, antwort))
+    return _answer(request, "vorhersage", antwort)
 
 
-@router.post("/transfer", response_class=HTMLResponse)
+@router.post("/transfer")
+@exam_router.post("/transfer")
 def transfer(request: Request, antwort: str = Form("")):
-    if _aus():
-        return zurueck("/lernen")
-    sitzung = _laufende(request)
-    if sitzung is None:
-        return zurueck("/lernen/adaptiv")
-    return _zeige(request, unterricht.transfer_beantwortet(sitzung, antwort))
+    return _answer(request, "transfer", antwort)
+
+
+@router.post("/tipp")
+@exam_router.post("/tipp")
+def tipp(request: Request):
+    return _answer(request, "tipp")
 
 
 @eltern_router.get("", response_class=HTMLResponse)
 def eltern_lernfortschritt(request: Request):
-    """§18: Was das Kind versteht, wo es hakt — ohne Modellgedanken."""
     if _aus():
         return zurueck("/eltern")
-    eintraege = store.fortschritt_uebersicht()
-    return render(request, "adaptiv_eltern.html", eintraege=eintraege,
-                  nachher=[e for e in eintraege if e.get("braucht_mensch")],
+    entries = store.fortschritt_uebersicht()
+    return render(request, "adaptiv_eltern.html", eintraege=entries,
+                  nachher=[e for e in entries if e.get("braucht_mensch")],
                   stand_labels=STAND_LABELS)
-
-
-@router.post("/tipp", response_class=HTMLResponse)
-def tipp(request: Request):
-    if _aus():
-        return zurueck("/lernen")
-    sitzung = _laufende(request)
-    if sitzung is None:
-        return zurueck("/lernen/adaptiv")
-    return _zeige(request, unterricht.tipp(sitzung))

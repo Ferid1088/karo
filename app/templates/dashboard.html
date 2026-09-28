@@ -4,7 +4,7 @@
 {# "Heute" beantwortet genau eine Frage: was mache ich jetzt? Alles andere
    steht eine Zeile tiefer als ruhiger Hinweis oder hinter einem Hauptpunkt.
    Die Themenliste lebt unter "Lernen" — sie stand hier nur noch einmal. #}
-<p class="heute-gruss"><img src="/static/karo-fox-wave.png" alt="" width="56" height="56"><b>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</b> <span>Ein kleiner Schritt. Ein bisschen mehr verstanden.</span></p>
+<p class="heute-gruss"><img src="{{ learner_photo_url or '/static/karo-fox-wave.png' }}" alt="" width="56" height="56"><b>Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</b> <span>Ein kleiner Schritt. Ein bisschen mehr verstanden.</span></p>
 
 <section class="card schritt-karte">
   <p class="eyebrow">DEIN NÄCHSTER SCHRITT</p>
@@ -13,14 +13,18 @@
   <h1>{{ 'Deine Generalprobe' if exam_today.is_simulation else exam_today.inhalt }}</h1>
   <p>{{ 'Probiere in Ruhe aus, was du schon kannst.' if exam_today.is_simulation else 'Wir machen dort weiter, wo du gerade stehst.' }}</p>
   {% if exam_today.is_simulation %}<a class="btn" href="/klassenarbeit/{{ exam_today.exam_id }}/simulation">Generalprobe öffnen →</a>
-  {% elif exam_today.topic_id %}<form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ exam_today.topic_id }}"><input type="hidden" name="exam_id" value="{{ exam_today.exam_id }}"><button type="submit">Jetzt lernen →</button></form>
+  {% elif exam_today.topic_id %}<form method="post" action="/klassenarbeit/{{ exam_today.exam_id }}/lernen/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ exam_today.topic_id }}"><input type="hidden" name="exam_id" value="{{ exam_today.exam_id }}"><button type="submit">Jetzt lernen →</button></form>
   {% else %}<a class="btn" href="/klassenarbeit/{{ exam_today.exam_id }}">Prüfungsthemen ansehen →</a>{% endif %}
   <a class="subtle-link" href="/klassenarbeit/{{ exam_today.exam_id }}">Deinen Lernkalender ansehen</a>
+{% elif naechstes and next_action_kind in ('review', 'quiz', 'lesson') %}
+  <h1>{{ naechstes.titel }}</h1>
+  <p>{{ naechstes.text }}</p>
+  <a class="btn" href="{{ naechstes.url }}">{{ naechstes.button }} →</a>
 {% elif next_topic %}
   <span class="learn-status {{ next_topic.learning_status }}">{{ next_topic.subject }}</span>
   <h1>{{ next_topic.label }}</h1>
   <p>{{ 'Du kannst genau hier weitermachen.' if next_topic.learning_status == 'bearbeitung' else 'Wir schauen zuerst, was du schon kannst.' }}</p>
-  <form method="post" action="/lernen/adaptiv/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ next_topic.id }}"><button type="submit">{{ 'Weiterlernen' if next_topic.learning_status == 'bearbeitung' else 'Los geht’s' }} →</button></form>
+  <form method="post" action="{{ '/lernen/adaptiv/start' if cfg.adaptive_learning_enabled else '/lernzyklus/' ~ next_topic.id ~ '/quiz/starten' }}">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ next_topic.id }}"><input type="hidden" name="modus" value="bildschirm"><button type="submit">{{ 'Weiterlernen' if next_topic.learning_status == 'bearbeitung' else 'Los geht’s' }} →</button></form>
   <a class="subtle-link" href="/lernen">Lieber ein anderes Thema</a>
 {% else %}
   <h1>{{ 'Das kannst du schon richtig gut!' if safe_count else 'Worauf bist du neugierig?' }}</h1>
@@ -38,4 +42,5 @@
 {% if cfg.klassenarbeit_kind and exam %}
 <a class="heute-hinweis" href="/klassenarbeit">Klassenarbeit am {{ exam.exam_date|datum }} — in kleinen Schritten vorbereiten <span aria-hidden="true">→</span></a>
 {% endif %}
+{% include '_learning_support.html' %}
 {% endblock %}

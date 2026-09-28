@@ -16,7 +16,7 @@ import datetime as dt
 import logging
 from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .. import config, db, quizzes, security, teaching, topics
 from ..services import exam, exam_calendar, learning_progress, measurement
@@ -39,9 +39,10 @@ def klassenarbeit_neu(request: Request, exam_date: str = Form(...),
         ergebnis = exam.create_exam(exam_date, scan_id, themen, fach)
     except ExamError as exc:
         flash(request, str(exc), "warn")
-        return zurueck("/klassenarbeit")
+        return measurement.render_klassenarbeit_neu(request, draft={
+            "exam_date": exam_date, "themen": themen, "fach": fach, "scan_id": scan_id})
     flash(request, "Deine Klassenarbeit ist angelegt. Wähle jetzt deine Lerntage.")
-    return zurueck(f"/klassenarbeit#exam-{ergebnis.exam_id}")
+    return zurueck(f"/klassenarbeit/{ergebnis.exam_id}#exam-calendar-title")
 
 
 @router.post("/klassenarbeit/themenblatt")
@@ -51,7 +52,7 @@ async def klassenarbeit_themenblatt(request: Request,
     datei = datei or formular.get("datei")
     if datei is None or not getattr(datei, "filename", ""):
         flash(request, "Es wurde keine Datei ausgewählt.", "err")
-        return zurueck("/klassenarbeit")
+        return zurueck("/klassenarbeit/neu")
 
     endung = Path(datei.filename).suffix.lower()
     puffer = bytearray()
@@ -59,20 +60,22 @@ async def klassenarbeit_themenblatt(request: Request,
         puffer.extend(stueck)
         if len(puffer) > security.MAX_UPLOAD_BYTES:
             flash(request, "Die Datei ist zu groß.", "err")
-            return zurueck("/klassenarbeit")
+            return zurueck("/klassenarbeit/neu")
 
     try:
         exam.upload_exam_topics_sheet(bytes(puffer), endung)
     except ExamError as exc:
         flash(request, str(exc), "err")
-        return zurueck("/klassenarbeit")
+        return zurueck("/klassenarbeit/neu")
 
     flash(request, "Themenblatt aufgenommen. Karo liest es jetzt ein.")
-    return zurueck("/klassenarbeit")
+    return zurueck("/klassenarbeit/neu")
 
 
 @router.get("/klassenarbeit/themenblatt/status")
 def klassenarbeit_themenblatt_status(scan_id: int):
+    if db.q1('SELECT 1 FROM learning_upload WHERE scan_id=?', scan_id):
+        raise HTTPException(404, 'Dieses Blatt gehört nicht zu deinen Prüfungen.')
     return {"signatur": exam.get_exam_topic_scan_status(scan_id)}
 
 
@@ -90,19 +93,40 @@ async def klassenarbeit_kalender(request: Request, exam_id: int):
             exam_id, formular.get("simulation_early") == "ja")
     except exam_calendar.ExamCalendarError as exc:
         flash(request, str(exc), "warn")
-        return zurueck(f"/klassenarbeit#exam-{exam_id}")
-    flash(request, "Dein Lernkalender ist gespeichert. Heutige Lerntage erscheinen unter „Heute“.")
-    return zurueck(f"/klassenarbeit#exam-{exam_id}")
+        return zurueck(f"/klassenarbeit/{exam_id}#exam-calendar-title")
+    flash(request, "Dein Plan ist gespeichert. Karo bleibt beim ersten Thema, bis es sicher sitzt.")
+    return zurueck(f"/klassenarbeit/{exam_id}#exam-next-step")
+
+
+@router.post("/klassenarbeit/{exam_id}/themen")
+def klassenarbeit_themen(request: Request, exam_id: int, themen: str = Form("")):
+    from ..services import learning_hub
+    import json
+    row = db.q1("SELECT * FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL", exam_id)
+    if not row:
+        raise HTTPException(404, "Klassenarbeit nicht gefunden.")
+    names = list(dict.fromkeys(n.strip() for n in themen.replace(',', '\n').splitlines() if n.strip()))
+    if not names or len(names) > 20 or any(len(n) > 200 for n in names):
+        flash(request, "Trage 1 bis 20 Prüfungsthemen ein, jeweils in einer eigenen Zeile.", "warn")
+    else:
+        learning_hub.link_exam(exam_id, names, row['subject'])
+        all_names = [t['label'] for t in learning_hub.exam_topics(exam_id)]
+        with db.tx() as c:
+            c.execute("UPDATE exam SET themen=? WHERE id=?", (json.dumps(all_names, ensure_ascii=False), exam_id))
+        flash(request, "Deine Prüfungsthemen sind gespeichert. Wähle jetzt deine Lerntage.")
+    return zurueck(f"/klassenarbeit/{exam_id}#exam-calendar-title")
 
 
 @router.get("/klassenarbeit/{exam_id}/simulation", response_class=HTMLResponse)
 def klassenarbeit_simulation(request: Request, exam_id: int):
+    from ..services import exam_rehearsal
     if not exam_calendar.simulation_available(exam_id):
         raise HTTPException(403, "Die Prüfungssimulation ist erst am geplanten Simulationstag verfügbar.")
     return render(
         request, "exam_simulation.html",
         exam_id=exam_id,
-        themen=exam_calendar.simulation_topics(exam_id),
+        themen=exam_rehearsal.overview(exam_id),
+        learning_ui=True, show_nav=False, adult_page=False,
     )
 
 
@@ -113,101 +137,105 @@ def klassenarbeit_simulation_starten(request: Request, exam_id: int, topic_id: i
     erlaubt = {t["id"] for t in exam_calendar.simulation_topics(exam_id)}
     if topic_id not in erlaubt:
         raise HTTPException(404, "Dieses Thema gehört nicht zu dieser Klassenarbeit.")
-    quiz_id = quizzes.anfordern(topic_id, anlass="probe", modus=quizzes.BILDSCHIRM, anzahl=5)
-    return zurueck(f"/quiz/{quiz_id}")
+    from ..services import exam_rehearsal
+    try:
+        exam_rehearsal.start(exam_id, topic_id)
+    except LookupError:
+        from ..adaptiv import erzeugung
+        topic = topics.get(topic_id)
+        if config.load_safe().llm_error_creation_enabled:
+            erzeugung.anfordern(topic['label'], fach=topic['subject'], klasse=topic.get('grade'))
+            flash(request, "Karo bereitet die geprüften Aufgaben vor. Öffne dieses Thema gleich noch einmal.")
+        else:
+            flash(request, "Für dieses Thema fehlt noch die geprüfte Lernreihe. Bitte deine Eltern um Hilfe.", "warn")
+        return zurueck(f"/klassenarbeit/{exam_id}/simulation")
+    except ValueError as exc:
+        flash(request, str(exc), "warn")
+        return zurueck(f"/klassenarbeit/{exam_id}/simulation")
+    return zurueck(f"/klassenarbeit/{exam_id}/simulation/{topic_id}")
+
+
+@router.get("/klassenarbeit/{exam_id}/simulation/{topic_id}")
+def klassenarbeit_simulation_aufgaben(request: Request, exam_id: int, topic_id: int):
+    from ..services import exam_rehearsal
+    try:
+        attempt = exam_rehearsal.get(exam_id, topic_id)
+    except ValueError as exc:
+        raise HTTPException(403, str(exc))
+    if not attempt:
+        return zurueck(f"/klassenarbeit/{exam_id}/simulation")
+    return render(request, "exam_rehearsal.html", exam_id=exam_id, topic=topics.get(topic_id),
+                  attempt=attempt, learning_ui=True, show_nav=False, adult_page=False)
+
+
+@router.post("/klassenarbeit/{exam_id}/simulation/{topic_id}/antworten")
+async def klassenarbeit_simulation_antworten(request: Request, exam_id: int, topic_id: int):
+    from ..services import exam_rehearsal
+    form = await request.form()
+    answers = {key.removeprefix('answer_'): value for key, value in form.items()
+               if key.startswith('answer_')}
+    try:
+        exam_rehearsal.submit(exam_id, topic_id, answers)
+    except ValueError as exc:
+        flash(request, str(exc), "warn")
+    return zurueck(f"/klassenarbeit/{exam_id}/simulation/{topic_id}")
 
 
 @router.post("/klassenarbeit/{exam_id}/plan/neu")
 def klassenarbeit_plan_neu(request: Request, exam_id: int):
-    try:
-        exam.regenerate_exam_plan(exam_id)
-    except ExamError as exc:
-        flash(request, str(exc), "err")
-        return zurueck("/klassenarbeit")
-    flash(request, "Lernplan wird neu erstellt.")
-    return zurueck("/klassenarbeit")
+    flash(request, "Wähle deine Lerntage und Minuten. Daraus entsteht dein Prüfungsplan.")
+    return zurueck(f"/klassenarbeit/{exam_id}#exam-calendar-title")
 
 
 @router.post("/klassenarbeit/{exam_id}/lernen")
 def klassenarbeit_lernen(request: Request, exam_id: int, topic_id: int = Form(0)):
     """Startet einen Lerntag ausschließlich im Klassenarbeitsbereich."""
-    if alter_generator_aus():
-        flash(request, "Der Prüfungslernweg ist noch nicht freigeschaltet.", "warn")
-        return zurueck(f"/klassenarbeit/{exam_id}")
-    from .. import exam_plan
-    plan = exam_plan.holen_plan(exam_id) or {}
-    tag = next((t for t in plan.get("tagesplan_liste", [])
-                if int(t.get("topic_id") or 0) == topic_id), None)
-    if not tag:
-        flash(request, "Dieses Thema gehört nicht zum Prüfungslernplan.", "warn")
-        return zurueck(f"/klassenarbeit/{exam_id}")
-    try:
-        material_id = exam.start_exam_learning_day(exam_id, tag["row_key"], "")
-    except teaching.TeachingError as exc:
-        flash(request, str(exc), "err")
-        return zurueck(f"/klassenarbeit/{exam_id}")
-    return zurueck(f"/klassenarbeit/material/{material_id}")
+    return RedirectResponse(f"/klassenarbeit/{exam_id}/lernen/start", status_code=307)
 
 
 @router.post("/klassenarbeit/{exam_id}/lerntag")
 def klassenarbeit_lerntag(request: Request, exam_id: int,
                           row_key: str = Form(...), ausgabe: str = Form("")):
-    # Lernmaterial zur Klassenarbeit entsteht im selben alten
-    # Erzeugungsweg (`exam_learning.starten()` → `teaching.starten()`).
-    if alter_generator_aus():
-        return zurueck("/klassenarbeit")
-    as_json = "application/json" in request.headers.get("accept", "")
-    try:
-        material_id = exam.start_exam_learning_day(exam_id, row_key, ausgabe)
-    except teaching.TeachingError as exc:
-        if as_json:
-            return JSONResponse({"fehler": str(exc)}, status_code=400)
-        return render(request, "material_fehler.html", error=str(exc), status_code=400)
+    flash(request, "Deine Vorbereitung geht jetzt direkt in deinem Prüfungsplan weiter.")
+    return zurueck(f"/klassenarbeit/{exam_id}#exam-next-step")
+
+
+def _exam_material(material_id: int):
     material = exam.get_exam_material(material_id)
-    if request.session.get('role') == 'child':
-        learning_progress.start(teaching.holen(material['lesson_id'])['topic_id'])
-    if as_json:
-        return material
-    return zurueck(f"/klassenarbeit/material/{material_id}")
+    if material is None or not db.q1('''SELECT id FROM exam WHERE id=?
+            AND deleted_at IS NULL AND purged_at IS NULL''', material['exam_id']):
+        raise HTTPException(404, "Lernmaterial nicht gefunden.")
+    return material
 
 
 @router.get("/klassenarbeit/material/{material_id}", response_class=HTMLResponse)
 def klassenarbeit_material(request: Request, material_id: int):
-    if alter_generator_aus():
-        return zurueck("/klassenarbeit")
-    material = exam.get_exam_material(material_id)
-    if material is None:
-        raise HTTPException(404, "Lernmaterial nicht gefunden.")
-    topic_id = teaching.holen(material['lesson_id'])['topic_id']
-    if request.session.get('role') == 'child':
-        learning_progress.start(topic_id)
+    material = _exam_material(material_id)
     return render(request, "klassenarbeit_material.html", material=material,
-                  progress_topic=topics.get(topic_id),
-                  adult_page=request.session.get("role") == "parent" and not config.load().klassenarbeit_kind,
-                  auswertung=exam.get_exam_material_evaluation(material))
+                  learning_ui=True, show_nav=False, adult_page=False)
+
+
+@router.get("/klassenarbeit/material/{material_id}/inhalt")
+def klassenarbeit_material_inhalt(material_id: int):
+    from ..services import workflow
+    material = _exam_material(material_id)
+    if material['state'] != 'bereit' or not material['round_id']:
+        raise HTTPException(404, 'Dieses Material ist noch nicht verfügbar.')
+    return workflow.render_material(material['round_id'])
 
 
 @router.get("/klassenarbeit/material/{material_id}/status")
 def klassenarbeit_material_status(material_id: int):
-    if alter_generator_aus():
-        return zurueck("/klassenarbeit")
-    material = exam.get_exam_material(material_id)
-    if material is None:
-        raise HTTPException(404, "Lernmaterial nicht gefunden.")
+    material = _exam_material(material_id)
     material["signatur"] = material["state"]
     return material
 
 
 @router.post("/klassenarbeit/material/{material_id}/fragen")
 def klassenarbeit_material_fragen(request: Request, material_id: int):
-    if alter_generator_aus():
-        return zurueck("/klassenarbeit")
-    try:
-        quiz_id = exam.request_exam_questions(material_id)
-    except teaching.TeachingError as exc:
-        flash(request, str(exc), "err")
-        return zurueck(f"/klassenarbeit/material/{material_id}")
-    return zurueck(f"/quiz/{quiz_id}")
+    material = _exam_material(material_id)
+    flash(request, "Deine Aufgaben findest du jetzt direkt in deiner Prüfungsvorbereitung.")
+    return zurueck(f"/klassenarbeit/{material['exam_id']}#exam-next-step")
 
 
 @router.get("/klassenarbeit/{exam_id}/plan/status")

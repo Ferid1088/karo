@@ -206,19 +206,30 @@ def anker_beantwortet(sitzung: dict, antwort: str) -> dict:
                   fehlerhinweis=None)
 
 
+def _diagnose_aufgaben(konzept_id: int) -> tuple[dict, dict]:
+    first = (katalog.erstkontakt_fuer(konzept_id) or {}).get("erste_aufgabe") or {}
+    second = first.get("bestaetigung") or {}
+    # Older generated lessons lacked a second diagnostic question. Reuse a
+    # DIFFERENT checked task, never repeat the first question indefinitely.
+    if not second.get("frage") or not second.get("loesung"):
+        second = next((task for error in store.fehlertypen(konzept_id)
+                       for task in inhalt_store.aufgaben(error["id"], inhalt_store.SELBSTSTAENDIG)
+                       if task["frage"] != first.get("frage")), {})
+    return first, second
+
+
 def diagnose_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     """Produktives Scheitern auswerten: Fehlertyp bestimmen oder Erfolg buchen."""
     konzept_id = sitzung["konzept_id"]
     daten = _daten(sitzung)
-    erste = (katalog.erstkontakt_fuer(konzept_id) or {}).get("erste_aufgabe") or {}
-    bestaetigung = erste.get("bestaetigung") or {}
+    erste, bestaetigung = _diagnose_aufgaben(konzept_id)
     loesung = (bestaetigung if daten.get("zweite_diagnose") else erste).get(
         "loesung", "")
 
     if not (antwort or '').strip() or (als_bruch(loesung) is not None and als_bruch(antwort) is None):
         return _merke(sitzung["id"], sitzung,
-                      fehlerhinweis="Das kann ich nicht als Bruch lesen. "
-                                    "Schreib es zum Beispiel so: 5/6")
+                      fehlerhinweis="Schreib bitte eine Antwort ins Feld. Bei einer Rechnung "
+                                    "nutze eine Zahl, zum Beispiel 2 oder 5/6.")
 
     if ist_richtig(antwort, loesung):
         ergebnis = zustand.antwort_richtig(sitzung["id"], antwort, cfg=cfg,
@@ -226,6 +237,9 @@ def diagnose_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
         if ergebnis["zustand"] == zustand.MASTERED:
             return ergebnis
         # Eine richtige Antwort ist keine Beherrschung (A8): noch eine Aufgabe.
+        if not bestaetigung:
+            return _merke(sitzung["id"], ergebnis,
+                          fehlerhinweis="Die zweite Kontrollaufgabe fehlt noch. Bitte lass dir helfen.")
         return _merke(sitzung["id"], ergebnis,
                       zweite_diagnose=bestaetigung.get("frage", ""),
                       fehlerhinweis=None)
@@ -235,14 +249,22 @@ def diagnose_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
         # A4: keine Fehlvorstellung erfinden, nur weil die Zahl unbekannt ist.
         store.ereignis_schreiben(sitzung["id"], "Fehler nicht im Katalog",
                                  nutzdaten={"antwort": antwort})
+        attempts = int(daten.get('unbekannte_antworten', 0)) + 1
+        if attempts >= 3:
+            return zustand.eskalieren(sitzung['id'])
         return _merke(sitzung["id"], sitzung,
+                      unbekannte_antworten=attempts,
                       fehlerhinweis="Interessant. Probier es noch einmal — "
                                     "oder schau unter „Das habe ich nicht "
                                     "verstanden“ nach.")
 
     fehlertyp = treffer.fehlertyp
     ergebnis = zustand.fehler_erkannt(sitzung["id"], fehlertyp["id"], antwort)
-    erklaerung = katalog.erklaerung_fuer(fehlertyp["id"], _klasse(cfg))
+    entry = store.eingabe(sitzung.get("eingabe_id")) or {}
+    from .. import topics
+    topic = topics.get(entry["topic_id"]) if entry.get("topic_id") else {}
+    grade = (topic or {}).get("grade") or _klasse(cfg)
+    erklaerung = katalog.erklaerung_fuer(fehlertyp["id"], grade)
     ergebnis = zustand.unterricht_beginnen(
         sitzung["id"], (erklaerung or {}).get("id"), phase=zustand.HOOK)
     return _merke(sitzung["id"], ergebnis, fehlerhinweis=None, tipp_stufe=0)
@@ -278,7 +300,7 @@ def transfer_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     if aufgabe is None:
         return zustand.wechsle_phase(sitzung["id"], zustand.COMPLETE)
 
-    if (antwort or "").strip() == aufgabe["loesung"]:
+    if ist_richtig(antwort, aufgabe["loesung"]):
         ergebnis = zustand.antwort_richtig(sitzung["id"], antwort, cfg=cfg)
         if ergebnis["zustand"] == zustand.MASTERED:
             return ergebnis
@@ -288,8 +310,8 @@ def transfer_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     if ergebnis["zustand"] == zustand.ESCALATED:
         return ergebnis
     return _merke(sitzung["id"], ergebnis,
-                  fehlerhinweis="Überleg noch einmal: Etwas dazubekommen kann "
-                                "nie weniger werden.")
+                  fehlerhinweis="Schau dir die Frage noch einmal in Ruhe an. "
+                                "Welche Regel hilft dir hier?")
 
 
 def tipp(sitzung: dict) -> dict:
@@ -312,8 +334,8 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
 
     if not (antwort or '').strip() or (als_bruch(aufgabe['loesung']) is not None and als_bruch(antwort) is None):
         return _merke(sitzung["id"], sitzung,
-                      fehlerhinweis="Das kann ich nicht als Bruch lesen. "
-                                    "Schreib es zum Beispiel so: 3/4")
+                      fehlerhinweis="Schreib bitte eine Antwort ins Feld. Bei einer Rechnung "
+                                    "nutze eine Zahl, zum Beispiel 2 oder 3/4.")
 
     if ist_richtig(antwort, aufgabe["loesung"]):
         # Die Rechnung allein beendet die selbstständige Phase nicht — der

@@ -75,7 +75,7 @@ def gelernt(request: Request, topic_id: int, gelernt: str = Form("")):
         host = request.headers.get("host") or request.url.netloc
         ziel = security.eigene_seite(request.headers.get("referer"), host)
         return zurueck(ziel or "/lernstand")
-    return zurueck(f"/lernen?tab={learning_progress.status(topic_id)}")
+    return zurueck(f"/lernen?status={learning_progress.status(topic_id)}")
 
 
 @router.post("/{topic_id}/start")

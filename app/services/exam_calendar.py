@@ -6,10 +6,8 @@ jeden Kalendertag bis zur Arbeit separat, ob und wie lange es lernen möchte.
 from __future__ import annotations
 
 import datetime as dt
-import json
 
-from .. import db, exam_plan, topics
-from ..adaptiv import store as adaptiv_store
+from .. import db, topics
 
 WEEKDAY_LABELS = {
     1: "Montag", 2: "Dienstag", 3: "Mittwoch", 4: "Donnerstag",
@@ -22,7 +20,7 @@ class ExamCalendarError(ValueError):
 
 
 def _exam(exam_id: int) -> dict:
-    row = db.q1("SELECT * FROM exam WHERE id=?", exam_id)
+    row = db.q1("SELECT * FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL", exam_id)
     if row is None:
         raise ExamCalendarError("Klassenarbeit nicht gefunden.")
     return dict(row)
@@ -66,10 +64,10 @@ def save_days(exam_id: int, minutes_by_date: dict[str, int]) -> None:
 
     stamp = db.now()
     with db.tx() as c:
-        c.execute("DELETE FROM exam_schedule_day WHERE exam_id=? AND study_date>=?", (exam_id, str(today)))
         c.executemany(
             """INSERT INTO exam_schedule_day(exam_id,study_date,minutes,updated_at)
-               VALUES(?,?,?,?)""",
+               VALUES(?,?,?,?) ON CONFLICT(exam_id,study_date) DO UPDATE SET
+                 minutes=excluded.minutes, updated_at=excluded.updated_at""",
             [(exam_id, day, minutes, stamp)
              for day, minutes in sorted(cleaned.items())],
         )
@@ -128,42 +126,6 @@ def _content_rows(exam_id: int) -> list[dict]:
             if t['learning_status'] != 'sicher']
 
 
-def _legacy_content_rows(exam_id: int) -> list[dict]:
-    plan = exam_plan.holen_plan(exam_id) or {}
-    raw = [dict(row) for row in plan.get("tagesplan_liste", []) if int(row.get("minuten") or 0) > 0]
-
-    if not raw:
-        exam = _exam(exam_id)
-        try:
-            names = json.loads(exam.get("themen") or "[]")
-        except json.JSONDecodeError:
-            names = []
-        matching = topics.passende(names, topics.liste(topics.AKTIV))
-        raw = [{"inhalt": item["label"], "topic_id": item["id"]}
-               for item in matching]
-        if not raw:
-            raw = [{"inhalt": str(name), "topic_id": None}
-                   for name in names if str(name).strip()]
-
-    # Ein Thema kann im KI-Plan an mehreren Tagen vorkommen. Für die
-    # Mastery-Steuerung zählt es trotzdem nur einmal.
-    seen, rows = set(), []
-    for row in raw:
-        key = row.get("topic_id") or row.get("inhalt")
-        if key in seen:
-            continue
-        seen.add(key)
-        rows.append(row)
-
-    def mastered(row: dict) -> bool:
-        topic_id = row.get("topic_id")
-        return bool(topic_id and adaptiv_store.topic_mastery(int(topic_id)) == "MASTERED")
-
-    unsicher = [row for row in rows if not mastered(row)]
-    sicher = [row for row in rows if mastered(row)]
-    return unsicher + sicher
-
-
 def calendar(exam_id: int) -> list[dict]:
     """Alle Tage von heute bis einschließlich Prüfungstag.
 
@@ -178,7 +140,6 @@ def calendar(exam_id: int) -> list[dict]:
 
     saved = get_days(exam_id)
     content = _content_rows(exam_id)
-    learning_index = 0
     result = []
 
     positive_days = sorted(
@@ -196,8 +157,10 @@ def calendar(exam_id: int) -> list[dict]:
         is_simulation = bool(simulation_day and day == simulation_day)
         row = None
         if minutes > 0 and not is_simulation:
+            from .learning_hub import exam_topics
             row = content[0] if content else {
-                "inhalt": "Alles sicher – Zeit zum Wiederholen",
+                "inhalt": ("Alles sicher – Zeit zum Wiederholen" if exam_topics(exam_id)
+                           else "Zuerst Prüfungsthemen ergänzen"),
                 "topic_id": None,
             }
 
@@ -248,7 +211,8 @@ def today_task() -> dict | None:
     today = db.today()
     exams = [dict(row) for row in db.q(
         """SELECT e.* FROM exam e
-           WHERE e.exam_date>? ORDER BY e.exam_date,e.id""", today)]
+           WHERE e.exam_date>? AND e.deleted_at IS NULL AND e.purged_at IS NULL
+           ORDER BY e.exam_date,e.id""", today)]
     for exam in exams:
         task = next(
             (item for item in calendar(exam["id"])
@@ -350,7 +314,7 @@ def monat(wunsch: str = "", heute: dt.date | None = None) -> dict:
     ende = letzter + dt.timedelta(days=7 - letzter.isoweekday())
 
     arbeiten = [dict(r) for r in db.q(
-        "SELECT id, subject, exam_date FROM exam ORDER BY exam_date, id")]
+        "SELECT id, subject, exam_date FROM exam WHERE deleted_at IS NULL AND purged_at IS NULL ORDER BY exam_date, id")]
     for platz, arbeit in enumerate(arbeiten):
         arbeit["farbe"] = platz % 5
         arbeit["probe"] = simulation_date(arbeit["id"])
@@ -374,14 +338,26 @@ def monat(wunsch: str = "", heute: dt.date | None = None) -> dict:
             continue
         plan.setdefault(zeile["study_date"], []).append({
             "exam_id": arbeit["id"], "subject": arbeit["subject"],
+            "exam_date": arbeit["exam_date"],
             "farbe": arbeit["farbe"], "minutes": int(zeile["minutes"]),
             "thema_id": arbeit["thema_id"], "thema": arbeit["thema"],
             "art": _tages_art(arbeit, zeile["study_date"], heute)})
 
     for arbeit in arbeiten:
+        # Vorziehen kann die Probe auf einen bisher freien Tag legen. Sie
+        # bleibt sichtbar, ohne dem Kind ungeplante Minuten zuzuschreiben.
+        probe = arbeit["probe"]
+        if (probe and str(start) <= probe <= str(ende)
+                and not any(e["exam_id"] == arbeit["id"] for e in plan.get(probe, []))):
+            plan.setdefault(probe, []).append({
+                "exam_id": arbeit["id"], "subject": arbeit["subject"],
+                "exam_date": arbeit["exam_date"], "farbe": arbeit["farbe"],
+                "minutes": 0, "thema_id": arbeit["thema_id"],
+                "thema": arbeit["thema"], "art": "probe"})
         if str(start) <= arbeit["exam_date"] <= str(ende):
             plan.setdefault(arbeit["exam_date"], []).append({
                 "exam_id": arbeit["id"], "subject": arbeit["subject"],
+                "exam_date": arbeit["exam_date"],
                 "farbe": arbeit["farbe"], "minutes": 0,
                 "thema_id": arbeit["thema_id"], "thema": arbeit["thema"],
                 "art": "arbeit"})
@@ -390,9 +366,13 @@ def monat(wunsch: str = "", heute: dt.date | None = None) -> dict:
     while tag <= ende:
         reihe = []
         for _ in range(7):
-            eintraege = plan.get(str(tag), [])
+            eintraege = sorted(plan.get(str(tag), []),
+                               key=lambda e: (e["art"] != "arbeit", e["exam_id"]))
             fremd = tag.month != erster.month
             reihe.append({"date": str(tag), "nummer": tag.day,
+                          "date_label": tag.strftime("%d.%m.%Y"),
+                          "weekday": WEEKDAY_LABELS[tag.isoweekday()],
+                          "lernminuten": sum(e["minutes"] for e in eintraege),
                           "im_monat": not fremd,
                           "monat_kurz": MONATE_KURZ[tag.month - 1] if fremd else "",
                           "heute": tag == heute, "eintraege": eintraege})
@@ -408,4 +388,7 @@ def monat(wunsch: str = "", heute: dt.date | None = None) -> dict:
             "jetzt": heute.strftime("%Y-%m"),
             "arbeiten": [a for a in arbeiten
                          if any(e["exam_id"] == a["id"] for e in im_monat)],
+            "pruefungen": sum(e["art"] == "arbeit" for e in im_monat),
+            "lerntage": sum(t["lernminuten"] > 0 for w in wochen
+                            for t in w if t["im_monat"]),
             "lernminuten": sum(e["minutes"] for e in im_monat)}

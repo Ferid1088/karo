@@ -64,7 +64,7 @@ def test_parent_agreement_child_and_dashboard(family):
     role(family, 'parent')
     html = family[0].get('/eltern').text
     assert 'Ihr Kind bittet um eine Änderung' in html and 'Noch keine Rückmeldung' in html
-    assert 'Meine Woche' in family[0].get('/').text
+    assert 'Ziele planen' in family[0].get('/').text
     assert 'data-ui-area="parent"' in family[0].get('/woche/eltern').text
 
 

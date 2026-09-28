@@ -19,7 +19,6 @@ from starlette.datastructures import FormData
 
 from .. import config, db, exam_learning, exam_plan, ingest
 from ..domain import Flag
-from ..topics import AKTIV, liste, passende
 
 
 class ExamError(Exception):
@@ -33,16 +32,13 @@ class ExamCreated:
 
 
 def create_exam(exam_date: str, scan_id: str = '', manual_topics: str = '', subject: str = '') -> ExamCreated:
-    """Legt eine Klassenarbeit aus einem eingelesenen Themenblatt an und
-    friert die Prognose fuer die dazu passenden Themen ein — nur fuer
-    Themen, die zum Themenblatt passen (`topics.passende`), sonst wuerde
-    jede Arbeit sich mit ALLEN aktiven Themen im Fach befassen, auch mit
-    Themen, die auf dem Blatt gar nicht standen (change.txt Abschnitt 8).
-    """
+    """Create an exam with its own topics, never personal-topic predictions."""
     if not scan_id.isdigit() and not manual_topics.strip():
         raise ExamError(
             "Bitte zuerst das Themenblatt hochladen und vollständig einlesen lassen.")
     scan = db.q1("SELECT * FROM exam_scan WHERE id = ?", int(scan_id)) if scan_id.isdigit() else None
+    if scan_id.isdigit() and db.q1("SELECT 1 FROM learning_upload WHERE scan_id=?", int(scan_id)):
+        raise ExamError("Dieses Blatt gehört zu deinen Lernthemen. Lade das Prüfungsblatt hier separat hoch.")
     if scan_id and (scan is None or scan["state"] != "gelesen"):
         raise ExamError(
             "Das Themenblatt wird noch gelesen oder konnte nicht gelesen werden. "
@@ -72,17 +68,6 @@ def create_exam(exam_date: str, scan_id: str = '', manual_topics: str = '', subj
             ((subject.strip() or cfg.subject)[:80], exam_date, json.dumps(liste_themen, ensure_ascii=False),
              db.now()))
         exam_id = cur.lastrowid
-        n = 0
-        aktiv = [t for t in liste(AKTIV) if t["flag"] != Flag.WEISS.value]
-        for t in aktiv:
-            if t['label'].casefold() not in {n.casefold() for n in liste_themen}:
-                continue
-            cur2 = c.execute(
-                """INSERT INTO prediction (exam_id, topic_id, prognose, frozen_at)
-                   VALUES (?, ?, ?, ?)
-                   ON CONFLICT(exam_id, topic_id) DO NOTHING""",
-                (exam_id, t["id"], t["flag"], db.now()))
-            n += cur2.rowcount
 
     # Erst nach dem Commit: beides loest eigene Hintergrund-Jobs aus und
     # braucht die gerade angelegte Klassenarbeit/den Scan bereits sichtbar.
@@ -90,7 +75,7 @@ def create_exam(exam_date: str, scan_id: str = '', manual_topics: str = '', subj
     link_exam(exam_id, liste_themen, subject.strip() or cfg.subject)
     if scan_id:
         exam_plan.scan_uebernehmen(int(scan_id))
-    return ExamCreated(exam_id=exam_id, themen_eingefroren=n)
+    return ExamCreated(exam_id=exam_id, themen_eingefroren=0)
 
 
 def upload_exam_topics_sheet(daten: bytes, endung: str) -> int:
@@ -134,7 +119,7 @@ def request_exam_questions(material_id: int) -> int:
 
 def get_next_exam() -> dict | None:
     """Die naechste bevorstehende Klassenarbeit — fuer die "Heute"-Anzeige."""
-    row = db.q1("SELECT * FROM exam WHERE exam_date >= ? ORDER BY exam_date LIMIT 1",
+    row = db.q1("SELECT * FROM exam WHERE exam_date >= ? AND deleted_at IS NULL AND purged_at IS NULL ORDER BY exam_date LIMIT 1",
                db.today())
     return dict(row) if row else None
 

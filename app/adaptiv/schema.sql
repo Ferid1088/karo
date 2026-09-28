@@ -26,6 +26,13 @@ CREATE TABLE IF NOT EXISTS lern_konzept (
 );
 
 -- … → ErrorType (§2). Die Fehlvorstellung ist die Inhaltseinheit, nicht das Thema.
+CREATE TABLE IF NOT EXISTS lern_curriculum_import (
+  fingerprint TEXT PRIMARY KEY,
+  konzept_id INTEGER NOT NULL REFERENCES lern_konzept(id),
+  provenance TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS lern_fehlertyp (
   id            INTEGER PRIMARY KEY,
   konzept_id    INTEGER NOT NULL REFERENCES lern_konzept(id),

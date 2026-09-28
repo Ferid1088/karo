@@ -1,0 +1,7 @@
+# Prüfungskalender-Logo v2
+
+Generated with the built-in Imagegen tool. Reference: `app/static/pruefungskalender.png`. Selected asset: `app/static/pruefungskalender-v2.png`.
+
+## Final prompt
+
+Use case: logo-brand. Edit target: attached existing circular Prüfungskalender logo for Karo, a friendly German children's learning app. Redesign into a polished, much clearer round app navigation icon recognizable at 56–90 pixels. Keep the cheerful illustrated visual family, circular silhouette, teal and dark blue with small purple accents. Make a large simple white calendar the dominant central object, with two rounded binder rings, four clearly spaced blue date squares and one coral-red square bearing a white star to signify an exam. Remove the large comic explosion and all lettering, remove tiny decorations. Retain the friendly boy and girl from the reference as small simplified half-body mascots tucked at the lower left and lower right edges, with welcoming smiles; they must not obscure the calendar. Refined clean soft 3D cartoon illustration, crisp chunky shapes, restrained highlights, bold clear silhouette, minimal details. Centered single circular badge occupying 92% of a square canvas, fully visible, transparent outside the circle, no text, no numbers, no watermark, no scene background. This is a final production PNG navigation icon, not a mockup. Save generated image for use in app.

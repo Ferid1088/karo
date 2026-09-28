@@ -34,7 +34,7 @@
 
 
 {% if lesson.state == 'abgebrochen' %}
-<section class="card"><h2>Diese Runde ist zu Ende</h2><p>Du kannst ein anderes Thema wählen oder dir gemeinsam helfen lassen.</p><a class="btn" href="/lernen?tab=bearbeitung">Thema aussuchen</a><details class="disclosure"><summary>Für Eltern: Grund ansehen</summary><p>{{ lesson.abbruch_grund or 'Diese Lerneinheit ist beendet.' }}</p></details></section>
+<section class="card"><h2>Diese Runde ist zu Ende</h2><p>Du kannst ein anderes Thema wählen oder dir gemeinsam helfen lassen.</p><a class="btn" href="/lernen?status=bearbeitung">Thema aussuchen</a><details class="disclosure"><summary>Für Eltern: Grund ansehen</summary><p>{{ lesson.abbruch_grund or 'Diese Lerneinheit ist beendet.' }}</p></details></section>
 {% elif lesson.state == 'gelernt' %}
 <section class="card"><h2>Das kannst du gut!</h2><p>Diese Lernrunde ist geschafft.</p><div class="actions"><a class="btn" href="/lernstand">Meine Erfolge ansehen</a><form method="post" action="/lernzyklus/{{ lesson.topic_id }}/quiz/starten">{{ csrf_input() }}<input type="hidden" name="erneut" value="ja"><button class="ghost" type="submit">Mit Fragen wiederholen</button></form></div></section>
 {% elif lesson.state == 'wartet' %}
