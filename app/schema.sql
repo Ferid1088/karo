@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS document (
     state         TEXT NOT NULL DEFAULT 'neu',
     note          TEXT,
     themenname    TEXT,      -- von der Familie vorgegebener Rahmen beim Upload
+    subject       TEXT,      -- deutsch | mathematik | englisch; leer = Elternordner
     created_at    TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_document_state ON document(state);
@@ -394,3 +395,36 @@ CREATE TABLE IF NOT EXISTS learning_upload (
   subject TEXT NOT NULL,
   grade INTEGER NOT NULL
 );
+-- Content-level consent and parent inbox; independent of topic.grade.
+CREATE TABLE IF NOT EXISTS learning_grade_notice (
+    id INTEGER PRIMARY KEY,
+    consent_key TEXT NOT NULL UNIQUE,
+    area TEXT NOT NULL,
+    topic_id INTEGER,
+    concept_id INTEGER NOT NULL,
+    topic_label TEXT NOT NULL,
+    profile_grade INTEGER NOT NULL CHECK(profile_grade BETWEEN 1 AND 13),
+    grade_from INTEGER NOT NULL CHECK(grade_from BETWEEN 1 AND 13),
+    grade_to INTEGER NOT NULL CHECK(grade_to BETWEEN grade_from AND 13),
+    created_at TEXT NOT NULL,
+    read_at TEXT
+);
+-- Post von zu Hause: Eltern schreiben dem Kind. Nur freundliche Emojis, kein
+-- Bezug zu Ampel oder Fehlerzahlen. Das Kind sieht nur die Nachricht.
+CREATE TABLE IF NOT EXISTS family_message (
+    id INTEGER PRIMARY KEY,
+    child_key TEXT NOT NULL DEFAULT 'installation' CHECK(child_key='installation'),
+    kind TEXT NOT NULL DEFAULT 'nachricht' CHECK(kind IN ('nachricht','ueberraschung','feier')),
+    text TEXT NOT NULL DEFAULT '' CHECK(length(text) <= 200),
+    emoji TEXT,
+    goal_id INTEGER,
+    created_at TEXT NOT NULL,
+    read_at TEXT,
+    reaction TEXT,
+    reacted_at TEXT,
+    withdrawn_at TEXT,
+    CHECK(length(text) > 0 OR emoji IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_family_message_created ON family_message(created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_family_message_feier ON family_message(goal_id)
+    WHERE kind='feier' AND withdrawn_at IS NULL;

@@ -22,10 +22,16 @@
 </div></dialog>
 {%- endmacro %}
 
+{% set kid = cfg.learner_name or 'Ihr Kind' %}
+{% set post = report.get('post') or {'suggestions': [], 'recent': [], 'celebrations': [], 'emojis': [], 'max_text': 200} %}
+{% set here = '/eltern?ansicht=' ~ report.mode ~ '&datum=' ~ report.anchor %}
+{% macro formbits() -%}<input type="hidden" name="{{ csrf_field }}" value="{{ csrf }}"><input type="hidden" name="zurueck_zu" value="{{ here }}">{%- endmacro %}
+{% macro feier_rows() -%}{% for c in post.celebrations %}<div class="pr-feier"><span class="pr-feier-e" aria-hidden="true">🎉</span><span class="pr-feier-t"><b>„{{ c.statement }}“ geschafft!</b><small>Feier-Idee von {{ kid }}: {{ c.celebration }}</small></span><form method="post" action="/eltern/post/feier/{{ c.id }}">{{ formbits() }}<button type="submit" class="pr-feier-btn">Machen wir!</button></form></div>{% endfor %}{%- endmacro %}
 <section id="parent-report" class="pr" aria-label="Elternbericht" data-date="{{ report.anchor }}" data-mode="{{ report.mode }}">
   <header class="pr-heading">
     <div><p class="pr-eyebrow">ELTERNBERICHT · {{ cfg.learner_name or 'Ihr Kind' }} · Klasse {{ cfg.learner_grade }}</p>
-      <h1>Alles Wichtige im Blick</h1><p class="pr-muted">{{ report.title }} · Alle Fächer · Eigene Themen, Prüfungen &amp; Ziele</p></div>
+      <h1>Alles Wichtige im Blick</h1><p class="pr-muted">{{ report.title }} · Alle Fächer · Eigene Themen, Prüfungen &amp; Ziele</p>
+      <a class="pr-post-btn" {{ opener('pr-d-post') }}><span aria-hidden="true">✉️</span> Nachricht an {{ kid }}{% set last = post.recent|selectattr('reaction')|first %}{% if last and last.reaction %}<span class="pr-post-last">Letzte Antwort: {{ last.reaction_label }}</span>{% endif %}</a></div>
     <nav class="pr-period" aria-label="Berichtszeitraum">
       <div class="pr-switch"><a data-report-link href="{{ report.day_link }}" {% if report.mode == 'tag' %}aria-current="true"{% endif %}>Tag</a><a data-report-link href="{{ report.week_link }}" {% if report.mode == 'woche' %}aria-current="true"{% endif %}>Woche</a><a data-report-link href="{{ report.month_link }}" {% if report.mode == 'monat' %}aria-current="true"{% endif %}>Monat</a></div>
       <div class="pr-date-nav">
@@ -147,6 +153,7 @@
       </div>
     </section>
     <section class="pr-panel pr-goals-panel" aria-labelledby="pr-goals-title">
+      {{ feier_rows() }}
       <div class="pr-panel-heading"><h2 id="pr-goals-title">Ziele</h2><span class="pr-legend"><span><i class="pr-pip" aria-hidden="true"></i>geschafft</span><span><i class="pr-pip missed" aria-hidden="true"></i>verpasst</span><span><i class="pr-pip planned" aria-hidden="true"></i>geplant</span></span></div>
       {% for goal in report.goals %}
         <a class="pr-grow" {{ opener('pr-d-goal-' ~ goal.id) }}>
@@ -163,6 +170,8 @@
   {# ================= Details (Dialoge) ================= #}
   {% call sheet('pr-d-status', 'Lagebild') %}
     <div class="pr-d-hero">{{ lamp(st.level, 'big') }}<div><b>{{ st.head }}</b><span>{{ st.line }}</span></div></div>
+    {{ feier_rows() }}
+    <a class="pr-d-btn" {{ opener('pr-d-post') }}>✉️ Nachricht an {{ kid }} schicken</a>
     <div class="pr-insights">{% for insight in report.insights %}<article class="pr-insight pr-{{ insight.tone }}"><h3>{{ insight.title }}</h3><p>{{ insight.text }}</p></article>{% endfor %}</div>
     <h3 class="pr-d-sec">Die Kontrolllampen</h3>
     <div class="pr-d-list">{% for l in st.lamps %}
@@ -247,6 +256,26 @@
     </tbody></table></div>
     <p class="pr-d-expl">Antworten sind Übungsversuche, keine Schulnote. Unterschiedlich schwere Aufgaben sind nicht direkt vergleichbar. Zielminuten sind Selbstauskunft, Prüfungsminuten stammen aus der Planung.</p>
   {% endcall %}{% endif %}
+
+  {% call sheet('pr-d-post', 'Nachricht an ' ~ kid) %}
+    <form method="post" action="/eltern/post" class="pr-post-form" data-post-form>{{ formbits() }}
+      <fieldset class="pr-choice pr-post-art"><legend>Was möchten Sie schicken?</legend>
+        <label><input type="radio" name="art" value="nachricht" checked><span>✉️ Nachricht</span></label>
+        <label><input type="radio" name="art" value="ueberraschung"><span>🎁 Überraschung</span></label></fieldset>
+      {% if post.suggestions %}<fieldset class="pr-choice pr-post-vorschlaege"><legend>Vorschläge aus dem Bericht</legend>
+        {% for sug in post.suggestions %}<label><input type="radio" name="vorschlag" value="{{ sug.text }}" data-emoji="{{ sug.emoji }}"{{ ' checked' if loop.first }}><span>{{ sug.emoji }} {{ sug.text }}</span></label>{% endfor %}
+        <label><input type="radio" name="vorschlag" value="" data-emoji=""><span>Ohne Vorschlag</span></label></fieldset>{% endif %}
+      <label class="pr-post-text"><span>Eigene Worte <small>(ersetzen den Vorschlag)</small></span><textarea name="text" maxlength="{{ post.max_text }}" rows="3" placeholder="Zum Beispiel: Samstag gehen wir zusammen Eis essen."></textarea><small class="pr-note" data-post-count>höchstens {{ post.max_text }} Zeichen</small></label>
+      <fieldset class="pr-choice pr-post-emojis"><legend>Emoji</legend>
+        {% for e in post.emojis %}<label><input type="radio" name="emoji" value="{{ e }}"{{ ' checked' if post.suggestions and post.suggestions[0].emoji == e }}><span>{{ e }}</span></label>{% endfor %}
+        <label><input type="radio" name="emoji" value=""{{ ' checked' if not post.suggestions }}><span class="pr-post-ohne">ohne</span></label></fieldset>
+      <p class="pr-d-expl">Loben Sie den Einsatz, nicht die Fehlerzahl. Eine Überraschung kündigt man nicht vorher an – sie sagt Danke fürs Dranbleiben. {{ kid }} sieht nur diese Nachricht, nie den Bericht.</p>
+      <button type="submit" class="pr-d-btn">Abschicken</button>
+    </form>
+    {% if post.recent %}<h3 class="pr-d-sec">Zuletzt geschickt</h3>
+    <div class="pr-d-list">{% for m in post.recent %}<div class="pr-drow"><span class="pr-nm"><span class="pr-post-e" aria-hidden="true">{{ m.emoji or ('🎁' if m.kind == 'ueberraschung' else '✉️') }}</span><span>{{ m.text or 'Nur ein Emoji' }}<small>{{ m.when|capitalize }} · {{ m.kind_label }} · {{ 'gelesen ✓' if m.read_at else 'noch ungelesen' }}</small></span></span>
+      <span class="pr-rt">{% if m.reaction %}{{ badge('good', kid ~ ': ' ~ m.reaction_label) }}{% elif not m.read_at %}<form method="post" action="/eltern/post/{{ m.id }}/zurueckziehen">{{ formbits() }}<button type="submit" class="pr-textbtn">Zurückziehen</button></form>{% endif %}</span></div>{% endfor %}</div>{% endif %}
+  {% endcall %}
 
   {% call sheet('pr-d-help', 'So lesen Sie den Bericht') %}
     <p class="pr-d-lead">Oben sehen Sie auf einen Blick, wie es läuft. Alles andere öffnet sich erst, wenn Sie es antippen.</p>

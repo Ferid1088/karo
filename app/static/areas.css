@@ -502,3 +502,24 @@
   [data-ui-area="child"] .simple-header .simple-nav { flex-wrap: wrap; overflow: visible; row-gap: .3rem; }
   [data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: 0; }
 }
+
+/* Hell / Automatisch / Dunkel im Kopf des Elternbereichs (themes.js). */
+.modus-schalter { display: inline-flex; flex: none; gap: 2px; padding: 3px; border: 1px solid var(--header-muted); border-radius: 9px; }
+.modus-schalter button { display: grid; place-items: center; width: 30px; height: 28px; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 6px; background: transparent; box-shadow: none; transform: none; cursor: pointer; }
+.modus-schalter button:hover { background: var(--header-active); transform: none; }
+.modus-schalter button[aria-pressed="true"] { background: var(--header-text); }
+.modus-schalter svg { width: 17px; height: 17px; fill: none; stroke: var(--header-muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.modus-schalter .halb { fill: var(--header-muted); stroke: none; }
+.modus-schalter button:hover svg { stroke: var(--header-text); }
+.modus-schalter button:hover .halb { fill: var(--header-text); }
+.modus-schalter button[aria-pressed="true"] svg { stroke: var(--header); }
+.modus-schalter button[aria-pressed="true"] .halb { fill: var(--header); }
+@media (max-width: 680px) {
+  [data-ui-area="parent"] .kopf-werkzeuge { flex-wrap: wrap; justify-content: flex-end; row-gap: .5rem; }
+}
+
+/* Briefumschlag im Kinderbereich (Post von zu Hause). */
+.kopf-post { position: relative; display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 12px; color: var(--text); text-decoration: none; }
+.kopf-post:hover { background: var(--ink-soft); }
+.kopf-post svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.kopf-post-zahl { position: absolute; top: -3px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--bad, #e11d48); color: #fff; font: 800 .72rem/20px system-ui, sans-serif; text-align: center; box-shadow: 0 0 0 2px var(--surface); }

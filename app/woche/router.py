@@ -477,7 +477,8 @@ async def wizard_save(request: Request):
             if start < plaene.today():
                 raise ValueError("Das Startdatum darf nicht vor heute liegen.")
             end = date.fromisoformat(values["end_date"]) if values["duration"] == "custom" else start + timedelta(days=int(values["duration"]) - 1)
-            goal_id = plan_store.create_goal(values["statement"], start, end, int(values["minutes"]), values["weekdays"])
+            goal_id = plan_store.create_goal(values["statement"], start, end, int(values["minutes"]), values["weekdays"],
+                                             celebration=data.get("celebration", ""))
             request.session.pop("plan_wizard", None)
             flash(request, "Dein Plan ist fertig. Los geht’s!")
             return zurueck(f"/woche/ziele/{goal_id}")
@@ -545,6 +546,19 @@ async def edit_goal(request: Request, goal_id: int):
                                  date.fromisoformat(str(data.get("end_date", ""))),
                                  number(data, "minutes"), data.getlist("weekdays"), plaene.today() + timedelta(days=1))
         flash(request, "Dein Ziel ist angepasst. Vergangene Einheiten bleiben unverändert.")
+    except (ValueError, LookupError) as exc:
+        flash(request, str(exc), "err")
+    return zurueck(f"/woche/ziele/{goal_id}")
+
+
+@router.post('/ziele/{goal_id}/feier')
+async def goal_celebration(request: Request, goal_id: int):
+    """Die Feier-Idee gehört dem Kind: es trägt sie ein, ändert sie oder löscht sie."""
+    data = await form(request)
+    try:
+        plan_store.set_celebration(goal_id, data.get("celebration", ""))
+        flash(request, "Deine Feier-Idee ist gespeichert." if str(data.get("celebration", "")).strip()
+              else "Die Feier-Idee ist entfernt.")
     except (ValueError, LookupError) as exc:
         flash(request, str(exc), "err")
     return zurueck(f"/woche/ziele/{goal_id}")

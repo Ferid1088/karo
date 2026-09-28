@@ -27,7 +27,7 @@ from starlette.status import HTTP_303_SEE_OTHER
 from . import config, db, jobs, security
 from .config import ConfigUnreadable
 from .routers import (adaptiv, auth, eltern, kind, admin, dashboard,
-                      lernzyklus, vorbereitung, messung)
+                      lernzyklus, vorbereitung, messung, post)
 from .woche import router as woche
 from .welten import router as welten
 
@@ -62,7 +62,7 @@ VALID_ROLES = frozenset({"parent", "child"})
 # wird hier zentral erzwungen, nicht nur durch ausgeblendete Menuepunkte.
 CHILD_ALLOWED_EXACT = frozenset({"/", "/hilfe", "/lernstand", "/profilbild"})
 CHILD_ALLOWED_PREFIXES = ("/lernen", "/lernzyklus", "/quiz", "/material",
-                          "/klassenarbeit/material", "/woche", "/welten")
+                          "/klassenarbeit/material", "/woche", "/welten", "/post")
 
 # Die Freigabe bleibt Elternsache, bis Eltern sie in den Einstellungen
 # ausdruecklich auch fuer das Kind aktivieren. Gilt fuer beide Routenfamilien.
@@ -76,7 +76,7 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
         path in {"/klassenarbeit", "/klassenarbeit/neu",
                  "/klassenarbeit/kalender", "/messung/examen",
                  "/klassenarbeit/themenblatt", "/klassenarbeit/themenblatt/status"}
-        or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|themen|loeschen|lernen(?:/(?:start|status|wartet|neu|anker|diagnose|weiter|aufgabe|vorhersage|transfer|tipp))?|simulation(?:/[0-9]+(?:/antworten)?)?))?", path)
+        or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|themen|loeschen|lernen(?:/(?:start|status|wartet|neu|anker|diagnose|weiter|aufgabe|vorhersage|transfer|tipp|klasse-bestaetigen))?|simulation(?:/[0-9]+(?:/antworten)?)?))?", path)
     ):
         return True
     if schulblaetter_kind and (
@@ -132,6 +132,7 @@ app.include_router(kind.router)
 app.include_router(admin.router)
 app.include_router(vorbereitung.router)
 app.include_router(messung.router)
+app.include_router(post.router)
 # „Meine Woche“ verwendet die bestehende Anmeldung; Schema in db.init().
 app.include_router(woche.router)
 app.include_router(welten.router)

@@ -1,5 +1,5 @@
 """Einfache Einstiege: ein nächster Lernschritt und ein eigener Elternbereich."""
-from fastapi import APIRouter, Request, Form, UploadFile
+from fastapi import APIRouter, Request, Form, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse
 
 from .. import config, db, jobs, kb, quizzes, topics
@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.get('/', response_class=HTMLResponse)
 def dashboard(request: Request):
-    from ..services import learning_hub, today
+    from ..services import learning_hub, today, family_post
     personal = learning_hub.personal_topics()
     next_topic = next((t for t in personal if t['learning_status'] == 'bearbeitung'), None)
     next_topic = next_topic or next((t for t in personal if t['learning_status'] == 'neu'), None)
@@ -22,7 +22,8 @@ def dashboard(request: Request):
     aktion = workflow.get_next_action(
         'child', themen, schritte, reviews,
         antworten_pruefen_kind=config.load().antworten_pruefen_kind)
-    return render(request, 'dashboard.html', tag=today.mein_tag(choice=request.query_params.get('jetzt', ''),
+    return render(request, 'dashboard.html', post_neu=family_post.unread(),
+                  tag=today.mein_tag(choice=request.query_params.get('jetzt', ''),
                                      role=request.session.get('role')),
                   naechstes=workflow.next_action_display(aktion), next_action_kind=aktion.kind,
                   next_topic=next_topic,
@@ -33,17 +34,27 @@ def dashboard(request: Request):
 @router.get('/lernen/neu', response_class=HTMLResponse)
 def neues_thema(request: Request):
     from ..services import learning_hub
-    return render(request, 'learning_new.html', katalog=learning_hub.catalog())
+    from .shared import aktives_fach
+    fach = aktives_fach(request, request.query_params.get('fach'))
+    return render(request, 'learning_new.html', fach=fach, katalog=learning_hub.catalog(fach))
 
 
 @router.post('/lernen/neu')
 def thema_anlegen(request: Request, thema: str = Form(''), fach: str = Form(''), klasse: int = Form(6)):
     from ..services import learning_hub
+    from .shared import aktives_fach
+    from .. import faecher
+    if not faecher.schluessel(fach):
+        flash(request, 'Bitte wähle zuerst ein Fach: Deutsch, Mathematik oder Englisch.', 'warn')
+        return zurueck('/lernen')
+    fach = aktives_fach(request, fach)
     try:
         topic_id = learning_hub.create_topic(thema, fach, klasse)
     except ValueError as exc:
+        # SUBJECT_MISMATCH: nichts wird gespeichert, das Kind erfährt, wohin
+        # das Thema gehört.
         flash(request, str(exc), 'warn')
-        return zurueck('/lernen/neu')
+        return zurueck(f'/lernen/neu?fach={fach}')
     flash(request, 'Dein Thema ist da. Los geht’s, wenn du bereit bist.')
     return zurueck(f'/lernen/thema/{topic_id}')
 
@@ -56,7 +67,8 @@ def thema_einstieg(request: Request, topic_id: int):
     topic = learning_hub.topic_in_scope(topic_id)
     if topic is None:
         raise HTTPException(404, "Dieses Thema gehört nicht zu deinen Lernthemen.")
-    ready = lektionen.fuer_thema(topic['label'], topic['subject'], topic.get('grade'))
+    learning_hub.decorate([topic])
+    ready = lektionen.fuer_thema(topic['label'], topic['subject'])
     return render(request, 'learning_topic_intro.html', topic=topic, ready=bool(ready))
 
 
@@ -120,13 +132,15 @@ def arbeit_zurueck(request: Request, exam_id: int):
 
 @router.get('/lernen/material', response_class=HTMLResponse)
 def lernmaterial(request: Request):
+    from .shared import aktives_fach
+    fach = aktives_fach(request, request.query_params.get('fach'))
     import json
     row = db.q1('''SELECT s.* FROM exam_scan s JOIN learning_upload u ON u.scan_id=s.id
                   WHERE s.state!='uebernommen' ORDER BY s.id DESC LIMIT 1''')
     scan = dict(row) if row else None
     if scan:
         scan['names'] = json.loads(scan.get('themen') or '[]')
-    return render(request, 'learning_upload.html', scan=scan)
+    return render(request, 'learning_upload.html', scan=scan, fach=fach)
 
 
 @router.post('/lernen/material')
@@ -135,6 +149,11 @@ async def material_hochladen(request: Request, datei: UploadFile, fach: str = Fo
     from .. import security
     from ..services.exam import ExamError
     from starlette.concurrency import run_in_threadpool
+    from .. import faecher
+    fach = faecher.schluessel(fach)
+    if fach is None:
+        flash(request, 'Bitte wähle zuerst ein Fach: Deutsch, Mathematik oder Englisch.', 'warn')
+        return zurueck('/lernen')
     if not 1 <= klasse <= 13:
         flash(request, 'Bitte eine Klasse von 1 bis 13 wählen.', 'warn')
         return zurueck('/lernen/material')
@@ -148,9 +167,8 @@ async def material_hochladen(request: Request, datei: UploadFile, fach: str = Fo
         flash(request, str(exc), 'warn')
         return zurueck('/lernen/material')
     with db.tx() as c:
-        c.execute('INSERT INTO learning_upload VALUES(?,?,?)',
-                  (scan_id, (fach.strip() or config.load().subject)[:80], klasse))
-    return zurueck('/lernen/material')
+        c.execute('INSERT INTO learning_upload VALUES(?,?,?)', (scan_id, fach, klasse))
+    return zurueck(f'/lernen/material?fach={fach}')
 
 
 @router.get('/lernen/material/status')
@@ -171,16 +189,47 @@ def material_themen(request: Request, scan_id: int = Form(...), themen: str = Fo
     if not scan or not names or len(names) > 20 or any(len(n) > 200 for n in names):
         flash(request, 'Prüfe bitte die erkannten Themen. Du kannst bis zu 20 Themen übernehmen.', 'warn')
         return zurueck('/lernen/material')
+    from .. import faecher
+    fach = faecher.schluessel(scan['subject'])
+    if fach is None:
+        flash(request, 'Dieses Blatt hat kein Fach. Bitte lade es in einem Fach hoch.', 'warn')
+        return zurueck('/lernen/material')
+    abgewiesen = []
     for name in names:
-        learning_hub.create_topic(name, scan['subject'], scan['grade'])
+        try:
+            learning_hub.create_topic(name, fach, scan['grade'], modell=False)
+        except faecher.SubjectMismatch:
+            abgewiesen.append(name)
     exam_plan.scan_uebernehmen(scan_id)
-    flash(request, 'Deine Themen sind bereit zum Auswählen.')
-    return zurueck('/lernen')
+    if abgewiesen:
+        flash(request, f'Nicht aus {faecher.NAMEN[fach]} und deshalb nicht übernommen: '
+              + ', '.join(abgewiesen), 'warn')
+    else:
+        flash(request, 'Deine Themen sind bereit zum Auswählen.')
+    return zurueck(f'/lernen/{fach}')
 
 
 @router.get('/lernen', response_class=HTMLResponse)
 def lernen(request: Request):
-    return workflow.render_lernen_uebersicht(request)
+    """Lernen beginnt immer in einem Fach: im zuletzt gewählten."""
+    from .shared import aktives_fach
+    return zurueck(f'/lernen/{aktives_fach(request, request.query_params.get("fach"))}'
+                   + (f'?{request.url.query}' if request.url.query else ''))
+
+
+def _fach_seite(fach: str):
+    def seite(request: Request):
+        return workflow.render_lernen_uebersicht(request, fach)
+    seite.__name__ = f'lernen_{fach}'
+    return seite
+
+
+# Drei feste Adressen statt /lernen/{fach}: ein Platzhalter verdeckte
+# /lernen/neu, /lernen/material und die übrigen Lernwege.
+from .. import faecher as _faecher  # noqa: E402
+for _fach in _faecher.FAECHER:
+    router.add_api_route(f'/lernen/{_fach}', _fach_seite(_fach),
+                         methods=['GET'], response_class=HTMLResponse)
 
 
 @router.get('/lernen/themen')
@@ -190,13 +239,69 @@ def lernen_themen(request: Request):
     return zurueck('/lernen')
 
 
+@router.get('/eltern/ohne-fach', response_class=HTMLResponse)
+def ohne_fach_ordner(request: Request):
+    from ..services import ohne_fach
+    return render(request, 'eltern_ohne_fach.html', ordner=ohne_fach.inhalte())
+
+
+@router.post('/eltern/ohne-fach/zuordnen')
+def ohne_fach_zuordnen(request: Request, art: str = Form(''), eintrag_id: int = Form(...),
+                       fach: str = Form('')):
+    from ..services import ohne_fach
+    from .. import faecher
+    try:
+        ohne_fach.zuordnen(art, eintrag_id, fach)
+    except ValueError as exc:
+        flash(request, str(exc), 'err')
+    else:
+        flash(request, f'Zugeordnet zu {faecher.NAMEN[faecher.pflicht(fach)]}.')
+    return zurueck('/eltern/ohne-fach')
+
+
 @router.get('/eltern', response_class=HTMLResponse)
 def eltern(request: Request):
     _, schritte, reviews = workflow.offene_schritte()
     if config.load().antworten_pruefen_kind:
         reviews = []
-    return render(request, 'eltern.html', reviews=reviews, schritte=schritte,
+    from ..services import ohne_fach, grade_guidance, parent_overview, parent_report, family_post
+    try:
+        report = parent_report.build(request.query_params.get('ansicht', 'monat'),
+            request.query_params.get('datum', ''), request.query_params.get('zurueck', 'monat'),
+            request.query_params.get('basis', ''))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+    report['post'] = family_post.parent_view(report, config.load_safe().learner_name or '')
+    response = render(request, 'eltern.html', reviews=reviews, schritte=schritte,
+                  report=report,
+                  overview=parent_overview.summary(),
+                  ohne_fach_anzahl=ohne_fach.anzahl(),
+                  grade_notices=grade_guidance.unread(),
                   woche=parent_summary(), begleiter=current_companion(),
                   begleiter_interesse=current_interest(),
                   counts=jobs.counts(), kb_stat=kb.statistik(),
                   einig=quizzes.uebereinstimmung(), fehler=jobs.fehlgeschlagen())
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@router.get('/eltern/bericht', response_class=HTMLResponse)
+def eltern_bericht(request: Request):
+    from ..services import parent_report, family_post
+    try:
+        report = parent_report.build(request.query_params.get('ansicht', 'monat'),
+            request.query_params.get('datum', ''), request.query_params.get('zurueck', 'monat'),
+            request.query_params.get('basis', ''))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+    report['post'] = family_post.parent_view(report, config.load_safe().learner_name or '')
+    response = render(request, '_parent_report.html', report=report)
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@router.post('/eltern/klassenhinweis/{notice_id}/gelesen')
+def klassenhinweis_gelesen(request: Request, notice_id: int):
+    from ..services import grade_guidance
+    grade_guidance.mark_read(notice_id)
+    return zurueck('/eltern')

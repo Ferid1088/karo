@@ -42,6 +42,9 @@ BASE = Path(__file__).parent.parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 # Datumsangaben erscheinen in den Vorlagen deutsch: {{ wert|datum }}
 templates.env.filters["datum"] = plaene.date_label
+# Fächer werden als Schlüssel gespeichert und als Name gezeigt.
+from .. import faecher as _faecher  # noqa: E402
+templates.env.filters["fachname"] = _faecher.name
 
 try:
     ASSET_VERSION = str(max(
@@ -88,6 +91,8 @@ def render(request: Request, name: str, status_code: int = 200,
         "offene_funde": research.anzahl_vorschlaege(),
         "learner_photo_url": profile.photo_url(),
         "learning_ui": request.url.path == "/" or request.url.path.startswith(("/lernen", "/lernzyklus", "/quiz")),
+        "faecher": [(key, _faecher.NAMEN[key]) for key in _faecher.FAECHER],
+        "aktives_fach": aktives_fach(request),
     }
     basis.update(ctx)
     # The visible area follows the page, including shared pages enabled for children.
@@ -99,6 +104,14 @@ def render(request: Request, name: str, status_code: int = 200,
             and quiz.get("state") in ("beantwortet", "ausgewertet")):
         basis["adult_page"] = True
     basis["ui_area"] = "parent" if basis["adult_page"] else "child"
+    # Kleiner Briefumschlag im Kinderbereich: wie viel Post von zu Hause ungelesen ist.
+    basis["post_neu_anzahl"] = 0
+    if not basis["adult_page"]:
+        from ..services import family_post
+        try:
+            basis["post_neu_anzahl"] = len(family_post.unread())
+        except Exception:  # noqa: BLE001 - die Anzeige darf nie eine Seite verhindern
+            log.warning("Postfach-Zaehler nicht verfuegbar", exc_info=True)
     # Der Begleiter (Name/Foto) ersetzt "Karo" nur im Kind-Bereich — der
     # Eltern-Bereich bleibt bewusst bei "Karo" und dem Original-Logo.
     begleiter = None if basis["adult_page"] else _begleiter()
@@ -123,6 +136,21 @@ def companion_name(request: Request) -> str:
         return "Karo"
     begleiter = _begleiter()
     return begleiter["name"] if begleiter else "Karo"
+
+
+def aktives_fach(request: Request, wert: str | None = None) -> str:
+    """Das Fach, in dem das Kind gerade arbeitet.
+
+    Ein gültiges ``wert`` (aus Adresse oder Formular) wird gemerkt. Sonst gilt
+    das zuletzt gewählte Fach, dann das Fach aus den Einstellungen.
+    """
+    key = _faecher.schluessel(wert)
+    if key:
+        request.session["fach"] = key
+        return key
+    return (_faecher.schluessel(request.session.get("fach"))
+            or _faecher.schluessel(getattr(config.load_safe(), "subject", ""))
+            or "mathematik")
 
 
 def flash(request: Request, text: str, art: str = "ok") -> None:

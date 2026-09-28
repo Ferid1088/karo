@@ -73,4 +73,30 @@
     if (sheet.matches?.('dialog.pr-sheet') && sheet.returnTo?.isConnected) sheet.returnTo.focus({preventScroll:true});
   }, true);
   window.addEventListener('popstate', () => show(location.href, false));
+  // Post von zu Hause: ein Vorschlag landet im Textfeld (dort änderbar) und wählt sein Emoji.
+  document.addEventListener('change', event => {
+    const choice = event.target.closest?.('[data-post-form] input[name="vorschlag"]');
+    if (!choice) return;
+    const form = choice.form;
+    form.elements.text.value = choice.value;
+    const emoji = form.querySelector(`input[name="emoji"][value="${CSS.escape(choice.dataset.emoji || '')}"]`);
+    if (emoji) emoji.checked = true;
+    form.elements.text.dispatchEvent(new Event('input', {bubbles:true}));
+  });
+  document.addEventListener('input', event => {
+    const box = event.target.closest?.('[data-post-form] textarea[name="text"]');
+    const count = box?.form.querySelector('[data-post-count]');
+    if (count) count.textContent = `${box.value.length} / ${box.maxLength} Zeichen`;
+  });
+  // Beim Öffnen steht der ausgewählte Vorschlag schon im Textfeld.
+  document.addEventListener('click', event => {
+    const opener = event.target.closest?.('#parent-report [data-dialog="pr-d-post"]');
+    if (!opener) return;
+    const form = document.querySelector('#pr-d-post [data-post-form]');
+    const picked = form?.querySelector('input[name="vorschlag"]:checked');
+    if (form && picked && !form.elements.text.value) {
+      form.elements.text.value = picked.value;
+      form.elements.text.dispatchEvent(new Event('input', {bubbles:true}));
+    }
+  });
 })();

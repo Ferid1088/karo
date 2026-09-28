@@ -11,6 +11,27 @@ from . import plaene
 def init() -> None:
     db.conn().executescript(Path(__file__).with_name("plaene.sql").read_text(encoding="utf-8"))
     _drop_single_completion_limit()
+    _add_celebration()
+
+
+def _add_celebration() -> None:
+    """Feier-Idee des Kindes (freiwillig). Bestehende Datenbanken bekommen die Spalte nachgezogen."""
+    if not any(row["name"] == "celebration" for row in db.q("PRAGMA table_info(plan_goal)")):
+        db.conn().execute("ALTER TABLE plan_goal ADD COLUMN celebration TEXT")
+
+
+def clean_celebration(value) -> str | None:
+    text = " ".join(str(value or "").split())
+    if len(text) > 60:
+        raise ValueError("Deine Feier-Idee darf höchstens 60 Zeichen haben.")
+    return text or None
+
+
+def set_celebration(goal_id: int, value) -> None:
+    goal(goal_id)
+    with db.tx() as connection:
+        connection.execute("UPDATE plan_goal SET celebration=?,updated_at=? WHERE id=?",
+                           (clean_celebration(value), db.now(), goal_id))
 
 
 def _drop_single_completion_limit() -> None:
@@ -39,6 +60,26 @@ def _drop_single_completion_limit() -> None:
 
 def _dict(row):
     return dict(row) if row else None
+
+
+def parent_report_rows() -> tuple[list[dict], list[dict]]:
+    """Read-only public progress projection. Never includes focus or private notes.
+
+    Do not call init(), mark_missed(), sessions(), or goal(): visiting a parent
+    report must not change the child's plan or database schema.
+    """
+    if not db.q1("SELECT 1 FROM sqlite_master WHERE type='table' AND name='plan_session'"):
+        return [], []  # Goals have never been opened on this installation.
+    sessions = [dict(r) for r in db.q('''SELECT s.id, s.goal_id, s.scheduled_date,
+        s.planned_minutes, s.status, s.created_at, g.statement
+        FROM plan_session s JOIN plan_goal g ON g.id=s.goal_id
+        WHERE g.child_key='installation' ORDER BY s.scheduled_date,s.id''')]
+    completions = [dict(r) for r in db.q('''SELECT c.id, c.planned_session_id,
+        c.actual_minutes, c.completed_at, c.is_makeup
+        FROM plan_completion c JOIN plan_session s ON s.id=c.planned_session_id
+        JOIN plan_goal g ON g.id=s.goal_id
+        WHERE g.child_key='installation' ORDER BY c.completed_at,c.id''')]
+    return sessions, completions
 
 
 def goal(goal_id: int) -> dict:
@@ -104,14 +145,15 @@ def session(session_id: int) -> dict:
     return rows[0]
 
 
-def create_goal(statement: str, start: date, end: date, minutes: int, weekdays) -> int:
+def create_goal(statement: str, start: date, end: date, minutes: int, weekdays, celebration=None) -> int:
     init()
     statement, days = plaene.validate_goal(statement, start, end, minutes, weekdays)
+    celebration = clean_celebration(celebration)
     stamp = db.now()
     with db.tx() as connection:
         cursor = connection.execute(
-            "INSERT INTO plan_goal(statement,start_date,end_date,planned_minutes,weekdays,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
-            (statement, str(start), str(end), minutes, ",".join(map(str, days)), stamp, stamp))
+            "INSERT INTO plan_goal(statement,start_date,end_date,planned_minutes,weekdays,celebration,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+            (statement, str(start), str(end), minutes, ",".join(map(str, days)), celebration, stamp, stamp))
         goal_id = int(cursor.lastrowid)
         connection.executemany(
             "INSERT INTO plan_session(goal_id,scheduled_date,planned_minutes,created_at) VALUES(?,?,?,?)",

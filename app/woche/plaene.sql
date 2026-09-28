@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS plan_goal (
  planned_minutes INTEGER NOT NULL CHECK(planned_minutes BETWEEN 1 AND 60),
  weekdays TEXT NOT NULL,
  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','paused','completed','archived')),
+ celebration TEXT CHECK(celebration IS NULL OR length(celebration) <= 60),
  created_at TEXT NOT NULL,
  updated_at TEXT NOT NULL,
  completed_at TEXT,

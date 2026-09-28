@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Für Eltern – Karo{% endblock %}
-{% block page_styles %}<link rel="stylesheet" href="/static/parent-overview.css?v=1"><link rel="stylesheet" href="/static/parent-report.css?v=3"><script src="/static/parent-report.js?v=2" defer></script>{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="/static/parent-overview.css?v=1"><link rel="stylesheet" href="/static/parent-report.css?v=5"><script src="/static/parent-report.js?v=3" defer></script>{% endblock %}
 {% block mainclass %}parent-overview{% endblock %}
 {% block content %}
 {% include "_parent_report.html" %}
@@ -87,8 +87,11 @@
 <details class="card disclosure parent-details">
   <summary><span>Aussehen &amp; Anmeldung<small>Farben wählen oder das Gerät ans Kind übergeben</small></span></summary>
   <div class="row area-preferences"><div class="field">
+    <label for="eltern-modus">Hell oder dunkel</label><select id="eltern-modus" data-modus-picker>
+    <option value="auto">Automatisch (wie das Gerät)</option><option value="hell">Hell</option><option value="dunkel">Dunkel</option></select>
+  </div><div class="field">
     <label for="eltern-farbwelt">Elternbereich</label><select id="eltern-farbwelt" data-theme-picker="parent">
-    {% for wert, name in [('schiefer','Schiefer & Petrol'),('sand','Sand & Braun'),('nacht','Nachtblau')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
+    {% for wert, name in [('schiefer','Schiefer & Petrol'),('sand','Sand & Braun'),('nacht','Nachtblau (dunkel)')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
   </div><div class="field">
     <label for="farbwelten-auswahl">Kinderbereich</label><select id="farbwelten-auswahl" data-theme-picker="child">
     {% for wert, name in [('lila','Lila'),('ozean','Blau'),('wiese','Grün'),('sonne','Orange'),('zuckerwatte','Rosa'),('lava','Rot'),('dunkel','Dunkel')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>

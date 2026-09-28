@@ -1,0 +1,32 @@
+/* Post von zu Hause – Kinderbereich. Nutzt die Farbwelten des Kinderbereichs. */
+.post-kopf { display: flex; align-items: center; gap: 1rem; margin: .5rem 0 1.4rem; }
+.post-kopf img { border-radius: 50%; background: var(--ink-soft); flex: none; }
+.post-kopf h1 { margin: .15rem 0 .3rem; }
+.post-satz { margin: 0; color: var(--muted); }
+.post-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: .9rem; }
+.post-brief { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1rem; align-items: start; margin: 0; }
+.post-brief.ist-neu { border-color: var(--ink); box-shadow: 0 4px 0 var(--border-firm); }
+.post-brief.art-ueberraschung, .post-brief.art-feier { background: linear-gradient(135deg, var(--surface) 60%, var(--ink-soft)); }
+.post-emoji { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 20px; background: var(--ink-soft); font-size: 2.1rem; line-height: 1; }
+.post-meta { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: 0 0 .35rem; font-size: .85rem; color: var(--muted); }
+.post-neu { padding: .1rem .55rem; border-radius: 999px; background: var(--ink); color: #fff; font-weight: 700; font-size: .75rem; }
+.post-art { font-weight: 700; color: var(--text); }
+.post-text { margin: 0 0 .8rem; font-size: 1.15rem; line-height: 1.45; overflow-wrap: anywhere; }
+.post-geantwortet { margin: 0; color: var(--muted); }
+.post-geantwortet b { color: var(--text); font-size: 1.1rem; }
+.post-antworten { display: flex; flex-wrap: wrap; gap: .45rem; }
+.post-antworten button.quiet { min-height: 44px; margin: 0; padding: .35rem .8rem; border: 2px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); box-shadow: none; font-weight: 700; cursor: pointer; transform: none; }
+.post-antworten button.quiet:hover { border-color: var(--ink); background: var(--ink-soft); transform: none; }
+.post-antworten button.post-symbol { min-width: 48px; font-size: 1.35rem; padding-inline: .5rem; }
+.post-zurueck { display: inline-block; margin-top: 1.2rem; }
+/* Hinweis auf "Heute" */
+.post-hinweis { display: flex; align-items: center; gap: .9rem; margin: 0 0 1rem; padding: 1rem 1.2rem; text-decoration: none; color: var(--text); border-color: var(--ink); }
+.post-hinweis:hover { background: var(--ink-soft); }
+.post-hinweis-emoji { display: grid; place-items: center; width: 52px; height: 52px; flex: none; border-radius: 16px; background: var(--ink-soft); font-size: 1.7rem; }
+.post-hinweis b { display: block; font-size: 1.05rem; }
+.post-hinweis small { display: block; color: var(--muted); margin-top: .15rem; overflow-wrap: anywhere; }
+.post-hinweis-pfeil { margin-left: auto; font-weight: 800; font-size: 1.3rem; color: var(--ink); }
+@media (max-width: 520px) {
+  .post-brief { grid-template-columns: 1fr; }
+  .post-emoji { width: 52px; height: 52px; font-size: 1.7rem; }
+}

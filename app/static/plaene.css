@@ -425,3 +425,10 @@
 /* Titel, Wochenkreise und Zahlen stehen nebeneinander, solange Platz ist,
    und brechen sonst um — statt die Karte zu sprengen. */
 .week-head { flex-wrap:wrap; gap:1rem; }
+
+/* Feier-Idee (freiwillig): das Kind legt fest, wie es sein Ziel feiern möchte. */
+.feier-feld { display:grid; gap:.4rem; padding:1rem; border:1px dashed #c6dae5; border-radius:10px; background:#fffdf5; font-weight:700; color:var(--plan-navy); }
+.feier-feld small { font-weight:400; }
+.feier-feld input,.feier-details input[type=text] { width:100%; padding:.7rem .8rem; border:1px solid #9ebbd0; border-radius:9px; font:inherit; font-weight:400; }
+.detail-actions .feier-details { background:#fffdf5; }
+.feier-details small { color:#56759a; }

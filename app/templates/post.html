@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Post von zu Hause – {{ companion_name }}{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="/static/post.css?v={{ asset_version }}">{% endblock %}
+{% block content %}
+{# Das Kind sieht nur die Nachricht – nie den Elternbericht dahinter. Antworten
+   gehen mit einem Tipp: ein Emoji, „Danke!“ oder „Lass uns reden“. #}
+<header class="post-kopf">
+  <img src="/static/karo-fox-wave.png" alt="" width="72" height="72">
+  <div><p class="eyebrow">DEIN POSTFACH</p><h1>Post von zu Hause</h1>
+    <p class="post-satz">{% if fresh %}Du hast {{ 'eine neue Nachricht' if fresh|length == 1 else fresh|length ~ ' neue Nachrichten' }}!{% elif messages %}Hier steht alles, was dir deine Eltern geschrieben haben.{% else %}Noch keine Post. Wenn dir deine Eltern schreiben, steht es hier.{% endif %}</p></div>
+</header>
+{% if messages %}
+<ul class="post-liste">
+{% for m in messages %}
+  <li id="post-{{ m.id }}" class="card post-brief art-{{ m.kind }}{{ ' ist-neu' if m.id in fresh }}">
+    <div class="post-emoji" aria-hidden="true">{{ m.emoji or ('🎁' if m.kind == 'ueberraschung' else '🎉' if m.kind == 'feier' else '✉️') }}</div>
+    <div class="post-inhalt">
+      <p class="post-meta">{% if m.id in fresh %}<span class="post-neu">Neu</span>{% endif %}{% if m.kind == 'ueberraschung' %}<span class="post-art">🎁 Überraschung</span>{% elif m.kind == 'feier' %}<span class="post-art">🎉 Deine Feier</span>{% endif %}<span>{{ m.when|capitalize }}</span></p>
+      {% if m.text %}<p class="post-text">{{ m.text }}</p>{% endif %}
+      {% if m.reaction %}<p class="post-geantwortet">Deine Antwort: <b>{{ m.reaction_label }}</b></p>
+      {% else %}<form method="post" action="/post/{{ m.id }}/antwort" class="post-antworten" aria-label="Auf diese Nachricht antworten">{{ csrf_input() }}
+        {% for key, label in reactions.items() %}<button type="submit" name="antwort" value="{{ key }}" class="quiet {{ 'post-wort' if key in ('danke', 'reden') else 'post-symbol' }}" aria-label="Antworten mit {{ label }}">{{ label }}</button>{% endfor %}
+      </form>{% endif %}
+    </div>
+  </li>
+{% endfor %}
+</ul>
+{% endif %}
+<a class="subtle-link post-zurueck" href="/">← Zurück zu Heute</a>
+{% endblock %}

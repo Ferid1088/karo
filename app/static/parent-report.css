@@ -9,6 +9,7 @@ main.simple-main.parent-overview { max-width:1200px; padding-top:1.5rem; }
   --heat3:color-mix(in srgb,var(--ink) 66%,var(--surface)); --heat4:var(--ink);
   display:grid; gap:14px; line-height:1.45; overflow-wrap:anywhere; container:pr / inline-size; }
 [data-theme-color="nacht"] .pr { --math:#69bfba; --german:#aaa2df; --english:#eac077; --m-uebt:color-mix(in srgb,var(--text) 45%,var(--surface)); }
+[data-theme-color="nacht"] .pr .pr-status { border-color:var(--border); }
 .pr :is(p,h1,h2,h3) { margin:0; }
 .pr [hidden] { display:none!important; }
 .pr :is(a,summary,button):focus-visible { outline:3px solid var(--ink); outline-offset:3px; }
@@ -297,3 +298,35 @@ html:not(.pr-js) .pr .pr-sheet:target { display:block; position:fixed; inset:0 0
   .pr .pr-arrow,.pr .pr-help { min-width:44px; }
 }
 @media(prefers-reduced-motion:reduce) { .pr *,.pr .pr-sheet[open] { transition:none!important; animation:none!important; } .pr .pr-tile:hover { transform:none; } }
+
+/* Post von zu Hause (Eltern schreiben aus dem Bericht) */
+.pr .pr-post-btn { display:inline-flex; gap:8px; align-items:center; margin-top:10px; padding:8px 14px; border-radius:999px; background:var(--ink); color:var(--button-text); font-size:.85rem; font-weight:700; text-decoration:none; }
+.pr .pr-post-btn:hover { filter:brightness(1.08); }
+.pr .pr-post-last { padding:1px 8px; border-radius:999px; background:color-mix(in srgb,var(--button-text) 22%,transparent); font-weight:600; font-size:.78rem; }
+.pr .pr-post-form { display:grid; gap:14px; }
+.pr .pr-choice { display:flex; flex-wrap:wrap; gap:6px; margin:0; padding:0; border:0; min-width:0; }
+.pr .pr-choice legend { width:100%; margin-bottom:6px; padding:0; font-size:.7rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
+.pr .pr-choice label { position:relative; cursor:pointer; }
+.pr .pr-choice input { position:absolute; opacity:0; inset:0; margin:0; cursor:pointer; }
+.pr .pr-choice span { display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:7px 12px; border:1.5px solid var(--border); border-radius:10px; background:var(--surface); font-size:.86rem; }
+.pr .pr-choice input:checked + span { border-color:var(--ink); background:var(--ink-soft); font-weight:650; }
+.pr .pr-choice input:focus-visible + span { outline:3px solid var(--ink); outline-offset:2px; }
+.pr .pr-post-vorschlaege { display:grid; }
+.pr .pr-post-vorschlaege span { width:100%; }
+.pr .pr-post-emojis span { justify-content:center; min-width:46px; font-size:1.3rem; padding:4px 8px; }
+.pr .pr-post-emojis .pr-post-ohne { font-size:.8rem; color:var(--muted); }
+.pr .pr-post-text { display:grid; gap:5px; font-size:.86rem; font-weight:650; }
+.pr .pr-post-text small { font-weight:400; color:var(--muted); }
+.pr .pr-post-text span small { display:inline; margin:0; font-size:.8rem; }
+.pr .pr-post-text textarea { width:100%; min-height:78px; padding:10px 12px; border:1.5px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text); font:inherit; font-weight:400; resize:vertical; }
+.pr .pr-post-text textarea:focus { outline:3px solid var(--ink); outline-offset:1px; }
+.pr .pr-post-form .pr-d-btn { border:0; cursor:pointer; font-size:.95rem; }
+.pr .pr-post-e { display:grid; place-items:center; width:32px; height:32px; flex:none; border-radius:9px; background:var(--surface-2); font-size:1.1rem; }
+.pr .pr-textbtn { min-height:0; padding:4px 10px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-size:.78rem; font-weight:650; cursor:pointer; }
+.pr .pr-feier { display:flex; align-items:center; gap:12px; margin:0 0 10px; padding:10px 12px; border-radius:12px; background:var(--ok-bg); color:var(--text); }
+.pr .pr-feier-e { font-size:1.6rem; line-height:1; }
+.pr .pr-feier-t { flex:1; min-width:0; }
+.pr .pr-feier-t b { display:block; font-size:.9rem; }
+.pr .pr-feier-t small { display:block; font-size:.8rem; color:var(--muted); }
+.pr .pr-feier form { margin:0; }
+.pr .pr-feier-btn { min-height:0; padding:8px 12px; border:0; border-radius:9px; background:var(--ok); color:var(--surface); font-weight:700; font-size:.82rem; cursor:pointer; white-space:nowrap; }

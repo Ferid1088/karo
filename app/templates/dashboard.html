@@ -1,5 +1,6 @@
 {% extends 'learning_base.html' %}
 {% block title %}Heute – {{ companion_name }}{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="/static/post.css?v={{ asset_version }}">{% endblock %}
 {% block content %}
 {# "Heute" ist der Tag des Kindes und beantwortet drei Fragen: Was mache ich
    jetzt? Wie viel ist es heute? Was habe ich schon geschafft? Der Tag kommt
@@ -20,6 +21,12 @@
   </div>
 </header>
 
+{% if post_neu %}{% set brief = post_neu[0] %}
+<a class="card post-hinweis" href="/post"><span class="post-hinweis-emoji" aria-hidden="true">{{ '🎁' if brief.kind == 'ueberraschung' else (brief.emoji or '✉️') }}</span>
+  <span><b>{{ 'Neue Post von zu Hause' if post_neu|length == 1 else post_neu|length ~ ' neue Nachrichten von zu Hause' }}</b>
+  <small>{{ 'Eine Überraschung wartet auf dich!' if brief.kind == 'ueberraschung' else (brief.text|truncate(80) if brief.text else 'Tippe, um sie zu lesen.') }}</small></span>
+  <span class="post-hinweis-pfeil" aria-hidden="true">→</span></a>
+{% endif %}
 <section id="jetzt" class="card schritt-karte{{ ' ist-fertig' if tag.state == 'fertig' }}">
 {% set item = tag.next_item %}
 {% if tag.state == 'fertig' %}
@@ -33,7 +40,7 @@
 {% elif item and item.kind == 'arbeit' %}
   {% set task = item.task %}
   <p class="eyebrow">JETZT</p>
-  <span class="learn-status bearbeitung">Klassenarbeit{% if task.minutes %} · {{ task.minutes }} Minuten{% endif %}</span>
+  <span class="learn-status bearbeitung">{{ item.tag }}{% if task.minutes %} · {{ task.minutes }} Minuten{% endif %}</span>
   <h2>{{ 'Deine Generalprobe' if task.is_simulation else task.inhalt }}</h2>
   <p>{{ 'Probiere in Ruhe aus, was du schon kannst.' if task.is_simulation else 'Wir machen dort weiter, wo du gerade stehst.' }}</p>
   {% if task.is_simulation %}<a class="btn" href="/klassenarbeit/{{ task.exam_id }}/simulation">Generalprobe öffnen →</a>
@@ -48,12 +55,13 @@
   <form method="post" action="/woche/ziele/{{ item.goal_id }}/start">{{ csrf_input() }}<button type="submit">Los geht’s →</button></form>
 {% elif naechstes and next_action_kind in ('review', 'quiz', 'lesson') %}
   <p class="eyebrow">JETZT</p>
+  {% if naechstes.fach %}<span class="learn-status bearbeitung">{{ naechstes.fach }}</span>{% endif %}
   <h2>{{ naechstes.titel }}</h2>
   <p>{{ naechstes.text }}</p>
   <a class="btn" href="{{ naechstes.url }}">{{ naechstes.button }} →</a>
 {% elif next_topic %}
   <p class="eyebrow">JETZT</p>
-  <span class="learn-status {{ next_topic.learning_status }}">{{ next_topic.subject }}</span>
+  <span class="learn-status {{ next_topic.learning_status }}">{{ next_topic.subject|fachname }}</span>
   <h2>{{ next_topic.label }}</h2>
   <p>{{ 'Du kannst genau hier weitermachen.' if next_topic.learning_status == 'bearbeitung' else 'Wir schauen zuerst, was du schon kannst.' }}</p>
   <form method="post" action="{{ '/lernen/adaptiv/start' if cfg.adaptive_learning_enabled else '/lernzyklus/' ~ next_topic.id ~ '/quiz/starten' }}">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ next_topic.id }}"><input type="hidden" name="modus" value="bildschirm"><button type="submit">{{ 'Weiterlernen' if next_topic.learning_status == 'bearbeitung' else 'Los geht’s' }} →</button></form>
