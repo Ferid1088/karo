@@ -414,3 +414,14 @@
    aneinander, sobald der Streifen schmaler ist als frueher. */
 .plans-local-strip .plans-slogan { flex:1; text-align:left; white-space:normal; line-height:1.5; }
 .plans-local-strip .plans-slogan span { display:inline-block; margin-left:.6rem; }
+
+/* Die Wochentabelle ist 850px breit. Die einspaltige Ansicht darf daran
+   nicht mitwachsen, sonst wird die ganze Seite breiter als der Bildschirm:
+   die Tabelle scrollt in ihrer Karte. Auf dem Handy tragen die Zeilen ihre
+   Beschriftung selbst, die Kopfzeile entfaellt. */
+@media(max-width:900px){.today-layout,.month-layout{grid-template-columns:minmax(0,1fr)}}
+.today-side,.today-main{grid-template-columns:minmax(0,1fr);min-width:0}
+@media(max-width:760px){.stats-table .stats-row.stats-head{display:none}}
+/* Titel, Wochenkreise und Zahlen stehen nebeneinander, solange Platz ist,
+   und brechen sonst um — statt die Karte zu sprengen. */
+.week-head { flex-wrap:wrap; gap:1rem; }

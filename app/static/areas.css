@@ -478,3 +478,27 @@
   [data-ui-area="child"] .simple-nav a.welten-entry img { display: none; }
   [data-ui-area="child"] .simple-nav a.welten-entry { padding-left: .42rem; }
 }
+
+/* Mit "Klassenarbeit" sind es sechs Wege. Sie werden nie abgeschnitten:
+   wo die Kopfzeile nicht reicht, bekommt die Navigation eine eigene Zeile
+   und bricht bei Bedarf um — ein Kind soll keinen Reiter suchen muessen. */
+[data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: 2rem; }
+/* Sicherheitsnetz: lieber eine zweite Zeile als ein versteckter Reiter. */
+[data-ui-area="child"] .simple-header .simple-nav { flex-wrap: wrap; overflow: visible; row-gap: .4rem; }
+/* Mit "Für Eltern" im Kopf reicht eine Zeile auf keiner Breite: die
+   Navigation steht dann immer in ihrer eigenen Zeile. */
+[data-ui-area="child"] .simple-header:has(.area-switch) { flex-wrap: wrap; row-gap: .6rem; }
+[data-ui-area="child"] .simple-header:has(.area-switch) .brand { flex: 1; }
+[data-ui-area="child"] .simple-header:has(.area-switch) .simple-nav { order: 3; flex-basis: 100%; }
+@media (max-width: 1240px) {
+  [data-ui-area="child"] .simple-header { flex-wrap: wrap; row-gap: .6rem; }
+  [data-ui-area="child"] .simple-header .brand { flex: 1; }
+  [data-ui-area="child"] .simple-header .simple-nav {
+    order: 3; flex-basis: 100%; flex-wrap: wrap; overflow: visible; row-gap: .4rem;
+  }
+  [data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: 1rem; }
+}
+@media (max-width: 680px) {
+  [data-ui-area="child"] .simple-header .simple-nav { flex-wrap: wrap; overflow: visible; row-gap: .3rem; }
+  [data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: 0; }
+}

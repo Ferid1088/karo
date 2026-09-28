@@ -24,10 +24,25 @@ def test_learning_pages_use_their_own_mascot(client, fake_llm, fake_cli, app_env
         assert 'karo-fox' not in main
         subnav = re.search(r'<nav class="sub-nav".*?</nav>', page, re.S).group()
         assert 'class="learning-entry" href="/lernen"' in subnav
-        exam_tab = re.search(r'<a class="pruefung-tab".*?</a>', subnav).group()
+        assert 'href="/klassenarbeit' not in subnav
+        # Die Klassenarbeit ist ein eigener Hauptreiter rechts neben Lernen.
+        mainnav = re.search(r'<nav class="simple-nav".*?</nav>', page, re.S).group()
+        exam_tab = re.search(r'<a class="exam-entry".*?</a>', mainnav).group()
         assert 'href="/klassenarbeit"' in exam_tab
         assert 'src="/static/pruefung-duo.jpg"' in exam_tab
-        assert 'Klassenarbeit</a>' in exam_tab
+        assert '<span>Klassenarbeit</span>' in exam_tab
+        assert mainnav.index('href="/lernen"') < mainnav.index('href="/klassenarbeit"') < mainnav.index('href="/lernstand"')
+    # Unter dem Reiter Klassenarbeit steht der Prüfungskalender.
+    page = client.get('/klassenarbeit').text
+    mainnav = re.search(r'<nav class="simple-nav".*?</nav>', page, re.S).group()
+    assert re.search(r'class="exam-entry" href="/klassenarbeit" aria-current=page', mainnav)
+    subnav = re.search(r'<nav class="sub-nav".*?</nav>', page, re.S).group()
+    assert 'aria-label="Klassenarbeit"' in subnav
+    assert 'class="kalender-tab" href="/klassenarbeit/kalender"' in subnav
+    assert 'class="exam-nav-banner"' in subnav
+    # Kein zweites "Klassenarbeit" unter dem gleichnamigen Reiter.
+    assert 'pruefung-tab' not in subnav and 'href="/klassenarbeit"' not in subnav
+    assert 'href="/lernen"' not in subnav
 
 
 def test_learning_mascot_asset_exists():

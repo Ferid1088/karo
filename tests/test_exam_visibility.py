@@ -19,8 +19,11 @@ def test_exam_plan_moves_between_parent_and_child_sections(client, fake_llm, fak
         app_env.config.update(klassenarbeit_kind=enabled)
         for path in ('/lernen', '/lernzyklus'):
             assert ('href="/klassenarbeit"' in client.get(path).text) is enabled
-        # Ohne angelegte Arbeit gibt es auf Heute keinen leeren Prüfungsauftrag.
-        assert 'href="/klassenarbeit"' not in client.get('/').text
+        # Ohne angelegte Arbeit gibt es auf Heute keinen leeren Prüfungsauftrag;
+        # der Weg dorthin steht nur als Reiter in der Hauptnavigation.
+        heute = client.get('/').text
+        assert 'href="/klassenarbeit"' not in heute[heute.index('<main'):]
+        assert ('class="exam-entry" href="/klassenarbeit"' in heute) is enabled
         for path in ('/klassenarbeit', '/messung/examen'):
             page = client.get(path)
             assert page.status_code == (200 if enabled else 403)

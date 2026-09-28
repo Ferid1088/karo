@@ -15,6 +15,8 @@
   object-fit: contain;
   margin-block: -3px;
 }
+.simple-nav a.exam-entry { gap: .4rem; }
+.simple-nav a.exam-entry img,
 .sub-nav a.pruefung-tab img {
   width: 56px;
   height: 28px;
@@ -25,4 +27,5 @@
 }
 @media (max-width: 600px) {
   .simple-nav a.learning-entry img { width: 24px; height: 24px; flex-basis: 24px; }
+  .simple-nav a.exam-entry img { width: 44px; height: 22px; flex-basis: 44px; }
 }
