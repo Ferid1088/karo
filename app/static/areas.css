@@ -1,35 +1,46 @@
 /* Area identity is independent of the signed-in role and the other area's palette. */
+/* Elternbereich: "karo" ist die Grundfarbwelt (Indigo mit hellen Akzenten),
+   "sand" die warme Alternative, "nacht" die dunkle. Die frühere Wahl
+   "schiefer" fällt in themes.js auf "karo" zurück. */
 :root[data-ui-area="parent"] {
-  --ground: #f2f5f5; --surface: #fff; --surface-2: #edf2f2;
-  --text: #24373c; --muted: #53686d; --faint: #63777c;
-  --border: #d3dfe0; --border-firm: #9aafb3;
-  --ink: #176b69; --ink-soft: #e0efec;
-  --ok: #237045; --ok-bg: #e2f3e7;
-  --warn: #956000; --warn-bg: #fff2d4;
-  --bad: #b32e49; --bad-bg: #fbe6ea;
-  --radius: 12px; --radius-sm: 8px; --shadow-clay: none;
-  --header: #20383e; --header-text: #f4faf9; --header-muted: #c2d7d8;
-  --header-active: #36565b; --button-text: #fff;
+  --ground: #f3f4fb; --surface: #fff; --surface-2: #eef0fa;
+  --text: #1d2045; --muted: #545880; --faint: #62668f;
+  --border: #dfe2f3; --border-firm: #aeb3d8;
+  --ink: #4f46e5; --ink-soft: #ecebfd;
+  --ok: #157a45; --ok-bg: #e2f6ea;
+  --warn: #935900; --warn-bg: #fff1d4;
+  --bad: #b8284f; --bad-bg: #fde8ee;
+  --radius: 14px; --radius-sm: 9px; --shadow-clay: none;
+  --header: #25215e; --header-text: #f4f3ff; --header-muted: #c9c6f5;
+  --header-active: #3d3889; --button-text: #fff;
+  /* Akzentfarben: je Anzeige eine Farbe (Grafik / Schrift). */
+  --c-days: #0fa596; --c-days-t: #0b7168; --c-answers: #6366f1; --c-answers-t: #4f46e5;
+  --c-checks: #f5a300; --c-checks-t: #a15c00; --c-goals: #ec4899; --c-goals-t: #be185d;
+  --c-sky: #0ea5e9; --c-sky-t: #0369a1;
   color-scheme: light;
 }
 :root[data-ui-area="parent"][data-theme-color="sand"] {
-  --ground: #f6f3ed; --surface: #fffefb; --surface-2: #f2ece1;
-  --text: #40392f; --muted: #71634f; --faint: #776953;
-  --border: #e0d6c5; --border-firm: #b4a58c;
-  --ink: #85552c; --ink-soft: #f0e3cf;
-  --header: #443b30; --header-text: #fffaf0; --header-muted: #dfd1bd;
-  --header-active: #655541;
+  --ground: #f7f3ec; --surface: #fffefb; --surface-2: #f3ece0;
+  --text: #40392f; --muted: #6e604c; --faint: #756751;
+  --border: #e6dccb; --border-firm: #b8a88e;
+  --ink: #a8461f; --ink-soft: #fbe6da;
+  --header: #4a3526; --header-text: #fff8f0; --header-muted: #ecd6c2;
+  --header-active: #6c4d37;
+  --c-answers: #c2562b; --c-answers-t: #a8461f;
 }
 :root[data-ui-area="parent"][data-theme-color="nacht"] {
-  --ground: #151f2a; --surface: #202e3c; --surface-2: #283948;
-  --text: #edf3f7; --muted: #b7c7d4; --faint: #a4bacb;
-  --border: #3b5063; --border-firm: #647f95;
-  --ink: #92d7d0; --ink-soft: #28464a; --button-text: #142e32;
-  --ok: #85d7a2; --ok-bg: #253e32;
-  --warn: #f2cd80; --warn-bg: #403724;
-  --bad: #ffa5b8; --bad-bg: #442e3a;
-  --header: #101923; --header-text: #edf3f7; --header-muted: #b7c7d4;
-  --header-active: #2c4254;
+  --ground: #111331; --surface: #1b1e45; --surface-2: #242856;
+  --text: #eef0ff; --muted: #b8bbe2; --faint: #a3a7d4;
+  --border: #33386b; --border-firm: #545a96;
+  --ink: #a9a4ff; --ink-soft: #2e2f68; --button-text: #17153f;
+  --ok: #86dfae; --ok-bg: #1c3b36;
+  --warn: #f7cb74; --warn-bg: #3d3424;
+  --bad: #ff9fb8; --bad-bg: #472640;
+  --header: #0b0c26; --header-text: #eef0ff; --header-muted: #b8bbe2;
+  --header-active: #272b5e;
+  --c-days: #3fd0bd; --c-days-t: #6ee3d3; --c-answers: #a9a4ff; --c-answers-t: #c3bfff;
+  --c-checks: #ffc54d; --c-checks-t: #ffd37a; --c-goals: #ff7bb5; --c-goals-t: #ff9fc8;
+  --c-sky: #5cc8ff; --c-sky-t: #8fd9ff;
   color-scheme: dark;
 }
 .area-brand { display: flex; flex-direction: column; flex-shrink: 0; gap: .1rem; }

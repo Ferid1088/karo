@@ -5,7 +5,8 @@
 (() => {
   'use strict';
   const palettes = {
-    parent: ['schiefer', 'sand', 'nacht'],
+    // An old saved "schiefer" is no longer listed and falls back to "karo".
+    parent: ['karo', 'sand', 'nacht'],
     child: ['lila', 'ozean', 'wiese', 'sonne', 'zuckerwatte', 'lava', 'dunkel']
   };
   const DARK = 'nacht';
@@ -44,9 +45,10 @@
     const current = mode();
     document.querySelectorAll('[data-modus]').forEach(button =>
       button.setAttribute('aria-pressed', String(button.dataset.modus === current)));
-    document.querySelectorAll('[data-modus-picker]').forEach(select => { select.value = current; });
+    // The parent picker only lists light palettes; dark is the header switch.
     document.querySelectorAll('[data-theme-picker]').forEach(picker => {
-      if (palettes[picker.dataset.themePicker]) picker.value = effective(picker.dataset.themePicker);
+      const target = picker.dataset.themePicker;
+      if (palettes[target]) picker.value = target === 'parent' ? lightPalette() : effective(target);
     });
   }
   function setMode(value) {
@@ -72,8 +74,6 @@
       const button = event.target.closest && event.target.closest('[data-modus]');
       if (button) setMode(button.dataset.modus);
     });
-    document.querySelectorAll('[data-modus-picker]').forEach(select =>
-      select.addEventListener('change', () => setMode(select.value)));
     document.querySelectorAll('[data-theme-picker]').forEach(picker => {
       const target = picker.dataset.themePicker;
       if (!palettes[target]) return;

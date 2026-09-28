@@ -264,7 +264,7 @@ def eltern(request: Request):
     _, schritte, reviews = workflow.offene_schritte()
     if config.load().antworten_pruefen_kind:
         reviews = []
-    from ..services import ohne_fach, grade_guidance, parent_overview, parent_report, family_post
+    from ..services import ohne_fach, grade_guidance, parent_report, family_post
     try:
         report = parent_report.build(request.query_params.get('ansicht', 'monat'),
             request.query_params.get('datum', ''), request.query_params.get('zurueck', 'monat'),
@@ -274,7 +274,6 @@ def eltern(request: Request):
     report['post'] = family_post.parent_view(report, config.load_safe().learner_name or '')
     response = render(request, 'eltern.html', reviews=reviews, schritte=schritte,
                   report=report,
-                  overview=parent_overview.summary(),
                   ohne_fach_anzahl=ohne_fach.anzahl(),
                   grade_notices=grade_guidance.unread(),
                   woche=parent_summary(), begleiter=current_companion(),

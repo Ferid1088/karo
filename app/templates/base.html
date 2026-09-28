@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de" data-ui-area="{{ ui_area|default('child') }}" data-theme-color="{{ 'schiefer' if ui_area == 'parent' else 'lila' }}">
+<html lang="de" data-ui-area="{{ ui_area|default('child') }}" data-theme-color="{{ 'karo' if ui_area == 'parent' else 'lila' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -92,7 +92,7 @@
     </div>{% endif %}
     {% if not adult_page and request.session.get("auth") %}<a class="kopf-post{{ ' hat-neue' if post_neu_anzahl }}" href="/post" aria-label="Post von zu Hause{{ ', ' ~ post_neu_anzahl ~ ' neu' if post_neu_anzahl }}" title="Post von zu Hause"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m4 7.5 8 6 8-6"/></svg>{% if post_neu_anzahl %}<span class="kopf-post-zahl">{{ post_neu_anzahl }}</span>{% endif %}</a>{% endif %}
     <a class="kopf-hilfe" href="/hilfe" title="{{ 'Hilfe & Anleitung' if adult_page else 'Brauchst du Hilfe?' }}" aria-label="{{ 'Hilfe & Anleitung' if adult_page else 'Brauchst du Hilfe?' }}">?</a>
-    {% if request.session.get('auth') %}<form method="post" action="/logout" class="kopf-abmelden">{{ csrf_input() }}<button type="submit" class="linklike">Abmelden</button></form>{% endif %}
+    {% if request.session.get('auth') %}<form method="post" action="/logout" class="kopf-abmelden" data-logout>{{ csrf_input() }}<button type="submit" class="linklike">Abmelden</button></form>{% endif %}
   </div>
 </header>
 

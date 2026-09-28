@@ -1,23 +1,17 @@
 /* Parent home only: clear priorities, no changes to child pages or shared cards. */
 [data-ui-area="parent"] .kopf-abmelden button.linklike { color: var(--header-muted); }
 .parent-overview { max-width: 1120px; }
-.parent-overview .parent-welcome { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin: .5rem 0 1.5rem; }
-.parent-overview .parent-welcome h1 { margin: .3rem 0 .6rem; }
-.parent-overview .parent-welcome .eyebrow { margin: 0; color: var(--muted); }
-.parent-overview .parent-welcome .sub { margin: 0; font-size: .95rem; }
-.parent-overview .parent-welcome .sub a { margin-left: .65rem; font-size: .85rem; text-decoration: underline; text-underline-offset: 3px; }
 .parent-overview h2 { font-size: 1.15rem; margin: 0 0 .9rem; color: var(--text); }
 .parent-overview .card { margin: 0; padding: 1.3rem; }
 .parent-overview .parent-section-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .parent-overview .parent-section-heading h2 { margin: 0; }
-.parent-overview .parent-badge { background: var(--ok-bg); color: var(--ok); padding: .3rem .6rem; border-radius: 6px; font-size: .75rem; font-weight: 650; flex-shrink: 0; }
-.parent-overview .parent-badge.has-tasks { color: var(--warn); background: var(--warn-bg); }
 .parent-overview .parent-muted { color: var(--muted); font-size: .9rem; line-height: 1.6; margin: .6rem 0 0; }
 .parent-overview .parent-task-list { display: grid; margin-top: .6rem; }
 .parent-overview .parent-task-list > a { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 58px; padding: .9rem 0; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); }
 .parent-overview .parent-task-list > a:last-child { border-bottom: 0; padding-bottom: .3rem; }
 .parent-overview small { display: block; color: var(--muted); font-size: .83rem; font-weight: 400; line-height: 1.5; margin-top: .3rem; }
-.parent-overview .parent-task-list > a:hover strong, .parent-overview .parent-shortcut:hover strong { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.parent-overview .parent-task-list > a:hover strong { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.parent-overview .parent-shortcut:hover strong { color: var(--hue-t); }
 .parent-overview .parent-grade-notices { margin-top: 1rem; }
 .parent-overview .parent-grade-notices h3 { font-size: 1rem; margin: 0 0 .65rem; }
 .parent-overview .parent-notice { display: flex; align-items: flex-start; gap: 1rem; background: var(--surface-2); border-radius: 8px; padding: 1rem; margin-top: .5rem; }
@@ -25,21 +19,18 @@
 .parent-overview .parent-notice p { font-size: .88rem; margin: .45rem 0 0; line-height: 1.6; }
 .parent-overview .parent-notice .hint { font-size: .8rem; }
 .parent-overview .parent-notice form { flex-shrink: 0; }
-.parent-overview .parent-learning, .parent-overview .parent-shortcuts { margin-top: 1.7rem; }
-.parent-overview .parent-snapshot-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
-.parent-overview .parent-snapshot { display: flex; flex-direction: column; align-items: flex-start; }
-.parent-overview .parent-kicker { margin: 0 0 .6rem; font-size: .72rem; color: var(--muted); font-weight: 700; letter-spacing: .07em; }
-.parent-overview .parent-snapshot h3 { margin: 0; font-size: 1rem; font-weight: 600; color: var(--text); }
-.parent-overview .parent-number { font-size: 2rem; letter-spacing: -.06em; margin-right: .3rem; font-weight: 700; line-height: 1.2; }
-.parent-overview .parent-snapshot .parent-muted { margin-bottom: .5rem; }
-.parent-overview .parent-text-link { display: inline-flex; gap: .6rem; align-items: center; min-height: 44px; font-size: .88rem; font-weight: 650; margin-top: auto; color: var(--ink); }
-.parent-overview .parent-shortcut-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .75rem; }
-.parent-overview .parent-shortcut { display: flex; align-items: flex-start; gap: .7rem; padding: 1rem; text-decoration: none; color: var(--text); font-size: .9rem; }
-.parent-overview .parent-shortcut > span:nth-child(2) { flex: 1; }
-.parent-overview .parent-shortcut > span:last-child { color: var(--ink); }
-.parent-overview .parent-action-icon { display: grid; place-items: center; flex: 0 0 32px; height: 32px; color: var(--ink); background: var(--ink-soft); border-radius: 7px; }
+/* Schnellzugriff: je Kachel eine Akzentfarbe aus der Farbwelt. */
+.parent-overview .parent-shortcut-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: .75rem; }
+.parent-overview .parent-shortcut { --hue: var(--ink); --hue-t: var(--ink); display: flex; align-items: center; gap: .8rem; padding: .9rem 1rem; text-decoration: none; color: var(--text); font-size: .9rem; border: 1px solid color-mix(in srgb,var(--hue) 18%,var(--border)); background: color-mix(in srgb,var(--hue) 6%,var(--surface)); border-radius: 16px; transition: border-color .15s, transform .15s; }
+.parent-overview .parent-shortcut:hover { border-color: color-mix(in srgb,var(--hue) 50%,var(--border)); transform: translateY(-1px); }
+.parent-overview .parent-shortcut small { margin-top: .15rem; }
+.parent-overview .ps-days { --hue: var(--c-days); --hue-t: var(--c-days-t); }
+.parent-overview .ps-answers { --hue: var(--c-answers); --hue-t: var(--c-answers-t); }
+.parent-overview .ps-checks { --hue: var(--c-checks); --hue-t: var(--c-checks-t); }
+.parent-overview .ps-goals { --hue: var(--c-goals); --hue-t: var(--c-goals-t); }
+.parent-overview .ps-sky { --hue: var(--c-sky); --hue-t: var(--c-sky-t); }
+.parent-overview .parent-action-icon { display: grid; place-items: center; flex: 0 0 40px; height: 40px; color: var(--hue-t, var(--ink)); background: color-mix(in srgb,var(--hue, var(--ink)) 16%,var(--surface)); border-radius: 12px; }
 .parent-overview .parent-action-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.parent-overview .parent-secondary-title { margin-top: 1.7rem; }
 .parent-overview .parent-details { margin-top: .65rem; padding: 0; }
 .parent-overview .parent-details > summary { padding: 1rem 1.3rem; color: var(--text); min-height: 64px; display: flex; align-items: center; gap: .75rem; font-size: .95rem; cursor: pointer; list-style: none; }
 .parent-overview .parent-details > summary::-webkit-details-marker { display: none; }
@@ -54,17 +45,17 @@
 .parent-overview .parent-details .item { overflow-wrap: anywhere; }
 .parent-overview :is(a,button,summary,select):focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
 .parent-overview #betrieb { scroll-margin-top: 1rem; }
-@media (max-width: 900px) {
-  .parent-overview .parent-shortcut-grid { grid-template-columns: 1fr; }
-  .parent-overview .parent-shortcut { align-items: center; }
-}
 @media (max-width: 600px) {
-  .parent-overview .parent-welcome { align-items: flex-start; flex-direction: column; gap: .9rem; }
-  .parent-overview .parent-welcome h1 { font-size: 1.8rem; }
   .parent-overview .parent-section-heading { flex-wrap: wrap; }
-  .parent-overview .parent-snapshot-grid, .parent-overview .parent-family-grid { grid-template-columns: 1fr; }
+  .parent-overview .parent-family-grid { grid-template-columns: 1fr; }
   .parent-overview .parent-notice { flex-direction: column; }
   .parent-overview .parent-details small { font-size: .8rem; }
   .parent-overview .area-preferences { flex-direction: column; }
   .parent-overview .area-preferences .field { min-width: 0; }
 }
+/* Aufmerksamkeit: erscheint nur, wenn wirklich etwas zu tun ist. */
+.parent-overview .parent-attention { margin-top: 14px; border: 1px solid color-mix(in srgb,var(--warn) 35%,var(--border)); background: color-mix(in srgb,var(--warn-bg) 55%,var(--surface)); border-radius: 18px; }
+.parent-overview .parent-attention h2 { display: flex; align-items: center; gap: .6rem; margin: 0; font-size: 1.05rem; }
+.parent-overview .parent-attention-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c-checks); box-shadow: 0 0 0 4px color-mix(in srgb,var(--c-checks) 25%,transparent); flex: none; }
+.parent-overview .parent-attention .parent-task-list > a { border-bottom-color: color-mix(in srgb,var(--warn) 22%,var(--border)); }
+.parent-overview .parent-attention .parent-notice { background: var(--surface); }

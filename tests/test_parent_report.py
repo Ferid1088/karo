@@ -226,7 +226,7 @@ def test_browser_drilldown_history_responsive_and_failure(client,fake_llm,fake_c
             assert root.get_attribute('data-mode')=='monat'
             assert page.locator('.pr-overview .pr-tile').count()==5
             assert '8 von 10' in page.locator('.pr-overview .pr-tile').nth(2).inner_text()
-            for theme in ['schiefer','sand','nacht']:
+            for theme in ['karo','sand','nacht']:
                 page.locator('html').evaluate('(e,v)=>e.dataset.themeColor=v',theme)
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
                 root.screenshot(path=str(tmp_path/f'report-{width}-{theme}.png'))

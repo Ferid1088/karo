@@ -1,17 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Für Eltern – Karo{% endblock %}
-{% block page_styles %}<link rel="stylesheet" href="/static/parent-overview.css?v=1"><link rel="stylesheet" href="/static/parent-report.css?v=5"><script src="/static/parent-report.js?v=3" defer></script>{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="/static/parent-overview.css?v=2"><link rel="stylesheet" href="/static/parent-report.css?v=6"><script src="/static/parent-report.js?v=3" defer></script>{% endblock %}
 {% block mainclass %}parent-overview{% endblock %}
 {% block content %}
 {% include "_parent_report.html" %}
 <p id="report-status" class="sr-only" role="status" aria-live="polite"></p>
 {% set weekly_change = woche.plan and woche.plan.child_status == 'aendern' %}
 {% set needs_attention = reviews or offene_vorschlaege or offene_funde or ohne_fach_anzahl or grade_notices or woche.helps or weekly_change or counts.get('fehler', 0) %}
-<details class="card report-attention" {% if grade_notices %}open{% endif %}><summary>{{ 'Hinweise & offene Aufgaben' if needs_attention else 'Im Moment ist nichts zu erledigen' }}<span class="parent-badge">{{ 'Bitte ansehen' if needs_attention else 'Alles im Blick' }}</span></summary>
+{% if needs_attention %}
 <section class="card parent-attention" aria-labelledby="attention-title">
-  <div class="parent-section-heading"><h2 id="attention-title">{{ 'Das braucht Ihre Aufmerksamkeit' if needs_attention else 'Im Moment ist nichts zu erledigen' }}</h2>
-  <span class="parent-badge {{ 'has-tasks' if needs_attention else '' }}">{{ 'Offene Aufgaben' if needs_attention else 'Alles im Blick' }}</span></div>
-  {% if not needs_attention %}<p class="parent-muted">Hier erscheinen Hilfeanfragen und Inhalte, die Sie prüfen sollen.</p>{% endif %}
+  <h2 id="attention-title"><span class="parent-attention-dot" aria-hidden="true"></span>Das braucht Ihre Aufmerksamkeit</h2>
   {% if reviews or offene_vorschlaege or offene_funde or ohne_fach_anzahl or woche.helps or weekly_change or counts.get('fehler', 0) %}
   <div class="parent-task-list">
     {% if ohne_fach_anzahl %}<a href="/eltern/ohne-fach"><span><strong>{{ ohne_fach_anzahl }} Inhalt{{ 'e' if ohne_fach_anzahl != 1 }} ohne gültiges Fach</strong><small>Bitte ein Fach zuordnen. Bis dahin sieht Ihr Kind diese Inhalte nicht.</small></span><span aria-hidden="true">→</span></a>{% endif %}
@@ -30,50 +28,23 @@
   </div><form method="post" action="/eltern/klassenhinweis/{{ notice.id }}/gelesen">{{ csrf_input() }}<button class="ghost" type="submit">Gelesen</button></form></article>
   {% endfor %}</div>{% endif %}
 </section>
+{% endif %}
 
-</details>
+{# Verwalten: eine Reihe bunter Abkürzungen, darunter drei aufklappbare Bereiche.
+   Hell/Dunkel und Abmelden stehen oben in der Kopfzeile, Einstellungen in der Navigation. #}
 <details class="parent-management"><summary>Verwalten &amp; Einstellungen</summary>
-<section class="parent-learning" aria-labelledby="learning-title">
-  <h2 id="learning-title">So steht es gerade</h2>
-  <div class="parent-snapshot-grid">
-    <article class="card parent-snapshot">
-      <p class="parent-kicker">MEINE THEMEN</p>
-      <h3><span class="parent-number">{{ overview.personal_topics }}</span> aktive{{ 's Thema' if overview.personal_topics == 1 else ' Themen' }}</h3>
-      <p class="parent-muted">{{ 'Eigene Lernthemen, unabhängig von Klassenarbeiten.' if overview.personal_topics else 'Noch keine eigenen Lernthemen. Wählen Sie gemeinsam einen ersten Einstieg.' }}</p>
-      <a href="/themen" class="parent-text-link">Themen verwalten <span aria-hidden="true">→</span></a>
-    </article>
-    <article class="card parent-snapshot">
-      <p class="parent-kicker">PRÜFUNGSVORBEREITUNG</p>
-      <h3><span class="parent-number">{{ overview.upcoming_exams }}</span> anstehende Prüfung{{ 'en' if overview.upcoming_exams != 1 }}</h3>
-      {% if overview.next_exam %}<p class="parent-muted">Als Nächstes: <strong>{{ overview.next_exam.subject|fachname }}</strong> · {{ overview.next_exam.date_label }}{% if overview.next_exam.days == 0 %} · heute{% endif %}</p>
-      {% else %}<p class="parent-muted">Keine kommende Klassenarbeit eingetragen.</p>{% endif %}
-      <a href="/klassenarbeit" class="parent-text-link">Klassenarbeiten ansehen <span aria-hidden="true">→</span></a>
-    </article>
-  </div>
-</section>
-
-<section aria-labelledby="parent-actions-title" class="parent-shortcuts">
-  <h2 id="parent-actions-title">Was möchten Sie tun?</h2>
-  <div class="parent-shortcut-grid">
-    <a class="card parent-shortcut" href="/wissen"><span class="parent-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z M14 3v5h4 M10 12h5 M10 16h5"/></svg></span><span><strong>Schulmaterial hinzufügen</strong><small>Fotos, Arbeitsblätter und PDFs verwalten.</small></span><span aria-hidden="true">→</span></a>
-    <a class="card parent-shortcut" href="{{ '/eltern/lernfortschritt' if cfg.adaptive_learning_enabled else '/messung/fortschritt#ausfuehrlich' }}"><span class="parent-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4v16h16 M8 16v-4 M12 16V8 M16 16V5"/></svg></span><span><strong>Lernen besser verstehen</strong><small>{{ 'Fortschritte und Denkfehler nachvollziehen.' if cfg.adaptive_learning_enabled else 'Antworten und Entwicklung nachvollziehen.' }}</small></span><span aria-hidden="true">→</span></a>
-    <a class="card parent-shortcut" href="/setup"><span class="parent-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h6m4 0h6 M4 17h10m4 0h2"/><circle cx="12" cy="7" r="2"/><circle cx="16" cy="17" r="2"/></svg></span><span><strong>Karo einstellen</strong><small>Profil, Zugriffsrechte und Passwörter.</small></span><span aria-hidden="true">→</span></a>
-  </div>
-</section>
-
-<h2 class="parent-secondary-title">Weitere Möglichkeiten</h2>
+<nav class="parent-shortcut-grid" aria-label="Schnellzugriff">
+  <a class="card parent-shortcut ps-days" href="/wissen"><span class="parent-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z M14 3v5h4 M10 12h5 M10 16h5"/></svg></span><span><strong>Schulmaterial hinzufügen</strong><small>Fotos, Arbeitsblätter und PDFs</small></span></a>
+  <a class="card parent-shortcut ps-checks" href="/klassenarbeit"><span class="parent-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16 M8 3v4 M16 3v4 M9 15l2 2 4-4"/></svg></span><span><strong>Klassenarbeiten</strong><small>Termine und Themen eintragen</small></span></a>
+  {% if cfg.adaptive_learning_enabled %}<a class="card parent-shortcut ps-answers" href="/eltern/lernfortschritt"><span class="parent-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4v16h16 M8 16v-4 M12 16V8 M16 16V5"/></svg></span><span><strong>Lernfortschritt</strong><small>Fortschritte und Denkfehler verstehen</small></span></a>{% endif %}
+  <a class="card parent-shortcut ps-goals" href="/messung/fortschritt#ausfuehrlich"><span class="parent-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h16 M7 15l3-4 3 2 4-6"/><circle cx="17" cy="7" r="1.2"/></svg></span><span><strong>Lernstand &amp; Export</strong><small>Verlauf, Antworten, Tabelle für Drive</small></span></a>
+  <a class="card parent-shortcut ps-sky" href="/recherche"><span class="parent-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M4 12h16 M12 4c2.5 2.5 2.5 13.5 0 16 M12 4c-2.5 2.5-2.5 13.5 0 16"/></svg></span><span><strong>Internetquellen</strong><small>Fundstellen prüfen, Seiten erlauben</small></span></a>
+</nav>
 <details class="card disclosure parent-details" id="familie">
   <summary><span>Wochenvereinbarung &amp; Meine Welt<small>Gemeinsame Absprachen, Rückmeldungen und Begleiter</small></span></summary>
   <div class="parent-family-grid">
     {% include "woche/pilot_card.html" %}
     <section class="card"><h2>Meine Welt</h2>{% if begleiter %}<p>Der Begleiter Ihres Kindes heißt aktuell „{{ begleiter.name }}“.</p>{% else %}<p>Ihr Kind hat noch keinen eigenen Begleiter eingerichtet.</p>{% endif %}{% if begleiter_interesse %}<p>Interessiert sich gerade für: {{ begleiter_interesse.text }}</p>{% endif %}<a class="btn ghost" href="/welten">Meine Welt ansehen</a></section>
-  </div>
-</details>
-<details class="card disclosure parent-details">
-  <summary><span>Quellen, Lernstand &amp; Export<small>Material prüfen und die Entwicklung im Detail ansehen</small></span></summary>
-  <div class="parent-task-list">
-    <a href="/recherche"><span><strong>Internetquellen verwalten</strong><small>Fundstellen prüfen und erlaubte Seiten festlegen.</small></span><span aria-hidden="true">→</span></a>
-    <a href="/messung/fortschritt#ausfuehrlich"><span><strong>Lernstand &amp; Export</strong><small>Entwicklung, Antworten und die Tabelle für Drive.</small></span><span aria-hidden="true">→</span></a>
   </div>
 </details>
 <details class="card disclosure parent-details" id="betrieb">
@@ -85,19 +56,16 @@
   {% if einig.gesamt %}<p class="hint">Karo und Lernbegleitung waren sich bei {{ (einig.quote * 100)|round|int }} % der letzten {{ einig.gesamt }} Antworten einig. Das ist kein Lernfortschritt Ihres Kindes.</p>{% endif %}
 </details>
 <details class="card disclosure parent-details">
-  <summary><span>Aussehen &amp; Anmeldung<small>Farben wählen oder das Gerät ans Kind übergeben</small></span></summary>
+  <summary><span>Farben &amp; Kind-Modus<small>Farbwelt wählen oder das Gerät ans Kind übergeben</small></span></summary>
   <div class="row area-preferences"><div class="field">
-    <label for="eltern-modus">Hell oder dunkel</label><select id="eltern-modus" data-modus-picker>
-    <option value="auto">Automatisch (wie das Gerät)</option><option value="hell">Hell</option><option value="dunkel">Dunkel</option></select>
-  </div><div class="field">
     <label for="eltern-farbwelt">Elternbereich</label><select id="eltern-farbwelt" data-theme-picker="parent">
-    {% for wert, name in [('schiefer','Schiefer & Petrol'),('sand','Sand & Braun'),('nacht','Nachtblau (dunkel)')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
+    {% for wert, name in [('karo','Karo – bunt'),('sand','Sand – warm')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
   </div><div class="field">
     <label for="farbwelten-auswahl">Kinderbereich</label><select id="farbwelten-auswahl" data-theme-picker="child">
     {% for wert, name in [('lila','Lila'),('ozean','Blau'),('wiese','Grün'),('sonne','Orange'),('zuckerwatte','Rosa'),('lava','Rot'),('dunkel','Dunkel')] %}<option value="{{ wert }}">{{ name }}</option>{% endfor %}</select>
   </div></div>
+  <p class="hint">Hell, dunkel oder automatisch stellen Sie oben rechts in der Kopfzeile um.</p>
   <form method="post" action="/eltern/kind-modus" class="section-space"><p class="hint">Gerät ans Kind übergeben? Zurück geht es nur mit dem Eltern-Passwort.</p>{{ csrf_input() }}<button type="submit" class="ghost">Kind-Modus starten</button></form>
-  <form method="post" action="/logout" class="section-space" data-logout>{{ csrf_input() }}<button type="submit" class="ghost">Abmelden</button></form>
 </details>
 </details>
 {% endblock %}

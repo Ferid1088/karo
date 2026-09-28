@@ -29,8 +29,8 @@
 {% macro feier_rows() -%}{% for c in post.celebrations %}<div class="pr-feier"><span class="pr-feier-e" aria-hidden="true">🎉</span><span class="pr-feier-t"><b>„{{ c.statement }}“ geschafft!</b><small>Feier-Idee von {{ kid }}: {{ c.celebration }}</small></span><form method="post" action="/eltern/post/feier/{{ c.id }}">{{ formbits() }}<button type="submit" class="pr-feier-btn">Machen wir!</button></form></div>{% endfor %}{%- endmacro %}
 <section id="parent-report" class="pr" aria-label="Elternbericht" data-date="{{ report.anchor }}" data-mode="{{ report.mode }}">
   <header class="pr-heading">
-    <div><p class="pr-eyebrow">ELTERNBERICHT · {{ cfg.learner_name or 'Ihr Kind' }} · Klasse {{ cfg.learner_grade }}</p>
-      <h1>Alles Wichtige im Blick</h1><p class="pr-muted">{{ report.title }} · Alle Fächer · Eigene Themen, Prüfungen &amp; Ziele</p>
+    <div><p class="pr-eyebrow">{{ report.title }} · {{ kid }} · Klasse {{ cfg.learner_grade }}</p>
+      <h1>Alles Wichtige im Blick</h1>
       <a class="pr-post-btn" {{ opener('pr-d-post') }}><span aria-hidden="true">✉️</span> Nachricht an {{ kid }}{% set last = post.recent|selectattr('reaction')|first %}{% if last and last.reaction %}<span class="pr-post-last">Letzte Antwort: {{ last.reaction_label }}</span>{% endif %}</a></div>
     <nav class="pr-period" aria-label="Berichtszeitraum">
       <div class="pr-switch"><a data-report-link href="{{ report.day_link }}" {% if report.mode == 'tag' %}aria-current="true"{% endif %}>Tag</a><a data-report-link href="{{ report.week_link }}" {% if report.mode == 'woche' %}aria-current="true"{% endif %}>Woche</a><a data-report-link href="{{ report.month_link }}" {% if report.mode == 'monat' %}aria-current="true"{% endif %}>Monat</a></div>
@@ -44,7 +44,6 @@
     </nav>
   </header>
   <p class="pr-error" id="report-error" role="alert" hidden></p>
-  <p class="pr-tapnote"><span aria-hidden="true">›</span>Alles antippen, was Sie genauer wissen möchten.</p>
 
   {# ---------- Überblick: eine Ampel und vier Anzeigen ---------- #}
   <div class="pr-overview" aria-label="Überblick">
@@ -59,23 +58,23 @@
         <span class="pr-status-line"><i aria-hidden="true"></i>{{ st.line }}</span>
         <span class="pr-more">Was heißt das? {{ chev() }}</span></span>
     </a>
-    <a class="pr-tile" {{ opener('pr-d-days') }}>
+    <a class="pr-tile pr-t-days" {{ opener('pr-d-days') }}>
       <span class="pr-tile-top"><span class="pr-kicker">Lerntage</span></span>
       <span class="pr-vis">{% if report.mode == 'monat' %}<span class="pr-mdots" aria-hidden="true">{% for _ in range(report.strip_offset) %}<i class="x"></i>{% endfor %}{% for d in report.strip %}<i class="{{ dstate(d) }}"></i>{% endfor %}</span>
         {% else %}<span class="pr-wdots" aria-hidden="true">{% for d in report.strip %}<span class="{{ dstate(d) }} {{ 'sel' if d.selected }} {{ 'today' if d.today }}"><i></i><small>{{ d.weekday }}</small></span>{% endfor %}</span>{% endif %}</span>
       <span class="pr-tile-foot"><span>{% if report.future %}noch offen{% elif report.mode == 'tag' %}<b>{{ 'Lerntag' if report.active_days else 'Kein Lerntag' }}</b>{% else %}<b>{{ report.active_days }} von {{ report.elapsed_days }}</b> Tagen{% endif %}</span>{{ chev() }}</span>
     </a>
-    <a class="pr-tile" {{ opener('pr-d-answers') }}>
+    <a class="pr-tile pr-t-answers" {{ opener('pr-d-answers') }}>
       <span class="pr-tile-top"><span class="pr-kicker">Richtig</span></span>
       <span class="pr-vis">{{ ten(report.answer_ten, 'pr-ten-big') }}</span>
       <span class="pr-tile-foot"><span>{% if report.answer_ten is none %}noch keine Antworten{% else %}<b>{{ report.answer_ten }} von 10</b> richtig{% endif %}</span>{{ chev() }}</span>
     </a>
-    <a class="pr-tile" {{ opener('pr-d-checks') }}>
+    <a class="pr-tile pr-t-checks" {{ opener('pr-d-checks') }}>
       <span class="pr-tile-top"><span class="pr-kicker">Neu sicher</span></span>
       <span class="pr-vis pr-newbig"><b>{{ '–' if report.future else report.all_checks }}</b><span class="pr-checks" aria-hidden="true">{% for c in report.check_rows[:6] %}<i class="{{ c.subject }}">✓</i>{% endfor %}</span></span>
       <span class="pr-tile-foot"><span>{{ 'Lerncheck' if report.all_checks == 1 else 'Lernchecks' }} bestanden</span>{{ chev() }}</span>
     </a>
-    <a class="pr-tile" {{ opener('pr-d-goals') }}>
+    <a class="pr-tile pr-t-goals" {{ opener('pr-d-goals') }}>
       <span class="pr-tile-top"><span class="pr-kicker">Ziele</span></span>
       <span class="pr-vis"><span class="pr-ringwrap">{{ ring(report.goal_minutes, report.goal_due_minutes) }}<span class="pr-ring-c"><b>{{ report.goal_minutes }}</b><small>Min. gemeldet</small></span></span></span>
       <span class="pr-tile-foot"><span>{% if report.goal_due %}<b>{{ report.goal_done }} von {{ report.goal_due }}</b> Einheiten{% elif report.goal_planned %}{{ report.goal_planned }} geplant{% else %}nichts fällig{% endif %}</span>{{ chev() }}</span>
@@ -93,7 +92,7 @@
         </div>
       {% elif report.mode == 'woche' %}
         <div class="pr-panel-heading"><h2 id="pr-activity-title">Antworten pro Tag</h2>
-          <span class="pr-legend">{% for s in report.subjects %}<span><i class="pr-dot {{ s.key }}" aria-hidden="true"></i>{{ s.name }}</span>{% endfor %}<span><i class="pr-dot pr-hatched" aria-hidden="true"></i>noch nicht richtig</span></span></div>
+          <span class="pr-legend">{% for s in report.subjects %}<span><i class="pr-dot {{ s.key }}" aria-hidden="true"></i>{{ s.name }}</span>{% endfor %}<span><i class="pr-dot pr-hatched" aria-hidden="true"></i>noch nicht richtig</span><span>✓ Lerncheck</span><span>○ geplant</span></span></div>
         <div class="pr-plot">
           {% for group in report.groups %}{% set d = report.strip[loop.index0] %}
           <a class="pr-chart-group {{ 'pr-today' if d.today }}" data-report-link data-day="{{ d.iso }}" href="{{ group.href }}" aria-label="{{ group.label }}: {{ group.total }} bewertete Antworten, {{ group.right }} richtig. {{ group.checks }} erste Lernchecks bestanden. {{ group.goal_minutes }} Zielminuten gemeldet. Tag anzeigen.">
@@ -103,7 +102,7 @@
           </a>
           {% endfor %}
         </div>
-        <div class="pr-panel-foot"><span class="pr-note">✓ Lerncheck bestanden · ○ geplant · Tag antippen für Details</span><a class="pr-link" {{ opener('pr-d-table') }}>Zahlen ansehen</a></div>
+        <div class="pr-panel-foot"><a class="pr-link" {{ opener('pr-d-table') }}>Zahlen ansehen</a></div>
       {% else %}
         <div class="pr-panel-heading"><h2 id="pr-activity-title">Lernkalender {{ report.month_label }}</h2>
           <span class="pr-legend"><span>wenig</span><span class="pr-scale" aria-hidden="true">{% for h in range(5) %}<i class="h{{ h }}"></i>{% endfor %}</span><span>viele Antworten</span><span>✓ Lerncheck</span><span><i class="pr-dot pr-miss-dot" aria-hidden="true"></i>Plan verpasst</span></span></div>
@@ -118,12 +117,12 @@
             <a data-report-link href="{{ row.href }}" class="pr-wk" aria-label="Kalenderwoche {{ row.week }} öffnen"><b>KW {{ row.week }}</b><span>{{ '–' if row.future else row.total }}</span></a>
           {% endfor %}
         </div>
-        <div class="pr-panel-foot"><span class="pr-note">Zahl im Feld = bewertete Antworten · Tag oder Woche antippen</span><a class="pr-link" {{ opener('pr-d-table') }}>Zahlen ansehen</a></div>
+        <div class="pr-panel-foot"><a class="pr-link" {{ opener('pr-d-table') }}>Zahlen ansehen</a></div>
       {% endif %}
     </section>
 
     <section class="pr-panel pr-exams-panel" aria-labelledby="pr-exams-title">
-      <div class="pr-panel-heading"><h2 id="pr-exams-title">Prüfungen</h2><span class="pr-note">Tage bis zur Prüfung</span></div>
+      <div class="pr-panel-heading"><h2 id="pr-exams-title">Prüfungen</h2></div>
       {% for exam in report.upcoming[:3] %}
       <a class="pr-xrow" {{ opener('pr-d-exam-' ~ exam.id) }}>
         <span class="pr-cdbox pr-l-{{ exam.verdict.level }}"><b>{{ exam.days }}</b><small>{{ 'Tag' if exam.days == 1 else 'Tage' }}</small></span>
@@ -142,9 +141,9 @@
       <div class="pr-panel-heading"><h2 id="pr-subject-title">Fächer</h2><span class="pr-legend"><span><i class="pr-dot pr-m-sicher" aria-hidden="true"></i>sicher</span><span><i class="pr-dot pr-m-uebt" aria-hidden="true"></i>übt noch</span><span><i class="pr-dot pr-m-offen" aria-hidden="true"></i>offen</span></span></div>
       <div class="pr-subj-grid">
       {% for s in report.subjects %}
-        <a class="pr-stile" {{ opener('pr-d-subj-' ~ s.key) }}>
-          <span class="pr-st-n"><i class="pr-dot {{ s.key }}" aria-hidden="true"></i>{{ s.name }}</span>
-          <span class="pr-st-big">{% if s.ten is not none %}{{ s.ten }}<small> von 10 richtig</small>{% else %}–<small> keine Antworten</small>{% endif %}</span>
+        <a class="pr-stile pr-s-{{ s.key }}" {{ opener('pr-d-subj-' ~ s.key) }}>
+          <span class="pr-st-top"><span class="pr-st-n">{{ s.name }}</span>
+          <span class="pr-st-big">{% if s.ten is not none %}{{ s.ten }}<small> von 10 richtig</small>{% else %}<small>keine Antworten</small>{% endif %}</span></span>
           {{ ten(s.ten) }}
           {{ mbar(s.mastery) }}
           <span class="pr-st-foot"><span>{{ s.safe_total }} von {{ s.mastery|length }} Themen sicher</span>{{ chev() }}</span>
@@ -164,8 +163,6 @@
       {% else %}<p class="pr-empty">Keine Zielplanung oder Zielmeldung in diesem Zeitraum.</p>{% endfor %}
     </section>
   </div>
-
-  <footer class="pr-foot"><p>{{ report.conversation }}</p><a class="pr-link" {{ opener('pr-d-help') }}>Was bedeuten diese Zahlen?</a></footer>
 
   {# ================= Details (Dialoge) ================= #}
   {% call sheet('pr-d-status', 'Lagebild') %}

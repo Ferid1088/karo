@@ -64,9 +64,11 @@ def test_empty_overview_access_and_existing_tools(client, fake_llm, fake_cli, ap
     einrichten(client, fake_llm)
     response = client.get('/eltern')
     assert response.status_code == 200
-    assert 'Im Moment ist nichts zu erledigen' in response.text
-    assert 'Noch keine eigenen Lernthemen' in response.text
-    assert 'Keine kommende Klassenarbeit eingetragen' in response.text
+    # Nothing to do: no attention card at all, the report says what is missing.
+    assert 'parent-attention' not in response.text
+    assert 'Keine Klassenarbeit eingetragen.' in response.text
+    # Header already has Hell/Dunkel and Abmelden; the page does not repeat them.
+    assert response.text.count('action="/logout"') == 1
     for path in ['/themen', '/wissen', '/klassenarbeit', '/setup', '/woche/eltern',
                  '/welten', '/recherche', '/messung/fortschritt#ausfuehrlich', '/protokoll']:
         assert f'href="{path}"' in response.text
@@ -135,10 +137,13 @@ def test_mobile_desktop_themes_and_disclosures(client, fake_llm, fake_cli, app_e
             assert page.get_by_role('heading', name='Neue Hinweise zum Lernen').is_visible()
             assert not page.locator('#familie').evaluate('(el) => el.open')
             page.locator('.parent-management > summary').click()
-            for theme in ['schiefer', 'sand', 'nacht']:
+            for theme in ['karo', 'sand', 'nacht']:
                 appearance = page.locator('.parent-details').last
                 appearance.locator('summary').click()
-                page.locator('#eltern-farbwelt').select_option(theme)
+                if theme == 'nacht':  # dark is the header switch, not a palette
+                    page.get_by_role('button', name='Dunkel').click()
+                else:
+                    page.locator('#eltern-farbwelt').select_option(theme)
                 assert page.locator('html').get_attribute('data-theme-color') == theme
                 appearance.locator('summary').click()
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
