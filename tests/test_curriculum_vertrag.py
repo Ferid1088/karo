@@ -30,11 +30,12 @@ def _antwort(classification, klasse=(7, 8)):
 ])
 def test_ohne_gueltige_klasseneinordnung_wird_abgelehnt(app_env, classification, warum):
     from app import config
+    import karo_contract as kc
     from app.adaptiv import curriculum_dienst as cd, schemas
     app_env.db.init()
     with pytest.raises((schemas.InhaltUngueltig, ValueError, TypeError, KeyError)), \
             pytest.MonkeyPatch.context() as mp:
-        mp.setattr(cd.schemas, "pruefe_lektion", lambda l: l)
+        mp.setattr(kc.schemas, "pruefe_lektion", lambda l: l)
         cd.import_lesson(config.load_safe(), _antwort(classification), "Satz des Thales",
                          "mathematik", 8)
 
@@ -42,10 +43,11 @@ def test_ohne_gueltige_klasseneinordnung_wird_abgelehnt(app_env, classification,
 def test_die_ablehnung_nennt_die_klasseneinordnung_beim_namen(app_env):
     """Der Grund muss im Text stehen, sonst sucht man ihn wie ich stundenlang."""
     from app import config
+    import karo_contract as kc
     from app.adaptiv import curriculum_dienst as cd, schemas
     app_env.db.init()
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(cd.schemas, "pruefe_lektion", lambda l: l)
+        mp.setattr(kc.schemas, "pruefe_lektion", lambda l: l)
         with pytest.raises(schemas.InhaltUngueltig, match="Klasseneinordnung"):
             cd.import_lesson(config.load_safe(), _antwort({}), "Satz des Thales", "mathematik", 8)
 

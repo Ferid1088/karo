@@ -15,10 +15,13 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+import karo_contract
+from karo_contract import VertragVerletzt
+
 from .. import jobs, pii, prompts
 from . import komponenten, schemas, store
 
-FORMAT_ID = "karo-adaptiv-v1"
+FORMAT_ID = karo_contract.FORMAT_ID
 MAX_WAIT_SECONDS = 24 * 60 * 60
 MAX_RESPONSE_BYTES = 2_000_000
 
@@ -32,8 +35,9 @@ def settings(cfg) -> tuple[str, str]:
 #: CONTRACT_VERSION passen. Laufen sie auseinander, wird ein Auftrag
 #: zurueckgestellt — niemals abgelehnt: eine Ablehnung zaehlt beim Dienst
 #: gegen das Thema und hat es schon einmal dauerhaft unlieferbar gemacht,
-#: obwohl am Inhalt nichts falsch war.
-CONTRACT_VERSION = "karo-adaptiv-v1.1"
+#: obwohl am Inhalt nichts falsch war. Steht in `karo_contract`, weil der
+#: Dienst dieselbe Angabe braucht.
+CONTRACT_VERSION = karo_contract.CONTRACT_VERSION
 
 
 def betrieb_melden(text: str) -> None:
@@ -133,50 +137,15 @@ def _export_id(result: dict) -> int:
     return value
 
 
-class VertragVerletzt(schemas.InhaltUngueltig):
-    """Nicht die Lektion ist falsch, sondern die Huelle der Antwort.
-
-    Fach, Format, Inhaltsversion, Klasseneinordnung: darueber haben sich
-    Karo und der Dienst geeinigt. Stimmt davon etwas nicht, hilft kein neu
-    geschriebener Text — das muss ein Mensch an der Schnittstelle richten.
-    Deshalb meldet Karo es dem Dienst getrennt: als Vertragsverstoss, der
-    dort nicht gegen das Thema zaehlt.
-    """
-
-
 def _checked(result: dict, thema: str, grade: int, fach: str) -> dict:
-    from . import lektionen
-    from .normalisierung import normalisiere_thema
-    from ..faecher import schluessel
-    # Nur das Curriculum des aktiven Fachs: eine Antwort aus einem anderen
-    # Fach wird nicht importiert, auch wenn das Thema zufällig passt.
-    geliefert = result.get("subject")
-    if geliefert is not None and schluessel(geliefert) != fach:
-        raise VertragVerletzt("Die Lernreihe gehört zu einem anderen Fach.")
-    if result.get("format") != FORMAT_ID or not result.get("concept_id") or not result.get("concept_version"):
-        raise VertragVerletzt("Format oder Inhaltsversion fehlt.")
-    lesson = schemas.pruefe_lektion(result.get("lesson"))
-    if "erstkontakt" not in lesson:
-        raise schemas.InhaltUngueltig("Einstieg in die Lernreihe fehlt.")
-    concept = lesson["konzept"]
-    classification = result.get('classification') or {}
-    lo, hi = classification.get('first_contact_grade'), classification.get('target_grade')
-    if (type(lo) is not int or type(hi) is not int or not 1 <= lo <= hi <= 13
-            or classification.get('source') != 'approved_curriculum'):
-        # Das Feld gehoert zur Huelle: fehlt es, ist der Dienst zu alt.
-        raise VertragVerletzt('Die Klasseneinordnung fehlt oder kommt nicht aus dem geprüften Curriculum.')
-    if (concept['klasse_von'], concept['klasse_bis']) != (lo, hi):
-        # Huelle in Ordnung, aber die Lektion widerspricht ihr: ein Inhaltsfehler.
-        raise schemas.InhaltUngueltig('Die Klasseneinordnung stimmt nicht mit dem geprüften Curriculum überein.')
-    if not lektionen._trifft(normalisiere_thema(thema), concept):
-        raise schemas.InhaltUngueltig("Die Lernreihe passt nicht zum angefragten Thema.")
-    # Repeated numerical practice would make apparent success meaningless.
-    for fault in lesson["fehlertypen"]:
-        questions = [normalisiere_thema(fault["aufgaben"][role]["frage"])
-                     for role in ("beispiel", "gefuehrt", "selbststaendig")]
-        if len(set(questions)) != len(questions):
-            raise schemas.InhaltUngueltig("Beispiel und Übungsaufgaben müssen verschieden sein.")
-    return lesson
+    """Die Pruefung, die auch der Lehrplan-Dienst faehrt.
+
+    Sie stand frueher hier — und eine zweite, etwas andere beim Dienst. Der
+    gab frei, Karo lehnte ab, und nach zwei Ablehnungen war das Thema
+    dauerhaft leer. Jetzt ist es dieselbe Funktion aus `karo_contract`, die
+    der Dienst installiert und aufruft, bevor eine Lektion „fertig" wird.
+    """
+    return karo_contract.pruefe(result, thema=thema, fach=fach)
 
 
 def import_lesson(cfg, result: dict, thema: str, fach: str, grade: int) -> int:

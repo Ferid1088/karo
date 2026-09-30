@@ -1,0 +1,20 @@
+# Nur `karo_contract` wird ausgeliefert, nicht die App. Der Lehrplan-Dienst
+# installiert daraus die Pruefung, die Karo beim Import faehrt:
+#
+#   pip install "karo-contract @ git+https://github.com/Ferid1088/karo.git"
+#
+# Damit gibt es eine Pruefung statt zwei. Karo selbst laeuft weiter aus dem
+# Quellbaum und braucht diese Datei nicht.
+[project]
+name = "karo-contract"
+version = "1.1.0"
+description = "Das Lektionsformat, das Karo und der Lehrplan-Dienst teilen"
+requires-python = ">=3.10"
+dependencies = []          # bewusst leer: keine App, keine Datenbank, kein Web
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["karo_contract*"]

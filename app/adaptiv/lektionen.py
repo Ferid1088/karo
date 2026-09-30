@@ -12,6 +12,8 @@ ist, als so tun, als sei alles da.
 
 from __future__ import annotations
 
+from karo_contract.huelle import trifft_thema
+
 from . import inhalte_brueche, store
 from .normalisierung import normalisiere_thema
 
@@ -45,15 +47,10 @@ def verfuegbar(fach: str | None = None) -> list[dict]:
 def _trifft(gesucht: str, lektion: dict) -> bool:
     """Stichworte gehoeren zum Konzept, nicht in eine Tabelle daneben.
 
-    Sie benennen das **Konzept**, nicht das Thema: „brueche" oder „nenner"
-    traefe jedes Bruchthema und damit auch „Brueche kuerzen" — eine andere
-    Fehlvorstellung als das Addieren (01_ARCHITECTURE.md §2).
+    Liegt in `karo_contract`: der Lehrplan-Dienst muss dieselbe Frage
+    gleich beantworten, sonst liefert er etwas, das Karo verwirft.
     """
-    for wort in lektion.get("stichworte") or ():
-        muster = normalisiere_thema(wort)
-        if muster and (muster in gesucht or gesucht in muster):
-            return True
-    return gesucht in normalisiere_thema(lektion["label"])
+    return trifft_thema(gesucht, lektion)
 
 
 def fuer_thema(thema_text: str | None, fach: str | None, klasse: int | None = None) -> dict | None:
