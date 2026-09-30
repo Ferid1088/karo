@@ -49,12 +49,17 @@ pull:
 	docker compose up -d
 	@echo "Karo läuft auf http://127.0.0.1:8080"
 
+# Gebaut wird ueber build.sh: nur aus einem sauberen, committeten, gepushten
+# Stand, und mit KARO_GIT_SHA im Image. Ohne das traegt das Image keinen Stand,
+# und /health kann nicht sagen, welcher Code antwortet.
 up:
-	$(BUILD_COMPOSE) up -d --build
+	./build.sh
+	$(BUILD_COMPOSE) up -d --no-build
 	@echo "Karo läuft auf http://127.0.0.1:8080"
 
 up-klein:
-	KARO_MIT_MP4=0 $(BUILD_COMPOSE) up -d --build
+	KARO_MIT_MP4=0 ./build.sh
+	KARO_MIT_MP4=0 $(BUILD_COMPOSE) up -d --no-build
 	@echo "Karo (schlank) läuft auf http://127.0.0.1:8080"
 
 # Baut für beide Architekturen (Apple Silicon UND Intel/AMD, also auch
@@ -67,7 +72,10 @@ up-klein:
 publish:
 	@test -n "$(VERSION)" || (echo "Bitte eine Version angeben, z. B. make publish VERSION=1.1.0"; exit 1)
 	@command -v docker buildx >/dev/null || (echo "docker buildx wird gebraucht (in Docker Desktop enthalten)"; exit 1)
+	@test -z "$$(git status --porcelain)" || (echo "Der Arbeitsbaum ist nicht sauber — ein veroeffentlichtes Image aus nicht committetem Code ist nicht nachvollziehbar."; git status --short; exit 2)
+	@git branch -r --contains HEAD | grep -q . || (echo "HEAD ist auf keinem Remote. Erst pushen, dann veroeffentlichen."; exit 3)
 	docker buildx build --platform linux/amd64,linux/arm64 \
+		--build-arg KARO_GIT_SHA=$$(git rev-parse HEAD) \
 		-t $(DOCKERHUB_REPO):$(VERSION) -t $(DOCKERHUB_REPO):latest --push .
 	@echo "Veröffentlicht: $(DOCKERHUB_REPO):$(VERSION) und :latest (linux/amd64, linux/arm64)"
 

@@ -100,3 +100,28 @@ def test_das_image_traegt_seinen_stand():
     assert "git status --porcelain" in bau          # nicht aus schmutzigem Baum
     assert "git branch -r --contains" in bau        # nicht aus ungepushtem Commit
     assert "KARO_GIT_SHA=$SHA" in bau
+
+
+def test_make_baut_ueber_build_sh():
+    """`make up` baute am Riegel vorbei — und ohne Stand im Image.
+
+    Zwei Wege, dasselbe Image zu bauen, von denen nur einer prueft, sind
+    kein Riegel.
+    """
+    mk = (WURZEL / "Makefile").read_text(encoding="utf-8")
+    ziele = {}
+    aktuell = None
+    for zeile in mk.splitlines():
+        if zeile and not zeile[0].isspace() and ":" in zeile and not zeile.startswith("#"):
+            aktuell = zeile.split(":", 1)[0].strip()
+            ziele[aktuell] = []
+        elif aktuell and zeile.startswith("\t"):
+            ziele[aktuell].append(zeile.strip())
+    for ziel in ("up", "up-klein"):
+        zeilen = " ".join(ziele.get(ziel, []))
+        assert "build.sh" in zeilen, f"{ziel} baut nicht ueber build.sh"
+        assert "--build" not in zeilen.replace("--build-arg", ""), \
+            f"{ziel} baut zusaetzlich an build.sh vorbei"
+    veroeffentlichen = " ".join(ziele.get("publish", []))
+    assert "KARO_GIT_SHA=" in veroeffentlichen
+    assert "git status --porcelain" in veroeffentlichen
