@@ -13,7 +13,6 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from .. import db
@@ -50,18 +49,15 @@ class LlmResult:
 class ClaudeClient:
     """Fassade. Kennt beide Backends und entscheidet nach der Konfiguration."""
 
-    def __init__(self, backend: Backend, model_vision: str = "",
-                 model_text: str = "") -> None:
+    def __init__(self, backend: Backend, model_text: str = "") -> None:
         self._backend = backend
-        self.model_vision = model_vision
         self.model_text = model_text
 
     # -- Aufbau -------------------------------------------------------------
 
     @classmethod
     def from_config(cls, cfg, timeout: int | None = None) -> "ClaudeClient":
-        return cls(build_backend(cfg.llm_backend, cfg, timeout),
-                   cfg.model_vision, cfg.model_text)
+        return cls(build_backend(cfg.llm_backend, cfg, timeout), cfg.model_text)
 
     @property
     def backend_name(self) -> str:
@@ -78,8 +74,7 @@ class ClaudeClient:
     # -- Der eigentliche Aufruf --------------------------------------------
 
     def complete(self, purpose: str, prompt: str, schema: dict, *,
-                 image_path: Path | None = None, system: str = "",
-                 max_tokens: int = 8192, model: str | None = None,
+                 system: str = "", max_tokens: int = 8192, model: str | None = None,
                  web_search: bool = False, web_fetch: bool = False) -> LlmResult:
         """Ein Modellaufruf mit erzwungener Antwortstruktur.
 
@@ -91,19 +86,18 @@ class ClaudeClient:
         Websuche bzw. das Abrufen einer freigegebenen Quelle (`research.py`),
         nicht einfach auf jeden Aufruf setzen.
         """
-        gewaehlt = model or (self.model_vision if image_path else self.model_text)
+        # Nur noch ein Modell: hier geht ausschliesslich Text hin.
+        gewaehlt = model or self.model_text
         if not gewaehlt:
             raise ClaudeSetupError(
                 "Es ist kein Modell konfiguriert. Bitte Einstellungen öffnen.")
 
         begonnen = time.monotonic()
-        call_id = _log_start(purpose, gewaehlt, prompt, image_path is not None,
-                             self._backend.name)
+        call_id = _log_start(purpose, gewaehlt, prompt, self._backend.name)
         try:
             roh = self._backend.call(prompt, schema, model=gewaehlt,
-                                     system=system, image_path=image_path,
-                                     max_tokens=max_tokens, web_search=web_search,
-                                     web_fetch=web_fetch)
+                                     system=system, max_tokens=max_tokens,
+                                     web_search=web_search, web_fetch=web_fetch)
         except ClaudeError as fehler:
             _log_finish(call_id, None, False, str(fehler), 0, 0, None,
                         _ms(begonnen))
@@ -186,14 +180,15 @@ def _missing_required(nutzdaten, schema: dict) -> list[str]:
     return [k for k in schema.get("required", []) if k not in nutzdaten]
 
 
-def _log_start(purpose: str, model: str, prompt: str, mit_bild: bool,
-               backend: str) -> int:
+def _log_start(purpose: str, model: str, prompt: str, backend: str) -> int:
+    # `had_image` bleibt in der Tabelle und bleibt 0: die alten Zeilen sagen
+    # damit weiterhin die Wahrheit ueber das, was damals hinausging.
     with db.tx() as c:
         cur = c.execute(
             """INSERT INTO llm_call (purpose, backend, model, prompt, had_image,
                                      created_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (purpose, backend, model, redact(prompt), int(mit_bild), db.now()))
+               VALUES (?, ?, ?, ?, 0, ?)""",
+            (purpose, backend, model, redact(prompt), db.now()))
         return cur.lastrowid
 
 

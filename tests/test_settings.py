@@ -76,7 +76,7 @@ def test_saving_one_setting_preserves_collapsed_controls(client, fake_llm, fake_
     assert response.headers['location'] == '/setup'
     cfg = app_env.config.load()
     assert cfg.max_lernrunden == 5
-    for key in ('header_crop_percent', 'recherche_erlaubt', 'model_text', 'model_vision',
+    for key in ('header_crop_percent', 'recherche_erlaubt', 'model_text', 'model_stark',
                 'default_ausgabe', 'tts_stimme', 'app_password_hash',
                 'antworten_pruefen_kind', 'schulblaetter_kind', 'klassenarbeit_kind'):
         assert getattr(cfg, key) == getattr(before, key), key

@@ -71,7 +71,12 @@ class Config:
     subject: str = "mathematik"     # Standardfach: deutsch | mathematik | englisch
 
     # --- Modellwahl --------------------------------------------------------
-    model_vision: str = ""
+    # Zwei Textmodelle: das starke schreibt Lektionen (Didaktik, §5), das
+    # kleine erledigt den Rest. Frueher hiess das starke `model_vision` und
+    # las Handschrift — Bilder gehen nicht mehr an ein Modell, der Name log
+    # also. Ein alter Eintrag `model_vision` in der config.json wird beim
+    # Laden verworfen; beim naechsten Verbinden wird neu gewaehlt.
+    model_stark: str = ""
     model_text: str = ""
 
     # --- Ausgabe des Lernmaterials ----------------------------------------

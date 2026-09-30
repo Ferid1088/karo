@@ -227,15 +227,15 @@ def setup_credentials(request: Request, backend: str = Form("abo"),
         # Nur eines der drei Fächer; es ist der Reiter, mit dem Lernen öffnet.
         subject=faecher.schluessel(subject) or "mathematik",
         model_text=_waehle(modelle, "haiku") or modelle[0]["id"],
-        model_vision=_waehle(modelle, "sonnet") or modelle[0]["id"],
+        model_stark=_waehle(modelle, "sonnet") or modelle[0]["id"],
     )
     return render(request, "setup.html", schritt="modell",
                   **_setup_context(config.load(), modelle))
 
 
 @router.post("/setup/finish")
-async def setup_finish(request: Request, model_vision: str = Form(""),
-                 model_text: str = Form(""), header_crop: str = Form("8"),
+async def setup_finish(request: Request, model_text: str = Form(""),
+                 model_stark: str = Form(""), header_crop: str = Form("8"),
                  default_ausgabe: str = Form("html"),
                  tts_stimme: str = Form(""),
                  max_lernrunden: str = Form("4"),
@@ -276,8 +276,8 @@ async def setup_finish(request: Request, model_vision: str = Form(""),
     entwurf = dataclasses.replace(
         cfg,
         learner_name=profilname,
-        model_vision=model_vision if model_vision in gueltige else cfg.model_vision,
         model_text=model_text if model_text in gueltige else cfg.model_text,
+        model_stark=model_stark if model_stark in gueltige else cfg.model_stark,
         header_crop_percent=crop,
         default_ausgabe=(default_ausgabe
                         if default_ausgabe in {a.value for a in Ausgabe}
@@ -333,8 +333,8 @@ async def setup_finish(request: Request, model_vision: str = Form(""),
 
     aenderungen = {
         "learner_name": entwurf.learner_name,
-        "model_vision": entwurf.model_vision,
         "model_text": entwurf.model_text,
+        "model_stark": entwurf.model_stark,
         "header_crop_percent": entwurf.header_crop_percent,
         "default_ausgabe": entwurf.default_ausgabe,
         "tts_stimme": entwurf.tts_stimme,
@@ -435,8 +435,8 @@ def setup_claude_verbinden(request: Request, backend: str = Form("abo"),
     }
     if backend != cfg.llm_backend or cfg.model_text not in gueltige:
         aenderungen["model_text"] = _waehle(modelle, "haiku") or modelle[0]["id"]
-    if backend != cfg.llm_backend or cfg.model_vision not in gueltige:
-        aenderungen["model_vision"] = _waehle(modelle, "sonnet") or modelle[0]["id"]
+    if backend != cfg.llm_backend or cfg.model_stark not in gueltige:
+        aenderungen["model_stark"] = _waehle(modelle, "sonnet") or modelle[0]["id"]
 
     config.update(**aenderungen)
     connections.status(config.load(), force=True)
@@ -485,6 +485,6 @@ def setup_notebooklm_trennen(request: Request):
 @router.post("/setup/reset")
 def setup_reset(request: Request):
     config.update(claude_oauth_token="", anthropic_api_key="",
-                  model_vision="", model_text="", setup_complete=False)
+                  model_text="", model_stark="", setup_complete=False)
     request.session.clear()
     return zurueck("/setup")

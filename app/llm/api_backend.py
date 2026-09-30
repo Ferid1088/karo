@@ -6,10 +6,7 @@ wird. Kostet bei einem Kind rund einen Euro im Monat.
 
 from __future__ import annotations
 
-import base64
 import logging
-import mimetypes
-from pathlib import Path
 
 from .base import (
     ClaudeAuthError,
@@ -22,8 +19,6 @@ from .base import (
 log = logging.getLogger("karo.llm.api")
 
 TOOL_NAME = "antwort"
-MAX_IMAGE_BYTES = 5 * 1024 * 1024
-SUPPORTED_IMAGE_MIME = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 # Preise in USD je Million Token (Eingabe, Ausgabe), Stand September 2026.
 # Nur fuer die Schaetzung im Protokoll; unbekanntes Modell => None.
@@ -87,8 +82,8 @@ class ApiBackend:
                 for m in seite.data]
 
     def call(self, prompt: str, schema: dict, *, model: str, system: str = "",
-             image_path: Path | None = None, max_tokens: int = 8192,
-             web_search: bool = False, web_fetch: bool = False) -> RawResult:
+             max_tokens: int = 8192, web_search: bool = False,
+             web_fetch: bool = False) -> RawResult:
         if web_search or web_fetch:
             # Echte Websuche/-abruf würde ein zweites, unerzwungenes Werkzeug
             # neben dem Struktur-Werkzeug brauchen — die API erzwingt aber
@@ -103,10 +98,8 @@ class ApiBackend:
                 f"{was} wird für den API-Schlüssel-Weg noch nicht "
                 "unterstützt. Karo funktioniert ohne Recherche vollständig "
                 "weiter.")
-        inhalt: list[dict] = []
-        if image_path is not None:
-            inhalt.append(self._bildblock(image_path))
-        inhalt.append({"type": "text", "text": prompt})
+        # Nur Text. Es gab hier einmal einen Bildblock — siehe llm/base.py.
+        inhalt: list[dict] = [{"type": "text", "text": prompt}]
 
         try:
             msg = self._client.messages.create(
@@ -135,22 +128,6 @@ class ApiBackend:
         )
 
     # -- intern -------------------------------------------------------------
-
-    @staticmethod
-    def _bildblock(path: Path) -> dict:
-        if not path.is_file():
-            raise ClaudeError(f"Die Bilddatei {path.name} wurde nicht gefunden.")
-        groesse = path.stat().st_size
-        if groesse > MAX_IMAGE_BYTES:
-            raise ClaudeError(
-                f"Das Bild {path.name} ist mit {groesse // 1024} KB zu groß.")
-        mime = mimetypes.guess_type(path.name)[0] or "image/jpeg"
-        if mime not in SUPPORTED_IMAGE_MIME:
-            raise ClaudeError(f"Bildformat {mime} wird nicht unterstützt.")
-        return {"type": "image",
-                "source": {"type": "base64", "media_type": mime,
-                           "data": base64.standard_b64encode(
-                               path.read_bytes()).decode("ascii")}}
 
     def _deuten(self, exc: Exception) -> ClaudeError:
         from ..security import redact

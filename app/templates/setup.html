@@ -291,14 +291,18 @@ claude setup-token                         <span class="c-com"># Token wird ange
 <details class="card setup-group settings-category" id="erweitert">
   <summary><span><strong>Erweiterte Einstellungen</strong><small>KI-Modelle und Speicherorte · nur bei Bedarf ändern</small></span></summary>
 <div id="ki-modelle" class="settings-subsection">
-    <h3>KI-Modelle {{ hilfe('Stärker für Handschrift, billiger für Texte.') }}</h3>
+    {# Es gab hier zwei Modelle: eines fuer Handschrift, eines fuer Texte.
+       Das Handschriftmodell ist weg, weil kein Bild mehr an ein Modell geht
+       (app/llm/base.py). Ein Feld stehen zu lassen, das nichts mehr tut,
+       waere schlimmer als keines. #}
+    <h3>KI-Modelle {{ hilfe('Beide erzeugen Text. Bilder gehen nie an ein Modell.') }}</h3>
     {% if modelle %}
     <div class="row">
       <div class="field">
-        <label for="model_vision">Handschrift lesen</label>
-        <select id="model_vision" name="model_vision">
+        <label for="model_stark">Lernreihen schreiben</label>
+        <select id="model_stark" name="model_stark">
           {% for m in modelle %}
-          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_vision }}>{{ m.name }}</option>
+          <option value="{{ m.id }}" {{ 'selected' if m.id == cfg.model_stark }}>{{ m.name }}</option>
           {% endfor %}
         </select>
       </div>

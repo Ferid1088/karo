@@ -4,12 +4,21 @@ Alles oberhalb dieser Datei kennt nur `complete(...)` und bekommt entweder ein
 schemakonformes Objekt oder eine Ausnahme mit einer Meldung, die man einer
 Person zeigen kann. Es weiss nicht, ob dahinter ein Abo oder ein API-Schluessel
 steckt.
+
+Hier geht **Text** hin und sonst nichts. Es gab einmal einen `image_path`:
+damit gingen Fotos von Schulblaettern und handschriftlich bearbeiteten
+Fragebogen an ein Modell — mit allem, was zufaellig mit drauf war, vom Namen
+in der Kopfzeile bis zum Kinderzimmer im Hintergrund. Ein Bild laesst sich
+nicht saeubern wie ein Text, und was einmal draussen ist, kommt nicht zurueck.
+Deshalb gibt es diesen Weg nicht mehr, und deshalb hat diese Schnittstelle
+keinen Bildparameter: eine Regel, die sich nicht umgehen laesst, ist besser
+als eine, an die sich alle erinnern muessen. Bilder werden ab jetzt auf dem
+Geraet gelesen (siehe docs/Karo_Prompts_Schritt_fuer_Schritt.MD, Schritt 2).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Protocol
 
 
@@ -63,7 +72,6 @@ class Backend(Protocol):
         *,
         model: str,
         system: str = "",
-        image_path: Path | None = None,
         max_tokens: int = 8192,
         web_search: bool = False,
         web_fetch: bool = False,

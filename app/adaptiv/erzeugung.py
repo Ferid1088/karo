@@ -213,7 +213,7 @@ def _handler_anmelden():
         # das schrieb Komponentenparameter, die die Prüfung verwarf.
         ergebnis = ClaudeClient.from_config(cfg, TIMEOUT_SEKUNDEN).complete(
             purpose="lektion_erzeugen",
-            model=cfg.model_vision or None,
+            model=cfg.model_stark or None,
             max_tokens=MAX_TOKENS,
             prompt=prompts.lektion_prompt(
                 None, NAMEN[fach],

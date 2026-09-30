@@ -29,7 +29,6 @@ import os
 import shutil
 import subprocess
 import tempfile
-from pathlib import Path
 
 from .base import (
     Backend,
@@ -110,29 +109,27 @@ class CliBackend:
         return list(CLI_MODELS)
 
     def call(self, prompt: str, schema: dict, *, model: str, system: str = "",
-             image_path: Path | None = None, max_tokens: int = 8192,
-             web_search: bool = False, web_fetch: bool = False) -> RawResult:
+             max_tokens: int = 8192, web_search: bool = False,
+             web_fetch: bool = False) -> RawResult:
         self._require_cli()
         return self._run(prompt, schema, model=model, system=system,
-                         image_path=image_path, max_tokens=max_tokens,
-                         web_search=web_search, web_fetch=web_fetch)
+                         max_tokens=max_tokens, web_search=web_search,
+                         web_fetch=web_fetch)
 
     # -- intern -------------------------------------------------------------
 
     def _run(self, prompt: str, schema: dict, *, model: str, system: str = "",
-             image_path: Path | None = None, max_tokens: int = 8192,
-             timeout: int | None = None, web_search: bool = False,
-             web_fetch: bool = False) -> RawResult:
-        # Bilder gehen nicht in den Prompt, sondern werden gelesen: die CLI
-        # bekommt das Read-Werkzeug und den Pfad genannt. Ohne ausdrückliche
-        # Freigabe hat die CLI im Kopfmodus (-p) KEIN Werkzeug — auch keine
-        # Websuche, selbst wenn der Prompt danach fragt. Das war lange
-        # unbemerkt: die Recherche lief fehlerfrei durch, fand aber nie
-        # etwas, weil das Modell ehrlich nichts suchen konnte.
+             max_tokens: int = 8192, timeout: int | None = None,
+             web_search: bool = False, web_fetch: bool = False) -> RawResult:
+        # Ohne ausdrückliche Freigabe hat die CLI im Kopfmodus (-p) KEIN
+        # Werkzeug — auch keine Websuche, selbst wenn der Prompt danach fragt.
+        # Das war lange unbemerkt: die Recherche lief fehlerfrei durch, fand
+        # aber nie etwas, weil das Modell ehrlich nichts suchen konnte.
+        #
+        # Das Read-Werkzeug steht hier bewusst NICHT mehr: damit las die CLI
+        # fotografierte Schulblaetter. Siehe llm/base.py.
         volltext = prompt
         werkzeuge = []
-        if image_path:
-            werkzeuge.append("Read")
         if web_search:
             werkzeuge.append("WebSearch")
         if web_fetch:
@@ -140,16 +137,6 @@ class CliBackend:
         allowed = ",".join(werkzeuge)
         arbeitsverzeichnis = tempfile.mkdtemp(prefix="karo-claude-")
         try:
-            if image_path is not None:
-                if not image_path.is_file():
-                    raise ClaudeError(f"Die Bilddatei {image_path.name} fehlt.")
-                kopie = Path(arbeitsverzeichnis) / image_path.name
-                kopie.write_bytes(image_path.read_bytes())
-                volltext = (
-                    f"Lies zuerst die Bilddatei ./{kopie.name} mit dem "
-                    f"Read-Werkzeug. Dann:\n\n{prompt}"
-                )
-
             argv = [
                 self._binary, "-p", volltext,
                 "--output-format", "json",

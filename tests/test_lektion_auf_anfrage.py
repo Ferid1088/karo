@@ -152,7 +152,7 @@ def test_die_lektion_schreibt_das_starke_modell(client, fake_llm, fake_cli,
     Ausgabe-Token und Komponentenparameter, die die Pruefung verwarf.
     """
     token = _kind(client, fake_llm, app_env, erzeugen=True)
-    app_env.config.update(model_vision="sonnet-stark", model_text="haiku-klein")
+    app_env.config.update(model_stark="sonnet-stark", model_text="haiku-klein")
     _waehle(client, token)
 
     run_jobs(app_env, fake_llm)
