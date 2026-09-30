@@ -139,11 +139,17 @@ def auftrag_schluessel(thema: str, fach: str, klasse: int | None = None) -> str:
     return f"lektion:{normalisiere(thema)}" + (f':{normalisiere(fach or "")}:{klasse or ""}' if fach or klasse else '')
 
 
-def anfordern(thema: str, fach: str, klasse: int | None = None) -> int | None:
+def anfordern(thema: str, fach: str, klasse: int | None = None,
+              gebraucht_am: str | None = None) -> int | None:
     """Reiht die Erzeugung ein. Gibt None zurück, wenn schon eine läuft.
 
     Nur mit Fach: der Curriculum-Agent und das Modell bekommen ausschließlich
     das aktive Fach, nie einen Vorgabewert aus den Einstellungen.
+
+    `gebraucht_am` ist das Datum der Klassenarbeit. Der Lehrplan-Dienst
+    sortiert seine Schlange danach: sonst wartet das Thema fuer die Arbeit am
+    Freitag hinter dem fuer die Arbeit in drei Wochen. Das Datum steuert nur
+    die Reihenfolge, nie den Inhalt.
     """
     import time
     from .. import config, jobs
@@ -152,6 +158,8 @@ def anfordern(thema: str, fach: str, klasse: int | None = None) -> int | None:
     cfg = config.load()
     fach = pflicht(fach)
     payload = {"thema": thema, 'fach': fach, 'klasse': klasse}
+    if gebraucht_am:
+        payload["gebraucht_am"] = gebraucht_am
     if curriculum_dienst.configured(cfg):
         payload.update(curriculum_service=curriculum_dienst.settings(cfg)[0],
                        curriculum_started=time.time(),

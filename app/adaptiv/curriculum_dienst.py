@@ -195,10 +195,17 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
     if payload.get("curriculum_export"):
         result = request(cfg, "GET", f"/v1/lessons/{int(payload['curriculum_export'])}")
     else:
-        result = request(cfg, "POST", "/v1/lessons", {
+        anfrage = {
             # Nur der Schlüssel des aktiven Fachs: der Dienst sucht in genau
             # diesem Curriculum. Mehr verlässt die App nicht.
-            "subject": fach, "grade": grade, "topic": safe_topic, "format": format_spec()})
+            "subject": fach, "grade": grade, "topic": safe_topic, "format": format_spec()}
+        if payload.get("gebraucht_am"):
+            # Das Datum der Klassenarbeit — kein Kinderdatum, nur ein Tag.
+            # Der Dienst sortiert danach seine Schlange: sonst wartet das
+            # Thema fuer die Arbeit am Freitag hinter dem fuer die Arbeit in
+            # drei Wochen.
+            anfrage["needed_by"] = payload["gebraucht_am"]
+        result = request(cfg, "POST", "/v1/lessons", anfrage)
     status = result.get("status")
     if status == "unavailable":
         # "Nicht verfuegbar" heisst meistens "gerade nicht": der Dienst
@@ -218,6 +225,12 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
     eid = _export_id(result)
     payload["curriculum_export"] = eid
     if status == "pending":
+        # Platz in der Schlange und Schaetzung mitnehmen: die Eltern sehen
+        # sonst nur „wird vorbereitet" und koennen das nicht von „haengt"
+        # unterscheiden.
+        for feld in ("position", "waiting", "seconds"):
+            if type(result.get(feld)) is int:
+                payload[f"curriculum_{feld}"] = result[feld]
         delay = result.get("retry_after", 15)
         raise jobs.Deferred(payload, delay if type(delay) is int else 15)
     if status != "ready":

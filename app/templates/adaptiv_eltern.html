@@ -24,6 +24,45 @@
 </section>
 {% endif %}
 
+{% if vorbereitung %}
+<section class="card">
+  <h2>Was Karo gerade vorbereitet</h2>
+  {# Vorher stand hier nur "wird vorbereitet", fuer alle Themen zusammen.
+     Ob etwas laeuft oder haengt, war daran nicht zu erkennen — und ein
+     gescheitertes Thema sah genauso aus wie eins, das gleich fertig ist. #}
+  <p class="sub">Zu jedem Thema einer Klassenarbeit braucht Karo geprüfte
+     Aufgaben. Hier steht, wo das gerade steht.</p>
+  {% for arbeit in vorbereitung %}
+  <h3>{{ arbeit.fach }} · {{ arbeit.datum }}</h3>
+  <p>{{ arbeit.bereit }} von {{ arbeit.gesamt }} Themen sind fertig.{% if arbeit.sekunden %}
+     Für den Rest rechnet der Lehrplan-Dienst mit etwa
+     {{ (arbeit.sekunden / 60)|round|int }} Minuten — eine grobe Schätzung aus
+     der Dauer der zuletzt fertigen Themen.{% endif %}</p>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Thema</th><th>Stand</th><th>Wartet auf</th></tr></thead>
+    <tbody>
+    {% for t in arbeit.themen %}
+      <tr>
+        <td>{{ t.thema }}</td>
+        <td>{% if t.stand == 'bereit' %}fertig
+            {%- elif t.stand == 'laeuft' %}wird erstellt
+            {%- elif t.stand == 'gescheitert' %}nicht geklappt
+            {%- else %}noch nicht begonnen{% endif %}</td>
+        <td>{% if t.stand == 'gescheitert' %}{{ t.grund|klartext }}
+            {%- elif t.platz %}Platz {{ t.platz }} von {{ t.warten }} in der Warteschlange{% if t.sekunden %},
+              etwa {{ (t.sekunden / 60)|round|int }} Minuten{% endif %}
+            {%- elif t.stand == 'laeuft' %}Der Lehrplan-Dienst hat noch keinen Platz genannt.
+            {%- else %}—{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
 <section class="card">
   <h2>Überblick</h2>
   {% if eintraege %}

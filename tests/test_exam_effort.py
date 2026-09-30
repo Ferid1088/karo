@@ -136,11 +136,12 @@ def test_fehlende_inhalte_werden_beim_speichern_angefordert(app_env, monkeypatch
 
     angefordert = []
     monkeypatch.setattr("app.adaptiv.erzeugung.anfordern",
-                        lambda thema, fach, klasse=None: angefordert.append(thema) or 1)
+                        lambda thema, fach, klasse=None, gebraucht_am=None:
+                        angefordert.append((thema, gebraucht_am)) or 1)
     monkeypatch.setattr("app.adaptiv.lektionen.fuer_thema",
                         lambda *a, **k: None)
     assert exam_effort.inhalte_anfordern(exam_id) == 2
-    assert sorted(angefordert) == ["Pythagoras anwenden", "Winkel berechnen"]
+    assert sorted(t for t, _ in angefordert) == ["Pythagoras anwenden", "Winkel berechnen"]
 
     # Ist die adaptive Schicht aus, entsteht kein Auftrag ins Leere.
     app_env.config.update(adaptive_learning_enabled=False)
@@ -174,7 +175,8 @@ def test_beim_anlegen_einer_arbeit_entstehen_die_inhaltsauftraege(
     app_env.config.update(adaptive_learning_enabled=True)
     angefordert = []
     monkeypatch.setattr("app.adaptiv.erzeugung.anfordern",
-                        lambda thema, fach, klasse=None: angefordert.append(thema) or 1)
+                        lambda thema, fach, klasse=None, gebraucht_am=None:
+                        angefordert.append((thema, gebraucht_am)) or 1)
     monkeypatch.setattr("app.adaptiv.lektionen.fuer_thema", lambda *a, **k: None)
 
     seite = client.get("/klassenarbeit/neu")
@@ -182,4 +184,7 @@ def test_beim_anlegen_einer_arbeit_entstehen_die_inhaltsauftraege(
         "_csrf": csrf_from(seite.text), "fach": "mathematik",
         "exam_date": "2099-05-05", "themen": "Satz des Thales\nKreisumfang berechnen"})
     assert antwort.status_code == 200
-    assert sorted(angefordert) == ["Kreisumfang berechnen", "Satz des Thales"]
+    assert sorted(t for t, _ in angefordert) == ["Kreisumfang berechnen", "Satz des Thales"]
+    # Das Datum der Arbeit geht mit: der Lehrplan-Dienst arbeitet die Themen
+    # danach ab, sonst wartet die naechste Arbeit hinter einer spaeteren.
+    assert {d for _, d in angefordert} == {"2099-05-05"}

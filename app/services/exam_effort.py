@@ -125,15 +125,63 @@ def inhalte_anfordern(exam_id: int) -> int:
     from ..adaptiv import erzeugung, lektionen
     from .learning_hub import exam_topics
 
+    from .. import db
+
     if not getattr(config.load_safe(), "adaptive_learning_enabled", False):
         return 0
+    # Das Datum der Arbeit geht mit: der Lehrplan-Dienst arbeitet die Themen
+    # danach ab. Ohne das wartet die Arbeit am Freitag hinter der in drei
+    # Wochen, und das faellt erst am Freitag auf.
+    arbeit = db.q1("SELECT exam_date FROM exam WHERE id=?", exam_id)
+    termin = arbeit["exam_date"] if arbeit else None
     angefordert = 0
     for t in exam_topics(exam_id):
         if lektionen.fuer_thema(t["label"], t["subject"], t.get("grade")):
             continue
-        if erzeugung.anfordern(t["label"], t["subject"], t.get("grade")):
+        if erzeugung.anfordern(t["label"], t["subject"], t.get("grade"), gebraucht_am=termin):
             angefordert += 1
     return angefordert
+
+
+def thema_stand(thema: str, fach: str, klasse: int | None) -> dict:
+    """Ein Thema, ein Stand — mit Schaetzung, wenn der Dienst eine nennt.
+
+    „Wird vorbereitet" ohne Zahl ist fuer Eltern nicht von „haengt" zu
+    unterscheiden. Gibt der Dienst einen Platz in der Schlange und eine
+    Dauer an, steht das hier; sonst wird nichts erfunden.
+    """
+    import json
+
+    from .. import db
+    from ..adaptiv import erzeugung, lektionen
+
+    if lektionen.fuer_thema(thema, fach, klasse):
+        return {"thema": thema, "stand": "bereit"}
+    schluessel = erzeugung.auftrag_schluessel(thema, fach, klasse)
+    auftrag = db.q1("""SELECT state, payload, last_error FROM job
+                       WHERE type='lektion_erzeugen' AND dedup_key=?
+                       ORDER BY id DESC LIMIT 1""", schluessel) if schluessel else None
+    if not auftrag:
+        # Ein gescheiterter Auftrag gibt seinen Schluessel wieder frei;
+        # erkennbar ist er nur noch an der Nutzlast.
+        frueher = db.q1("""SELECT last_error FROM job WHERE type='lektion_erzeugen'
+                           AND state='fehler' AND payload LIKE ? ORDER BY id DESC LIMIT 1""",
+                        f'%"{thema}"%')
+        if frueher:
+            return {"thema": thema, "stand": "gescheitert", "grund": frueher["last_error"]}
+        return {"thema": thema, "stand": "fehlt"}
+    if auftrag["state"] == "fehler":
+        return {"thema": thema, "stand": "gescheitert", "grund": auftrag["last_error"]}
+    try:
+        nutzlast = json.loads(auftrag["payload"] or "{}")
+    except (ValueError, TypeError):
+        nutzlast = {}
+    stand = {"thema": thema, "stand": "laeuft"}
+    for feld, name in (("curriculum_position", "platz"), ("curriculum_waiting", "warten"),
+                       ("curriculum_seconds", "sekunden")):
+        if type(nutzlast.get(feld)) is int:
+            stand[name] = nutzlast[feld]
+    return stand
 
 
 def inhalte_stand(exam_id: int) -> dict:
@@ -147,28 +195,16 @@ def inhalte_stand(exam_id: int) -> dict:
     from ..adaptiv import erzeugung, lektionen
     from .learning_hub import exam_topics
 
-    bereit, laeuft, fehlt, gescheitert = 0, 0, 0, 0
-    for t in exam_topics(exam_id):
-        if lektionen.fuer_thema(t["label"], t["subject"], t.get("grade")):
-            bereit += 1
-        elif erzeugung.laeuft(t["label"], t["subject"], t.get("grade")):
-            laeuft += 1
-        else:
-            # Ein gescheiterter Auftrag gibt seinen Schluessel wieder frei;
-            # erkennbar ist er nur noch an der Nutzlast.
-            schluessel = erzeugung.auftrag_schluessel(
-                t["label"], t["subject"], t.get("grade"))
-            frueher = db.q1(
-                """SELECT last_error FROM job WHERE type='lektion_erzeugen'
-                    AND state='fehler' AND payload LIKE ?
-                    ORDER BY id DESC LIMIT 1""", f'%"{t["label"]}"%')
-            if frueher and schluessel:
-                gescheitert += 1
-            else:
-                fehlt += 1
-    return {"bereit": bereit, "laeuft": laeuft, "fehlt": fehlt,
-            "gescheitert": gescheitert, "offen": laeuft + fehlt + gescheitert,
-            "gesamt": bereit + laeuft + fehlt + gescheitert}
+    zeilen = [thema_stand(t["label"], t["subject"], t.get("grade")) for t in exam_topics(exam_id)]
+    zaehlen = {"bereit": 0, "laeuft": 0, "fehlt": 0, "gescheitert": 0}
+    for z in zeilen:
+        zaehlen[z["stand"]] += 1
+    # Die laengste Schaetzung zaehlt: fertig ist die Familie erst, wenn das
+    # letzte Thema da ist.
+    dauer = [z["sekunden"] for z in zeilen if type(z.get("sekunden")) is int]
+    return {**zaehlen, "offen": zaehlen["laeuft"] + zaehlen["fehlt"] + zaehlen["gescheitert"],
+            "gesamt": len(zeilen), "themen": zeilen,
+            "sekunden": max(dauer) if dauer else None}
 
 
 def bedarf(exam_id: int) -> dict:
@@ -234,3 +270,28 @@ def lage(exam_id: int) -> dict:
     return {**stand, "gewaehlt": gewaehlt,
             "fehlend": max(0, stand["min"] - gewaehlt),
             "reicht": gewaehlt >= stand["min"]}
+
+
+def vorbereitung_uebersicht() -> list[dict]:
+    """Was Karo fuer die kommenden Arbeiten gerade vorbereitet — fuer Eltern.
+
+    Eltern sahen bisher nur „wird vorbereitet", fuer alle Themen zusammen und
+    ohne Zahl. Ob etwas laeuft oder haengt, war daran nicht zu erkennen; ein
+    gescheitertes Thema sah genauso aus wie eins, das gleich fertig ist.
+    Hier steht es pro Thema, mit dem, was der Lehrplan-Dienst an Schaetzung
+    hergibt — und nichts, was er nicht hergibt.
+    """
+    from .. import db, faecher
+
+    arbeiten = db.q(f"""SELECT id, subject, exam_date FROM exam
+                        WHERE exam_date >= ? AND deleted_at IS NULL AND purged_at IS NULL
+                          AND subject IN {faecher.SQL_FAECHER}
+                        ORDER BY exam_date""", db.today())
+    uebersicht = []
+    for a in arbeiten:
+        stand = inhalte_stand(a["id"])
+        if not stand["gesamt"]:
+            continue
+        uebersicht.append({"exam_id": a["id"], "fach": faecher.name(a["subject"]),
+                           "datum": a["exam_date"], **stand})
+    return uebersicht

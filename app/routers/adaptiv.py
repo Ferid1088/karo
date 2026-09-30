@@ -340,7 +340,9 @@ def tipp(request: Request):
 def eltern_lernfortschritt(request: Request):
     if _aus():
         return zurueck("/eltern")
+    from ..services import exam_effort
     entries = store.fortschritt_uebersicht()
     return render(request, "adaptiv_eltern.html", eintraege=entries,
                   nachher=[e for e in entries if e.get("braucht_mensch")],
+                  vorbereitung=exam_effort.vorbereitung_uebersicht(),
                   stand_labels=STAND_LABELS)
