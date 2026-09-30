@@ -41,8 +41,19 @@ def klassenarbeit_neu(request: Request, exam_date: str = Form(...),
         flash(request, str(exc), "warn")
         return measurement.render_klassenarbeit_neu(request, draft={
             "exam_date": exam_date, "themen": themen, "fach": fach, "scan_id": scan_id})
-    flash(request, "Deine Klassenarbeit ist angelegt. Wähle jetzt deine Lerntage.")
-    return zurueck(f"/klassenarbeit/{ergebnis.exam_id}#exam-calendar-title")
+    # Ohne geprüfte Aufgaben kann Karo weder einstufen noch üben. Der Auftrag
+    # dafür entsteht schon hier: wer die Themen gleich beim Anlegen eintraegt,
+    # wartete sonst bis zum ersten Oeffnen der Einstufung auf etwas, das nie
+    # angefordert wurde.
+    from ..services import exam_effort
+    offen = exam_effort.inhalte_anfordern(ergebnis.exam_id)
+    if offen:
+        flash(request, f"Deine Klassenarbeit ist angelegt. Karo sucht gerade passende "
+                       f"Aufgaben für {offen} Themen — das läuft im Hintergrund weiter. "
+                       "Wähle solange deine Lerntage.")
+    else:
+        flash(request, "Deine Klassenarbeit ist angelegt. Wähle jetzt deine Lerntage.")
+    return zurueck(f"/klassenarbeit/{ergebnis.exam_id}#exam-next-step")
 
 
 @router.post("/klassenarbeit/themenblatt")

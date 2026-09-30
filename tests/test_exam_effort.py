@@ -158,3 +158,28 @@ def test_die_herkunft_der_einschaetzung_steht_dabei(app_env):
     nach_label = {z["label"]: z for z in exam_effort.bedarf(exam_id)["themen"]}
     assert nach_label["Bruchteile eines Ganzen"]["quelle"] == 'aus deinem Thema „Bruchteile“'
     assert nach_label["Etwas ganz Neues"]["quelle"] == ""
+
+
+def test_beim_anlegen_einer_arbeit_entstehen_die_inhaltsauftraege(
+        client, fake_llm, fake_cli, app_env, monkeypatch):
+    """Wer die Themen gleich beim Anlegen eintraegt, wartete sonst ewig.
+
+    `inhalte_anfordern` hing nur am Nachtragen von Themen und am Oeffnen der
+    Einstufung — der Hauptweg (POST /klassenarbeit) loeste nichts aus, und
+    ohne geprüfte Aufgaben kann Karo weder einstufen noch üben.
+    """
+    from .conftest import csrf_from
+    from .test_app import einrichten
+    einrichten(client, fake_llm)
+    app_env.config.update(adaptive_learning_enabled=True)
+    angefordert = []
+    monkeypatch.setattr("app.adaptiv.erzeugung.anfordern",
+                        lambda thema, fach, klasse=None: angefordert.append(thema) or 1)
+    monkeypatch.setattr("app.adaptiv.lektionen.fuer_thema", lambda *a, **k: None)
+
+    seite = client.get("/klassenarbeit/neu")
+    antwort = client.post("/klassenarbeit", data={
+        "_csrf": csrf_from(seite.text), "fach": "mathematik",
+        "exam_date": "2099-05-05", "themen": "Satz des Thales\nKreisumfang berechnen"})
+    assert antwort.status_code == 200
+    assert sorted(angefordert) == ["Kreisumfang berechnen", "Satz des Thales"]

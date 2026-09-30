@@ -226,6 +226,7 @@ def test_klassenarbeit_kann_mit_manuellen_themen_angelegt_werden(
         'themen': 'Brüche addieren', 'fach': 'Mathematik'}, follow_redirects=False)
     exam = app_env.db.q1('SELECT * FROM exam')
     assert response.status_code == 303
-    assert response.headers['location'] == f'/klassenarbeit/{exam["id"]}#exam-calendar-title'
+    # Nach dem Anlegen steht die Einstufung an, nicht der Kalender.
+    assert response.headers['location'] == f'/klassenarbeit/{exam["id"]}#exam-next-step'
     assert app_env.db.q1('SELECT COUNT(*) AS n FROM exam_topic WHERE exam_id=?', exam['id'])['n'] == 1
     assert not app_env.db.q('SELECT * FROM exam_scan')

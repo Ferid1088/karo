@@ -163,7 +163,8 @@ def test_create_exam_guides_to_own_plan_and_retains_invalid_form(client, fake_ll
     _, _, _, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     response = client.post("/klassenarbeit", data={"_csrf": token, "exam_date": "2026-11-03",
                            "themen": "Brüche kürzen", "fach": "Mathematik"}, follow_redirects=False)
-    assert re.fullmatch(r"/klassenarbeit/\d+#exam-calendar-title", response.headers["location"])
+    # Nach dem Anlegen steht die Einstufung an, nicht der Kalender.
+    assert re.fullmatch(r"/klassenarbeit/\d+#exam-next-step", response.headers["location"])
     page = client.post("/klassenarbeit", data={"_csrf": token, "exam_date": "2020-01-01",
                        "themen": "Behaltenes Thema", "fach": "mathematik"})
     assert "Behaltenes Thema" in page.text and 'value="mathematik" selected' in page.text
