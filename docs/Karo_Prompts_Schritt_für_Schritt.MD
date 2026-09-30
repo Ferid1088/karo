@@ -1,8 +1,8 @@
-# Karo_Prompts_Schritt_für_Schritt
+# Karo – Prompts Schritt für Schritt
 
 Reihenfolge einhalten. Einen Prompt erst geben, wenn der vorige **fertig** ist (Bedingung steht jeweils unten).
-Erledigt: Runde 1 (Vertrag), Runde 2 (Container-SHA, Fail-closed, Vertragsversion, CI, Dockerfile,
-Kontingent) und **Schritt 1** (keine Bilder mehr an Claude).
+Erledigt: Runde 1 (Vertrag), Runde 2 (Container-SHA, Fail-closed, Vertragsversion, CI, Dockerfile, Kontingent),
+Schritt 1 (karo 130285a). Deployment und Brücke übernimmt Schritt 1b.
 
 Jeder Prompt beginnt mit demselben Rahmen – bei einer neuen Agent-Sitzung immer mitgeben:
 
@@ -30,10 +30,33 @@ Ziel: Sofortiger Datenschutzschritt. Kein Foto geht mehr an ein KI-Modell.
 ```
 **Fertig, wenn:** Test grün, App läuft ohne Bildaufrufe, Upload → manuelle Themenwahl funktioniert.
 
-**Erledigt** (Commits 915cc04, 226f7a3, 536b142, 498a7f7). Offen daraus für Schritt 2:
-die Wissensbasis füllt sich nicht mehr aus Blättern, also braucht der klassische Lernweg
-bis dahin eine freigegebene Internetquelle oder den Lehrplan-Dienst. `topic_propose`
-(Unterthemen aus Text) bleibt bestehen und wird wieder gerufen, sobald Text vorliegt.
+---
+
+## Schritt 1b – Deployment und Brücke (damit im Alltag nichts auffällt)
+
+```text
+Ziel: Schritt 1 läuft live, und Karo bleibt bis Schritt 2 voll benutzbar, ohne dass die
+Familie etwas umstellen muss.
+
+1. Deployment übernimmst du selbst
+   - Laufende Instanz auf den Stand 130285a (oder neuer) bringen: Image bauen, Container neu
+     starten, danach prüfen: /health zeigt den gepushten SHA, kein Codepfad schickt Bilder
+     (Architekturtest), Login, Heute und eine Lerneinheit funktionieren (Rauchtest).
+   - Vorher ein Backup der Daten (Volume/SQLite), bei Fehlschlag automatisch auf das alte Image
+     zurück. Mir nur das Ergebnis melden.
+
+2. Brücke bis Schritt 2: Blatt als Text
+   - Beim Hochladen zusätzlich ein Feld "Text vom Blatt einfügen oder abtippen" (optional,
+     vorbelegt leer). Dieser Text läuft über GENAU den Weg, den Schritt 2 später nutzt:
+     POST /blatt/text → pii.scrub() → Thema per Regeln/Katalog → Top-3 → Bestätigung, und
+     füllt kb_chunk wieder, damit die Wissensbasis nicht leer bleibt.
+   - Ist kein Text da, bleibt es beim eingetippten Thema wie jetzt.
+   - Die Fehlermeldung "Wissensbasis füllt sich nicht" durch einen freundlichen Hinweis
+     ersetzen, der auf das Textfeld zeigt.
+   - Wenn Schritt 2 fertig ist, füllt das Browser-OCR dasselbe Feld automatisch; die Familie
+     merkt nur, dass sie nichts mehr abtippen muss.
+```
+**Fertig, wenn:** Live-Instanz läuft auf neuem SHA, Rauchtest grün, Text-Brücke füllt die Wissensbasis.
 
 ---
 
@@ -85,6 +108,31 @@ Datenschutzerklärung und Hilfe-Seite anpassen.
 ```
 **Fertig, wenn:** gemessene Trefferquote im Bericht, Zielwert erreicht oder Abweichung begründet.
 
+### Antwort an den Agenten zu Schritt 2 (nach seiner Rückfrage)
+
+```text
+Antworten zu deinen Fragen aus Schritt 2:
+
+1. Repo-Größe: Die OCR-/PDF-Dateien kommen NICHT ins Repo. Ein Build-Schritt holt sie beim
+   Image-Bau in festen Versionen aus dem npm-Registry (tesseract.js, tesseract.js-core,
+   pdfjs-dist, heic2any) und die traineddata deu+eng (tessdata_fast) aus einer festen Release-
+   Version, prüft jede Datei per SHA-256 gegen eine eingecheckte Prüfsummenliste und legt sie
+   unter /static/ocr/ und /static/pdfjs/ ab. Zur Laufzeit lädt der Browser alles nur von
+   unserem eigenen Server – kein CDN. Bei falscher Prüfsumme bricht der Build ab.
+
+2. Testmaterial ohne Aufwand für mich: Nutze die Blätter, die Karo bereits hat (scans_dir
+   und 02_Verarbeitet auf dieser Maschine), NUR lokal:
+   - `make ocr-report` liest sie aus einem lokalen, per .gitignore ausgeschlossenen Ordner,
+     schneidet den Kopfbereich ab, lässt OCR laufen und vergleicht mit dem Thema, das für
+     dieses Blatt schon bestätigt in der Datenbank steht.
+   - Kein echtes Blatt und kein Text daraus kommt je ins Repo, in die CI oder an eine KI.
+     Ins Repo kommt nur die Kennzahl (Trefferquote pro Art: Foto, PDF mit Text, gescanntes PDF).
+   - Für die CI: wenige synthetische Dateien als Rauchtest, damit der Ablauf geprüft ist.
+   - Reichen die vorhandenen Blätter für eine Art nicht (z. B. keine PDFs), sag mir nur, was
+     fehlt; alles andere läuft weiter.
+   Die Fertig-Bedingung (Trefferquote ≥ 90 %) wird mit diesem lokalen Bericht geprüft.
+```
+
 ---
 
 ## Schritt 3 – Lernkreislauf beschreiben (nur dokumentieren)
@@ -116,12 +164,60 @@ Vorgaben, falls noch nicht vorhanden:
 - Langsam: andere Erklärung, kleinere Schritte, mehr Beispiele; nach wiederholtem Scheitern
   Voraussetzung prüfen.
 - Gleiche Fehlvorstellung zweimal: gezielte Erklärung zu genau dieser Fehlvorstellung.
-- Wiederholung mit Abstand nach Abschluss.
+- Wiederholung mit Abstand: siehe Schritt 4a.
 - Grenzen: nie unter die Untergrenze, Abschluss immer auf Zielniveau.
 - Antwortzeit nur schwach gewichten.
 Jede Regel mit eigenem Test. LERNKREISLAUF.md aktualisieren.
 ```
 **Fertig, wenn:** jede Regel hat einen Test, Dokument = Code.
+
+---
+
+## Schritt 4a – Grundlagen: einzelne Antworten, aktive Zeit, Wiederholung
+
+```text
+Ziel: Drei Bausteine, die das Lernsystem braucht und auf denen später die Sterne aufbauen.
+Noch keine Sterne in diesem Schritt.
+
+1. Einzelne Antworten protokollieren
+   - Neue Tabelle lern_antwort: child_key, sitzung_id, aufgabe_id, konzept_id, fach,
+     gezeigt_at, beantwortet_at, antwort, richtig, tipp_genutzt, phase.
+   - Jede beantwortete Aufgabe (anker, diagnose, aufgabe, vorhersage, transfer) schreibt genau
+     eine Zeile. Nur anhängen, nie ändern.
+
+2. Aktive Zeit (getrennt von learning_time, das für den Elternbericht bleibt)
+   - lern_aufgabe bekommt erwartete_sekunden (Standardwert nach antwort_art und Klasse,
+     überschreibbar durch Curriculum-Inhalte).
+   - Aktive Zeit einer Aufgabe = Zeit von gezeigt_at bzw. letzter Eingabe bis beantwortet_at,
+     höchstens 2 × erwartete_sekunden.
+   - Die Lernseite meldet Eingaben (Tippen, Auswählen, Tipp öffnen) leichtgewichtig; nach
+     2 Minuten ohne Eingabe oder wenn die Seite im Hintergrund ist, stoppt die Uhr.
+   - Nach Ende einer Einheit (COMPLETE/MASTERED/ESCALATED) entsteht keine aktive Zeit mehr.
+   - Antworten unter 3 Sekunden zählen 0; eine Serie solcher Antworten markiert den Abschnitt
+     als "nicht ernsthaft" (Kennzeichen in lern_antwort, Regel konfigurierbar).
+   - Funktion aktive_zeit(child_key, von, bis, fach=None) mit Tests.
+
+3. Wiederholung mit Abstand
+   - Heute zählt lern_fortschritt.wiederholungen nur neue Runden nach einem Fehler – das
+     bleibt so, heißt aber nichts mit Abstand.
+   - Neue Tabelle lern_wiederholung: child_key, konzept_id, faellig_am, gewaehlt_am, status
+     (offen / bestanden / nicht_bestanden), ergebnis.
+   - Nach MASTERED fragt Karo das Kind: "Wann willst du das noch einmal wiederholen?"
+     Auswahl: in 2, 3, 4 oder 5 Tagen. Steht eine Klassenarbeit an, markiert Karo den Tag
+     davor als Vorschlag (innerhalb dieser Auswahl).
+   - "Heute" (services/today.py, mein_tag) zeigt fällige Wiederholungen als eigene Einträge
+     ("Wiederholen: Brüche addieren, ca. 5 Minuten"). Verpasste bleiben als "noch offen"
+     stehen, bis sie gemacht sind.
+   - Die Wiederholung ist ein kurzer Check: 3–5 NEUE Aufgaben auf Zielniveau (andere als in
+     der Einheit; bei Mathe Varianten über rechnen.py/Aufgabenvorlagen).
+   - Bestanden → Konzept gilt als gefestigt. Nicht bestanden → kurze Auffrischung (andere
+     Erklärung, geführte Aufgabe), danach wählt das Kind wieder 2–5 Tage. Kein Minus.
+   - Tests: Auswahl, Anzeige unter Heute am richtigen lokalen Tag, verpasste Wiederholung,
+     bestanden/nicht bestanden, neue Aufgaben statt alter.
+
+LERNKREISLAUF.md um diese drei Bausteine ergänzen.
+```
+**Fertig, wenn:** alle Tests grün, Wiederholung erscheint unter „Heute“, aktive Zeit ist für eine offene App ohne Eingabe 0.
 
 ---
 
@@ -148,6 +244,87 @@ Zielwerte VOR dem Lauf festlegen und als Tests in die CI:
 Je Profil 200 Läufe, fester Seed. Bericht: Zielwert / Ist / bestanden, Ursachen der Fehler.
 ```
 **Fertig, wenn:** alle Zielwerte erreicht oder bewusst angepasst.
+
+---
+
+## Schritt 5b – Sterne und Vereinbarungen
+
+```text
+Ziel: Sterne zeigen den Eltern verlässlich, dass das Kind wirklich gelernt hat, und Eltern
+und Kind können damit Vereinbarungen treffen. Baut auf Schritt 4a auf (lern_antwort, aktive
+Zeit, lern_wiederholung). Keine KI, alles regelbasiert.
+
+Abgrenzung: "Meine Welt" und "Ziele planen" gehören NICHT zu diesem System – keine Daten von
+dort (auch nicht die selbst eingetragenen Minuten), keine Anzeige dort, keine Verknüpfung im
+Code. Architekturtest dafür.
+
+1. Silberstern – Einsatz
+   - ½ Stern = 15 Minuten aktive Zeit (aus Schritt 4a), 1 Stern = 30 Minuten.
+   - Nur Aufgaben auf dem eigenen Niveau zählen (Konzept noch nicht beherrscht oder fällige
+     Wiederholung); schon beherrschte leichte Aufgaben nicht.
+   - Abschnitte "nicht ernsthaft" (Zufallsklicken) zählen nicht.
+   - Minuten sammeln sich über Tage; Reste verfallen nicht. Kein Tageslimit.
+   - Jeder halbe Stern trägt sein Fach.
+
+2. Goldstern – Geschafft
+   - ½ Stern: Konzept beherrscht (MASTERED, Abschlusstest auf Zielniveau selbstständig).
+   - ½ Stern: Wiederholung zu diesem Konzept bestanden.
+   - +1 Stern: ganzes Thema erledigt = alle Konzepte des Themas beherrscht UND wiederholt.
+   - Jedes Konzept zahlt nur einmal.
+
+3. Beleg zu jedem Stern
+   - Tabelle stern: child_key, art (silber/gold), menge (0.5 oder 1), fach, grund,
+     quelle (eindeutig: kein Ereignis erzeugt zwei Sterne), beleg (Thema, aktive Minuten,
+     Anzahl Aufgaben, Ergebnis vorher/nachher), created_at. Nur anhängen.
+   - Tabelle stern_ruecknahme: Eltern nehmen einen Stern mit Begründung zurück (protokolliert;
+     das Kind sieht es freundlich erklärt).
+   - Der Kontostand wird immer berechnet (Sterne − Rücknahmen − Einlösungen), nie gespeichert.
+   - Vergabe: nach jedem geschriebenen lern_antwort/lern_ereignis bzw. Wiederholungsergebnis
+     prüft services/sterne.py die Regeln, in derselben Transaktion.
+
+4. Vereinbarungen – Ping-Pong
+   - Tabelle vereinbarung (status: verhandlung → aktiv → einloesung_angefragt → eingeloest,
+     oder abgelehnt) und vereinbarung_angebot (seite kind/eltern, wunsch, sternzahl, faecher
+     = alle oder 1–2 Fächer, antwort, zeitpunkt; nur anhängen).
+   - Eine Seite macht ein Angebot, die andere ist am Zug: zustimmen, Gegenangebot (Wunsch,
+     Sternzahl und/oder Fächer ändern) oder ablehnen. Immer nur eine Seite am Zug, ein offenes
+     Angebot pro Vereinbarung. Weiter, bis beide zustimmen. Das Kind kann sein offenes Angebot
+     zurückziehen. Verlauf sichtbar.
+   - Zu jeder Sternzahl zeigt Karo eine Einordnung ("20 Sterne ≈ 10 Stunden Lernen, bei deinem
+     Tempo etwa 3 Wochen"), berechnet aus den Sternen der letzten Wochen.
+   - Wunschtext des Kindes: kurz (max. 60 Zeichen), pii.scrub(), Filter für Unpassendes.
+   - Nach Einigung sind Wunsch, Sternzahl und Fächer fest; Änderung nur über neue Verhandlung.
+   - Balken zählt nur Sterne aus den vereinbarten Fächern. Jeder Stern kann nur einmal
+     eingelöst werden; laufen zwei Vereinbarungen parallel, zeigt Karo vor dem Einlösen, wie
+     sich der andere Balken verändert.
+   - Einlösen: Kind tippt "Einlösen" → Eltern bekommen die Anfrage (Muster wie woche_help) →
+     Eltern bestätigen → erst dann Abbuchung; optional Feier-Nachricht über family_post.
+
+5. Oberfläche
+   - Kind: eigener Bereich "Meine Sterne" (erreichbar von der Lernseite und nach jeder
+     Einheit): Sternglas mit halben Sternen, Silber und Gold, Balken der Vereinbarungen,
+     Wunsch vorschlagen, Verhandlung, Einlösen. Nach einer Einheit kurze Animation mit dem
+     Grund in einem Satz.
+   - Eltern: Sterne pro Woche mit Beleg, Angebote beantworten, Einlösungen bestätigen,
+     Rücknahme.
+   - Erklärtext für beide: "Silberne Sterne gibt es fürs Dranbleiben: eine halbe Stunde
+     ernsthaft gelernt. Goldene Sterne gibt es fürs Schaffen: etwas verstanden, und es sitzt
+     auch noch Tage später."
+
+6. Grenzen
+   - Keine Ranglisten, kein Vergleich zwischen Kindern oder Geschwistern, kein Abzug durch
+     das System, keine Käufe/Shops/Werbung/Produktvorschläge.
+   - Sterne und Wünsche verlassen Karo nie (nicht an den Curriculum-Dienst, nicht an eine KI).
+
+7. Tests
+   - Jede Vergaberegel, "nicht ernsthaft" zählt nicht, offene App ohne Eingabe gibt nichts,
+     Konzept zahlt Gold nur einmal, Thema-Bonus, Rücknahme, Kontostand-Berechnung.
+   - Ping-Pong vollständig (Angebot, Gegenangebot, Zustimmung, Ablehnung, Zurückziehen),
+     Fächerfilter, Einlösen mit Bestätigung, doppelte Einlösung unmöglich.
+   - Simulationsprofile aus Schritt 5: schnell und langsam bekommen pro aktiver Lernzeit
+     vergleichbar viele Silbersterne; rater praktisch keine; Anteil Gold ungefähr 1/3.
+```
+**Fertig, wenn:** alle Tests grün und die Sternverteilung der Simulationsprofile im Bericht.
 
 ---
 
