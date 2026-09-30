@@ -11,7 +11,8 @@
   <section class="card hilfe-card hilfe-card-primary">
     <span class="hilfe-kapitel">Was Karo ist</span>
     <h2>Ein Lernbegleiter für ein Kind und ein Fach</h2>
-    <p>Karo liest die Blätter aus dem Unterricht, prüft daran den Stand je Thema, erklärt die Lücken mit genau dem Rechenweg aus diesen Blättern und fragt danach nach, bis das Thema sitzt. Karo läuft ausschließlich auf dem eigenen Rechner der Familie.</p>
+    <p>Karo prüft den Stand je Thema, erklärt die Lücken und fragt danach nach, bis das Thema sitzt. Karo läuft ausschließlich auf dem eigenen Rechner der Familie.</p>
+    <p class="hint">Die Blätter aus dem Unterricht liest Karo zurzeit nicht selbst: dafür müsste ihr Foto an ein Sprachmodell gehen. Sie geben das Thema beim Hochladen an; das Blatt bleibt bei Ihnen. Das Lesen kommt zurück, sobald es im Browser auf Ihrem Gerät läuft.</p>
   </section>
   <div class="hilfe-grid">
     <section class="card hilfe-card hilfe-card-primary">
@@ -56,7 +57,7 @@
     <span class="hilfe-kapitel">Der Lernzyklus</span>
     <h2>Von der Wissensbasis bis zur Klassenarbeit</h2>
     <div class="hilfe-timeline">
-      <div><b>1</b><span><strong>Wissensbasis</strong><small>Erklär- und Aufgabenblätter werden eingelesen, in Abschnitte zerlegt und durchsuchbar abgelegt. Das ist die Faktenquelle für alles Weitere — Karo erfindet keinen Rechenweg.</small></span></div>
+      <div><b>1</b><span><strong>Wissensbasis</strong><small>Erklär- und Aufgabenblätter werden abgelegt, das Thema geben Sie dabei an. Zerlegt und durchsuchbar gemacht werden sie erst wieder, wenn das Lesen im Browser läuft — bis dahin ist die Faktenquelle eine freigegebene Internetquelle oder der Lehrplan-Dienst. Karo erfindet keinen Rechenweg.</small></span></div>
       <div><b>2</b><span><strong>Themen</strong><small>Karo schlägt aus den Blättern Themen vor, ein Erwachsener gibt sie frei oder legt eigene an.</small></span></div>
       <div><b>3</b><span><strong>Prüfen</strong><small>Zu jedem Thema erzeugt Karo Fragen — am Bildschirm oder als druckbares Blatt. Das Kind antwortet.</small></span></div>
       <div><b>4</b><span><strong>Freigabe</strong><small>Nichts wird gespeichert, bevor ein Mensch jede Frage bestätigt, korrigiert oder bewusst übersprungen hat. Diese Freigabe ist nicht abschaltbar.</small></span></div>
@@ -148,7 +149,7 @@
 
   <section class="card hilfe-card hilfe-notiz">
     <strong>Warum die Freigabe nicht abschaltbar ist</strong>
-    <span>Wie gut Handschrift erkannt wird, ist die entscheidende Unbekannte. Ohne menschliche Freigabe jeder Antwort gäbe es keine verlässliche Rückmeldung, ob eine Flagge stimmt — die Freigabe ist deshalb die eigentliche Qualitätskontrolle, nicht nur eine Formalie.</span>
+    <span>Ob eine Antwort richtig ist, entscheidet am Ende ein Mensch. Ohne menschliche Freigabe jeder Antwort gäbe es keine verlässliche Rückmeldung, ob eine Flagge stimmt — die Freigabe ist deshalb die eigentliche Qualitätskontrolle, nicht nur eine Formalie.</span>
   </section>
 </details>
 
@@ -158,17 +159,22 @@
     <section class="card hilfe-card">
       <h2>Was an Anthropic geht</h2>
       <ul class="help-compact-list">
-        <li>Das Bild des Blattes, zugeschnitten und verkleinert</li>
         <li>Klassenstufe, Fach und Thema</li>
-        <li>Der abgelesene Text der Blätter und die Antworten des Kindes im Wortlaut</li>
+        <li>Die Antworten des Kindes im Wortlaut</li>
         <li>Die Themenliste und, für den Lernplan, die Flaggen samt Fehlerzahlen</li>
       </ul>
+      <p class="hint"><strong>Kein Bild.</strong> Karo hat Fotos von Schulblättern
+      und bearbeiteten Fragebogen an das Modell geschickt. Ein Foto trägt mehr
+      als das, was man zeigen will: den Namen in der Kopfzeile, die Handschrift
+      des Kindes, was daneben auf dem Tisch lag. Und es lässt sich nicht
+      säubern wie ein Text. Diesen Weg gibt es nicht mehr — die Schnittstelle
+      zum Modell nimmt gar kein Bild mehr entgegen.</p>
     </section>
     <section class="card hilfe-card hilfe-card-primary">
       <span class="hilfe-kapitel">Nicht übertragen</span>
       <h2>Name, Schule, Geburtsdatum, Lehrkraft</h2>
       <p>Soweit Karo sie erkennt. Der eingetragene Vorname wird nur lokal gespeichert und dient genau dazu: Karo entfernt ihn aus allem, was hinausgeht — dazu Kopfzeilenmuster wie „Name:“ und Klassenangaben, Schul- und Lehrkraftangaben, Geburtsdaten, E-Mail-Adressen und Telefonnummern.</p>
-      <p class="hint">Was Karo nicht garantieren kann: einen Namen außerhalb des abgeschnittenen Randes — in einer Fußzeile, auf einem Stempel oder mitten in einer Textaufgabe. Unter <a href="/protokoll">Protokoll</a> sehen Sie zu jedem Aufruf den gesendeten Text im Wortlaut; das gesendete Bild sehen Sie je Blatt auf der Freigabeseite.</p>
+      <p class="hint">Was Karo nicht garantieren kann: einen Namen mitten in einer Textaufgabe, den Sie selbst abtippen. Unter <a href="/protokoll">Protokoll</a> sehen Sie zu jedem Aufruf den gesendeten Text im Wortlaut — und nur Text, denn mehr geht nicht hinaus.</p>
     </section>
   </div>
 
