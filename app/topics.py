@@ -32,6 +32,48 @@ def client() -> ClaudeClient:
 # Vorschlagen
 # --------------------------------------------------------------------------
 
+def aus_blatt(doc_id: int) -> str | None:
+    """Legt das beim Hochladen eingetippte Thema an, ohne Modell.
+
+    Frueher schlug ein Modell Themen vor, nachdem es das Foto des Blatts
+    gelesen hatte. Das Foto geht nicht mehr hinaus (siehe app/llm/base.py) —
+    und es braucht auch keins: den Themennamen tippt beim Hochladen ohnehin
+    ein Mensch ein, das Modell hat ihn bisher nur bestaetigt.
+
+    Gibt den Code des angelegten Themas zurueck, oder None, wenn es das
+    Thema schon gibt.
+    """
+    from .faecher import schluessel
+
+    doc = db.q1("SELECT themenname, subject FROM document WHERE id = ?", doc_id)
+    if doc is None:
+        return None
+    fach = schluessel(doc["subject"])
+    label = (doc["themenname"] or "").strip()
+    if fach is None or not label:
+        return None
+    code = normalize_code(label)
+    if not code:
+        return None
+    with db.tx() as c:
+        if c.execute("SELECT 1 FROM topic WHERE code = ?", (code,)).fetchone():
+            return None
+        # Aehnliche Namen fangen wir wie bisher ab: „Brueche addieren" und
+        # „Brueche addieren." sind dasselbe Thema, und zwei davon zu fuehren
+        # verwirrt mehr, als es hilft.
+        labels = [r["label"] for r in c.execute(
+            "SELECT label FROM topic WHERE subject = ? AND state != ?",
+            (fach, ABGELEHNT)).fetchall()]
+        if naechstes_duplikat(label, labels):
+            return None
+        c.execute(
+            """INSERT INTO topic (subject, code, label, beschreibung, state,
+                                  quelle_doc, sort, created_at)
+               VALUES (?, ?, ?, NULL, ?, ?, 500, ?)""",
+            (fach, code, label[:200], VORSCHLAG, doc_id, db.now()))
+    return code
+
+
 @jobs.handler("topic_propose")
 def job_topic_propose(payload: dict) -> None:
     """Schlägt Themen für ein neu erschlossenes Blatt vor."""

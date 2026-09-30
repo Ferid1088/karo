@@ -14,11 +14,10 @@ reads if doing so adds complexity for no benefit").
 
 import datetime as dt
 import logging
-from pathlib import Path
-from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .. import config, db, quizzes, security, teaching, topics
+from .. import config, db, quizzes, teaching, topics
 from ..services import exam, exam_calendar, learning_progress, measurement
 from ..services.exam import ExamError
 from .shared import alter_generator_aus, render, flash, zurueck
@@ -56,38 +55,11 @@ def klassenarbeit_neu(request: Request, exam_date: str = Form(...),
     return zurueck(f"/klassenarbeit/{ergebnis.exam_id}#exam-next-step")
 
 
-@router.post("/klassenarbeit/themenblatt")
-async def klassenarbeit_themenblatt(request: Request,
-                                    datei: UploadFile | None = None):
-    formular = await request.form()
-    datei = datei or formular.get("datei")
-    if datei is None or not getattr(datei, "filename", ""):
-        flash(request, "Es wurde keine Datei ausgewählt.", "err")
-        return zurueck("/klassenarbeit/neu")
-
-    endung = Path(datei.filename).suffix.lower()
-    puffer = bytearray()
-    while stueck := await datei.read(1 << 20):
-        puffer.extend(stueck)
-        if len(puffer) > security.MAX_UPLOAD_BYTES:
-            flash(request, "Die Datei ist zu groß.", "err")
-            return zurueck("/klassenarbeit/neu")
-
-    try:
-        exam.upload_exam_topics_sheet(bytes(puffer), endung)
-    except ExamError as exc:
-        flash(request, str(exc), "err")
-        return zurueck("/klassenarbeit/neu")
-
-    flash(request, "Themenblatt aufgenommen. Karo liest es jetzt ein.")
-    return zurueck("/klassenarbeit/neu")
-
-
-@router.get("/klassenarbeit/themenblatt/status")
-def klassenarbeit_themenblatt_status(scan_id: int):
-    if db.q1('SELECT 1 FROM learning_upload WHERE scan_id=?', scan_id):
-        raise HTTPException(404, 'Dieses Blatt gehört nicht zu deinen Prüfungen.')
-    return {"signatur": exam.get_exam_topic_scan_status(scan_id)}
+# Hier standen „/klassenarbeit/themenblatt" und sein Status: ein Foto des
+# Ankündigungsblatts ging an ein Modell, das Themen und Termin ablas.
+# Bestätigen musste ein Mensch sie ohnehin immer — jetzt tippt er sie gleich
+# ein. Siehe app/llm/base.py; das Lesen kommt zurück, sobald es auf dem Gerät
+# läuft (docs/Karo_Prompts_Schritt_fuer_Schritt.MD, Schritt 2).
 
 
 @router.post("/klassenarbeit/{exam_id}/kalender")

@@ -134,10 +134,18 @@ def runde_starten(lesson_id: int, stufe: str | None = None) -> int | None:
         return None
     if not kb.lehrmaterial(thema["id"], thema["label"], limit=1) \
             and not research.material_fuer(thema["id"]):
+        # Der ehrliche Stand seit Schritt 1: ein hochgeladenes Blatt füllt die
+        # Wissensbasis nicht mehr, weil dafür sein Foto an ein Modell gehen
+        # müsste. Bis das Lesen auf dem Gerät läuft (Schritt 2), kommt das
+        # Material aus einer freigegebenen Internetquelle oder vom
+        # Lehrplan-Dienst. Das muss hier stehen, sonst sucht eine Familie den
+        # Fehler bei sich und lädt dasselbe Blatt dreimal hoch.
         raise TeachingError(
             "Zu diesem Thema liegt weder eigenes Material noch eine "
-            "freigegebene Internetquelle vor. Bitte erst ein Erklärblatt "
-            "einlesen, oder unten im Netz suchen und eine Quelle freigeben.")
+            "freigegebene Internetquelle vor. Hochgeladene Blätter liest Karo "
+            "zurzeit nicht selbst — dafür müsste das Foto an einen fremden "
+            "Dienst gehen. Bitte unten im Netz suchen und eine Quelle "
+            "freigeben.")
 
     if stufe is None:
         stufe = NEXT_STUFE.get(letzte["stufe"], Stufe.GANZ_EINFACH.value) \
@@ -225,8 +233,9 @@ def job_lesson_build(payload: dict) -> None:
     if not quellen:
         raise TeachingError(
             "Zu diesem Thema liegt weder eigenes Material noch eine "
-            "freigegebene Internetquelle vor. Bitte erst ein Erklärblatt "
-            "einlesen, oder im Netz suchen und eine Quelle freigeben.")
+            "freigegebene Internetquelle vor. Hochgeladene Blätter liest Karo "
+            "zurzeit nicht selbst — bitte im Netz suchen und eine Quelle "
+            "freigeben.")
     fundstellen = research.freigegebene(thema["id"])
     fehlerbild = ERROR_LABELS.get(thema.get("haupt_fehler") or "")
     vorherige_folien = _vorherige_folien(lesson["id"], runde["nr"])

@@ -1,14 +1,14 @@
-"""Themenblatt lesen und Lernplan vor einer Klassenarbeit.
+"""Themenblatt aufnehmen und Lernplan vor einer Klassenarbeit.
 
-Zwei Schritte, beide mit Modellaufruf, beide erst nach menschlicher Prüfung
-wirksam:
-
-  1. Ein fotografiertes Ankündigungsblatt wird gelesen (Themen, Datum) und
-     liegt als Vorschlag bereit — ein Mensch übernimmt ihn oder tippt die
-     Themen wie bisher von Hand ein, bevor eine Klassenarbeit entsteht.
+  1. Ein Ankündigungsblatt wird aufgenommen und liegt bereit. Gelesen wird
+     es nicht: dafür müsste das Foto an ein Modell gehen, und ein Foto vom
+     Küchentisch trägt mehr als die Ankündigung — den Namen des Kindes, die
+     Klasse, was sonst noch danebenlag. Themen und Datum tippt ein Mensch
+     ein. Bestätigen musste er sie ohnehin immer.
   2. Sobald die Klassenarbeit angelegt ist, baut Karo daraus einen
      Tag-für-Tag-Lernplan, auf Basis der angekündigten Themen und des
-     aktuellen Standes je Thema (siehe `prompts.plan_prompt`).
+     aktuellen Standes je Thema (siehe `prompts.plan_prompt`) — das ist ein
+     Modellaufruf, aber nur mit Text.
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ import datetime as dt
 import hashlib
 import json
 import logging
-from pathlib import Path
 
 from . import config, db, ingest, jobs, pii, prompts, topics, faecher
 from .llm import ClaudeClient, ClaudeError
@@ -51,49 +50,26 @@ def foto_hochladen(daten: bytes, endung: str) -> int:
 
 @jobs.handler("exam_scan_read")
 def job_exam_scan_read(payload: dict) -> None:
+    """Nimmt das Ankuendigungsblatt auf — ohne es zu lesen.
+
+    Hier ging das Foto an ein Modell, das Themen und Datum ablas. Ein Foto
+    vom Küchentisch traegt mehr als die Ankuendigung: den Namen des Kindes,
+    die Klasse, was sonst noch danebenlag. Und es liess sich nicht saeubern.
+
+    Bis das Lesen auf dem Geraet laeuft (Schritt 2), tippt ein Mensch die
+    Themen und das Datum ein. Das war ohnehin der Weg, auf dem am Ende
+    entschieden wurde: der Vorschlag musste immer bestaetigt werden.
+    """
     scan_id = int(payload["scan_id"])
-    scan = db.q1("SELECT * FROM exam_scan WHERE id = ?", scan_id)
-    if scan is None or scan["state"] != "offen":
-        return
-    doc = db.q1("SELECT * FROM document WHERE id = ?", scan["document_id"])
-    if doc is None:
-        return
-
-    cfg = config.load()
-    try:
-        ergebnis = client().complete(
-            purpose="exam_scan_read",
-            prompt=prompts.exam_scan_prompt(cfg.learner_grade, cfg.subject),
-            schema=prompts.EXAM_SCAN_SCHEMA,
-            image_path=Path(doc["stored_path"]),
-            system=prompts.SYSTEM,
-        )
-    except ClaudeError as exc:
-        with db.tx() as c:
-            c.execute("UPDATE exam_scan SET state='fehler', fehler=? WHERE id=?",
-                      (str(exc), scan_id))
-        return
-
-    daten = ergebnis.data
-    themen = [t.strip()[:120] for t in (daten.get("themen") or []) if t and t.strip()][:20]
-    exam_date = daten.get("exam_date")
-    try:
-        if exam_date:
-            dt.date.fromisoformat(exam_date)
-    except ValueError:
-        exam_date = None
-
     with db.tx() as c:
-        c.execute(
-            """UPDATE exam_scan SET state='gelesen', themen=?, exam_date=?
-                WHERE id=?""",
-            (json.dumps(themen, ensure_ascii=False), exam_date, scan_id))
+        c.execute("""UPDATE exam_scan SET state='manuell'
+                      WHERE id=? AND state='offen'""", (scan_id,))
 
 
 def offene_scan() -> dict | None:
     """Der zuletzt hochgeladene Scan, der noch nicht übernommen wurde."""
     row = db.q1(
-        """SELECT * FROM exam_scan WHERE state IN ('offen', 'gelesen', 'fehler')
+        """SELECT * FROM exam_scan WHERE state IN ('offen', 'manuell', 'gelesen', 'fehler')
             AND id NOT IN (SELECT scan_id FROM learning_upload)
             ORDER BY id DESC LIMIT 1""")
     if row is None:

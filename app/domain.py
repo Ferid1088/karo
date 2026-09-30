@@ -257,13 +257,17 @@ DOC_STATE_LABELS = {
     "erschlossen": "in der Wissensbasis",
     "diagnostiziert": "zur Freigabe bereit",
     "leer": "nichts erkannt",
+    "abgelegt": "in der Sammlung",
     "freigegeben": "freigegeben",
     "verworfen": "verworfen",
     "fach_falsch": "falsches Fach",
 }
 
 DOC_STATE_HINTS = {
-    "neu": "Karo liest das Blatt gerade ein.",
+    "neu": "Karo nimmt das Blatt gerade auf.",
+    "abgelegt": "Das Blatt liegt in der Sammlung. Karo liest es nicht selbst — "
+                "dafür müsste das Foto an einen fremden Dienst gehen. Das Thema "
+                "hast du beim Hochladen angegeben.",
     "gelesen": "Die Auswertung läuft. Dauert das länger als ein paar Minuten, "
                "steht der Grund im Eingang unter „Fehlgeschlagene Vorgänge“.",
     "leer": "Auf dem Bild war nichts erkennbar — meist liegt es an der "

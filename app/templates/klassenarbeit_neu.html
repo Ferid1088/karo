@@ -9,38 +9,23 @@
 <section class="card">
   <h1><img class="pruefung-zeichen" src="/static/pruefung-symbol.svg" alt="" aria-hidden="true">Neue Klassenarbeit</h1>
   <p class="hint">1. Termin und Themen → 2. Lerntage wählen → 3. Vorbereiten</p>
-  {% if scan and scan.state == 'gelesen' %}<p class="msg">Die Themen wurden erkannt. Prüfe sie und den Termin, bevor du die Arbeit anlegst.</p>{% endif %}
   <form method="post" action="/klassenarbeit" class="learn-form exam-create-form">{{ csrf_input() }}
-    {% if scan and scan.state == 'gelesen' %}<input type="hidden" name="scan_id" value="{{ scan.id }}">{% endif %}
     <div class="learn-two-col compact">
-      <div class="field"><label for="exam_date">Termin</label><input type="date" id="exam_date" name="exam_date" min="{{ today }}" value="{{ draft.get('exam_date', scan.exam_date if scan and scan.state == 'gelesen' else '') or '' }}" required></div>
+      <div class="field"><label for="exam_date">Termin</label><input type="date" id="exam_date" name="exam_date" min="{{ today }}" value="{{ draft.get('exam_date', '') or '' }}" required></div>
       <div class="field"><label for="exam_subject">Fach</label><select id="exam_subject" name="fach" required>{% set gewaehlt = draft.get('fach') or aktives_fach %}{% for key, label in faecher %}<option value="{{ key }}" {{ 'selected' if key == gewaehlt }}>{{ label }}</option>{% endfor %}</select></div>
     </div>
     <label for="exam_topics">Prüfungsthemen <small>(ein Thema pro Zeile oder mit Komma)</small></label>
     <textarea id="exam_topics" name="themen" rows="4" required placeholder="Brüche addieren
 Brüche kürzen
-Textaufgaben">{{ draft.get('themen', scan.themen_liste|join('\n') if scan and scan.state == 'gelesen' else '') }}</textarea>
+Textaufgaben">{{ draft.get('themen', '') }}</textarea>
     <button type="submit">Klassenarbeit anlegen →</button>
   </form>
 </section>
 
-<section class="card blatt-karte">
-  <h2>Oder: Themenblatt hochladen</h2>
-  <p class="hint">Foto oder Scan des Ankündigungsblatts. {{ companion_name }} liest die Themen heraus und trägt sie ein.</p>
-  <form method="post" action="/klassenarbeit/themenblatt" enctype="multipart/form-data" class="blatt-form">
-    {{ csrf_input() }}
-    <label class="sr" for="themenblatt-datei">Themenblatt</label>
-    <input type="file" id="themenblatt-datei" name="datei" accept="image/*,application/pdf" required>
-    <button type="submit">Blatt einlesen →</button>
-  </form>
-  {% if scan and scan.state == 'offen' %}
-  <p class="msg">{{ companion_name }} liest das Blatt gerade ein … die Seite geht von selbst weiter.</p>
-  <script>karoAutoRefresh("/klassenarbeit/themenblatt/status?scan_id={{ scan.id }}", "{{ scan.state }}");</script>
-  {% endif %}
-  {# "fehler" heisst technischer Abbruch, nie schlechte Bildqualitaet: ein
-   unleserliches Blatt endet als "gelesen" mit leerer Themenliste. Die alte
-   Meldung schob es auf das Foto und verschwieg den festgehaltenen Grund. #}
-{% if scan and scan.state == 'fehler' %}<div class="msg warn"><b>Karo konnte das Blatt nicht einlesen.</b> {{ scan.fehler|klartext }}<br><small class="klein">Festgehalten: {{ scan.fehler }}</small></div>{% endif %}
-{% if scan and scan.state == 'gelesen' and not scan.themen_liste %}<p class="msg warn">Auf dem Blatt wurde kein Thema erkannt. Ein deutlicheres Foto hilft — oder trage die Themen oben selbst ein.</p>{% endif %}
-</section>
+{# Hier stand „Oder: Themenblatt hochladen": ein Foto des Ankündigungsblatts
+   ging an ein Modell, das Themen und Termin ablas. Ein Foto vom Küchentisch
+   trägt mehr als die Ankündigung — den Namen des Kindes, die Klasse, was
+   sonst noch danebenlag. Bestätigen musste ein Mensch die Themen ohnehin
+   immer; jetzt tippt er sie gleich oben ein. Das Lesen kommt zurück, sobald
+   es auf dem Gerät läuft (Schritt 2). #}
 {% endblock %}

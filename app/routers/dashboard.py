@@ -1,9 +1,9 @@
 """Einfache Einstiege: ein nächster Lernschritt und ein eigener Elternbereich."""
-from fastapi import APIRouter, Request, Form, UploadFile, HTTPException
+from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse
 
 from .. import config, db, jobs, kb, quizzes, topics
-from ..services import exam, workflow
+from ..services import workflow
 from .shared import render, flash, zurueck, erfolge_ziel
 from ..woche.pilot_store import parent_summary
 from ..welten.store import current_companion, current_interest
@@ -135,73 +135,37 @@ def arbeit_zurueck(request: Request, exam_id: int, ziel: str = Form('')):
 def lernmaterial(request: Request):
     from .shared import aktives_fach
     fach = aktives_fach(request, request.query_params.get('fach'))
-    import json
-    row = db.q1('''SELECT s.* FROM exam_scan s JOIN learning_upload u ON u.scan_id=s.id
-                  WHERE s.state!='uebernommen' ORDER BY s.id DESC LIMIT 1''')
-    scan = dict(row) if row else None
-    if scan:
-        scan['names'] = json.loads(scan.get('themen') or '[]')
-    return render(request, 'learning_upload.html', scan=scan, fach=fach)
+    return render(request, 'learning_upload.html', fach=fach)
 
 
-@router.post('/lernen/material')
-async def material_hochladen(request: Request, datei: UploadFile, fach: str = Form(''), klasse: int = Form(6)):
-    from pathlib import Path
-    from .. import security
-    from ..services.exam import ExamError
-    from starlette.concurrency import run_in_threadpool
+# Hier standen „/lernen/material" (Foto hochladen) und sein Status: das Blatt
+# ging an ein Modell, das die Themen ablas. Jetzt tippt das Kind sie ab —
+# siehe app/llm/base.py. Das Lesen kommt zurück, sobald es auf dem Gerät
+# läuft (docs/Karo_Prompts_Schritt_fuer_Schritt.MD, Schritt 2).
+
+
+@router.post('/lernen/material/uebernehmen')
+def material_themen(request: Request, themen: str = Form(''),
+                    fach: str = Form(''), klasse: int = Form(6)):
+    from ..services import learning_hub
+    names = list(dict.fromkeys(n.strip() for n in themen.replace(',', '\n').splitlines() if n.strip()))
+    if not names or len(names) > 20 or any(len(n) > 200 for n in names):
+        flash(request, 'Bitte mindestens ein Thema eintragen. Bis zu 20 gehen auf einmal.', 'warn')
+        return zurueck('/lernen/material')
     from .. import faecher
     fach = faecher.schluessel(fach)
     if fach is None:
         flash(request, 'Bitte wähle zuerst ein Fach: Deutsch, Mathematik oder Englisch.', 'warn')
-        return zurueck('/lernen')
+        return zurueck('/lernen/material')
     if not 1 <= klasse <= 13:
         flash(request, 'Bitte eine Klasse von 1 bis 13 wählen.', 'warn')
-        return zurueck('/lernen/material')
-    data = await datei.read(security.MAX_UPLOAD_BYTES + 1)
-    if len(data) > security.MAX_UPLOAD_BYTES:
-        flash(request, 'Die Datei ist zu groß. Bitte ein kleineres Bild oder PDF auswählen.', 'warn')
-        return zurueck('/lernen/material')
-    try:
-        scan_id = await run_in_threadpool(exam.upload_exam_topics_sheet, data, Path(datei.filename or '').suffix.lower())
-    except ExamError as exc:
-        flash(request, str(exc), 'warn')
-        return zurueck('/lernen/material')
-    with db.tx() as c:
-        c.execute('INSERT INTO learning_upload VALUES(?,?,?)', (scan_id, fach, klasse))
-    return zurueck(f'/lernen/material?fach={fach}')
-
-
-@router.get('/lernen/material/status')
-def material_status(scan_id: int):
-    if not db.q1('SELECT 1 FROM learning_upload WHERE scan_id=?', scan_id):
-        from fastapi import HTTPException
-        raise HTTPException(404, 'Dieses Blatt gehört nicht zu deinen Lernthemen.')
-    return {'signatur': exam.get_exam_topic_scan_status(scan_id)}
-
-
-@router.post('/lernen/material/uebernehmen')
-def material_themen(request: Request, scan_id: int = Form(...), themen: str = Form('')):
-    from ..services import learning_hub
-    from .. import exam_plan
-    scan = db.q1('''SELECT s.*,u.subject,u.grade FROM exam_scan s JOIN learning_upload u ON u.scan_id=s.id
-                   WHERE s.id=? AND s.state='gelesen' ''', scan_id)
-    names = list(dict.fromkeys(n.strip() for n in themen.replace(',', '\n').splitlines() if n.strip()))
-    if not scan or not names or len(names) > 20 or any(len(n) > 200 for n in names):
-        flash(request, 'Prüfe bitte die erkannten Themen. Du kannst bis zu 20 Themen übernehmen.', 'warn')
-        return zurueck('/lernen/material')
-    from .. import faecher
-    fach = faecher.schluessel(scan['subject'])
-    if fach is None:
-        flash(request, 'Dieses Blatt hat kein Fach. Bitte lade es in einem Fach hoch.', 'warn')
         return zurueck('/lernen/material')
     abgewiesen = []
     for name in names:
         try:
-            learning_hub.create_topic(name, fach, scan['grade'], modell=False)
+            learning_hub.create_topic(name, fach, klasse, modell=False)
         except faecher.SubjectMismatch:
             abgewiesen.append(name)
-    exam_plan.scan_uebernehmen(scan_id)
     if abgewiesen:
         flash(request, f'Nicht aus {faecher.NAMEN[fach]} und deshalb nicht übernommen: '
               + ', '.join(abgewiesen), 'warn')

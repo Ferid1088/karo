@@ -14,9 +14,8 @@ from __future__ import annotations
 import json
 import logging
 import re
-from pathlib import Path
 
-from . import config, db, jobs, pii, prompts
+from . import config, db, jobs, pii
 from .llm import ClaudeClient
 
 log = logging.getLogger("karo.kb")
@@ -37,71 +36,50 @@ def client() -> ClaudeClient:
 
 @jobs.handler("kb_extract")
 def job_kb_extract(payload: dict) -> None:
-    """Liest ein Blatt und legt seine Abschnitte in der Wissensbasis ab."""
+    """Nimmt ein Blatt in die Sammlung auf — ohne es zu lesen.
+
+    Hier ging das Foto des Blatts an ein Modell, das daraus Abschnitte
+    machte. Damit verliess das Bild den Haushalt, mit allem, was zufaellig
+    mit drauf war: der Name in der Kopfzeile, die Handschrift des Kindes,
+    was neben dem Blatt auf dem Tisch lag. Ein Bild laesst sich nicht
+    saeubern wie ein Text.
+
+    Bis das Lesen auf dem Geraet laeuft (Schritt 2: Tesseract im Browser,
+    zum Server geht nur gefilterter Text), bleibt das Blatt liegen und
+    das Thema kommt von den Eltern — das tut es beim Hochladen ohnehin
+    schon, es war nur doppelt.
+    """
     doc_id = int(payload["document_id"])
     doc = db.q1("SELECT * FROM document WHERE id = ?", doc_id)
-    if doc is None:
-        return
-    if doc["state"] not in ("neu",):
+    if doc is None or doc["state"] not in ("neu",):
         return
 
-    from .faecher import NAMEN, schluessel
-    fach = schluessel(doc["subject"])
-    if fach is None:
-        # Ohne Fach wird nichts erschlossen: das Blatt wartet im Elternordner.
-        return
-    cfg = config.load()
-    ergebnis = client().complete(
-        purpose="kb_extract",
-        prompt=prompts.kb_prompt(cfg.learner_grade, NAMEN[fach],
-                                 themenname=doc["themenname"]),
-        schema=prompts.KB_SCHEMA,
-        image_path=Path(doc["stored_path"]),
-        system=prompts.SYSTEM,
-    )
-    daten = ergebnis.data
-    abschnitte = daten.get("abschnitte") or []
-    # SUBJECT_MISMATCH: ein Englischblatt im Reiter Mathematik wird nicht
-    # erschlossen — seine Abschnitte würden sonst Mathe-Erklärungen speisen.
-    erkannt = schluessel(daten.get("fach")) or (
-        "andere" if str(daten.get("fach") or "").lower() == "andere" else None)
-    if erkannt and erkannt != fach:
-        ziel = NAMEN.get(erkannt, "keinem der drei Fächer")
-        with db.tx() as c:
-            c.execute("UPDATE document SET state='fach_falsch', note=? WHERE id=?",
-                      (f"SUBJECT_MISMATCH: Das Blatt gehört zu {ziel}, nicht zu "
-                       f"{NAMEN[fach]}. Bitte im richtigen Fach hochladen.", doc_id))
+    from .faecher import schluessel
+    if schluessel(doc["subject"]) is None:
+        # Ohne Fach wird nichts aufgenommen: das Blatt wartet im Elternordner.
         return
 
     with db.tx() as c:
-        # Ein Blatt wird nur erschlossen, solange nichts daran hängt.
-        c.execute("DELETE FROM kb_chunk WHERE document_id = ?", (doc_id,))
-        for i, roh in enumerate(abschnitte, start=1):
-            art = roh.get("art")
-            text = (roh.get("text") or "").strip()
-            if art not in ARTEN or not text:
-                continue
-            c.execute(
-                """INSERT INTO kb_chunk (document_id, position, art, titel, text,
-                                         thema_hinweis, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, i, art, (roh.get("titel") or None),
-                 text[:6000], (roh.get("thema") or None), db.now()))
-
-        zustand = "erschlossen" if abschnitte else "leer"
-        notiz = f"Lesbarkeit: {daten.get('lesbarkeit', 'unbekannt')}"
-        if not abschnitte:
-            notiz += " — es wurde kein Abschnitt erkannt"
-        else:
-            notiz += f" · {len(abschnitte)} Abschnitte"
         c.execute(
-            """UPDATE document SET state=?, doc_type=COALESCE(doc_type, ?), note=?
-                WHERE id=?""",
-            (zustand, daten.get("dokumenttyp") or None, notiz, doc_id))
+            """UPDATE document SET state='abgelegt', note=?
+                WHERE id=? AND state='neu'""",
+            ("Abgelegt. Karo liest Blätter gerade nicht selbst — das Thema "
+             "steht beim Hochladen dabei.", doc_id))
 
-        if abschnitte:
-            _einreihen(c, "topic_propose", {"document_id": doc_id},
-                       f"topic:{doc_id}")
+    # Das eingetippte Thema wird zum Vorschlag, den ein Mensch bestaetigt —
+    # genau wie vorher, nur ohne den Umweg ueber ein Modell.
+    from . import topics
+    topics.aus_blatt(doc_id)
+
+    # Liegt zu diesem Blatt schon Text vor, schlaegt Karo daraus wie bisher
+    # Unterthemen vor. Heute ist das nie der Fall — Text entsteht erst, wenn
+    # das Lesen auf dem Geraet laeuft (Schritt 2). Die Zeile steht hier, damit
+    # der Weg dann wieder zusammenhaengt und nicht jemand suchen muss, warum
+    # `topic_propose` niemand mehr ruft.
+    hat_text = db.q1("SELECT 1 AS da FROM kb_chunk WHERE document_id=? LIMIT 1", doc_id)
+    if hat_text:
+        with db.tx() as c:
+            _einreihen(c, "topic_propose", {"document_id": doc_id}, f"topic:{doc_id}")
 
 
 def _einreihen(c, art: str, payload: dict, schluessel: str) -> None:

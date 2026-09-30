@@ -7,66 +7,32 @@
 
 
 
-<details class="card disclosure" id="klassenarbeit-neu" {{ 'open' if scan or not zeilen }}><summary>{{ '' if cfg.klassenarbeit_kind else 'Für Eltern: ' }}Klassenarbeit hinzufügen</summary>
+<details class="card disclosure" id="klassenarbeit-neu" {{ 'open' if not zeilen }}><summary>{{ '' if cfg.klassenarbeit_kind else 'Für Eltern: ' }}Klassenarbeit hinzufügen</summary>
 
-<div class="card">
-  <h3><span class="klein">Schritt 1</span><br>Themenblatt einlesen</h3>
-  <p class="hint">Foto oder Scan des Ankündigungsblatts hochladen — {{ companion_name }} liest
-  Themen und, falls lesbar, den Termin heraus und trägt beides unten ein.
-  Geprüft und angelegt wird trotzdem erst von Hand.</p>
-  <form method="post" action="/klassenarbeit/themenblatt" enctype="multipart/form-data"
-        class="row" style="align-items:flex-end">
-    {{ csrf_input() }}
-    <div class="field" style="flex:1 1 260px">
-      <label for="themenblatt-datei" class="sr">Themenblatt</label>
-      <input type="file" id="themenblatt-datei" name="datei"
-             accept="image/*,application/pdf" required>
-    </div>
-    <button type="submit" class="ghost">Blatt einlesen</button>
-  </form>
-
-  {% if scan and scan.state == 'offen' %}
-  <div class="msg" style="margin-top:.8rem">{{ companion_name }} liest das Blatt gerade ein …
-  <br><span class="hint">Diese Seite aktualisiert sich von selbst, sobald das
-  Blatt gelesen ist{% if offen %} ({{ offen }} Vorgang läuft){% endif %}.</span></div>
-  <script>karoAutoRefresh("/klassenarbeit/themenblatt/status?scan_id={{ scan.id }}", "{{ scan.state }}");</script>
-  {% elif scan and scan.state == 'fehler' %}
-  <div class="msg warn" style="margin-top:.8rem">Konnte das Blatt nicht lesen:
-  {{ scan.fehler }}</div>
-  {% elif scan and scan.state == 'gelesen' %}
-  <div class="msg ok" style="margin-top:.8rem">Aus dem Blatt gelesen — bitte
-  unten prüfen, bevor die Klassenarbeit angelegt wird.</div>
-  {% else %}
-  <div class="msg warn" style="margin-top:.8rem">Bitte zuerst das Themenblatt
-  hochladen und vollständig einlesen lassen. Erst danach kann der Lernplan
-  ausschließlich aus den erkannten Themen erstellt werden.</div>
-  {% endif %}
-</div>
+{# Hier stand „Themenblatt einlesen": ein Foto des Ankündigungsblatts ging an
+   ein Modell, das Themen und Termin ablas. Ein Foto vom Küchentisch trägt
+   mehr als die Ankündigung — den Namen des Kindes, die Klasse, was sonst noch
+   danebenlag —, und ein Bild lässt sich nicht säubern wie ein Text.
+   Bestätigen musste ein Mensch die Themen ohnehin immer; jetzt tippt er sie
+   gleich ein. Das Lesen kommt zurück, sobald es auf dem Gerät läuft. #}
 
 <form method="post" action="/klassenarbeit" class="card">
   {{ csrf_input() }}
-  <h3><span class="klein">Schritt 2</span><br>Klassenarbeit anlegen</h3>
-  {% if scan and scan.state == 'gelesen' %}
-  <input type="hidden" name="scan_id" value="{{ scan.id }}">
-  {% endif %}
+  <h3>Klassenarbeit anlegen</h3>
   <div class="row">
     <div class="field">
       <label for="exam_date">Termin</label>
-      <input type="date" id="exam_date" name="exam_date" required min="{{ today }}"
-             value="{{ scan.exam_date if scan and scan.state == 'gelesen' and scan.exam_date else '' }}">
+      <input type="date" id="exam_date" name="exam_date" required min="{{ today }}">
     </div>
     <div class="field" style="flex:2 1 300px">
-          <label for="themen">Erkannte Themen aus dem Themenblatt</label>
-      <input type="text" id="themen" name="themen"
-             placeholder="Brüche addieren, Brüche kürzen, Textaufgaben"
-              value="{{ (scan.themen_liste | join(', ')) if scan and scan.state == 'gelesen' else '' }}"
-              readonly>
-            <p class="hint">Diese Themen stammen ausschließlich aus dem hochgeladenen
-            Themenblatt. Für eine Änderung bitte ein korrigiertes Blatt hochladen.</p>
+      <label for="themen">Prüfungsthemen</label>
+      <input type="text" id="themen" name="themen" required
+             placeholder="Brüche addieren, Brüche kürzen, Textaufgaben">
+      <p class="hint">Vom Ankündigungsblatt abtippen, mit Komma getrennt.
+      Genau diese Themen nimmt Karo für den Lernplan — nichts sonst.</p>
     </div>
   </div>
-  <button type="submit" {{ 'disabled' if not (scan and scan.state == 'gelesen') }}>
-    Klassenarbeit und Lernplan anlegen</button>
+  <button type="submit">Klassenarbeit und Lernplan anlegen</button>
 </form>
 </details>
 
