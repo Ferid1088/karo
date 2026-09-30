@@ -19,6 +19,13 @@ def bridge(app_env, monkeypatch):
     store.init()
     app_env.config.update(curriculum_url="http://127.0.0.1:8088",
                           curriculum_key="kc_test_secret", learner_name="Lena")
+    # Vor jedem Auftrag gleicht Karo die Vertragsfassung ab. Hier ist das nicht
+    # der Prüfgegenstand, also antwortet der Dienst passend — sonst würde jeder
+    # Test dieser Datei am Versionsabgleich hängen bleiben statt zu prüfen, was
+    # er prüfen will. Den Abgleich selbst prüft tests/test_curriculum_vertrag.py.
+    monkeypatch.setattr(service, "meta", lambda cfg: {
+        "contract_version": service.CONTRACT_VERSION, "git_sha": "test",
+        "formats": [service.FORMAT_ID]})
     return service
 
 

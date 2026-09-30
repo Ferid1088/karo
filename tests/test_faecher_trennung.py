@@ -174,6 +174,8 @@ def test_curriculum_agent_bekommt_nur_das_aktive_fach(app_env, monkeypatch):
     gesendet = []
 
     def anfrage(cfg, method, path, body=None):
+        if path == "/v1/meta":     # Versionsabgleich vor jedem Auftrag
+            return {"contract_version": bridge.CONTRACT_VERSION, "git_sha": "test", "formats": []}
         gesendet.append(body)
         return {"status": "pending", "export_id": 3}
     monkeypatch.setattr(bridge, "request", anfrage)

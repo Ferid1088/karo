@@ -133,6 +133,17 @@ def _export_id(result: dict) -> int:
     return value
 
 
+class VertragVerletzt(schemas.InhaltUngueltig):
+    """Nicht die Lektion ist falsch, sondern die Huelle der Antwort.
+
+    Fach, Format, Inhaltsversion, Klasseneinordnung: darueber haben sich
+    Karo und der Dienst geeinigt. Stimmt davon etwas nicht, hilft kein neu
+    geschriebener Text — das muss ein Mensch an der Schnittstelle richten.
+    Deshalb meldet Karo es dem Dienst getrennt: als Vertragsverstoss, der
+    dort nicht gegen das Thema zaehlt.
+    """
+
+
 def _checked(result: dict, thema: str, grade: int, fach: str) -> dict:
     from . import lektionen
     from .normalisierung import normalisiere_thema
@@ -141,9 +152,9 @@ def _checked(result: dict, thema: str, grade: int, fach: str) -> dict:
     # Fach wird nicht importiert, auch wenn das Thema zufällig passt.
     geliefert = result.get("subject")
     if geliefert is not None and schluessel(geliefert) != fach:
-        raise schemas.InhaltUngueltig("Die Lernreihe gehört zu einem anderen Fach.")
+        raise VertragVerletzt("Die Lernreihe gehört zu einem anderen Fach.")
     if result.get("format") != FORMAT_ID or not result.get("concept_id") or not result.get("concept_version"):
-        raise schemas.InhaltUngueltig("Format oder Inhaltsversion fehlt.")
+        raise VertragVerletzt("Format oder Inhaltsversion fehlt.")
     lesson = schemas.pruefe_lektion(result.get("lesson"))
     if "erstkontakt" not in lesson:
         raise schemas.InhaltUngueltig("Einstieg in die Lernreihe fehlt.")
@@ -151,8 +162,11 @@ def _checked(result: dict, thema: str, grade: int, fach: str) -> dict:
     classification = result.get('classification') or {}
     lo, hi = classification.get('first_contact_grade'), classification.get('target_grade')
     if (type(lo) is not int or type(hi) is not int or not 1 <= lo <= hi <= 13
-            or classification.get('source') != 'approved_curriculum'
-            or (concept['klasse_von'], concept['klasse_bis']) != (lo, hi)):
+            or classification.get('source') != 'approved_curriculum'):
+        # Das Feld gehoert zur Huelle: fehlt es, ist der Dienst zu alt.
+        raise VertragVerletzt('Die Klasseneinordnung fehlt oder kommt nicht aus dem geprüften Curriculum.')
+    if (concept['klasse_von'], concept['klasse_bis']) != (lo, hi):
+        # Huelle in Ordnung, aber die Lektion widerspricht ihr: ein Inhaltsfehler.
         raise schemas.InhaltUngueltig('Die Klasseneinordnung stimmt nicht mit dem geprüften Curriculum überein.')
     if not lektionen._trifft(normalisiere_thema(thema), concept):
         raise schemas.InhaltUngueltig("Die Lernreihe passt nicht zum angefragten Thema.")
@@ -241,13 +255,24 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
         raise jobs.PermanentFailure("Unbekannter Curriculum-Auftragsstatus.")
     try:
         cid = import_lesson(cfg, result, safe_topic, fach, grade)
+    except VertragVerletzt as verstoss:
+        # Die Huelle passt nicht. Das dem Dienst als Inhaltsmangel zu melden
+        # war der Fehler: zwei solche Meldungen und das Thema war fuer Karo
+        # dauerhaft tot, obwohl an der Lektion nie etwas falsch war. Jetzt
+        # geht es als Vertragsverstoss hin, zaehlt dort nicht, und hier
+        # sieht ein Mensch, dass jemand die Schnittstelle richten muss.
+        betrieb_melden(f"Der Lehrplan-Dienst liefert eine Antwort, die nicht zum Vertrag passt: {verstoss}")
+        request(cfg, "POST", f"/v1/lessons/{eid}/reject",
+                {"reason": f"Vertrag {CONTRACT_VERSION}: {verstoss}", "reason_code": "contract"})
+        raise jobs.Deferred(payload, 300) from None
     except (schemas.InhaltUngueltig, ValueError, TypeError, KeyError):
         # Stable, non-sensitive reason; no child text or model payload in logs.
         if payload.get("curriculum_rejections", 0) >= 2:
             raise jobs.PermanentFailure("Das Material braucht eine fachliche Überprüfung.") from None
         revised = request(cfg, "POST", f"/v1/lessons/{eid}/reject", {
             "reason": "Lokale Karo-Prüfung fehlgeschlagen: Schema, Einstieg, Klasse, "
-                      "Themenzuordnung, Rechenlösung oder getrennte Übungsaufgaben prüfen."})
+                      "Themenzuordnung, Rechenlösung oder getrennte Übungsaufgaben prüfen.",
+            "reason_code": "content"})
         if revised.get("status") == "unavailable":
             raise jobs.PermanentFailure("Das Material braucht eine fachliche Überprüfung.") from None
         payload["curriculum_export"] = _export_id(revised)
