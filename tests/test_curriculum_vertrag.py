@@ -48,3 +48,61 @@ def test_die_ablehnung_nennt_die_klasseneinordnung_beim_namen(app_env):
         mp.setattr(cd.schemas, "pruefe_lektion", lambda l: l)
         with pytest.raises(schemas.InhaltUngueltig, match="Klasseneinordnung"):
             cd.import_lesson(config.load_safe(), _antwort({}), "Satz des Thales", "mathematik", 8)
+
+
+# ---------------- Versionsabgleich statt stiller Sackgasse ----------------
+def test_gleiche_vertragsfassung_laesst_durch(app_env, monkeypatch):
+    from app import config
+    from app.adaptiv import curriculum_dienst as cd
+    app_env.db.init()
+    monkeypatch.setattr(cd, "request", lambda *a, **k: {
+        "contract_version": cd.CONTRACT_VERSION, "git_sha": "abc123",
+        "formats": ["karo-adaptiv-v1"]})
+    passt, grund = cd.vertrag_passt(config.load_safe())
+    assert passt and grund == ""
+
+
+@pytest.mark.parametrize("fremd", ["karo-adaptiv-v1.0", None, "irgendwas"])
+def test_andere_vertragsfassung_stellt_zurueck_statt_abzulehnen(app_env, monkeypatch, fremd):
+    """Der Kern: bei Versionsunterschied wird gewartet, nicht abgelehnt.
+
+    Eine Ablehnung zaehlt beim Dienst gegen das Thema. Zwei davon, und es
+    wird dauerhaft nicht mehr ausgeliefert — obwohl am Inhalt nichts falsch
+    war. Genau so ist im Betrieb jedes Thema unlieferbar geworden.
+    """
+    import time
+    from app import config, jobs
+    from app.adaptiv import curriculum_dienst as cd
+    app_env.db.init()
+    angefragt = []
+
+    def gefaelscht(cfg, method, path, body=None):
+        angefragt.append((method, path))
+        if path == "/v1/meta":
+            return {"contract_version": fremd, "git_sha": "alt", "formats": []}
+        raise AssertionError(f"Bei Versionsunterschied darf nichts angefragt werden: {path}")
+
+    monkeypatch.setattr(cd, "request", gefaelscht)
+    passt, grund = cd.vertrag_passt(config.load_safe())
+    assert not passt and cd.CONTRACT_VERSION in grund
+
+    with pytest.raises(jobs.Deferred):
+        cd.prepare(config.load_safe(), {"curriculum_started": time.time()},
+                   "Satz des Thales", "Mathematik", 8)
+    # Kein /v1/lessons und vor allem kein /reject.
+    assert all(p == "/v1/meta" for _, p in angefragt), angefragt
+    # Und ein Mensch erfaehrt davon.
+    meldung = app_env.db.q1("SELECT text FROM betriebsmeldung WHERE bereich='lehrplan-dienst'")
+    assert meldung and cd.CONTRACT_VERSION in meldung["text"]
+
+
+def test_stummer_dienst_gilt_als_unpassend(app_env, monkeypatch):
+    """Antwortet /v1/meta nicht, weiss Karo nichts — und wartet lieber."""
+    from app import config
+    from app.adaptiv import curriculum_dienst as cd
+    app_env.db.init()
+    def kaputt(*a, **k):
+        raise OSError("Verbindung abgelehnt")
+    monkeypatch.setattr(cd, "request", kaputt)
+    passt, grund = cd.vertrag_passt(config.load_safe())
+    assert not passt and "meldet seine Vertragsfassung nicht" in grund

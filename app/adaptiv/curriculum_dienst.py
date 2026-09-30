@@ -28,6 +28,52 @@ def settings(cfg) -> tuple[str, str]:
             os.environ.get("KARO_CURRICULUM_KEY", cfg.curriculum_key).strip())
 
 
+#: Die Fassung des Vertrags mit dem Lehrplan-Dienst. Muss zu dessen
+#: CONTRACT_VERSION passen. Laufen sie auseinander, wird ein Auftrag
+#: zurueckgestellt — niemals abgelehnt: eine Ablehnung zaehlt beim Dienst
+#: gegen das Thema und hat es schon einmal dauerhaft unlieferbar gemacht,
+#: obwohl am Inhalt nichts falsch war.
+CONTRACT_VERSION = "karo-adaptiv-v1.1"
+
+
+def betrieb_melden(text: str) -> None:
+    """Haelt eine Betriebsstoerung fest, die ein Mensch sehen muss.
+
+    Ein zurueckgestellter Auftrag sieht von aussen aus wie ein langsamer —
+    ohne diese Meldung wartet eine Familie auf etwas, das nie kommt.
+    """
+    from .. import db
+    with db.tx() as c:
+        c.execute("""CREATE TABLE IF NOT EXISTS betriebsmeldung (
+            id INTEGER PRIMARY KEY, bereich TEXT NOT NULL, text TEXT NOT NULL,
+            zuerst_am TEXT NOT NULL, zuletzt_am TEXT NOT NULL, anzahl INTEGER NOT NULL DEFAULT 1,
+            UNIQUE(bereich, text))""")
+        c.execute("""INSERT INTO betriebsmeldung(bereich,text,zuerst_am,zuletzt_am)
+                     VALUES('lehrplan-dienst',?,?,?)
+                     ON CONFLICT(bereich,text) DO UPDATE
+                       SET zuletzt_am=excluded.zuletzt_am, anzahl=anzahl+1""",
+                  (text, db.now(), db.now()))
+
+
+def meta(cfg) -> dict:
+    """Vertragsfassung und Stand des Dienstes. Ohne Schluessel abrufbar."""
+    return request(cfg, "GET", "/v1/meta")
+
+
+def vertrag_passt(cfg) -> tuple[bool, str]:
+    """Reden beide dieselbe Fassung? Gibt (ja, Begruendung) zurueck."""
+    try:
+        angaben = meta(cfg)
+    except Exception as exc:  # noqa: BLE001 - jede Stoerung heisst hier "noch nicht wissen"
+        return False, f"Der Lehrplan-Dienst meldet seine Vertragsfassung nicht ({exc})."
+    fremd = angaben.get("contract_version")
+    if fremd == CONTRACT_VERSION:
+        return True, ""
+    return False, (f"Karo spricht {CONTRACT_VERSION}, der Lehrplan-Dienst {fremd or '(keine Angabe)'}"
+                   f" (Stand {angaben.get('git_sha', 'unbekannt')}). Solange das so ist, nimmt Karo "
+                   "keine Lieferungen an — der Dienst muss auf denselben Stand gebracht werden.")
+
+
 def configured(cfg) -> bool:
     # Incomplete configuration must fail closed, never silently generate locally.
     return any(settings(cfg))
@@ -154,6 +200,14 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
     payload.setdefault("curriculum_started", time.time())
     if time.time() - payload["curriculum_started"] > MAX_WAIT_SECONDS:
         raise jobs.PermanentFailure("Die Vorbereitung dauert zu lange. Bitte später erneut starten.")
+    # Vor jedem Auftrag: reden beide dieselbe Vertragsfassung? Wenn nicht,
+    # wird zurueckgestellt statt geliefert und abgelehnt. Eine Ablehnung
+    # zaehlt beim Dienst gegen das Thema, und zwei davon machen es dauerhaft
+    # unlieferbar — ein Versionsunterschied darf das nicht ausloesen.
+    passt, grund = vertrag_passt(cfg)
+    if not passt:
+        betrieb_melden(grund)
+        raise jobs.Deferred(payload, 300)
     safe_topic = pii.scrub(thema, cfg.learner_name)
     if payload.get("curriculum_export"):
         result = request(cfg, "GET", f"/v1/lessons/{int(payload['curriculum_export'])}")
