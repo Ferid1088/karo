@@ -520,3 +520,33 @@ Schulunterlagen kommen. Interessen lassen sich jederzeit wechseln oder
 pausieren; fertige Werke bleiben erhalten.
 
 [Ablauf, Datenschutz, technische Grenzen und Prüfliste](docs/interessenwelten.md)
+
+## Vertrag mit dem Lehrplan-Dienst ändern
+
+Das Lektionsformat liegt als eigenständiges Paket in `karo_contract/`. Der
+Lehrplan-Dienst (`karo-curriculum-team`) installiert es und prüft damit, bevor
+eine Lektion „fertig“ wird. So gibt es **eine** Prüfung statt zwei.
+
+Vorher gab es zwei: der Dienst gab eine Lektion frei, Karos Import lehnte sie
+ab, und nach zwei Ablehnungen gab der Dienst das Thema dauerhaft nicht mehr
+heraus — obwohl am Inhalt nie etwas falsch war.
+
+Das Paket hängt an nichts aus `app/`, an keiner Datenbank und an keinem
+Web-Rahmen. Das ist keine Stilfrage: sonst lässt es sich dort nicht
+installieren. `tests/test_karo_contract_paket.py` hält das fest.
+
+Reihenfolge, wenn sich am Format etwas ändert:
+
+1. `karo_contract.CONTRACT_VERSION` erhöhen (z. B. auf `karo-adaptiv-v1.2`),
+   committen, pushen.
+2. Taggen: `git tag -a contract-v1.2 -m "…" && git push origin contract-v1.2`.
+   Der Dienst installiert genau dieses Tag, nie `master` — sonst zöge ein
+   beliebiger Commit hier still seine Prüfung mit.
+3. Im Dienst die neue Fassung eintragen (`CONTRACT_VERSION`, `requirements.txt`,
+   `pyproject.toml`) und **beide CIs** grün bekommen.
+4. **Den Dienst zuerst ausrollen**, `kcteam doctor` grün, **erst dann Karo.**
+
+Läuft Karo voraus, ist das nicht schlimm: es merkt den Unterschied an
+`GET /v1/meta`, stellt seine Aufträge zurück und sagt es im Elternbereich.
+Was es nie tut, ist ablehnen — eine Ablehnung zählt beim Dienst gegen das
+Thema.
