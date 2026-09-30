@@ -248,14 +248,16 @@ def test_scan_ownership_cannot_cross_learning_areas(client, fake_llm, fake_cli, 
         scan = c.execute("INSERT INTO exam_scan (document_id,state,themen,created_at) VALUES (?,'gelesen',?,?)",
                          (doc, json.dumps(['Brüche addieren']), app_env.db.now())).lastrowid
         c.execute('INSERT INTO learning_upload VALUES(?,?,?)', (scan, 'Mathematik', 6))
-    assert client.get(f'/klassenarbeit/themenblatt/status?scan_id={scan}').status_code == 404
-    assert client.get(f'/lernen/material/status?scan_id={scan}').status_code == 200
+    # Ein Blatt aus dem Lernbereich darf keine Klassenarbeit anlegen. Ueber die
+    # Oberflaeche entstehen solche Eintraege seit Schritt 1 nicht mehr (Blaetter
+    # werden nicht gelesen); die Sperre im Dienst bleibt, damit ein alter
+    # Eintrag aus der Datenbank es auch nicht kann.
     with pytest.raises(ExamError):
         create_exam('2026-10-15', str(scan))
     response = client.post('/lernen/material/uebernehmen',
-                           data={'_csrf': token, 'scan_id': scan, 'themen': 'Brüche kürzen'})
+                           data={'_csrf': token, 'themen': 'Brüche kürzen',
+                                 'fach': 'mathematik', 'klasse': 6})
     assert response.status_code == 200 and 'Brüche kürzen' in response.text
-    assert app_env.db.q1('SELECT state FROM exam_scan WHERE id=?', scan)['state'] == 'uebernommen'
 
 
 def test_migration_preserves_ambiguous_history_and_is_idempotent(client, fake_llm, fake_cli, app_env, monkeypatch):
@@ -305,19 +307,11 @@ def test_generated_grade_variant_remains_findable_without_overwriting_source(cli
 def test_exam_upload_to_confirmed_exam_stays_separate(client, fake_llm, fake_cli, app_env, monkeypatch, tmp_path):
     from app.services import learning_hub
     personal, _, _, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
-    fake_llm.responses['exam_scan'] = {'themen': ['Brüche addieren'], 'exam_date': '2026-10-15'}
-    picture = make_jpeg(tmp_path / 'pruefung.jpg')
-    with picture.open('rb') as source:
-        response = client.post('/klassenarbeit/themenblatt', data={'_csrf': token},
-                               files={'datei': ('pruefung.jpg', source, 'image/jpeg')})
-    assert response.url.path == '/klassenarbeit/neu'
-    run_jobs(app_env, fake_llm)
-    scan = app_env.db.q1('SELECT id FROM exam_scan ORDER BY id DESC LIMIT 1')['id']
+    # Themen werden eingetippt; ein Themenblatt wird nicht mehr gelesen.
     page = client.get('/klassenarbeit/neu')
-    assert 'value="2026-10-15"' in page.text and 'Brüche addieren' in page.text
-    assert client.get(f'/lernen/material/status?scan_id={scan}').status_code == 404
-    response = client.post('/klassenarbeit', data={"fach": "mathematik", '_csrf': token, 'scan_id': scan,
-        'exam_date': '2026-10-15', 'themen': 'Brüche addieren', 'fach': 'Mathematik'})
+    assert 'name="themen"' in page.text
+    response = client.post('/klassenarbeit', data={'_csrf': token,
+        'exam_date': '2026-10-15', 'themen': 'Brüche addieren', 'fach': 'mathematik'})
     # Nach dem Eintragen der Themen fragt Karo zuerst ab, was schon sitzt.
     assert 'Einstufung' in response.text
     eid = app_env.db.q1('SELECT id FROM exam ORDER BY id DESC LIMIT 1')['id']

@@ -22,38 +22,34 @@ def test_klartext_nennt_den_grund_statt_der_bildqualitaet():
     assert "nicht festgehalten" in klartext("   ")
 
 
-def test_gescheiterter_scan_zeigt_den_festgehaltenen_grund(client, fake_llm, fake_cli, app_env):
+def test_der_festgehaltene_grund_steht_bei_den_eltern(client, fake_llm, fake_cli,
+                                                     app_env, monkeypatch):
+    """Nicht „lade ein deutlicheres Foto hoch", sondern der wirkliche Grund.
+
+    Frueher stand der Satz ueber die Bildqualitaet auch dann da, wenn in
+    Wahrheit das Kontingent aufgebraucht war — und man suchte stundenlang am
+    falschen Ende. Die Seite mit dem Themenblatt-Upload gibt es nicht mehr
+    (Schritt 1); dieselbe Zusage gilt jetzt im Elternbereich, wo steht, was
+    Karo gerade vorbereitet.
+    """
+    from app import db
+    from app.services import exam, exam_effort
+    from .test_app import einrichten
     einrichten(client, fake_llm)
-    with app_env.db.tx() as c:
-        doc_id = c.execute(
-            "INSERT INTO document(rolle,stored_path,sha256,source_name,mime,state,created_at)"
-            " VALUES('pruefung','/weg.jpg','a1','blatt.jpg','image/jpeg','neu',?)",
-            (app_env.db.now(),)).lastrowid
-        c.execute("""INSERT INTO exam_scan(document_id,state,themen,fehler,created_at)
-                     VALUES(?,'fehler','[]',?,?)""",
-                  (doc_id, "Die Claude-CLI ist fehlgeschlagen (Code 1). "
-                           "You've hit your session limit · resets 5am (Europe/Berlin)",
-                   app_env.db.now()))
-    seite = client.get("/klassenarbeit/neu")
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
+    monkeypatch.setattr("app.adaptiv.lektionen.fuer_thema", lambda *a, **k: None)
+    exam_id = exam.create_exam("2099-05-05", manual_topics="Satz des Thales",
+                               subject="mathematik").exam_id
+    exam_effort.inhalte_anfordern(exam_id)
+    with db.tx() as c:
+        c.execute("UPDATE job SET state='fehler', last_error=? WHERE type='lektion_erzeugen'",
+                  ("Die Claude-CLI ist fehlgeschlagen (Code 1). You've hit your "
+                   "session limit · resets 5am (Europe/Berlin)",))
+
+    seite = client.get("/eltern/lernfortschritt")
     assert seite.status_code == 200
     assert "Kontingent" in seite.text
-    assert "Lade ein deutlicheres Foto hoch" not in seite.text
-
-
-def test_leer_gelesenes_blatt_darf_weiter_nach_einem_besseren_foto_fragen(
-        client, fake_llm, fake_cli, app_env):
-    """Der eine Fall, in dem die Bildqualität wirklich die Ursache sein kann:
-    Karo hat gelesen, aber nichts gefunden."""
-    einrichten(client, fake_llm)
-    with app_env.db.tx() as c:
-        doc_id = c.execute(
-            "INSERT INTO document(rolle,stored_path,sha256,source_name,mime,state,created_at)"
-            " VALUES('pruefung','/x.jpg','b2','blatt.jpg','image/jpeg','neu',?)",
-            (app_env.db.now(),)).lastrowid
-        c.execute("""INSERT INTO exam_scan(document_id,state,themen,created_at)
-                     VALUES(?,'gelesen','[]',?)""", (doc_id, app_env.db.now()))
-    seite = client.get("/klassenarbeit/neu")
-    assert "kein Thema erkannt" in seite.text
+    assert "deutlicheres Foto" not in seite.text
 
 
 def test_verschwundenes_bild_wird_beim_erneuten_hochladen_neu_abgelegt(app_env, tmp_path):

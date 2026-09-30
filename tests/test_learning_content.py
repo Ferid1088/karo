@@ -1,6 +1,7 @@
 """Lerninhalte pro Thema erst nach bestätigter Eingangsprüfung."""
 from .conftest import csrf_from, run_jobs
 from .test_app import (einrichten, blatt_einlesen, themen_freigeben,
+                       wissen_einspielen,
                        quiz_beantworten, quiz_freigeben, kind_modus_aktivieren)
 from .test_ui import Forms
 
@@ -9,7 +10,10 @@ def test_content_creation_moves_to_child_topic_after_first_check(
         client, fake_llm, fake_cli, app_env, alter_generator):
     from app import quizzes, teaching
     einrichten(client, fake_llm)
-    blatt_einlesen(client, fake_llm, app_env)
+    blatt_einlesen(client, fake_llm, app_env, themenname="Brüche addieren")
+    blatt_einlesen(client, fake_llm, app_env, name="blatt2.jpg",
+                   themenname="Brüche kürzen", size=(800, 1000))
+    wissen_einspielen(app_env)          # Text fuer das Lernmaterial
     topic_id, other = themen_freigeben(client, app_env)
     action = f'action="/lernzyklus/{topic_id}/start"'
     parent = client.get('/themen')

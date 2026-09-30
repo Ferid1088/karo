@@ -240,29 +240,28 @@ def test_blatt_upload_ohne_fach_oder_mit_falschem_namen(client, fake_llm, fake_c
     assert app_env.db.q("SELECT id FROM document") == []
 
 
-def test_fachfremdes_blatt_wird_nicht_erschlossen(client, fake_llm, fake_cli, app_env, tmp_path):
-    from .test_app import KB
+def test_fachfremdes_blatt_wird_gar_nicht_erst_angenommen(client, fake_llm, fake_cli, app_env, tmp_path):
+    """Die Fachprüfung greift jetzt beim Hochladen, nicht nach dem Lesen.
+
+    Vorher las ein Modell das Foto und meldete „gehört zu Englisch". Das Foto
+    geht nicht mehr hinaus; geprüft wird der eingetippte Themenname — und zwar
+    bevor irgendetwas gespeichert wird. Das ist frueher und billiger.
+    """
     einrichten(client, fake_llm)
-    fake_llm.responses["kb"] = {**KB, "fach": "englisch"}
-    _blatt(client, tmp_path, "mathematik", "Arbeitsblatt")
-    run_jobs(app_env, fake_llm)
-    doc = app_env.db.q1("SELECT * FROM document")
-    assert doc["state"] == "fach_falsch" and "SUBJECT_MISMATCH" in doc["note"]
-    assert app_env.db.q("SELECT id FROM kb_chunk") == []
-    assert "falsches Fach" in client.get("/wissen?fach=mathematik").text
+    antwort = _blatt(client, tmp_path, "mathematik", "present perfect üben")
+    assert "Englisch" in antwort.text
+    # Nichts angelegt: kein Dokument, kein Thema im falschen Fach.
+    assert app_env.db.q("SELECT id FROM document") == []
+    assert app_env.db.q("SELECT id FROM topic") == []
 
 
-def test_themenvorschlaege_bleiben_im_fach_des_blatts(client, fake_llm, fake_cli, app_env, tmp_path):
-    from .test_app import TOPICS
+def test_das_thema_eines_blatts_bleibt_in_dessen_fach(client, fake_llm, fake_cli, app_env, tmp_path):
+    """Das Fach kommt aus dem Reiter, nicht aus einem Modell."""
     einrichten(client, fake_llm)
-    fake_llm.responses["topics"] = {"themen": [
-        *TOPICS["themen"],
-        {"code": "EN.PP", "label": "present perfect", "beschreibung": "", "fach": "englisch"}]}
     _blatt(client, tmp_path, "mathematik", "Bruchrechnung")
     run_jobs(app_env, fake_llm)
     themen = {r["label"]: r["subject"] for r in app_env.db.q("SELECT label, subject FROM topic")}
-    assert "present perfect" not in themen
-    assert themen and set(themen.values()) == {"mathematik"}
+    assert themen == {"Bruchrechnung": "mathematik"}
 
 
 # --------------------------------------------------------------------------

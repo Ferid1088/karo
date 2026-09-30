@@ -195,13 +195,57 @@ def einrichten(client, fake, backend="abo", passwort="geheim123"):
     return passwort
 
 
-def blatt_einlesen(client, fake, app_env, name="blatt.jpg"):
-    eingang = app_env.drive / "01_Eingang"
-    eingang.mkdir(parents=True, exist_ok=True)
-    make_jpeg(eingang / name)
+def blatt_einlesen(client, fake, app_env, name="blatt.jpg",
+                   themenname="Brüche addieren", size=(900, 1200)):
+    """Ein Blatt in die Sammlung geben — so, wie eine Familie es tut.
+
+    Frueher ging das Blatt ueber den Drive-Eingang hinein und ein Modell las
+    das Foto, um daraus Themen vorzuschlagen. Das Foto verlaesst den Haushalt
+    nicht mehr (siehe app/llm/base.py); das Thema tippt ein Mensch beim
+    Hochladen ein. Deshalb geht der Weg hier jetzt ueber den direkten Upload,
+    der diesen Namen ohnehin schon verlangt hat.
+    """
+    import io as _io
+
+    from PIL import Image
+
+    # `size` variieren, wenn mehrere Blaetter gebraucht werden: gleiche Bytes
+    # faengt die sha256-Erkennung doppelter Dateien ab, bevor irgendetwas
+    # passiert.
+    puffer = _io.BytesIO()
+    Image.new("RGB", size, (245, 245, 245)).save(puffer, "JPEG")
     token = csrf_from(client.get("/wissen").text)
-    client.post("/wissen/einlesen", data={"_csrf": token})
+    client.post("/wissen/upload",
+                data={"_csrf": token, "fach": "mathematik", "themenname": themenname},
+                files={"datei": (name, puffer.getvalue(), "image/jpeg")})
     run_jobs(app_env, fake)
+
+
+def wissen_einspielen(app_env, label="Brüche addieren", doc_id=None):
+    """Legt Abschnitte in die Wissensbasis, ohne ein Blatt zu lesen.
+
+    Steht hier stellvertretend fuer das, was ab Schritt 2 der Browser
+    liefert: gefilterter Text vom Geraet. Seit Schritt 1 fuellt ein
+    hochgeladenes Blatt die Wissensbasis nicht mehr — dafuer muesste sein
+    Foto an ein Modell gehen. Tests, die Lernmaterial brauchen, setzen den
+    Text deshalb direkt, statt so zu tun, als lese Karo das Blatt.
+    """
+    if doc_id is None:
+        row = app_env.db.q1("SELECT id FROM document ORDER BY id DESC LIMIT 1")
+        doc_id = row["id"] if row else None
+    abschnitte = [
+        ("regel", f"{label}: gleichnamig machen, dann Zähler addieren."),
+        ("beispiel", "1/2 + 1/3 = 3/6 + 2/6 = 5/6"),
+        ("aufgabe", "Rechne 1/4 + 1/6."),
+    ]
+    with app_env.db.tx() as c:
+        for i, (art, text) in enumerate(abschnitte, start=1):
+            c.execute(
+                """INSERT INTO kb_chunk (document_id, position, art, titel, text,
+                                         thema_hinweis, created_at)
+                   VALUES (?, ?, ?, NULL, ?, ?, datetime('now'))""",
+                (doc_id, i, art, text, label))
+    return doc_id
 
 
 def themen_freigeben(client, app_env):
@@ -756,17 +800,30 @@ def test_next_action_freigabe_erscheint_nie_fuer_kind():
 # Wissensbasis und Themen
 # ==========================================================================
 
-def test_blatt_wird_zur_wissensbasis(client, fake_llm, fake_cli, app_env):
+def test_blatt_kommt_in_die_sammlung_ohne_dass_es_jemand_liest(
+        client, fake_llm, fake_cli, app_env):
+    """Das Blatt wird abgelegt, das eingetippte Thema wird zum Vorschlag.
+
+    Hier ging das Foto an ein Modell, das es in Abschnitte zerlegte und daraus
+    Themen vorschlug. Ein Blatt traegt aber mehr als seinen Inhalt — den Namen
+    oben, die Handschrift daneben —, und ein Bild laesst sich nicht saeubern
+    wie ein Text. Den Themennamen tippt beim Hochladen ohnehin ein Mensch ein;
+    das Modell hat ihn nur bestaetigt.
+    """
     einrichten(client, fake_llm)
-    blatt_einlesen(client, fake_llm, app_env)
+    vorher = len(fake_llm.calls)
+    blatt_einlesen(client, fake_llm, app_env, themenname="Brüche addieren")
 
     doc = app_env.db.q1("SELECT * FROM document ORDER BY id DESC LIMIT 1")
-    assert doc["state"] == "erschlossen"
+    assert doc["state"] == "abgelegt"
     assert doc["rolle"] == "wissen"
+    # Kein Abschnitt, weil niemand das Blatt gelesen hat — und kein Modellaufruf.
+    assert app_env.db.q("SELECT * FROM kb_chunk") == []
+    assert len(fake_llm.calls) == vorher
 
-    abschnitte = app_env.db.q("SELECT * FROM kb_chunk ORDER BY position")
-    assert len(abschnitte) == 3
-    assert {a["art"] for a in abschnitte} == {"regel", "beispiel", "aufgabe"}
+    vorschlag = app_env.db.q1("SELECT * FROM topic WHERE state='vorschlag'")
+    assert vorschlag and vorschlag["label"] == "Brüche addieren"
+    assert vorschlag["subject"] == "mathematik"
 
     seite = client.get("/wissen")
     assert "Erklärungen" in seite.text
@@ -791,10 +848,14 @@ def test_wissen_upload_verlangt_themennamen(client, fake_llm, fake_cli, app_env)
     assert app_env.db.q("SELECT * FROM document") == []
 
 
-def test_wissen_upload_gibt_themennamen_an_die_ki_weiter(
+def test_der_eingetippte_themenname_wird_das_thema(
         client, fake_llm, fake_cli, app_env):
-    """Der Themenname wird gespeichert und lenkt sowohl die Blatt-Zerlegung
-    als auch den Unterthema-Vorschlag."""
+    """Kein Modell dazwischen: was eingetippt wird, steht danach als Thema da.
+
+    Der Name ging frueher zusammen mit dem Foto des Blatts an ein Modell, das
+    daraus Unterthemen vorschlug. Das Foto geht nicht mehr hinaus, und den
+    Namen hat das Modell ohnehin nur bestaetigt.
+    """
     import io
 
     from PIL import Image
@@ -809,18 +870,18 @@ def test_wissen_upload_gibt_themennamen_an_die_ki_weiter(
         data={"_csrf": csrf_from(seite.text), "themenname": "Bruchrechnung", "fach": "mathematik"},
         files={"datei": ("blatt.jpg", puffer.getvalue(), "image/jpeg")},
         follow_redirects=True)
-    assert "wird jetzt für „Bruchrechnung“ gelesen" in r.text
+    assert "Bruchrechnung" in r.text
 
     doc = app_env.db.q1("SELECT * FROM document ORDER BY id DESC LIMIT 1")
     assert doc["themenname"] == "Bruchrechnung"
 
+    vorher = len(fake_llm.calls)
     run_jobs(app_env, fake_llm)
 
-    # Der Themenname muss sowohl beim Zerlegen des Blatts (kb_extract) als
-    # auch beim Vorschlagen der Unterthemen (topic_propose) im Prompt stehen.
-    treffer = [c for c in fake_llm.calls
-              if "Bruchrechnung" in c["argv"][c["argv"].index("-p") + 1]]
-    assert len(treffer) >= 2
+    # Genau ein Thema, mit genau diesem Namen — und kein Modellaufruf dafuer.
+    vorschlaege = app_env.db.q("SELECT * FROM topic WHERE state='vorschlag'")
+    assert [t["label"] for t in vorschlaege] == ["Bruchrechnung"]
+    assert len(fake_llm.calls) == vorher
 
 
 def test_themen_werden_vorgeschlagen_und_freigegeben(client, fake_llm, fake_cli,
@@ -828,16 +889,14 @@ def test_themen_werden_vorgeschlagen_und_freigegeben(client, fake_llm, fake_cli,
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
 
+    # Ein Blatt, ein eingetipptes Thema — nicht mehr mehrere aus einem Modell.
     vorschlaege = app_env.db.q("SELECT * FROM topic WHERE state='vorschlag'")
-    assert len(vorschlaege) == 2
+    assert [t["label"] for t in vorschlaege] == ["Brüche addieren"]
     assert "Neue Themen bestätigen" in client.get("/themen").text
 
     themen_freigeben(client, app_env)
     aktive = app_env.db.q("SELECT * FROM topic WHERE state='aktiv'")
-    assert len(aktive) == 2
-    # Die Abschnitte der Wissensbasis wurden zugeordnet
-    assert app_env.db.q1("SELECT COUNT(*) AS n FROM kb_chunk "
-                         "WHERE topic_id IS NOT NULL")["n"] > 0
+    assert len(aktive) == 1
 
 
 def test_thema_umbenennen_behaelt_den_code(client, fake_llm, fake_cli, app_env):
@@ -865,24 +924,13 @@ def test_abgelehnte_themen_kommen_nicht_wieder(client, fake_llm, fake_cli,
         daten[f"aktion_{i}"] = "abgelehnt"
     client.post("/themen/entscheiden", data=daten)
 
-    # Andere Bildgroesse als blatt.jpg, damit die sha256-Dedup beim Einlesen
-    # nicht schon vor jeder Verarbeitung zuschlaegt — es geht hier um die
-    # Themen-Dedup, nicht die Datei-Dedup.
-    eingang = app_env.drive / "01_Eingang"
-    eingang.mkdir(parents=True, exist_ok=True)
-    make_jpeg(eingang / "blatt2.jpg", size=(800, 1000))
-    token = csrf_from(client.get("/wissen").text)
-    client.post("/wissen/einlesen", data={"_csrf": token})
-    run_jobs(app_env, fake_llm)
+    # Dasselbe Thema noch einmal hochladen: es kommt nicht als Vorschlag
+    # zurueck, sonst muesste eine Familie es jedes Mal neu ablehnen.
+    blatt_einlesen(client, fake_llm, app_env, name="blatt2.jpg",
+                   themenname="Brüche addieren", size=(800, 1000))
 
     assert app_env.db.q1("SELECT COUNT(*) AS n FROM topic "
                          "WHERE state='vorschlag'")["n"] == 0
-
-    # Dass nichts Neues entstand, ist kein stiller Fehlschlag — das Blatt
-    # sagt, welches vorhandene Thema den Konflikt ausgeloest hat.
-    doc2 = app_env.db.q1("SELECT * FROM document ORDER BY id DESC LIMIT 1")
-    assert "Bereits vorhandenes Thema erkannt" in doc2["note"]
-    assert doc2["note"] in client.get("/wissen").text
 
 
 # ==========================================================================
@@ -1086,51 +1134,12 @@ def test_freigegeben_bleibt_stabil_bei_erneutem_antwort_post_ueber_http(
     assert nach["state"] == "freigegeben"
 
 
-def test_quiz_read_sheet_ueberschreibt_keine_zwischenzeitliche_freigabe(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
-    """P0: ein Wettlauf zwischen dem Foto-Ablesen (Papierweg) und einer
-    direkten Freigabe (z. B. muendliche Lernkontrolle) darf den Endzustand
-    nicht zurueckdrehen. Der LLM-Aufruf zum Ablesen ist der Moment, in dem
-    real Zeit vergeht — genau dort simulieren wir die dazwischenkommende
-    Freigabe."""
-    import io
-    from types import SimpleNamespace
-
-    from PIL import Image
-
-    from app import quizzes as qz
-
-    einrichten(client, fake_llm)
-    blatt_einlesen(client, fake_llm, app_env)
-    topic_id = themen_freigeben(client, app_env)[0]
-    seite = client.get("/themen")
-    client.post(f"/themen/{topic_id}/pruefen",
-                data={"_csrf": csrf_from(seite.text), "modus": "papier"})
-    run_jobs(app_env, fake_llm)
-    quiz = app_env.db.q1("SELECT * FROM quiz ORDER BY id DESC LIMIT 1")
-    assert quiz["state"] == qz.STATE_BEREIT
-
-    puffer = io.BytesIO()
-    Image.new("RGB", (900, 1200), (250, 250, 250)).save(puffer, "JPEG")
-    doc_id = qz.blatt_hochladen(quiz["id"], puffer.getvalue(), ".jpg")
-
-    entscheidungen = _alle_entscheidungen(app_env, quiz["id"])
-    positionen = app_env.db.q("SELECT position FROM question WHERE quiz_id=?", quiz["id"])
-
-    def freigabe_waehrenddessen(**kwargs):
-        qz.freigeben(quiz["id"], entscheidungen)
-        return SimpleNamespace(
-            data={"lesbarkeit": "gut",
-                  "antworten": [{"position": p["position"], "antwort": "3/4",
-                                 "sicher_gelesen": True} for p in positionen]},
-            call_id=None)
-
-    monkeypatch.setattr(qz, "client",
-                        lambda: SimpleNamespace(complete=freigabe_waehrenddessen))
-    qz.job_quiz_read_sheet({"quiz_id": quiz["id"], "document_id": doc_id})
-
-    nach = app_env.db.q1("SELECT state FROM quiz WHERE id=?", quiz["id"])
-    assert nach["state"] == qz.STATE_FREIGEGEBEN
+# Hier stand ein Test fuer den Wettlauf zwischen dem Foto-Ablesen und einer
+# direkten Freigabe. Den Wettlauf gibt es nicht mehr: das Ablesen der
+# Handschrift ist weg (Schritt 1). Dass eine dazwischenkommende Freigabe den
+# Endzustand nicht zurueckdreht, sichern weiterhin
+# `test_antworten_speichern_race_schuetzt_question_daten` und
+# `test_freigegeben_ist_ein_endzustand_fuer_antworten_speichern`.
 
 
 # ==========================================================================
@@ -1298,27 +1307,6 @@ def test_quiz_check_race_schuetzt_question_daten(
     assert nach["vorschlag_richtig"] is None
 
 
-def test_freigegeben_lehnt_ein_neues_antwortblatt_ab(
-        client, fake_llm, fake_cli, app_env):
-    """blatt_hochladen() ist in change.txt (Klassenarbeits-Cleanup) explizit
-    als Mutationspfad genannt, der FREIGEGEBEN nicht mehr verlassen darf."""
-    from app import quizzes as qz
-    einrichten(client, fake_llm)
-    blatt_einlesen(client, fake_llm, app_env)
-    topic_id = themen_freigeben(client, app_env)[0]
-    quiz = _quiz_bereit_zum_freigeben(client, fake_llm, app_env, topic_id)
-    qz.freigeben(quiz["id"], _alle_entscheidungen(app_env, quiz["id"]))
-    blatt_pfad_vorher = app_env.db.q1(
-        "SELECT blatt_pfad FROM quiz WHERE id=?", quiz["id"])["blatt_pfad"]
-
-    with pytest.raises(qz.QuizError):
-        qz.blatt_hochladen(quiz["id"], b"irgendein-bild", ".jpg")
-
-    nach = app_env.db.q1("SELECT state, blatt_pfad FROM quiz WHERE id=?", quiz["id"])
-    assert nach["state"] == qz.STATE_FREIGEGEBEN
-    assert nach["blatt_pfad"] == blatt_pfad_vorher
-
-
 def test_freigegeben_ist_terminal_gegen_alle_mutationspfade(
         client, fake_llm, fake_cli, app_env):
     """Zusammenfassender Test (change.txt Abschnitt 1/15): nach der Freigabe
@@ -1342,10 +1330,7 @@ def test_freigegeben_ist_terminal_gegen_alle_mutationspfade(
 
     with pytest.raises(qz.QuizError):
         qz.antworten_speichern(quiz["id"], {vorher_fragen[0]["id"]: "geaendert"})
-    with pytest.raises(qz.QuizError):
-        qz.blatt_hochladen(quiz["id"], b"irgendein-bild", ".jpg")
     qz.job_quiz_check({"quiz_id": quiz["id"]})              # muss still no-open
-    qz.job_quiz_read_sheet({"quiz_id": quiz["id"], "document_id": 999999})
 
     nach_quiz = dict(app_env.db.q1("SELECT * FROM quiz WHERE id=?", quiz["id"]))
     nach_fragen = [dict(r) for r in app_env.db.q(
@@ -1383,19 +1368,17 @@ def test_papierweg_von_druck_bis_flagge(client, fake_llm, fake_cli, app_env):
     loesung = client.get(f"/quiz/{quiz['id']}/drucken?loesungen=ja")
     assert "23/20" in loesung.text
 
-    # Antwortblatt fotografieren
-    import io
-
-    from PIL import Image
-
-    puffer = io.BytesIO()
-    Image.new("RGB", (900, 1200), (250, 250, 250)).save(puffer, "JPEG")
+    # Auf Papier gerechnet, Antworten am Bildschirm eingetragen. Das Blatt
+    # abzufotografieren gibt es nicht mehr: dafuer muesste die Handschrift des
+    # Kindes an ein fremdes Modell gehen, und Ablesen ist das Unzuverlaessigste,
+    # was ein Modell tun kann — bei einer unleserlichen Stelle stand am Ende
+    # eine geratene Antwort im Protokoll, die das Kind nie gegeben hat.
     seite = client.get(f"/quiz/{quiz['id']}")
-    r = client.post(f"/quiz/{quiz['id']}/blatt",
-                    data={"_csrf": csrf_from(seite.text)},
-                    files={"datei": ("antwort.jpg", puffer.getvalue(),
-                                     "image/jpeg")}, follow_redirects=True)
-    assert "abgelesen" in r.text or "aufgenommen" in r.text
+    assert "Blatt ausdrucken" in seite.text
+    assert "Antworten eintragen" in seite.text
+    assert "/blatt" not in seite.text
+
+    quiz_beantworten(client, app_env, quiz["id"], {1: "3/4", 2: "5/9", 3: "2/9"})
     run_jobs(app_env, fake_llm)
 
     fragen = app_env.db.q("SELECT * FROM question WHERE quiz_id=? ORDER BY position",
@@ -1409,7 +1392,13 @@ def test_papierweg_von_druck_bis_flagge(client, fake_llm, fake_cli, app_env):
 
 
 def test_antwortblatt_wird_nicht_beschnitten(client, fake_llm, fake_cli, app_env):
-    """Ein Zuschnitt koennte die erste Antwort abschneiden."""
+    """Ein Zuschnitt koennte die erste Antwort abschneiden.
+
+    Der Weg „bearbeitetes Blatt hochladen" ist weg (Schritt 1). Die Regel
+    gilt trotzdem weiter fuer alles, was in `ingest` mit der Rolle
+    „bearbeitet" ankommt — und ab Schritt 2 wieder fuer das, was der Browser
+    liest.
+    """
     from app import ingest
     from PIL import Image
 
@@ -1457,6 +1446,10 @@ def _uebungstag(app_env, topic_id: int, datum: str, i: int, fragen: int = 3,
 def _bis_rot(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
+    # Lernmaterial braucht Text in der Wissensbasis. Den liefert ab Schritt 2
+    # der Browser; bis dahin setzen wir ihn hier direkt (siehe
+    # `wissen_einspielen`), statt so zu tun, als lese Karo das Blatt.
+    wissen_einspielen(app_env)
     topic_id = themen_freigeben(client, app_env)[0]
     seite = client.get("/themen")
     client.post(f"/themen/{topic_id}/pruefen",
@@ -2240,12 +2233,10 @@ def test_fehlgeschlagener_vorgang_wird_spaeter_erneut_versucht(
     from app import jobs
 
     einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    doc_id = wissen_einspielen(app_env)
     fake_llm.responses = {}          # keine Antwort -> Schemafehler
-    eingang = app_env.drive / "01_Eingang"
-    eingang.mkdir(parents=True, exist_ok=True)
-    make_jpeg(eingang / "blatt.jpg")
-    token = csrf_from(client.get("/wissen").text)
-    client.post("/wissen/einlesen", data={"_csrf": token})
+    jobs.enqueue("topic_propose", {"document_id": doc_id})
 
     assert jobs.run_once() is True
     job = app_env.db.q1("SELECT * FROM job ORDER BY id DESC LIMIT 1")
@@ -2256,16 +2247,17 @@ def test_fehlgeschlagener_vorgang_wird_spaeter_erneut_versucht(
 
 def test_abgeschnittene_antwort_wird_nicht_gespeichert(client, fake_llm,
                                                        fake_cli, app_env):
+    from app import jobs
+
     einrichten(client, fake_llm)
+    blatt_einlesen(client, fake_llm, app_env)
+    doc_id = wissen_einspielen(app_env)
+    vorher = app_env.db.q1("SELECT COUNT(*) AS n FROM topic")["n"]
     fake_llm.stop_reason = "max_tokens"
-    eingang = app_env.drive / "01_Eingang"
-    eingang.mkdir(parents=True, exist_ok=True)
-    make_jpeg(eingang / "blatt.jpg")
-    token = csrf_from(client.get("/wissen").text)
-    client.post("/wissen/einlesen", data={"_csrf": token})
+    jobs.enqueue("topic_propose", {"document_id": doc_id})
     run_jobs(app_env, fake_llm)
 
-    assert app_env.db.q1("SELECT COUNT(*) AS n FROM kb_chunk")["n"] == 0
+    assert app_env.db.q1("SELECT COUNT(*) AS n FROM topic")["n"] == vorher
     aufruf = app_env.db.q1("SELECT * FROM llm_call ORDER BY id DESC LIMIT 1")
     assert aufruf["schema_ok"] == 0
     assert "abgeschnitten" in (aufruf["error"] or "")

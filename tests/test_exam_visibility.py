@@ -49,26 +49,20 @@ def test_child_can_create_use_and_update_exam_with_setting(
     }
     kind_modus_aktivieren(client)
     token = csrf_from(client.get('/').text)
-    posts = ('/klassenarbeit', '/klassenarbeit/themenblatt',
-             '/klassenarbeit/1/plan/neu', '/klassenarbeit/1/lerntag',
-             '/klassenarbeit/1/ergebnis')
+    posts = ('/klassenarbeit', '/klassenarbeit/1/plan/neu',
+             '/klassenarbeit/1/lerntag', '/klassenarbeit/1/ergebnis')
     for path in posts:
         assert client.post(path, data={'_csrf': token}).status_code == 403
-    for path in ('/klassenarbeit/1/plan/status', '/klassenarbeit/themenblatt/status?scan_id=1'):
-        assert client.get(path).status_code == 403
+    assert client.get('/klassenarbeit/1/plan/status').status_code == 403
 
     # Die mitgelieferte, geprüfte Bruchlektion gehört zur 6. Klasse.
     app_env.config.update(klassenarbeit_kind=True, adaptive_learning_enabled=True, learner_grade=6)
     for path in posts:
         assert client.post(path, data={'_csrf': 'invalid'}).status_code == 403
-    jpeg = make_jpeg(tmp_path / 'themenblatt.jpg', size=(1000, 1300))
-    assert client.post('/klassenarbeit/themenblatt', data={'_csrf': token}, files={
-        'datei': ('themenblatt.jpg', jpeg.read_bytes(), 'image/jpeg')}).status_code == 200
-    run_jobs(app_env, fake_llm)
-    scan = app_env.db.q1('SELECT * FROM exam_scan ORDER BY id DESC LIMIT 1')
-    assert client.get(f"/klassenarbeit/themenblatt/status?scan_id={scan['id']}").json()['signatur'] == 'gelesen'
-    assert client.post('/klassenarbeit', data={"fach": "mathematik", 
-        '_csrf': token, 'exam_date': exam_date, 'scan_id': scan['id']}).status_code == 200
+    # Themen tippt das Kind ein; ein Themenblatt wird nicht mehr gelesen.
+    assert client.post('/klassenarbeit', data={"fach": "mathematik",
+        '_csrf': token, 'exam_date': exam_date,
+        'themen': 'Brüche addieren'}).status_code == 200
     run_jobs(app_env, fake_llm)
     exam = app_env.db.q1('SELECT * FROM exam ORDER BY id DESC LIMIT 1')
     exam_id = exam['id']

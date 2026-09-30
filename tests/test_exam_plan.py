@@ -34,65 +34,48 @@ def test_klassenarbeit_ohne_gelesenes_themenblatt_wird_nicht_angelegt(
     assert app_env.db.q("SELECT id FROM exam") == []
 
 
-def test_themenblatt_hochladen_liest_themen_und_datum(client, fake_llm, fake_cli,
-                                                       app_env, tmp_path):
+def test_themen_und_termin_werden_eingetippt_ohne_modell(
+        client, fake_llm, fake_cli, app_env):
+    """Das Ankündigungsblatt wird nicht mehr gelesen — es wird abgetippt.
+
+    Ein Foto vom Küchentisch trägt mehr als die Ankündigung: den Namen des
+    Kindes, die Klasse, was sonst noch danebenlag. Bestätigen musste ein
+    Mensch die erkannten Themen ohnehin immer.
+    """
     einrichten(client, fake_llm)
-    fake_llm.responses["exam_scan"] = {
-        "themen": ["Brüche addieren", "Brüche kürzen"],
-        "exam_date": "2026-10-01",
-    }
-    bild = make_jpeg(tmp_path / "themenblatt.jpg")
-    seite = client.get("/klassenarbeit")
-    with open(bild, "rb") as f:
-        r = client.post("/klassenarbeit/themenblatt",
-                        data={"_csrf": csrf_from(seite.text)},
-                        files={"datei": ("themenblatt.jpg", f, "image/jpeg")},
-                        follow_redirects=True)
-    assert r.status_code == 200
-
-    scan = app_env.db.q1("SELECT * FROM exam_scan ORDER BY id DESC LIMIT 1")
-    assert scan["state"] == "offen"
-
-    run_jobs(app_env, fake_llm)
-    scan = app_env.db.q1("SELECT * FROM exam_scan WHERE id=?", scan["id"])
-    assert scan["state"] == "gelesen"
-    assert scan["exam_date"] == "2026-10-01"
-    assert "Brüche addieren" in scan["themen"]
+    vorher = len(fake_llm.calls)
 
     seite = client.get("/klassenarbeit/neu")
-    assert 'value="2026-10-01"' in seite.text
-    assert "Brüche addieren\nBrüche kürzen" in seite.text
-    assert f'name="scan_id" value="{scan["id"]}"' in seite.text
+    assert "Themenblatt hochladen" not in seite.text
+    assert 'name="themen"' in seite.text
+
+    r = client.post("/klassenarbeit", data={
+        "_csrf": csrf_from(seite.text), "fach": "mathematik",
+        "exam_date": "2026-10-01",
+        "themen": "Brüche addieren\nBrüche kürzen"}, follow_redirects=True)
+    assert r.status_code == 200
+
+    exam = app_env.db.q1("SELECT * FROM exam ORDER BY id DESC LIMIT 1")
+    assert exam["exam_date"] == "2026-10-01"
+    from app.services import learning_hub
+    assert {t["label"] for t in learning_hub.exam_topics(exam["id"])} == {
+        "Brüche addieren", "Brüche kürzen"}
+    # Fuer das Anlegen selbst wurde kein Modell gebraucht.
+    assert len(fake_llm.calls) == vorher
 
 
 def test_klassenarbeit_uebernimmt_scan_und_plant_erst_nach_kalendereingabe(
         client, fake_llm, fake_cli, app_env, tmp_path):
     topic_id = _bis_rot(client, fake_llm, app_env)
 
-    fake_llm.responses["exam_scan"] = {"themen": ["Brüche addieren"],
-                                       "exam_date": None}
-    bild = make_jpeg(tmp_path / "themenblatt.jpg")
-    seite = client.get("/klassenarbeit")
-    with open(bild, "rb") as f:
-        client.post("/klassenarbeit/themenblatt",
-                    data={"_csrf": csrf_from(seite.text)},
-                    files={"datei": ("themenblatt.jpg", f, "image/jpeg")})
-    run_jobs(app_env, fake_llm)
-    scan = app_env.db.q1("SELECT * FROM exam_scan ORDER BY id DESC LIMIT 1")
-    assert scan["state"] == "gelesen"
-
     fake_llm.responses["plan"] = PLAN_ANTWORT
     seite = client.get("/klassenarbeit")
-    r = client.post("/klassenarbeit", data={"fach": "mathematik", 
+    r = client.post("/klassenarbeit", data={"fach": "mathematik",
         "_csrf": csrf_from(seite.text),
         "exam_date": "2026-10-01",
         "themen": "Brüche addieren, Brüche kürzen",
-        "scan_id": str(scan["id"]),
     }, follow_redirects=True)
     assert r.status_code == 200
-
-    scan = app_env.db.q1("SELECT * FROM exam_scan WHERE id=?", scan["id"])
-    assert scan["state"] == "uebernommen"
 
     exam = app_env.db.q1("SELECT * FROM exam ORDER BY id DESC LIMIT 1")
     plan = app_env.db.q1("SELECT * FROM exam_plan WHERE exam_id=?", exam["id"])
@@ -122,16 +105,16 @@ def test_klassenarbeit_uebernimmt_scan_und_plant_erst_nach_kalendereingabe(
 # keine Duplikate, kein Absturz bei unbekannten Themen.
 # ==========================================================================
 
-def _themenblatt_scan(client, fake_llm, app_env, tmp_path, themen):
-    fake_llm.responses["exam_scan"] = {"themen": themen, "exam_date": None}
-    bild = make_jpeg(tmp_path / "themenblatt.jpg")
-    seite = client.get("/klassenarbeit")
-    with open(bild, "rb") as f:
-        client.post("/klassenarbeit/themenblatt",
-                    data={"_csrf": csrf_from(seite.text)},
-                    files={"datei": ("themenblatt.jpg", f, "image/jpeg")})
-    run_jobs(app_env, fake_llm)
-    return app_env.db.q1("SELECT * FROM exam_scan ORDER BY id DESC LIMIT 1")
+def _arbeit_mit_themen(themen, datum="2026-10-01"):
+    """Eine Klassenarbeit mit abgetippten Themen — so, wie sie jetzt entsteht.
+
+    Frueher stand hier ein fotografiertes Themenblatt, das ein Modell las.
+    Fuer diese Tests war das immer nur der Weg, Themen in eine Arbeit zu
+    bekommen; gelesen wird nichts mehr.
+    """
+    from app.services import exam as exam_service
+    return exam_service.create_exam(datum, manual_topics="\n".join(themen),
+                                    subject="mathematik")
 
 
 def _farbe_geben(app_env, topic_id, flag="gelb"):
@@ -149,15 +132,15 @@ def test_exam_uebernimmt_keine_persoenlichen_prognosen(
     from app.services import exam as exam_service
 
     einrichten(client, fake_llm)
-    blatt_einlesen(client, fake_llm, app_env)
+    # Zwei eigene Themen mit Farbe: die Pruefung darf davon nichts uebernehmen.
+    blatt_einlesen(client, fake_llm, app_env, themenname="Brüche addieren")
+    blatt_einlesen(client, fake_llm, app_env, name="blatt2.jpg",
+                   themenname="Etwas ganz anderes", size=(800, 1000))
     passend_id, unpassend_id = themen_freigeben(client, app_env)
     for tid in (passend_id, unpassend_id):
         _farbe_geben(app_env, tid)
 
-    scan = _themenblatt_scan(client, fake_llm, app_env, tmp_path, ["Brüche addieren"])
-    assert scan["state"] == "gelesen"
-
-    ergebnis = exam_service.create_exam("2026-10-01", str(scan["id"]), subject="mathematik")
+    ergebnis = _arbeit_mit_themen(["Brüche addieren"])
 
     vorhergesagt = {r["topic_id"] for r in app_env.db.q(
         "SELECT topic_id FROM prediction WHERE exam_id=?", ergebnis.exam_id)}
@@ -175,14 +158,11 @@ def test_exam_hat_keine_duplikate_bei_doppelt_genanntem_thema(
     from app.services import exam as exam_service
 
     einrichten(client, fake_llm)
-    blatt_einlesen(client, fake_llm, app_env)
-    passend_id, _ = themen_freigeben(client, app_env)
+    blatt_einlesen(client, fake_llm, app_env, themenname="Brüche addieren")
+    passend_id = themen_freigeben(client, app_env)[0]
     _farbe_geben(app_env, passend_id)
 
-    scan = _themenblatt_scan(client, fake_llm, app_env, tmp_path,
-                             ["Brüche addieren", "Brüche addieren"])
-
-    ergebnis = exam_service.create_exam("2026-10-01", str(scan["id"]), subject="mathematik")
+    ergebnis = _arbeit_mit_themen(["Brüche addieren", "Brüche addieren"])
 
     from app.services import learning_hub
     owned = learning_hub.exam_topics(ergebnis.exam_id)
@@ -198,15 +178,15 @@ def test_unbekanntes_thema_auf_dem_blatt_laesst_die_erstellung_nicht_abstuerzen(
     from app.services import exam as exam_service
 
     einrichten(client, fake_llm)
-    blatt_einlesen(client, fake_llm, app_env)
+    # Zwei eigene Themen mit Farbe: die Pruefung darf davon nichts uebernehmen.
+    blatt_einlesen(client, fake_llm, app_env, themenname="Brüche addieren")
+    blatt_einlesen(client, fake_llm, app_env, name="blatt2.jpg",
+                   themenname="Etwas ganz anderes", size=(800, 1000))
     passend_id, unpassend_id = themen_freigeben(client, app_env)
     for tid in (passend_id, unpassend_id):
         _farbe_geben(app_env, tid)
 
-    scan = _themenblatt_scan(client, fake_llm, app_env, tmp_path,
-                             ["Völlig unbekanntes Thema XYZ"])
-
-    ergebnis = exam_service.create_exam("2026-10-01", str(scan["id"]), subject="mathematik")
+    ergebnis = _arbeit_mit_themen(["Völlig unbekanntes Thema XYZ"])
 
     vorhergesagt = {r["topic_id"] for r in app_env.db.q(
         "SELECT topic_id FROM prediction WHERE exam_id=?", ergebnis.exam_id)}

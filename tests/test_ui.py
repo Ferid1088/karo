@@ -2,7 +2,8 @@
 from html.parser import HTMLParser
 
 from .conftest import csrf_from, make_jpeg, run_jobs
-from .test_app import als_kind, einrichten, blatt_einlesen, themen_freigeben
+from .test_app import (als_kind, einrichten, blatt_einlesen, themen_freigeben,
+                       wissen_einspielen)
 
 
 class Forms(HTMLParser):
@@ -79,7 +80,7 @@ def test_upload_proposals_and_manual_topic_use_rendered_fields(client, fake_llm,
     assert response.status_code == 200
     run_jobs(app_env, fake_llm)
     doc = app_env.db.q1("SELECT * FROM document")
-    assert doc["state"] == "erschlossen"
+    assert doc["state"] == "abgelegt"
     assert client.get(f"/wissen/{doc['id']}").status_code == 200
     assert client.get(f"/scan/{doc['id']}.jpg").headers["content-type"] == "image/jpeg"
     page = client.get("/themen")
@@ -113,6 +114,7 @@ def test_learning_quiz_keeps_lesson_association_and_review_gate(client, fake_llm
     from app import quizzes, teaching
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
+    wissen_einspielen(app_env)          # Text fuer das Lernmaterial (ab Schritt 2 aus dem Browser)
     topic_id = themen_freigeben(client, app_env)[0]
     lesson_id = teaching.starten(topic_id)
     teaching.naechste_runde_bestaetigen(lesson_id)
@@ -163,6 +165,7 @@ def test_source_buttons_and_exam_fields_match_endpoints(client, fake_llm, fake_c
     from app import research
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
+    wissen_einspielen(app_env)          # Text fuer das Lernmaterial (ab Schritt 2 aus dem Browser)
     topic_id = themen_freigeben(client, app_env)[0]
     research.anfordern(topic_id)
     run_jobs(app_env, fake_llm)
@@ -231,7 +234,9 @@ def test_topic_start_immediately_builds_existing_material(client, fake_llm, fake
 def test_home_prefers_child_ready_work_to_parent_review(client, fake_llm, fake_cli, app_env):
     from app import quizzes
     einrichten(client, fake_llm)
-    blatt_einlesen(client, fake_llm, app_env)
+    blatt_einlesen(client, fake_llm, app_env, themenname="Brüche addieren")
+    blatt_einlesen(client, fake_llm, app_env, name="blatt2.jpg",
+                   themenname="Brüche kürzen", size=(800, 1000))
     topic_id, other_topic_id = themen_freigeben(client, app_env)
     first = quizzes.anfordern(topic_id)
     run_jobs(app_env, fake_llm)

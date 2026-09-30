@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from .conftest import csrf_from, run_jobs
 from .test_app import (einrichten, blatt_einlesen, themen_freigeben,
+                       wissen_einspielen,
                        kind_modus_aktivieren, quiz_beantworten, quiz_freigeben, _bis_rot)
 
 
@@ -12,6 +13,7 @@ def prepare(client, fake_llm, app_env):
     from app import quizzes
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
+    wissen_einspielen(app_env)          # Text fuer das Lernmaterial (ab Schritt 2 aus dem Browser)
     topic_id = themen_freigeben(client, app_env)[0]
     quiz_id = quizzes.anfordern(topic_id)
     run_jobs(app_env, fake_llm)
@@ -97,6 +99,7 @@ def test_quiz_requests_are_atomic(client, fake_llm, fake_cli, app_env):
     from app import quizzes, jobs
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
+    wissen_einspielen(app_env)          # Text fuer das Lernmaterial (ab Schritt 2 aus dem Browser)
     topic_id = themen_freigeben(client, app_env)[0]
     jobs.stop()
     def request(_):
