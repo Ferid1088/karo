@@ -2211,10 +2211,17 @@ def test_lernstand_wird_als_tabelle_geschrieben(client, fake_llm, fake_cli,
     assert "Thema" in [z.value for z in ws[1]]
 
 
-def test_health_funktioniert_ohne_anmeldung(client):
+def test_health_funktioniert_ohne_anmeldung(client, monkeypatch):
+    import karo_contract
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json()["ok"] is True
+    # Stand und Vertragsfassung: ohne die laesst sich von aussen nicht sagen,
+    # welcher Code antwortet und ob er zum Lehrplan-Dienst passt.
+    assert r.json()["contract_version"] == karo_contract.CONTRACT_VERSION
+    assert r.json()["git_sha"] == "unbekannt"        # ausserhalb des Images
+    monkeypatch.setenv("KARO_GIT_SHA", "abc123def456")
+    assert client.get("/health").json()["git_sha"] == "abc123def456"
 
 
 def test_beschaedigte_konfiguration_wird_gemeldet(client, fake_llm, fake_cli,

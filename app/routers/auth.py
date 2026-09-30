@@ -48,14 +48,24 @@ def speicher_auswaehlen(kind: str = Form(...), root: str = Form(...),
 
 @router.get("/health")
 def health() -> JSONResponse:
+    import os
+
+    import karo_contract
+
     try:
         cfg = config.load()
         ok, notiz = True, None
     except ConfigUnreadable as exc:
         cfg, ok, notiz = config.Config(), False, str(exc)
+    # Stand und Vertragsfassung gehoeren hier hin: ohne sie laesst sich von
+    # aussen nicht sagen, welcher Code antwortet und ob er zum Lehrplan-Dienst
+    # passt. Genau das war beim Dienst dreimal die Frage, die niemand
+    # beantworten konnte.
     return JSONResponse({"ok": ok, "note": notiz,
                          "setup_complete": cfg.setup_complete,
                          "backend": cfg.llm_backend,
+                         "git_sha": os.environ.get("KARO_GIT_SHA", "unbekannt"),
+                         "contract_version": karo_contract.CONTRACT_VERSION,
                          "drive": ingest.drive_available(),
                          "jobs": jobs.counts()})
 

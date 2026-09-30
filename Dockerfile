@@ -99,6 +99,15 @@ RUN pip install --no-cache-dir -r requirements.txt \
        fi
 
 COPY --chown=karo:karo app ./app
+COPY --chown=karo:karo karo_contract ./karo_contract
+
+# Welcher Stand hier laeuft. Kommt von build.sh, das nur aus einem sauberen,
+# committeten und gepushten Baum baut — sonst zeigt die Zahl ins Leere.
+# /health gibt sie aus: ohne das laesst sich von aussen nicht sagen, welcher
+# Code gerade antwortet.
+ARG KARO_GIT_SHA=unbekannt
+ENV KARO_GIT_SHA=$KARO_GIT_SHA
+LABEL org.opencontainers.image.revision=$KARO_GIT_SHA
 
 # Nur die WORKDIR-Ebene selbst chownen, nicht rekursiv: app/ ist durch
 # COPY --chown oben schon richtig — ein chown -R wuerde jede Datei darin

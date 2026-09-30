@@ -76,3 +76,27 @@ def test_befunde_statt_ausnahme_fuer_den_dienst():
     assert karo_contract.befunde(ohne_einordnung, thema="Würfel: Volumen",
                                  fach="mathematik") == [
         "Die Klasseneinordnung fehlt oder kommt nicht aus dem geprüften Curriculum."]
+
+
+def test_das_image_bringt_karo_contract_mit():
+    """Das Dockerfile kopierte nur app/ — im Container haette der Import gefehlt.
+
+    Lokal faellt das nie auf: hier liegt das Paket im Arbeitsverzeichnis und
+    ist damit im Pfad. Im Image ist es das nicht.
+    """
+    text = (WURZEL / "Dockerfile").read_text(encoding="utf-8")
+    assert "COPY --chown=karo:karo karo_contract ./karo_contract" in text
+    # Und der Build-Kontext darf es nicht wieder ausschliessen.
+    ignoriert = (WURZEL / ".dockerignore").read_text(encoding="utf-8").splitlines()
+    assert not any(z.strip().rstrip("/") == "karo_contract" for z in ignoriert)
+
+
+def test_das_image_traegt_seinen_stand():
+    text = (WURZEL / "Dockerfile").read_text(encoding="utf-8")
+    assert "ARG KARO_GIT_SHA=unbekannt" in text
+    assert "ENV KARO_GIT_SHA=$KARO_GIT_SHA" in text
+    assert "org.opencontainers.image.revision=$KARO_GIT_SHA" in text
+    bau = (WURZEL / "build.sh").read_text(encoding="utf-8")
+    assert "git status --porcelain" in bau          # nicht aus schmutzigem Baum
+    assert "git branch -r --contains" in bau        # nicht aus ungepushtem Commit
+    assert "KARO_GIT_SHA=$SHA" in bau
