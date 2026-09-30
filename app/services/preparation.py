@@ -15,7 +15,8 @@ from pathlib import Path
 from fastapi import Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-from .. import config, db, faecher, ingest, jobs, kb, quizzes, research, security, topics
+from .. import (blatt_text, config, db, faecher, ingest, jobs, kb, quizzes, research,
+                security, topics)
 from ..domain import FLAG_ORDER
 from ..routers.shared import aktives_fach, flash, render, zurueck
 
@@ -97,6 +98,12 @@ async def handle_wissen_upload(request: Request, rolle: str,
             flash(request, "Datei zu groß.", "err")
             return zurueck(ziel)
 
+    # Optional: der Text des Blatts, abgetippt oder eingefügt. Ab Schritt 2
+    # füllt das Browser-OCR dasselbe Feld — deshalb läuft es hier durch
+    # dieselbe Funktion wie `POST /blatt/text` und nicht durch eine zweite,
+    # die erst am Tag der Umstellung zum ersten Mal liefe.
+    blatt_text_roh = str(formular.get("blatt_text") or "").strip()
+
     try:
         ergebnis = await run_in_threadpool(
             ingest.aufnehmen, bytes(puffer), endung, rolle, themenname, fach)
@@ -105,11 +112,88 @@ async def handle_wissen_upload(request: Request, rolle: str,
                          dedup_key=f"kb_extract:{ergebnis['document_id']}")
     except ingest.IngestError as exc:
         flash(request, str(exc), "err")
-    else:
-        flash(request, "Dieses Blatt ist bereits in der Sammlung." if
-              ergebnis["status"] == "doppelt" else
-              f"Datei eingereicht — sie wird jetzt für „{themenname}“ gelesen.")
+        return zurueck(ziel)
+
+    if blatt_text_roh:
+        stand = await run_in_threadpool(
+            blatt_text.aufnehmen, blatt_text_roh, fach,
+            document_id=ergebnis["document_id"], themenname=themenname)
+        flash(request, f"Blatt aufgenommen, {stand['abschnitte']} Abschnitte in der "
+                       "Wissensbasis. Bitte unten das Thema bestätigen.")
+        return zurueck(f"/wissen/{ergebnis['document_id']}")
+
+    flash(request, "Dieses Blatt ist bereits in der Sammlung." if
+          ergebnis["status"] == "doppelt" else
+          f"Blatt abgelegt für „{themenname}“.")
     return zurueck(ziel)
+
+
+async def handle_blatt_text(request: Request):
+    """`POST /blatt/text` — Text eines Blatts, nie ein Bild.
+
+    Ab Schritt 2 ruft das hier das Browser-OCR auf; heute das Textfeld beim
+    Hochladen. Antwortet mit JSON, damit beides denselben Vertrag hat.
+    """
+    from fastapi.responses import JSONResponse
+
+    formular = await request.form()
+    fach = faecher.schluessel(formular.get("fach"))
+    text = str(formular.get("text") or "").strip()
+    if fach is None:
+        return JSONResponse({"fehler": "Bitte zuerst ein Fach wählen."}, status_code=422)
+    if not text:
+        return JSONResponse({"fehler": "Es kam kein Text an."}, status_code=422)
+    doc_id = formular.get("document_id")
+    konfidenz = formular.get("ocr_konfidenz")
+    try:
+        stand = await run_in_threadpool(
+            blatt_text.aufnehmen, text, fach,
+            document_id=int(doc_id) if doc_id else None,
+            themenname=str(formular.get("themenname") or "").strip()[:200],
+            ocr_konfidenz=float(konfidenz) if konfidenz else None)
+    except (ValueError, TypeError):
+        return JSONResponse({"fehler": "Die Angaben zum Blatt sind unvollständig."},
+                            status_code=422)
+    # Dasselbe Ergebnis, zwei Leser: das Browser-OCR (Schritt 2) will JSON,
+    # ein abgeschicktes Formular will die nächste Seite sehen.
+    if doc_id and "text/html" in (request.headers.get("accept") or ""):
+        flash(request, f"{stand['abschnitte']} Abschnitte übernommen. "
+                       "Bitte das Thema bestätigen.")
+        return zurueck(f"/wissen/{int(doc_id)}#blatt-thema")
+    return JSONResponse(stand)
+
+
+async def handle_blatt_thema(request: Request, doc_id: int):
+    """Die Bestätigung eines Menschen: dieses Blatt gehört zu diesem Thema."""
+    formular = await request.form()
+    doc = db.q1("SELECT * FROM document WHERE id=?", doc_id)
+    if doc is None:
+        flash(request, "Blatt nicht gefunden.", "err")
+        return zurueck("/wissen")
+    fach = faecher.schluessel(doc["subject"])
+    gewaehlt = str(formular.get("topic_id") or "").strip()
+    eigenes = str(formular.get("label") or "").strip()[:200]
+    if gewaehlt.isdigit():
+        topic_id = int(gewaehlt)
+        thema = db.q1("SELECT id, subject FROM topic WHERE id=?", topic_id)
+        # Ein Thema aus einem anderen Fach darf dieses Blatt nicht bekommen.
+        if not thema or faecher.schluessel(thema["subject"]) != fach:
+            flash(request, "Dieses Thema gehört zu einem anderen Fach.", "err")
+            return zurueck(f"/wissen/{doc_id}")
+    elif eigenes:
+        try:
+            faecher.pruefe(eigenes, fach, modell=False)
+        except faecher.SubjectMismatch as exc:
+            flash(request, str(exc), "err")
+            return zurueck(f"/wissen/{doc_id}")
+        topic_id = topics.anlegen(eigenes, subject=fach)
+    else:
+        flash(request, "Bitte ein Thema auswählen oder eintragen.", "err")
+        return zurueck(f"/wissen/{doc_id}")
+    n = blatt_text.zuordnen(doc_id, topic_id)
+    flash(request, f"{n} Abschnitte gehören jetzt zu diesem Thema." if n
+          else "Zu diesem Blatt liegt noch kein Text vor.")
+    return zurueck(f"/wissen/{doc_id}")
 
 
 def render_wissen_detail(request: Request, doc_id: int):
@@ -121,7 +205,15 @@ def render_wissen_detail(request: Request, doc_id: int):
         """SELECT k.*, t.label AS thema_label FROM kb_chunk k
              LEFT JOIN topic t ON t.id = k.topic_id
             WHERE k.document_id=? ORDER BY k.position""", doc_id)]
+    # Vorschläge nur, solange das Blatt noch keinem Thema gehört: danach ist
+    # die Frage beantwortet und eine Auswahl daneben nur noch verwirrend.
+    vorschlaege = []
+    if abschnitte and not any(a["topic_id"] for a in abschnitte):
+        text = "\n\n".join(a["text"] for a in abschnitte[:20])
+        vorschlaege = blatt_text.vorschlaege(
+            text, faecher.schluessel(doc["subject"]) or "", doc["themenname"] or "")
     return render(request, "wissen_blatt.html", doc=dict(doc), abschnitte=abschnitte,
+                  vorschlaege=vorschlaege,
                   adult_page=not config.load().schulblaetter_kind)
 
 

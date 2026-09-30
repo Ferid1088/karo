@@ -78,11 +78,12 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
     ):
         return True
     if schulblaetter_kind and (
-        path in {"/wissen", "/wissen/upload", "/wissen/einlesen",
+        path in {"/wissen", "/wissen/upload", "/wissen/einlesen", "/blatt/text",
                  "/vorbereitung", "/vorbereitung/",
                  "/vorbereitung/schulmaterial/hochladen",
                  "/vorbereitung/schulmaterial/einlesen"}
         or re.fullmatch(r"/(?:wissen|vorbereitung/schulmaterial)/[0-9]+", path)
+        or re.fullmatch(r"/blatt/[0-9]+/thema", path)
         or re.fullmatch(r"/scan/[0-9]+\.jpg", path)
     ):
         return True

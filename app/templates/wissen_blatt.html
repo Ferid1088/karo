@@ -10,8 +10,7 @@
 <div class="review">
   <div class="scanbox">
     <img src="/scan/{{ doc.id }}.jpg" alt="Gescanntes Blatt">
-    <p class="hint">Genau dieses Bild wurde an das Modell gesendet — bereits
-    zugeschnitten und verkleinert.</p>
+    <p class="hint">Dieses Bild bleibt hier. Es wird an kein Modell gesendet.</p>
   </div>
   <div>
     {% for a in abschnitte %}
@@ -22,12 +21,49 @@
       <div class="antwort">{{ a.text }}</div>
     </div>
     {% else %}
-    <div class="empty">Auf diesem Blatt wurde kein Abschnitt erkannt.
-      <p class="klein">Meist liegt es an der Bildqualität: Blatt flach
-      hinlegen, von oben fotografieren, keine Schatten.</p>
+    <div class="empty">Zu diesem Blatt liegt noch kein Text vor.
+      <p class="klein">{{ companion_name }} liest das Foto nicht selbst — dafür
+      müsste es an einen fremden Dienst gehen. Füge den Text unten ein, dann
+      kann {{ companion_name }} damit erklären.</p>
     </div>
     {% endfor %}
   </div>
 </div>
+
+{# Bestätigung: welchem Thema gehört dieses Blatt? Vorschläge kommen aus dem
+   eigenen Katalog, entschieden wird hier von einem Menschen. #}
+<section class="card" id="blatt-thema">
+  <h2>{% if abschnitte %}Wozu gehört dieses Blatt?{% else %}Text vom Blatt einfügen{% endif %}</h2>
+  {% if not abschnitte %}
+  <form method="post" action="/blatt/text" class="learn-form">
+    {{ csrf_input() }}
+    <input type="hidden" name="fach" value="{{ doc.subject }}">
+    <input type="hidden" name="document_id" value="{{ doc.id }}">
+    <input type="hidden" name="themenname" value="{{ doc.themenname or '' }}">
+    <label for="nachtrag">Text vom Blatt</label>
+    <textarea id="nachtrag" name="text" rows="8" required maxlength="20000"
+              placeholder="Regel, Beispiel, Aufgaben — so, wie sie auf dem Blatt stehen."></textarea>
+    <button type="submit">Text übernehmen</button>
+  </form>
+  {% else %}
+  <form method="post" action="/blatt/{{ doc.id }}/thema" class="learn-form">
+    {{ csrf_input() }}
+    {% if vorschlaege %}
+    <p>Passt eines davon?</p>
+    {% for v in vorschlaege %}
+    <label class="auswahl"><input type="radio" name="topic_id" value="{{ v.id }}"
+      {{ 'checked' if loop.first }}> {{ v.label }}</label>
+    {% endfor %}
+    {% else %}
+    <p>Zu diesem Text gibt es noch kein passendes Thema.</p>
+    {% endif %}
+    <label for="eigenes">{% if vorschlaege %}Oder ein eigenes Thema{% else %}Thema{% endif %}</label>
+    <input id="eigenes" name="label" maxlength="200"
+           value="{{ '' if vorschlaege else (doc.themenname or '') }}"
+           placeholder="Zum Beispiel: Brüche addieren">
+    <button type="submit">Thema bestätigen</button>
+  </form>
+  {% endif %}
+</section>
 <p style="margin-top:1.4rem"><a href="/wissen">← zurück zur Wissensbasis</a></p>
 {% endblock %}

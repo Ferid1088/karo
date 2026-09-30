@@ -134,18 +134,18 @@ def runde_starten(lesson_id: int, stufe: str | None = None) -> int | None:
         return None
     if not kb.lehrmaterial(thema["id"], thema["label"], limit=1) \
             and not research.material_fuer(thema["id"]):
-        # Der ehrliche Stand seit Schritt 1: ein hochgeladenes Blatt füllt die
-        # Wissensbasis nicht mehr, weil dafür sein Foto an ein Modell gehen
-        # müsste. Bis das Lesen auf dem Gerät läuft (Schritt 2), kommt das
-        # Material aus einer freigegebenen Internetquelle oder vom
-        # Lehrplan-Dienst. Das muss hier stehen, sonst sucht eine Familie den
-        # Fehler bei sich und lädt dasselbe Blatt dreimal hoch.
+        # Kein Vorwurf und keine Sackgasse: der Weg dorthin steht dabei. Das
+        # Foto liest Karo nicht (dafür müsste es an einen fremden Dienst),
+        # aber der Text vom Blatt genügt — und den gibt es beim Hochladen als
+        # Feld. Ohne diesen Satz lädt eine Familie dasselbe Blatt dreimal hoch
+        # und sucht den Fehler bei sich.
         raise TeachingError(
-            "Zu diesem Thema liegt weder eigenes Material noch eine "
-            "freigegebene Internetquelle vor. Hochgeladene Blätter liest Karo "
-            "zurzeit nicht selbst — dafür müsste das Foto an einen fremden "
-            "Dienst gehen. Bitte unten im Netz suchen und eine Quelle "
-            "freigeben.")
+            "Zu diesem Thema fehlt noch Material zum Erklären. Am schnellsten "
+            "geht es über „Schulblätter“: Blatt hinzufügen und den Text vom "
+            "Blatt einfügen oder abtippen — daraus erklärt Karo. Das Foto "
+            "allein reicht nicht, denn Karo liest es nicht: dafür müsste es an "
+            "einen fremden Dienst gehen. Alternativ unten im Netz suchen und "
+            "eine Quelle freigeben.")
 
     if stufe is None:
         stufe = NEXT_STUFE.get(letzte["stufe"], Stufe.GANZ_EINFACH.value) \
@@ -232,10 +232,9 @@ def job_lesson_build(payload: dict) -> None:
         + research.material_fuer(thema["id"])
     if not quellen:
         raise TeachingError(
-            "Zu diesem Thema liegt weder eigenes Material noch eine "
-            "freigegebene Internetquelle vor. Hochgeladene Blätter liest Karo "
-            "zurzeit nicht selbst — bitte im Netz suchen und eine Quelle "
-            "freigeben.")
+            "Zu diesem Thema fehlt noch Material zum Erklären. Unter "
+            "„Schulblätter“ ein Blatt hinzufügen und den Text vom Blatt "
+            "einfügen — oder im Netz suchen und eine Quelle freigeben.")
     fundstellen = research.freigegebene(thema["id"])
     fehlerbild = ERROR_LABELS.get(thema.get("haupt_fehler") or "")
     vorherige_folien = _vorherige_folien(lesson["id"], runde["nr"])

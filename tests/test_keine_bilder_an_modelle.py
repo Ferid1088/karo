@@ -92,9 +92,14 @@ def test_die_handschrift_wird_nirgends_mehr_abgelesen():
     """`quiz_read_sheet` ist weg — samt Job, Route und Knopf."""
     for pfad, quelle in _python_dateien():
         assert "quiz_read_sheet" not in quelle, pfad
+    # Kein Formular laedt mehr ein bearbeitetes Blatt hoch. `/blatt/text` und
+    # `/blatt/<id>/thema` sind etwas anderes: dort geht Text hin, kein Bild
+    # (siehe app/blatt_text.py) — deshalb hier ausgenommen.
     for pfad in sorted((APP / "templates").rglob("*.html")):
         text = pfad.read_text(encoding="utf-8")
-        assert "/blatt" not in text, f"{pfad.name} lädt noch ein Antwortblatt hoch"
+        ohne_textweg = text.replace("/blatt/text", "").replace("/blatt/{{ doc.id }}/thema", "")
+        assert "/blatt" not in ohne_textweg, f"{pfad.name} lädt noch ein Antwortblatt hoch"
+        assert 'enctype="multipart/form-data"' not in text or "/blatt" not in text, pfad.name
 
     from app import quizzes
     assert not hasattr(quizzes, "blatt_hochladen")

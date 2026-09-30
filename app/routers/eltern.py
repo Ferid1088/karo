@@ -35,6 +35,22 @@ async def wissen_upload(request: Request, rolle: str = Form("wissen"),
     return await preparation.handle_wissen_upload(request, rolle, datei)
 
 
+@router.post("/blatt/text")
+async def blatt_text(request: Request):
+    """Der Text eines Blatts — die Stelle, an der ab Schritt 2 das Browser-OCR
+    anliefert. Heute füttert das Textfeld beim Hochladen denselben Weg.
+
+    Hier geht **Text** hin, nie ein Bild: das Blatt bleibt auf dem Gerät.
+    """
+    return await preparation.handle_blatt_text(request)
+
+
+@router.post("/blatt/{doc_id}/thema")
+async def blatt_thema(request: Request, doc_id: int):
+    """Die Bestätigung: dieses Blatt gehört zu diesem Thema."""
+    return await preparation.handle_blatt_thema(request, doc_id)
+
+
 @router.get("/scan/{doc_id}.jpg")
 def scan(request: Request, doc_id: int):
     doc = db.q1("SELECT stored_path, rolle FROM document WHERE id=?", doc_id)

@@ -13,6 +13,16 @@
 {{ csrf_input() }}<input type="hidden" name="fach" value="{{ fach }}">
 <div class="field"><label for="themenname">Worum geht es?</label><input id="themenname" name="themenname" required maxlength="200" placeholder="Zum Beispiel: Bruchrechnung"></div>
 <div class="field"><label for="datei">Foto oder PDF</label><input type="file" id="datei" name="datei" accept="image/*,application/pdf" required></div>
+{# Das Blatt selbst bleibt hier. Damit {{ companion_name }} daraus erklären
+   kann, braucht es den Text — und den liest es nicht aus dem Foto, dafür
+   müsste das Bild an einen fremden Dienst gehen. Sobald das Lesen im
+   Browser läuft, füllt es genau dieses Feld von selbst. #}
+<div class="field"><label for="blatt_text">Text vom Blatt <span class="klein">(freiwillig, hilft beim Erklären)</span></label>
+<textarea id="blatt_text" name="blatt_text" rows="6" maxlength="20000"
+          placeholder="Text vom Blatt einfügen oder abtippen — Regel, Beispiel, Aufgaben.
+Leer lassen ist in Ordnung: dann wird das Blatt nur abgelegt."></textarea>
+<p class="hint">Der Text bleibt auf {{ 'deinem' if cfg.schulblaetter_kind else 'Ihrem' }} Rechner.
+Namen und Klassenangaben entfernt {{ companion_name }}, bevor irgendetwas damit passiert.</p></div>
 <button type="submit">Blatt hinzufügen</button>
 </form>
 <details class="disclosure"><summary>Mehrere Blätter aus dem Ordner einlesen</summary>

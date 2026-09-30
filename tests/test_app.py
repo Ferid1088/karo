@@ -1717,10 +1717,11 @@ def test_ohne_erklaermaterial_gibt_es_eine_klare_meldung(client, fake_llm,
     """Karo erklaert nur, was im Unterricht behandelt wurde — oder was aus
     einer freigegebenen Internetquelle stammt.
 
-    Das wird jetzt VOR dem Erzeugen geprüft (in `runde_starten()`), nicht
-    erst, wenn ein `lesson_build`-Job daran scheitert. Bewusst kein Abbruch
-    der Lerneinheit mehr: die Familie kann noch im Netz suchen und eine
-    Quelle freigeben, ohne von vorn anzufangen.
+    Das wird VOR dem Erzeugen geprüft (in `runde_starten()`), nicht erst,
+    wenn ein `lesson_build`-Job daran scheitert. Bewusst kein Abbruch der
+    Lerneinheit: die Familie kann noch Material nachreichen, ohne von vorn
+    anzufangen. Die Meldung muss deshalb den Weg nennen, nicht nur den
+    Mangel — sonst weiss niemand, was jetzt zu tun ist.
     """
     from app import teaching, topics
     from app.teaching import TeachingError
@@ -1730,8 +1731,11 @@ def test_ohne_erklaermaterial_gibt_es_eine_klare_meldung(client, fake_llm,
     assert topic_id is not None
 
     lesson_id = teaching.starten(topic_id, "html")
-    with pytest.raises(TeachingError, match="Internetquelle"):
+    with pytest.raises(TeachingError) as fehler:
         teaching.naechste_runde_bestaetigen(lesson_id)
+    # Beide Wege stehen dabei: Text vom Blatt und Quelle aus dem Netz.
+    assert "Text vom Blatt" in str(fehler.value)
+    assert "Netz" in str(fehler.value)
 
     lesson = app_env.db.q1("SELECT * FROM lesson WHERE id=?", lesson_id)
     assert lesson["state"] == "wartet"          # nicht abgebrochen — Weg offen
