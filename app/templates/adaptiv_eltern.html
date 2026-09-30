@@ -32,6 +32,14 @@
      gescheitertes Thema sah genauso aus wie eins, das gleich fertig ist. #}
   <p class="sub">Zu jedem Thema einer Klassenarbeit braucht Karo geprüfte
      Aufgaben. Hier steht, wo das gerade steht.</p>
+  {% if budget.grenze %}
+  {# Ehrlich sagen, dass Karo zurückhält — „wird erstellt" wäre eine Lüge,
+     wenn heute nichts mehr passiert. #}
+  <p class="hint">Karo bestellt höchstens {{ budget.grenze }} neue Themen am Tag,
+     damit der Lehrplan-Dienst auch für andere Familien Luft behält.
+     {% if budget.rest %}Heute sind noch {{ budget.rest }} frei.
+     {% else %}Heute ist das Tagespensum voll — der Rest wird morgen vorbereitet.{% endif %}</p>
+  {% endif %}
   {% for arbeit in vorbereitung %}
   <h3>{{ arbeit.fach }} · {{ arbeit.datum }}</h3>
   <p>{{ arbeit.bereit }} von {{ arbeit.gesamt }} Themen sind fertig.{% if arbeit.sekunden %}
@@ -47,9 +55,11 @@
         <td>{{ t.thema }}</td>
         <td>{% if t.stand == 'bereit' %}fertig
             {%- elif t.stand == 'laeuft' %}wird erstellt
+            {%- elif t.stand == 'morgen' %}morgen vorbereitet
             {%- elif t.stand == 'gescheitert' %}nicht geklappt
             {%- else %}noch nicht begonnen{% endif %}</td>
-        <td>{% if t.stand == 'gescheitert' %}{{ t.grund|klartext }}
+        <td>{% if t.stand == 'morgen' %}Das Tagespensum ist voll. Karo bestellt es morgen früh.
+            {%- elif t.stand == 'gescheitert' %}{{ t.grund|klartext }}
             {%- elif t.platz %}Platz {{ t.platz }} von {{ t.warten }} in der Warteschlange{% if t.sekunden %},
               etwa {{ (t.sekunden / 60)|round|int }} Minuten{% endif %}
             {%- elif t.stand == 'laeuft' %}Der Lehrplan-Dienst hat noch keinen Platz genannt.

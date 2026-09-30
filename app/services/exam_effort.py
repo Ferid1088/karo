@@ -176,6 +176,12 @@ def thema_stand(thema: str, fach: str, klasse: int | None) -> dict:
         nutzlast = json.loads(auftrag["payload"] or "{}")
     except (ValueError, TypeError):
         nutzlast = {}
+    if nutzlast.get("budget_wartet"):
+        # Nicht der Dienst haengt, sondern Karo haelt zurueck: mehr als
+        # KARO_FAMILY_DAILY_TOPICS neue Themen am Tag bestellt es nicht.
+        # Das als „wird erstellt" anzuzeigen waere eine Luege — es passiert
+        # heute nichts mehr.
+        return {"thema": thema, "stand": "morgen"}
     stand = {"thema": thema, "stand": "laeuft"}
     for feld, name in (("curriculum_position", "platz"), ("curriculum_waiting", "warten"),
                        ("curriculum_seconds", "sekunden")):
@@ -196,13 +202,14 @@ def inhalte_stand(exam_id: int) -> dict:
     from .learning_hub import exam_topics
 
     zeilen = [thema_stand(t["label"], t["subject"], t.get("grade")) for t in exam_topics(exam_id)]
-    zaehlen = {"bereit": 0, "laeuft": 0, "fehlt": 0, "gescheitert": 0}
+    zaehlen = {"bereit": 0, "laeuft": 0, "fehlt": 0, "gescheitert": 0, "morgen": 0}
     for z in zeilen:
         zaehlen[z["stand"]] += 1
     # Die laengste Schaetzung zaehlt: fertig ist die Familie erst, wenn das
     # letzte Thema da ist.
     dauer = [z["sekunden"] for z in zeilen if type(z.get("sekunden")) is int]
-    return {**zaehlen, "offen": zaehlen["laeuft"] + zaehlen["fehlt"] + zaehlen["gescheitert"],
+    return {**zaehlen, "offen": (zaehlen["laeuft"] + zaehlen["fehlt"]
+                                + zaehlen["gescheitert"] + zaehlen["morgen"]),
             "gesamt": len(zeilen), "themen": zeilen,
             "sekunden": max(dauer) if dauer else None}
 
@@ -295,3 +302,10 @@ def vorbereitung_uebersicht() -> list[dict]:
         uebersicht.append({"exam_id": a["id"], "fach": faecher.name(a["subject"]),
                            "datum": a["exam_date"], **stand})
     return uebersicht
+
+
+def budget_stand() -> dict:
+    """Wie viele neue Themen heute noch gehen — fuer die Elternansicht."""
+    from . import topic_budget
+    return {"grenze": topic_budget.grenze(), "verbraucht": topic_budget.verbraucht(),
+            "rest": topic_budget.rest()}

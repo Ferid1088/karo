@@ -195,6 +195,16 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
     if payload.get("curriculum_export"):
         result = request(cfg, "GET", f"/v1/lessons/{int(payload['curriculum_export'])}")
     else:
+        # Wie viele neue Themen diese Familie heute bestellt. Der Dienst
+        # bekommt keine Familienkennung und koennte das gar nicht wissen —
+        # die Grenze gehoert deshalb hierher. Siehe services/topic_budget.py.
+        from ..services import topic_budget
+        schluessel = f"{fach}:{grade}:{safe_topic}"
+        if not topic_budget.buchen(schluessel):
+            payload["budget_wartet"] = True
+            raise jobs.Deferred(payload, 300)
+        payload["budget_schluessel"] = schluessel
+        payload.pop("budget_wartet", None)
         anfrage = {
             # Nur der Schlüssel des aktiven Fachs: der Dienst sucht in genau
             # diesem Curriculum. Mehr verlässt die App nicht.
@@ -207,6 +217,11 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
             anfrage["needed_by"] = payload["gebraucht_am"]
         result = request(cfg, "POST", "/v1/lessons", anfrage)
     status = result.get("status")
+    if status == "ready" and payload.get("budget_schluessel"):
+        # Der Dienst hatte es schon fertig. Das kostet ihn nichts, also
+        # zaehlt es auch nicht gegen die Familie.
+        from ..services import topic_budget
+        topic_budget.freigeben(payload.pop("budget_schluessel"))
     if status == "unavailable":
         # "Nicht verfuegbar" heisst meistens "gerade nicht": der Dienst
         # drosselt, wenn viele Themen auf einmal kommen. Das als endgueltig

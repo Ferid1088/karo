@@ -345,4 +345,5 @@ def eltern_lernfortschritt(request: Request):
     return render(request, "adaptiv_eltern.html", eintraege=entries,
                   nachher=[e for e in entries if e.get("braucht_mensch")],
                   vorbereitung=exam_effort.vorbereitung_uebersicht(),
+                  budget=exam_effort.budget_stand(),
                   stand_labels=STAND_LABELS)
