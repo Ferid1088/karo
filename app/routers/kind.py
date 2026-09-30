@@ -185,3 +185,21 @@ def material_variante_notebooklm_quelle(variant_id: int):
     if alter_generator_aus():
         return zurueck("/lernen")
     return workflow.render_material_variante_notebooklm_quelle(variant_id)
+
+
+
+# --- Lernzeit -------------------------------------------------------------
+@router.post("/lernen/zeit")
+def lernzeit_schlag(request: Request, pfad: str = Form("")):
+    """Ein Herzschlag einer offenen Lernseite. Antwortet knapp und billig.
+
+    Das Thema kommt nicht aus dem Formular, sondern aus dem Pfad der Seite,
+    die schlaegt: was das Kind gerade sieht, entscheidet die Zuordnung — ein
+    gesendetes Thema waere eine Behauptung, die niemand nachprueft.
+    """
+    from ..services import learning_time
+    if len(pfad) > 200 or not pfad.startswith("/"):
+        return {"sekunden": learning_time.schlag(None)}
+    thema = learning_time.thema_fuer_pfad(
+        pfad, request.session.get("learning_session:/lernen/adaptiv"))
+    return {"sekunden": learning_time.schlag(thema)}

@@ -40,9 +40,14 @@ def create_exam(exam_date: str, scan_id: str = '', manual_topics: str = '', subj
     if scan_id.isdigit() and db.q1("SELECT 1 FROM learning_upload WHERE scan_id=?", int(scan_id)):
         raise ExamError("Dieses Blatt gehört zu deinen Lernthemen. Lade das Prüfungsblatt hier separat hoch.")
     if scan_id and (scan is None or scan["state"] != "gelesen"):
+        # Den festgehaltenen Grund nennen statt zu raten: beim Kontingentende
+        # hilft kein neues Blatt, sondern nur Warten.
+        if scan is not None and scan["state"] == "fehler" and scan["fehler"]:
+            from ..routers.shared import klartext
+            raise ExamError(f"Das Themenblatt wurde nicht eingelesen. {klartext(scan['fehler'])}")
         raise ExamError(
-            "Das Themenblatt wird noch gelesen oder konnte nicht gelesen werden. "
-            "Bitte warten oder ein neues Blatt hochladen.")
+            "Das Themenblatt wird noch gelesen. Bitte einen Moment warten "
+            "oder die Themen selbst eintragen.")
     try:
         scan_themen = (manual_topics.replace(',', '\n').splitlines() if manual_topics.strip()
                       else json.loads(scan["themen"] or "[]"))

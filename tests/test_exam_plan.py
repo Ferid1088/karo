@@ -102,7 +102,10 @@ def test_klassenarbeit_uebernimmt_scan_und_plant_erst_nach_kalendereingabe(
     assert {t['label'] for t in owned} == {'Brüche addieren', 'Brüche kürzen'}
     assert topic_id not in {t['id'] for t in owned}
     assert not exam_calendar.get_days(exam['id'])
-    assert 'Lernzeiten festlegen' in r.text
+    # Vor dem Kalender steht die Einstufung: ohne sie waere jede
+    # Minutenangabe geraten. Der Kalender selbst ist trotzdem schon da.
+    assert 'Einstufung' in r.text
+    assert 'Lernzeit festlegen' in r.text
     response = client.post(f"/klassenarbeit/{exam['id']}/kalender", data={
         '_csrf': csrf_from(r.text), 'minutes_2026-09-29': '20',
         'minutes_2026-09-30': '15'})

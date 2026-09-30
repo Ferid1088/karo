@@ -1,0 +1,76 @@
+{% extends "learning_base.html" %}
+{% block title %}Einstufung – {{ e.subject|fachname }} – {{ companion_name }}{% endblock %}
+{% block mainclass %}exam-detail-page{% endblock %}
+{% block content %}
+{# Die Einstufung steht vor der Planung: ohne sie wäre jede Minutenangabe
+   geraten. Ein Thema nach dem anderen — bei achtzehn Themen wären es sonst
+   sechsunddreißig Aufgaben in einem Rutsch. #}
+<a class="back-link" href="/klassenarbeit/{{ e.id }}">← Zur Klassenarbeit</a>
+
+<section class="card exam-next-step">
+  <p class="exam-section-kicker">SCHRITT 1 VON 3 · PRÜFEN</p>
+  <h2>Was kannst du schon?</h2>
+  <p>Zu jedem Prüfungsthema zwei Aufgaben. Karo braucht das, um zu wissen, wie
+  lange du wofür brauchst. Falsche Antworten sind hier völlig in Ordnung —
+  sie sagen Karo genau, wo es mit dir anfangen soll.</p>
+  <p class="einstufung-fortschritt"><b>{{ stand.fertig }} von {{ stand.moeglich or stand.gesamt }}</b> Themen eingestuft
+    <span class="einstufung-balken" aria-hidden="true"><i style="width:{{ (100 * stand.fertig / stand.moeglich)|round|int if stand.moeglich else 0 }}%"></i></span></p>
+</section>
+
+{% if thema and offen %}
+<section class="card einstufung-thema">
+  <p class="exam-section-kicker">{{ thema.subject|fachname }}</p>
+  <h2>{{ thema.label }}</h2>
+  <form method="post" action="/klassenarbeit/{{ e.id }}/einstufung/{{ thema.id }}">{{ csrf_input() }}
+    {% for frage in offen.questions %}{% set nr = loop.index0 %}
+    <div class="einstufung-frage">
+      <p class="einstufung-nummer">Aufgabe {{ loop.index }} von {{ offen.questions|length }}</p>
+      <p class="einstufung-text">{{ frage.frage }}</p>
+      {% if frage.optionen %}
+      <div class="einstufung-optionen">
+        {% for option in frage.optionen %}
+        <label><input type="radio" name="antwort_{{ nr }}" value="{{ option }}"><span>{{ option }}</span></label>
+        {% endfor %}
+      </div>
+      {% else %}
+      <label class="sr" for="antwort-{{ nr }}">Deine Antwort</label>
+      <input id="antwort-{{ nr }}" type="text" name="antwort_{{ nr }}" autocomplete="off" inputmode="text">
+      {% endif %}
+    </div>
+    {% endfor %}
+    <button type="submit">Weiter →</button>
+  </form>
+  <p class="hint">Du kannst jederzeit aufhören. Was du eingestuft hast, bleibt gespeichert.</p>
+</section>
+{% elif stand.ohne_aufgaben and not stand.fertig %}
+<section class="card">
+  {# Warten hilft nur, solange auch etwas laeuft. Gescheiterte Auftraege als
+     "wird gerade erstellt" auszugeben, schickt eine Familie ins Leere. #}
+  {% if inhalte.laeuft %}
+  <h2>Karo bereitet die Einstufung vor</h2>
+  <p>Für {{ stand.ohne_aufgaben }} deiner Themen sucht Karo gerade passende Aufgaben
+  ({{ inhalte.laeuft }} {{ 'läuft' if inhalte.laeuft == 1 else 'laufen' }}). Das dauert einen Moment und läuft weiter,
+  auch wenn du die Seite verlässt.</p>
+  <a class="btn" href="/klassenarbeit/{{ e.id }}/einstufung">Nachsehen, ob es schon geht</a>
+  {% elif inhalte.gescheitert %}
+  <h2>Karo kommt hier nicht weiter</h2>
+  <p>Für {{ inhalte.gescheitert }} {{ 'Thema' if inhalte.gescheitert == 1 else 'Themen' }} hat der Lehrplan-Dienst
+  nichts Geprüftes geliefert. Warten hilft dabei nicht — das braucht einen Erwachsenen.</p>
+  <p class="hint">Unter „Für Eltern → Betrieb und Protokoll“ steht bei jedem Versuch, woran es lag.</p>
+  <a class="btn" href="/klassenarbeit/{{ e.id }}/einstufung">Noch einmal versuchen</a>
+  {% else %}
+  <h2>Karo fängt gerade an</h2>
+  <p>Für {{ stand.ohne_aufgaben }} deiner Themen werden jetzt Aufgaben gesucht.
+  Schau in einem Moment noch einmal her.</p>
+  <a class="btn" href="/klassenarbeit/{{ e.id }}/einstufung">Nachsehen</a>
+  {% endif %}
+</section>
+{% else %}
+<section class="card ist-fertig">
+  <h2>Einstufung geschafft!</h2>
+  <p>Karo weiß jetzt, was du schon kannst{% if stand.ohne_aufgaben %} — für {{ stand.ohne_aufgaben }} Themen fehlen noch geprüfte Aufgaben, die schätzt Karo vorsichtshalber voll{% endif %}.
+  Damit steht deine Lernzeit.</p>
+  <a class="btn" href="/klassenarbeit/{{ e.id }}#exam-next-step">Weiter zur Lernzeit →</a>
+</section>
+{% endif %}
+{% endblock %}

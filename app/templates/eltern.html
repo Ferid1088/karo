@@ -44,7 +44,7 @@
   <summary><span>Wochenvereinbarung &amp; Meine Welt<small>Gemeinsame Absprachen, Rückmeldungen und Begleiter</small></span></summary>
   <div class="parent-family-grid">
     {% include "woche/pilot_card.html" %}
-    <section class="card"><h2>Meine Welt</h2>{% if begleiter %}<p>Der Begleiter Ihres Kindes heißt aktuell „{{ begleiter.name }}“.</p>{% else %}<p>Ihr Kind hat noch keinen eigenen Begleiter eingerichtet.</p>{% endif %}{% if begleiter_interesse %}<p>Interessiert sich gerade für: {{ begleiter_interesse.text }}</p>{% endif %}<a class="btn ghost" href="/welten">Meine Welt ansehen</a></section>
+    <section class="card"><h2>Meine Welt</h2>{% if begleiter %}<p>Der Begleiter Ihres Kindes heißt aktuell „{{ begleiter.name }}“.</p>{% else %}<p>Ihr Kind hat noch keinen eigenen Begleiter eingerichtet.</p>{% endif %}{% if begleiter_interesse %}<p>Interessiert sich gerade für: {{ begleiter_interesse.text }}</p>{% endif %}<a class="btn ghost" href="/welten/eltern">Meine Welt verwalten</a></section>
   </div>
 </details>
 <details class="card disclosure parent-details" id="betrieb">

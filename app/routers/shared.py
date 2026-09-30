@@ -42,14 +42,51 @@ BASE = Path(__file__).parent.parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 # Datumsangaben erscheinen in den Vorlagen deutsch: {{ wert|datum }}
 templates.env.filters["datum"] = plaene.date_label
+#: Technische Abbruchgruende in Saetze uebersetzen, die jemand lesen kann.
+#: Der Originaltext bleibt daneben stehen — wer ihn braucht, findet ihn.
+_KLARTEXT = (
+    ("session limit", "Das Claude-Kontingent ist gerade aufgebraucht. Es wird zur "
+                      "genannten Uhrzeit zurückgesetzt — danach genügt ein neuer Versuch."),
+    ("usage limit", "Das Claude-Kontingent ist gerade aufgebraucht. Versuchen Sie es "
+                    "später noch einmal."),
+    ("rate limit", "Zu viele Anfragen kurz hintereinander. Einen Moment warten, dann "
+                   "erneut versuchen."),
+    ("zu lange gedauert", "Der Aufruf hat zu lange gedauert. Ein erneuter Versuch hilft meist."),
+    ("fehlt", "Die hochgeladene Datei ist nicht mehr da. Bitte laden Sie sie erneut hoch."),
+    ("nicht angemeldet", "Karo ist gerade nicht bei Claude angemeldet. Bitte unter "
+                         "Einstellungen neu verbinden."),
+    ("authentication", "Die Anmeldung bei Claude wurde abgelehnt. Bitte unter "
+                       "Einstellungen neu verbinden."),
+)
+
+
+def klartext(fehler: str | None) -> str:
+    """Was ein technischer Abbruch fuer die Familie bedeutet.
+
+    Ohne das steht in der Oberflaeche eine Vermutung statt des Grundes — beim
+    Themenblatt stand jahrelang "Lade ein deutlicheres Foto hoch", auch wenn
+    in Wahrheit das Kontingent aufgebraucht war.
+    """
+    text = (fehler or "").strip()
+    if not text:
+        return "Der Grund wurde nicht festgehalten. Ein erneuter Versuch hilft oft."
+    klein = text.lower()
+    for merkmal, satz in _KLARTEXT:
+        if merkmal in klein:
+            return satz
+    return text
+
+
 # Fächer werden als Schlüssel gespeichert und als Name gezeigt.
 from .. import faecher as _faecher  # noqa: E402
+from ..services import learning_time  # noqa: E402
 templates.env.filters["fachname"] = _faecher.name
+templates.env.filters["klartext"] = klartext
 
 try:
     ASSET_VERSION = str(max(
         (BASE / "static" / name).stat().st_mtime_ns
-        for name in ("karo.css", "simple.css", "simple.js", "drafts.js", "setup.js", "storage.js", "areas.css", "themes.js", "begleiter.js", "meine-welt.css", "meine-welt.js")
+        for name in ("karo.css", "simple.css", "simple.js", "drafts.js", "setup.js", "storage.js", "areas.css", "themes.js", "begleiter.js", "meine-welt.css", "meine-welt.js", "lernzeit.js", "fonts.css")
     ))
 except OSError:
     ASSET_VERSION = "0"
@@ -91,6 +128,11 @@ def render(request: Request, name: str, status_code: int = 200,
         "offene_funde": research.anzahl_vorschlaege(),
         "learner_photo_url": profile.photo_url(),
         "learning_ui": request.url.path == "/" or request.url.path.startswith(("/lernen", "/lernzyklus", "/quiz")),
+        # Lernzeit misst nur, wo wirklich gelernt wird: "Heute" ist eine
+        # Uebersicht, kein Lernschritt, und der Elternbereich zaehlt nie mit.
+        "lernzeit_messen": (request.session.get("role") == "child"
+                            and request.url.path.startswith(("/lernen", "/lernzyklus", "/quiz"))),
+        "lernzeit_takt": learning_time.TAKT,
         "faecher": [(key, _faecher.NAMEN[key]) for key in _faecher.FAECHER],
         "aktives_fach": aktives_fach(request),
     }
@@ -104,6 +146,10 @@ def render(request: Request, name: str, status_code: int = 200,
             and quiz.get("state") in ("beantwortet", "ausgewertet")):
         basis["adult_page"] = True
     basis["ui_area"] = "parent" if basis["adult_page"] else "child"
+    # Eltern sehen den Kinderbereich, aendern ihn aber nicht (Gate in main.py).
+    # Die Oberflaeche sagt das vorher, statt den Knopf ins Leere laufen zu
+    # lassen — und zeigt den Weg: den Kind-Modus.
+    basis["nur_ansehen"] = (basis["role"] == "parent" and not basis["adult_page"])
     # Kleiner Briefumschlag im Kinderbereich: wie viel Post von zu Hause ungelesen ist.
     basis["post_neu_anzahl"] = 0
     if not basis["adult_page"]:
@@ -162,3 +208,15 @@ def flash(request: Request, text: str, art: str = "ok") -> None:
 def zurueck(ziel: str) -> RedirectResponse:
     """Redirect mit HTTP 303 See Other."""
     return RedirectResponse(ziel, status_code=HTTP_303_SEE_OTHER)
+
+
+def erfolge_ziel(ziel: str, tab: str = "") -> str:
+    """Die Erfolge-Seite gibt es zweimal: /lernstand im Kinderbereich und
+    /messung/fortschritt im Elternbereich. Eine Aktion darauf muss in dem
+    Bereich zurueckkommen, aus dem sie kam — sonst wechselt ein Klick auf
+    "löschen" oder "Zurück zum Lernen" mitten in der Bedienung den halben
+    Bildschirm. Das Ergebnis ist immer einer der beiden festen Pfade, nie
+    der uebergebene Wert: ein Formularfeld darf kein Umleitungsziel sein.
+    """
+    basis = "/messung/fortschritt" if ziel.startswith("/messung") else "/lernstand"
+    return f"{basis}?tab={tab}" if tab else basis

@@ -16,6 +16,8 @@ from base64 import b64encode
 from pathlib import Path
 
 import itsdangerous
+from contextlib import contextmanager
+
 import pytest
 
 from .conftest import csrf_from, make_jpeg, run_jobs
@@ -212,16 +214,42 @@ def themen_freigeben(client, app_env):
     return [t["id"] for t in vorschlaege]
 
 
+@contextmanager
+def als_kind(client, app_env):
+    """Fuehrt die eingeschlossenen Schritte in einer Kind-Sitzung aus.
+
+    Eltern duerfen im Kinderbereich nichts mehr aendern (Gate in main.py).
+    Wer den Lernweg des Kindes nachspielt, muss also die Rolle wechseln —
+    genau wie eine Familie es mit dem Kind-Modus tut. Danach steht wieder
+    die Sitzung von vorher, damit anschliessende Elternschritte gehen.
+    """
+    # Ueber den Cookie-Jar, nicht ueber dict(): nach einer Antwort des Servers
+    # liegen zwei "karo_session" nebeneinander (einer gesetzt, einer
+    # zurueckgeschickt), und dict() bricht darueber ab.
+    vorher = list(client.cookies.jar)
+    client.cookies.clear()
+    client.cookies.set("karo_session", session_cookie_faelschen(
+        app_env, auth=True, role="child", csrf="test-token"))
+    try:
+        yield
+    finally:
+        client.cookies.clear()
+        for keks in vorher:
+            client.cookies.jar.set_cookie(keks)
+
+
 def quiz_beantworten(client, app_env, quiz_id, antworten):
     seite = client.get(f"/quiz/{quiz_id}")
     fragen = app_env.db.q(
         "SELECT id, position FROM question WHERE quiz_id=? ORDER BY position",
         quiz_id)
-    daten = {"_csrf": csrf_from(seite.text)}
-    for f in fragen:
-        daten[f"antwort_{f['id']}"] = antworten.get(f["position"], "")
-    return client.post(f"/quiz/{quiz_id}/antworten", data=daten,
-                       follow_redirects=True)
+    with als_kind(client, app_env):
+        seite = client.get(f"/quiz/{quiz_id}")
+        daten = {"_csrf": csrf_from(seite.text)}
+        for f in fragen:
+            daten[f"antwort_{f['id']}"] = antworten.get(f["position"], "")
+        return client.post(f"/quiz/{quiz_id}/antworten", data=daten,
+                           follow_redirects=True)
 
 
 def quiz_freigeben(client, app_env, quiz_id):
@@ -254,9 +282,10 @@ def lernen_starten(client, app_env, topic_id, ausgabe="html"):
     lesson = app_env.db.q1(
         "SELECT * FROM lesson WHERE topic_id=? ORDER BY id DESC LIMIT 1",
         topic_id)
-    seite = client.get(f"/lernen/{lesson['id']}")
-    client.post(f"/lernen/{lesson['id']}/runde/weiter",
-                data={"_csrf": csrf_from(seite.text)})
+    with als_kind(client, app_env):
+        seite = client.get(f"/lernen/{lesson['id']}")
+        client.post(f"/lernen/{lesson['id']}/runde/weiter",
+                    data={"_csrf": csrf_from(seite.text)})
     return lesson["id"]
 
 
@@ -1045,11 +1074,13 @@ def test_freigegeben_bleibt_stabil_bei_erneutem_antwort_post_ueber_http(
     quiz_freigeben(client, app_env, quiz["id"])
     frage = app_env.db.q1("SELECT id FROM question WHERE quiz_id=? LIMIT 1", quiz["id"])
 
-    seite = client.get(f"/quiz/{quiz['id']}")
-    r = client.post(f"/quiz/{quiz['id']}/antworten",
-                    data={"_csrf": csrf_from(seite.text),
-                          f"antwort_{frage['id']}": "geaendert"},
-                    follow_redirects=True)
+    # Antworten gibt das Kind — Eltern duerfen das nicht mehr (main.py).
+    with als_kind(client, app_env):
+        seite = client.get(f"/quiz/{quiz['id']}")
+        r = client.post(f"/quiz/{quiz['id']}/antworten",
+                        data={"_csrf": csrf_from(seite.text),
+                              f"antwort_{frage['id']}": "geaendert"},
+                        follow_redirects=True)
     assert r.status_code == 200
     nach = app_env.db.q1("SELECT state FROM quiz WHERE id=?", quiz["id"])
     assert nach["state"] == "freigegeben"

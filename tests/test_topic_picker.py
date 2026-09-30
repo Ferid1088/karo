@@ -57,7 +57,9 @@ def test_search_keyboard_mobile_and_submit(client, fake_llm, fake_cli, app_env, 
             url = urlsplit(request.url)
             if url.hostname != 'karo.test':
                 return route.abort()
-            if request.method == 'POST':
+            # Der Lernzeit-Herzschlag laeuft auf jeder Lernseite und ist keine
+            # Formularabsendung — dieser Test schaut nur auf Absendungen.
+            if request.method == 'POST' and url.path != '/lernen/zeit':
                 posted.append(request.post_data)
             response = client.request(request.method, url.path + ('?' + url.query if url.query else ''),
                 content=request.post_data_buffer,

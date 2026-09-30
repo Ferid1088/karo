@@ -18,7 +18,7 @@ import datetime as dt
 import json
 from pathlib import Path
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from .. import config, db, export, ingest, jobs, faecher
@@ -55,6 +55,26 @@ async def handle_export(request: Request, zurueck_ziel: str = "/lernstand"):
     else:
         flash(request, "Der Tabellenexport ist nicht verfügbar.", "warn")
     return zurueck(zurueck_ziel)
+
+
+def render_einstufung(request, exam_id: int, naechstes, offen):
+    """Die Einstufungsseite: ein Thema, seine Aufgaben, der Fortschritt."""
+    from . import exam_placement
+    row = db.q1("SELECT * FROM exam WHERE id=? AND deleted_at IS NULL"
+                " AND purged_at IS NULL", exam_id)
+    if not row:
+        raise HTTPException(404, "Diese Klassenarbeit gibt es nicht.")
+    return render(request, "klassenarbeit_einstufung.html", e=dict(row),
+                  stand=exam_placement.stand(exam_id),
+                  inhalte=exam_effort_stand(exam_id),
+                  thema=(naechstes or {}).get("topic"), offen=offen,
+                  adult_page=not config.load().klassenarbeit_kind,
+                  learning_ui=True, show_nav=False)
+
+
+def exam_effort_stand(exam_id: int) -> dict:
+    from . import exam_effort
+    return exam_effort.inhalte_stand(exam_id)
 
 
 def _kalibrierung(exam_id: int) -> dict:
@@ -99,6 +119,12 @@ def _exam_ansicht(e: dict) -> dict:
         e["themen_liste"] = []
     e["kalibrierung"] = _kalibrierung(e["id"])
     e["plan"] = exam_plan.holen_plan(e["id"])
+    # Was die Arbeit an Zeit braucht und ob die gewaehlte Zeit dafuer reicht.
+    from . import exam_effort
+    e["aufwand"] = exam_effort.lage(e["id"])
+    e["inhalte"] = exam_effort.inhalte_stand(e["id"])
+    from . import exam_placement
+    e["einstufung"] = exam_placement.stand(e["id"])
     e["schedule"] = exam_calendar.get(e["id"])
     e["simulation_early"] = exam_calendar.simulation_early(e["id"])
     e["calendar"] = exam_calendar.calendar(e["id"])

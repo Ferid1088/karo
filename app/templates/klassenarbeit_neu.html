@@ -37,6 +37,10 @@ Textaufgaben">{{ draft.get('themen', scan.themen_liste|join('\n') if scan and sc
   <p class="msg">{{ companion_name }} liest das Blatt gerade ein … die Seite geht von selbst weiter.</p>
   <script>karoAutoRefresh("/klassenarbeit/themenblatt/status?scan_id={{ scan.id }}", "{{ scan.state }}");</script>
   {% endif %}
-  {% if scan and scan.state == 'fehler' %}<p class="msg warn">Das Blatt konnte nicht gelesen werden. Lade ein deutlicheres Foto hoch oder trage die Themen oben selbst ein.</p>{% endif %}
+  {# "fehler" heisst technischer Abbruch, nie schlechte Bildqualitaet: ein
+   unleserliches Blatt endet als "gelesen" mit leerer Themenliste. Die alte
+   Meldung schob es auf das Foto und verschwieg den festgehaltenen Grund. #}
+{% if scan and scan.state == 'fehler' %}<div class="msg warn"><b>Karo konnte das Blatt nicht einlesen.</b> {{ scan.fehler|klartext }}<br><small class="klein">Festgehalten: {{ scan.fehler }}</small></div>{% endif %}
+{% if scan and scan.state == 'gelesen' and not scan.themen_liste %}<p class="msg warn">Auf dem Blatt wurde kein Thema erkannt. Ein deutlicheres Foto hilft — oder trage die Themen oben selbst ein.</p>{% endif %}
 </section>
 {% endblock %}

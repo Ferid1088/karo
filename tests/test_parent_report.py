@@ -224,8 +224,11 @@ def test_browser_drilldown_history_responsive_and_failure(client,fake_llm,fake_c
             page.goto('http://karo.test/eltern?ansicht=monat&datum=2026-09-22')
             root=page.locator('#parent-report')
             assert root.get_attribute('data-mode')=='monat'
-            assert page.locator('.pr-overview .pr-tile').count()==5
-            assert '8 von 10' in page.locator('.pr-overview .pr-tile').nth(2).inner_text()
+            # Ampel, Lerntage, Lernzeit, Richtig, Neu sicher, Ziele.
+            assert page.locator('.pr-overview .pr-tile').count()==6
+            zeit = page.locator('.pr-overview .pr-tile').nth(2).inner_text()
+            assert 'LERNZEIT' in zeit.upper() and 'Min.' in zeit
+            assert '8 von 10' in page.locator('.pr-overview .pr-tile').nth(3).inner_text()
             for theme in ['karo','sand','nacht']:
                 page.locator('html').evaluate('(e,v)=>e.dataset.themeColor=v',theme)
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
@@ -245,14 +248,21 @@ def test_browser_drilldown_history_responsive_and_failure(client,fake_llm,fake_c
             subject.locator('[data-close]').click()
             subject.wait_for(state='hidden')
             page.get_by_role('link',name='Zahlen ansehen').click()
-            assert page.locator('#pr-d-table .pr-timeline tbody tr').count()==4
+            # Gearbeitet, Richtig/Antworten, Lernchecks, Zielminuten, Prüfungsminuten.
+            assert page.locator('#pr-d-table .pr-timeline tbody tr').count()==5
             page.keyboard.press('Escape')
+            # Erst warten, bis der Dialog wirklich zu ist. Beim Schliessen holt
+            # die Oberflaeche den Fokus zu ihrem Oeffner zurueck (parent-report.js,
+            # 'close'-Handler). Wer vorher fokussiert, verliert das Rennen: der
+            # Fokus springt auf "Zahlen ansehen", Enter oeffnet den Dialog erneut
+            # statt den Tag zu oeffnen, und dataset.mode bleibt 'monat'.
+            page.locator('#pr-d-table').wait_for(state='hidden')
             day=page.locator('.pr-cell[data-day="2026-09-22"]')
             day.focus();day.press('Enter')
             page.wait_for_function("document.querySelector('#parent-report').dataset.mode==='tag'")
             assert page.get_by_role('heading',name='Was an diesem Tag passiert ist').is_visible()
             assert '12 Min. gemeldet' in root.inner_text()
-            assert page.locator('.pr-overview .pr-tile').nth(4).locator('.pr-ring-c b').inner_text()=='20'
+            assert page.locator('.pr-overview .pr-tile').nth(5).locator('.pr-ring-c b').inner_text()=='20'
             assert len([r for r in requests if r==('GET','/eltern/bericht')])>0
             page.go_back()
             page.wait_for_function("document.querySelector('#parent-report').dataset.mode==='monat'")
@@ -275,7 +285,7 @@ def test_browser_drilldown_history_responsive_and_failure(client,fake_llm,fake_c
             page.wait_for_function("document.querySelector('#parent-report').dataset.date==='2026-09-29'")
         assert not errors
         assert all(method=='GET' for method,_ in requests)
-        plain=browser.new_context(java_script_enabled=False)
+        plain=browser.new_context(java_script_enabled=False, reduced_motion='reduce')
         ppage=plain.new_page();ppage.route('**/*',serve)
         ppage.goto('http://karo.test/eltern?datum=2026-09-22')
         ppage.locator('.pr-status').click()  # without JS the dialog opens via #anchor

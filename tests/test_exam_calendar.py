@@ -217,9 +217,23 @@ def test_exam_plan_stays_on_topic_until_adaptive_mastery(app_env, monkeypatch):
         "2026-09-30": 20,
     })
 
+    def reihenfolge(kalender):
+        """Themen in der Reihenfolge, in der die Lerntage sie tragen."""
+        gesehen = []
+        for item in kalender:
+            if not item["is_learning_day"] or item["is_simulation"]:
+                continue
+            for z in item["themen"]:
+                if z["topic_id"] not in gesehen:
+                    gesehen.append(z["topic_id"])
+        return gesehen
+
+    # Karo verteilt die Themen der Reihe nach auf die gewaehlten Lerntage —
+    # die angekuendigte Reihenfolge traegt die Voraussetzungen.
     before = exam_calendar.calendar(exam_id)
     normal = [item for item in before if item["is_learning_day"] and not item["is_simulation"]]
-    assert normal and all(item["topic_id"] == first_id for item in normal)
+    assert normal and normal[0]["topic_id"] == first_id
+    assert reihenfolge(before) == [first_id, second_id]
 
     input_id = adaptiv_store.eingabe_anlegen(
         "manuell", fach="Mathematik", thema_text="Brüche addieren",
@@ -228,9 +242,11 @@ def test_exam_plan_stays_on_topic_until_adaptive_mastery(app_env, monkeypatch):
         "INPUT_RECEIVED", eingabe_id=input_id)
     adaptiv_store.sitzung_aktualisieren(session_id, zustand="MASTERED")
 
+    # Ein sicheres Thema faellt aus der Planung heraus, das naechste rueckt vor.
     after = exam_calendar.calendar(exam_id)
     normal = [item for item in after if item["is_learning_day"] and not item["is_simulation"]]
-    assert normal and all(item["topic_id"] == second_id for item in normal)
+    assert normal and normal[0]["topic_id"] == second_id
+    assert reihenfolge(after) == [second_id]
 
 
 def test_empty_calendar_days_are_valid_and_mean_no_study(app_env, monkeypatch):

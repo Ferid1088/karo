@@ -22,8 +22,29 @@
     <h2>Diese Prüfung liegt hinter dir.</h2><p>Dein Lernweg bleibt hier gespeichert.</p>
   {% elif e.days_left == 0 %}
     <h2>Heute ist deine Prüfung. Viel Erfolg!</h2><p>Atme ruhig durch – du hast dich vorbereitet.</p>
+  {% elif e.einstufung.offen %}
+    {# Erst prüfen, dann schätzen: eine Minutenangabe ohne Einstufung wäre
+       geraten. Deshalb steht dieser Schritt vor dem Kalender. #}
+    <h2>Zuerst: was kannst du schon?</h2>
+    <p>Deine {{ e.topics|length }} Prüfungsthemen stehen. Karo fragt dich jetzt zu jedem
+    Thema zwei Aufgaben — daraus weiß es, wie lange du wofür brauchst.
+    {% if e.einstufung.fertig %}Du hast schon {{ e.einstufung.fertig }} von {{ e.einstufung.moeglich }} geschafft.{% endif %}</p>
+    <a class="btn" href="/klassenarbeit/{{ e.id }}/einstufung">{{ 'Einstufung fortsetzen' if e.einstufung.fertig else 'Einstufung starten' }} →</a>
+  {% elif e.einstufung.ohne_aufgaben and not e.einstufung.fertig %}
+    <h2>Karo bereitet deine Einstufung vor</h2>
+    <p>Für deine {{ e.topics|length }} Themen erstellt Karo gerade geprüfte Aufgaben{% if e.inhalte.laeuft %} ({{ e.inhalte.laeuft }} laufen){% endif %}.
+    Sobald sie da sind, fragt Karo dich ab und weiß dann, wie lange du wofür brauchst.</p>
+    <a class="btn" href="/klassenarbeit/{{ e.id }}/einstufung">Nachsehen →</a>
   {% elif not e.schedule or not e.schedule.active_days %}
-    <h2>Wann möchtest du lernen?</h2><p>Deine {{ e.topics|length }} Prüfungsthemen sind gespeichert. Wähle unten Lerntage und Minuten.</p>
+    <h2>Wann möchtest du lernen?</h2>
+    {# Karo darf nur behaupten, was es belegen kann: "weiss" heisst nicht
+       "kann es nicht", sondern "noch nie zusammen geübt". #}
+    <p>{% if e.aufwand.eingestuft %}Karo hat dich zu <b>{{ e.aufwand.eingestuft }}</b> deiner {{ e.topics|length }} Themen abgefragt und weiß jetzt, wo du stehst.{% if e.aufwand.ohne_beleg %} Für {{ e.aufwand.ohne_beleg }} Themen fehlen noch Aufgaben — die schätzt Karo vorsichtshalber voll.{% endif %}
+    {%- elif e.aufwand.belegt %}Von deinen {{ e.topics|length }} Prüfungsthemen kennt Karo <b>{{ e.aufwand.belegt }}</b> aus deinem Lernbereich.{% if e.aufwand.ohne_beleg %} Die anderen {{ e.aufwand.ohne_beleg }} habt ihr noch nie zusammen geübt — dafür rechnet Karo sicherheitshalber mit der vollen Zeit.{% endif %}
+    {%- else %}Karo hat deine {{ e.topics|length }} Prüfungsthemen noch nie mit dir geübt und weiß deshalb noch nicht, was du davon schon kannst. Es rechnet sicherheitshalber mit der vollen Zeit.{% endif %}
+    So kommt es auf <b>mindestens {{ e.aufwand.min }} bis {{ e.aufwand.max }} konzentrierte Minuten</b>. Du bestimmst, wann du sie dir nimmst.</p>
+    {% if e.inhalte.laeuft %}<p class="hint">Karo bereitet gerade Aufgaben und Erklärungen für {{ e.inhalte.laeuft }} deiner Themen vor. Das läuft im Hintergrund weiter, auch wenn du die Seite verlässt.</p>
+    {% else %}<p class="hint">Sobald du ein Thema öffnest, schaut Karo mit ein paar Aufgaben nach, was schon sitzt — danach wird die Schätzung genauer.</p>{% endif %}
     <a class="btn" href="#exam-calendar-title">Lernzeiten festlegen →</a>
   {% elif e.simulation_available %}
     <h2>Zeit für deine Generalprobe</h2><p>Übe die Prüfungsthemen ohne Tipps. Danach siehst du, was schon klappt.</p>
@@ -44,7 +65,7 @@
 <section class="card exam-detail-section" aria-labelledby="exam-topics-title">
   <header class="exam-detail-section-head"><div><p class="exam-section-kicker">DEIN LERNWEG</p><h2 id="exam-topics-title">Themen, die du können sollst</h2></div><span class="exam-count">{{ e.topics|length }}</span></header>
   <div class="exam-topic-list">{% for t in e.topics %}
-    <article class="exam-topic-row"><span class="topic-dot {{ t.learning_status }}"></span><div class="exam-topic-copy"><strong>{{ t.label }}</strong><small>{{ t.subject|fachname }}{% if t.content_level %} · {{ t.content_level }}{% endif %}</small></div><span class="learn-status {{ t.learning_status }}">{{ t.status_label }}</span><form method="post" action="/klassenarbeit/{{ e.id }}/lernen/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ t.id }}"><button class="quiet" type="submit">{{ 'Wiederholen' if t.learning_status == 'sicher' else 'Öffnen' }}</button></form></article>
+    <article class="exam-topic-row"><span class="topic-dot {{ t.learning_status }}"></span><div class="exam-topic-copy"><strong>{{ t.label }}</strong><small>{{ t.subject|fachname }}{% if t.content_level %} · {{ t.content_level }}{% endif %}{% set z = (e.aufwand.themen|selectattr('topic_id','equalto',t.id)|first) %}{% if z %} · etwa {{ z.min }}–{{ z.max }} Min.{% endif %}</small>{% if z %}<small class="exam-topic-quelle">{{ z.quelle if z.quelle else 'noch nie zusammen geübt' }}</small>{% endif %}</div><span class="learn-status {{ t.learning_status }}">{{ t.status_label }}</span><form method="post" action="/klassenarbeit/{{ e.id }}/lernen/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ t.id }}"><button class="quiet" type="submit">{{ 'Wiederholen' if t.learning_status == 'sicher' else 'Öffnen' }}</button></form></article>
   {% else %}<p class="hint">Zu dieser Arbeit sind noch keine Themen hinterlegt.</p>{% endfor %}</div>
 </section>
 
@@ -55,7 +76,15 @@
 
 <section class="card exam-calendar compact-exam-calendar" aria-labelledby="exam-calendar-title">
   <header class="exam-detail-section-head"><div><p class="exam-section-kicker">DEIN PLAN BIS ZUM TERMIN</p><h2 id="exam-calendar-title">Lernzeit festlegen</h2></div><span class="exam-calendar-hint">0 oder leer = frei</span></header>
-  {% if e.calendar %}<form method="post" action="/klassenarbeit/{{ e.id }}/kalender">{{ csrf_input() }}<div class="exam-calendar-weekdays" aria-hidden="true"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div><div class="exam-calendar-grid exam-calendar-full" aria-label="Lernkalender bis zur Klassenarbeit">{% for _ in range(e.calendar_leading_blanks) %}<span class="exam-calendar-empty" aria-hidden="true"></span>{% endfor %}{% for item in e.calendar %}<article id="exam-calendar-{{ item.date }}" class="exam-calendar-day {{ 'today' if item.today }} {{ 'exam' if item.is_exam }} {{ 'learning' if item.is_learning_day }}"><header><strong>{{ item.date[8:10] }}.{{ item.date[5:7] }}.</strong><small>{{ 'Heute' if item.today else item.weekday[:2] }}</small></header>{% if item.is_exam %}<div class="exam-calendar-exam-label">Klassenarbeit</div><strong class="exam-calendar-exam-time">★</strong>{% else %}<label class="exam-calendar-minute-input"><span class="sr">Minuten</span><input aria-label="Lernzeit am {{ item.date_label }}" type="number" name="minutes_{{ item.date }}" min="0" max="60" step="1" value="{{ item.minutes if item.minutes else '' }}" placeholder="0"><small>Min.</small></label>{% if item.is_simulation %}<small class="exam-calendar-topic"><strong>Generalprobe</strong></small>{% elif item.is_learning_day and item.inhalt %}<small class="exam-calendar-topic">{{ item.inhalt }}</small>{% endif %}{% endif %}</article>{% endfor %}</div><label class="exam-simulation-option"><input type="checkbox" name="simulation_early" value="ja" {{ 'checked' if e.simulation_early }}> Simulation einen Tag früher</label><div class="exam-calendar-save"><p class="hint">Der letzte Lerntag ist für Wiederholung und Generalprobe reserviert.</p><button type="submit">Kalender speichern</button></div></form>{% else %}<p class="hint">Diese Klassenarbeit liegt in der Vergangenheit.</p>{% endif %}
+  {% if e.topics %}
+  <p class="exam-zeitbedarf{{ ' ist-knapp' if not e.aufwand.reicht and e.aufwand.gewaehlt }}">
+    <b>{{ e.aufwand.gewaehlt }} von mindestens {{ e.aufwand.min }} Minuten</b> eingeplant.
+    {%- if e.aufwand.gewaehlt and not e.aufwand.reicht %}
+      Das sind <b>{{ e.aufwand.fehlend }} Minuten zu wenig</b> für alle Themen. Du kannst trotzdem so planen — dann schafft ihr nicht alles, und Karo fängt mit dem an, was am wichtigsten ist.
+    {%- elif e.aufwand.reicht %} Das reicht für alle deine Themen.
+    {%- else %} Trage unten ein, an welchen Tagen du wie lange lernen möchtest.{% endif %}</p>
+  {% endif %}
+  {% if e.calendar %}<form method="post" action="/klassenarbeit/{{ e.id }}/kalender">{{ csrf_input() }}<div class="exam-calendar-weekdays" aria-hidden="true"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div><div class="exam-calendar-grid exam-calendar-full" aria-label="Lernkalender bis zur Klassenarbeit">{% for _ in range(e.calendar_leading_blanks) %}<span class="exam-calendar-empty" aria-hidden="true"></span>{% endfor %}{% for item in e.calendar %}<article id="exam-calendar-{{ item.date }}" class="exam-calendar-day {{ 'today' if item.today }} {{ 'exam' if item.is_exam }} {{ 'learning' if item.is_learning_day }}"><header><strong>{{ item.date[8:10] }}.{{ item.date[5:7] }}.</strong><small>{{ 'Heute' if item.today else item.weekday[:2] }}</small></header>{% if item.is_exam %}<div class="exam-calendar-exam-label">Klassenarbeit</div><strong class="exam-calendar-exam-time">★</strong>{% else %}<label class="exam-calendar-minute-input"><span class="sr">Minuten</span><input aria-label="Lernzeit am {{ item.date_label }}" type="number" name="minutes_{{ item.date }}" min="0" max="60" step="1" value="{{ item.minutes if item.minutes else '' }}" placeholder="0"><small>Min.</small></label>{% if item.is_simulation %}<small class="exam-calendar-topic"><strong>Generalprobe</strong></small>{% elif item.is_learning_day and item.themen %}{% for z in item.themen %}<small class="exam-calendar-topic">{{ z.label }}<i>{{ z.minuten }} Min.</i></small>{% endfor %}{% elif item.is_learning_day and item.inhalt %}<small class="exam-calendar-topic">{{ item.inhalt }}</small>{% endif %}{% endif %}</article>{% endfor %}</div><label class="exam-simulation-option"><input type="checkbox" name="simulation_early" value="ja" {{ 'checked' if e.simulation_early }}> Simulation einen Tag früher</label><div class="exam-calendar-save"><p class="hint">Der letzte Lerntag ist für Wiederholung und Generalprobe reserviert.</p><button type="submit">Kalender speichern</button></div></form>{% else %}<p class="hint">Diese Klassenarbeit liegt in der Vergangenheit.</p>{% endif %}
 </section>
 {% if e.simulation_available %}<a class="btn exam-simulation-button" href="/klassenarbeit/{{ e.id }}/simulation">Generalprobe starten →</a>{% endif %}
 {% endblock %}

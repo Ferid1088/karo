@@ -354,3 +354,23 @@ main.settings-page { max-width: 880px; }
 .fortschritt-zeile b{color:#20345d}
 .fortschritt-balken{flex:1;min-width:8rem;max-width:22rem;height:8px;border-radius:999px;background:#e3ecfa;overflow:hidden}
 .fortschritt-balken i{display:block;height:100%;border-radius:999px;background:#22a66f}
+
+/* --------------------------------------------------------------------------
+   Eltern im Kinderbereich: der Hinweis oben auf der Seite.
+
+   Die Regel selbst steht im Gate (main.py) — hier steht nur, dass Eltern sie
+   kennen, bevor sie auf etwas drücken, und wo der Weg zum Mitmachen ist.
+   -------------------------------------------------------------------------- */
+.nur-ansehen-hinweis { display: flex; align-items: center; gap: .85rem; flex-wrap: wrap;
+  margin: 0 0 1.2rem; padding: .8rem 1.1rem; border: 1px solid var(--border-firm);
+  border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); }
+.nur-ansehen-hinweis > span:first-child { font-size: 1.3rem; line-height: 1 }
+.nur-ansehen-hinweis b { display: block; font-size: .95rem }
+.nur-ansehen-hinweis small { display: block; margin-top: .1rem; color: var(--muted); font-size: .85rem }
+.nur-ansehen-hinweis form { margin: 0 0 0 auto }
+.nur-ansehen-hinweis button { min-height: 40px; padding: .4rem .9rem; font-size: .88rem }
+
+/* Kein flaechiges Ausgrauen: Eltern duerfen im Lernbereich durchaus etwas —
+   Material erzeugen, recherchieren lassen, einen Papierbogen einscannen. Nur
+   die Arbeit des Kindes ist gesperrt (main.py), und wer sie doch ausloest,
+   bekommt die Seite "Nur ansehen" mit dem Weg in den Kind-Modus. */

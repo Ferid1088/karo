@@ -501,7 +501,12 @@ def aufnehmen(daten: bytes, endung: str, rolle: str = "wissen",
 
     digest = _h.sha256(daten).hexdigest()
     bestehend = db.q1("SELECT * FROM document WHERE sha256 = ?", digest)
-    if bestehend is not None:
+    # Dieselbe Datei zweimal: auf den vorhandenen Eintrag verweisen — aber nur,
+    # solange dessen Bild auch wirklich liegt, wo der Eintrag es behauptet.
+    # Fehlt es (Umzug aus dem Container, aufgeraeumter Ordner), hilft dem
+    # Hochladenden kein zweiter Versuch: derselbe Pruefwert fuehrt immer
+    # wieder auf denselben toten Pfad. Dann wird das Bild neu abgelegt.
+    if bestehend is not None and Path(bestehend["stored_path"]).is_file():
         return {"document_id": bestehend["id"], "status": "doppelt",
                 "stored_path": bestehend["stored_path"]}
 
@@ -520,6 +525,15 @@ def aufnehmen(daten: bytes, endung: str, rolle: str = "wissen",
             roh.unlink()
         except OSError:
             pass
+
+    if bestehend is not None:
+        # Der Eintrag bleibt, alles was an ihm haengt auch — nur der Pfad
+        # zeigt jetzt wieder auf eine Datei, die es gibt.
+        with db.tx() as c:
+            c.execute("UPDATE document SET stored_path=?, state='neu' WHERE id=?",
+                      (str(stored), bestehend["id"]))
+        return {"document_id": bestehend["id"], "status": "erneuert",
+                "stored_path": str(stored), **info}
 
     with db.tx() as c:
         cur = c.execute(

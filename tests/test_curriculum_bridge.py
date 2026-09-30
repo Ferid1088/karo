@@ -136,13 +136,36 @@ def test_invalid_content_is_rejected_before_any_import(app_env, bridge, monkeypa
     assert not app_env.db.q("SELECT id FROM lern_konzept WHERE quelle='curriculum'")
 
 
-def test_unavailable_is_terminal_not_a_local_generation_fallback(app_env, bridge, monkeypatch):
+def test_unavailable_waits_but_never_falls_back_to_local_generation(app_env, bridge, monkeypatch):
+    """"Nicht verfügbar" heißt meistens "gerade nicht".
+
+    Der Dienst drosselt, wenn viele Themen auf einmal kommen: bei siebzehn
+    Prüfungsthemen starben so die ersten Aufträge sofort, obwohl dieselben
+    Themen Sekunden später wieder ausgeliefert wurden. Der Auftrag wartet
+    deshalb und fragt erneut — was er nie tut, ist lokal erzeugen. Die
+    Gesamtdauer deckelt `MAX_WAIT_SECONDS`, siehe den Test darunter.
+    """
     from app import jobs
     monkeypatch.setattr(bridge, "request", lambda *a, **kw: {"status": "unavailable"})
+    vorher = len(app_env.db.q("SELECT id FROM lern_konzept"))
+    jid = enqueue()
+    assert jobs.run_now(jid)[0] == "pending"
+    assert job(app_env, jid)["state"] == "wartend"
+    # Kein lokal erzeugtes Konzept, und kein verbrauchter Versuch.
+    assert len(app_env.db.q("SELECT id FROM lern_konzept")) == vorher
+    assert job(app_env, jid)["attempts"] == 0
+
+
+def test_vom_dienst_endgueltig_abgelehntes_material_wartet_nicht(app_env, bridge, monkeypatch):
+    """Was Karos eigene Prüfung abgelehnt hat, gibt der Dienst nicht wieder
+    heraus. Darauf zu warten wäre endloses Nichts."""
+    from app import jobs
+    monkeypatch.setattr(bridge, "request", lambda *a, **kw: {
+        "status": "unavailable", "reason_code": "rejected_by_client"})
     jid = enqueue()
     assert jobs.run_now(jid)[0] == "failed"
     assert job(app_env, jid)["state"] == "fehler"
-    assert job(app_env, jid)["attempts"] == 1
+    assert "nichts Geprüftes mehr" in job(app_env, jid)["last_error"]
 
 
 def test_service_change_cannot_resume_old_export_elsewhere(app_env, bridge, monkeypatch):

@@ -69,8 +69,10 @@ def test_empty_overview_access_and_existing_tools(client, fake_llm, fake_cli, ap
     assert 'Keine Klassenarbeit eingetragen.' in response.text
     # Header already has Hell/Dunkel and Abmelden; the page does not repeat them.
     assert response.text.count('action="/logout"') == 1
+    # "Meine Welt" fuehrt fuer Eltern auf ihre Verwaltungsseite, nicht in
+    # den Bereich des Kindes.
     for path in ['/themen', '/wissen', '/klassenarbeit', '/setup', '/woche/eltern',
-                 '/welten', '/recherche', '/messung/fortschritt#ausfuehrlich', '/protokoll']:
+                 '/welten/eltern', '/recherche', '/messung/fortschritt#ausfuehrlich', '/protokoll']:
         assert f'href="{path}"' in response.text
     # Optional child access must not hide useful parent entry points.
     app_env.config.update(schulblaetter_kind=True, klassenarbeit_kind=True)
@@ -153,7 +155,7 @@ def test_mobile_desktop_themes_and_disclosures(client, fake_llm, fake_cli, app_e
             summary.focus()
             summary.press('Enter')
             assert page.get_by_role('link', name='Vereinbarung und Hilfe öffnen').is_visible()
-            assert page.get_by_role('link', name='Meine Welt ansehen', exact=True).is_visible()
+            assert page.get_by_role('link', name='Meine Welt verwalten', exact=True).is_visible()
             summary.press('Enter')
             page.locator('.parent-task-list a[href="#betrieb"]').click()
             page.wait_for_function("document.getElementById('betrieb').open")
@@ -164,7 +166,7 @@ def test_mobile_desktop_themes_and_disclosures(client, fake_llm, fake_cli, app_e
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         assert not errors
         # Main functions are server-rendered; no JavaScript required for disclosures.
-        plain = browser.new_context(java_script_enabled=False)
+        plain = browser.new_context(java_script_enabled=False, reduced_motion='reduce')
         plain_page = plain.new_page()
         plain_page.route('**/*', serve)
         plain_page.goto('http://karo.test/eltern')

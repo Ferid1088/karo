@@ -68,7 +68,6 @@ CHILD_ALLOWED_PREFIXES = ("/lernen", "/lernzyklus", "/quiz", "/material",
 # ausdruecklich auch fuer das Kind aktivieren. Gilt fuer beide Routenfamilien.
 CHILD_FORBIDDEN_SUFFIXES = ("/freigabe",)
 
-
 def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
                   schulblaetter_kind: bool = False,
                   klassenarbeit_kind: bool = False) -> bool:
@@ -76,7 +75,7 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
         path in {"/klassenarbeit", "/klassenarbeit/neu",
                  "/klassenarbeit/kalender", "/messung/examen",
                  "/klassenarbeit/themenblatt", "/klassenarbeit/themenblatt/status"}
-        or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|themen|loeschen|lernen(?:/(?:start|status|wartet|neu|anker|diagnose|weiter|aufgabe|vorhersage|transfer|tipp|klasse-bestaetigen))?|simulation(?:/[0-9]+(?:/antworten)?)?))?", path)
+        or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|themen|loeschen|einstufung(?:/[0-9]+)?|lernen(?:/(?:start|status|wartet|neu|anker|diagnose|weiter|aufgabe|vorhersage|transfer|tipp|klasse-bestaetigen))?|simulation(?:/[0-9]+(?:/antworten)?)?))?", path)
     ):
         return True
     if schulblaetter_kind and (
@@ -97,9 +96,52 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
     return any(path == p or path.startswith(p + "/")
               for p in CHILD_ALLOWED_PREFIXES)
 
-#: Obergrenze fuer den kompletten Request-Body (Gate, unten). Groesser als
-#: security.MAX_UPLOAD_BYTES: die Formular-Umhuellung eines Uploads braucht
-#: etwas mehr Platz als die reine Datei.
+
+# Umgekehrt: Eltern duerfen den Kinderbereich ansehen, aber nichts tun, was
+# als Arbeit des Kindes in dessen Lernstand landet. Jede Antwort, jede
+# Selbstauskunft und jede Minute Lernzeit aus einer Eltern-Sitzung
+# verfaelscht genau die Zahl, an der sich die Eltern spaeter orientieren.
+# Wer wirklich mitmachen will, schaltet in den Kind-Modus
+# (/eltern/kind-modus).
+#
+# Bewusst eng gefasst: Material erzeugen, recherchieren lassen, einen
+# Papierbogen einscannen oder eine Lerneinheit abbrechen sind Vorbereitung
+# und bleiben Eltern offen. Sie sagen nichts darueber aus, was das Kind kann.
+CHILD_OWN_WORK_SUFFIXES = (
+    "/antworten",   # Quiz, Lernrunde und Prüfungssimulation
+    "/antwort",     # Emoji-Antwort auf Post von zu Hause
+    # "/entwurf" steht bewusst nicht hier: derselbe Zwischenstand traegt beim
+    # Bewerten die Urteile der Eltern, und quiz_drafts.py prueft die Rolle je
+    # Phase schon selbst. Bindend ist ohnehin erst "/antworten".
+    "/zeit",        # gemessene Lernzeit
+)
+CHILD_OWN_WORK_PREFIXES = (
+    "/lernen/adaptiv/",     # der adaptive Dialog ist die Diagnose selbst
+    "/lernstand/thema/",    # das Archiv des Kindes
+    "/lernstand/arbeit/",
+)
+#: Die Einstufung ist eine Abfrage — was dort herauskommt, steht danach als
+#: Koennen des Kindes in der Planung. Eltern sehen die Seite, antworten aber
+#: nicht: sonst plant Karo die Prüfung nach dem Wissen der Erwachsenen.
+CHILD_OWN_WORK_PATTERN = re.compile(
+    r"^/klassenarbeit/\d+/(?:lernen(?:/|$)|einstufung/\d+$)")
+
+
+def _eltern_darf_aendern(path: str) -> bool:
+    """Darf eine Eltern-Sitzung mit dieser schreibenden Anfrage durch?
+
+    "/freigabe" steht bewusst nicht in der Sperre: das Bestaetigen einer
+    Antwort ist Elternarbeit und hat nur im Lernbereich einen Knopf.
+    """
+    if path.endswith("/freigabe"):
+        return True
+    if path.endswith(CHILD_OWN_WORK_SUFFIXES):
+        return False
+    if path.startswith(CHILD_OWN_WORK_PREFIXES):
+        return False
+    return not CHILD_OWN_WORK_PATTERN.match(path)
+
+
 MAX_BODY_BYTES = 30 * 1024 * 1024
 
 
@@ -186,6 +228,9 @@ class Gate:
                         path, cfg.antworten_pruefen_kind, cfg.schulblaetter_kind,
                         cfg.klassenarbeit_kind):
                     return await self._send(send, scope, self._kind_gesperrt())
+                if (role == "parent" and request.method not in security.SAFE_METHODS
+                        and not _eltern_darf_aendern(path)):
+                    return await self._send(send, scope, self._eltern_nur_ansehen())
 
         if authed and not oeffentlich and cfg.setup_complete:
             from .services.learning_scope import exam_resource_on_personal_path
@@ -251,6 +296,17 @@ class Gate:
         return HTMLResponse(
             "<h1>Zu groß</h1><p>Die gesendeten Daten überschreiten "
             f"{MAX_BODY_BYTES // 1_048_576} MB.</p>", status_code=413)
+
+    @staticmethod
+    def _eltern_nur_ansehen() -> HTMLResponse:
+        return HTMLResponse(
+            "<h1>Nur ansehen</h1><p>Der Lernbereich gehört Ihrem Kind. Sie "
+            "können alles sehen, aber nichts darin ändern — sonst stünde im "
+            "Lernstand Ihre Arbeit statt seiner.</p><p>Wenn Sie gemeinsam "
+            "lernen möchten, schalten Sie die Sitzung im Elternbereich in den "
+            "Kind-Modus.</p><p><a href=\"/eltern\">Zurück zum "
+            "Elternbereich</a></p>",
+            status_code=403)
 
     @staticmethod
     def _kind_gesperrt() -> HTMLResponse:

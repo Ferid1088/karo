@@ -2,7 +2,7 @@
 from html.parser import HTMLParser
 
 from .conftest import csrf_from, make_jpeg, run_jobs
-from .test_app import einrichten, blatt_einlesen, themen_freigeben
+from .test_app import als_kind, einrichten, blatt_einlesen, themen_freigeben
 
 
 class Forms(HTMLParser):
@@ -131,7 +131,11 @@ def test_learning_quiz_keeps_lesson_association_and_review_gate(client, fake_llm
     assert 'data-answer-form' in page.text
     assert 'simple-main focus-view' in page.text
     answers = {f"antwort_{f['id']}": "1/2" for f in quizzes.holen(quiz["id"])["fragen"]}
-    client.post(f"/quiz/{quiz['id']}/antworten", data={"_csrf": csrf_from(page.text), **answers})
+    # Antworten gibt das Kind, bewerten die Eltern — daher der Rollenwechsel.
+    with als_kind(client, app_env):
+        page = client.get(f"/quiz/{quiz['id']}")
+        client.post(f"/quiz/{quiz['id']}/antworten",
+                    data={"_csrf": csrf_from(page.text), **answers})
     run_jobs(app_env, fake_llm)
     page = client.get(f"/quiz/{quiz['id']}")
     review = next(f for f in Forms(page.text).forms if f["action"].endswith("/freigabe"))
@@ -181,10 +185,13 @@ def test_source_buttons_and_exam_fields_match_endpoints(client, fake_llm, fake_c
 
 def test_child_navigation_includes_week_and_parent_features_remain(client, fake_llm, fake_cli):
     import re
+    from .test_app import kind_modus_aktivieren
     einrichten(client, fake_llm)
     page = client.get('/')
     nav = re.search(r'<nav class="simple-nav".*?</nav>', page.text, re.S).group()
-    assert re.findall(r'href="([^"]+)"', nav) == ['/', '/lernen', '/klassenarbeit', '/lernstand', '/welten', '/woche/woche']
+    # Eltern duerfen im Kinderbereich alles ausser "Meine Welt": das Tagebuch
+    # des Kindes steht nur der Kind-Rolle offen.
+    assert re.findall(r'href="([^"]+)"', nav) == ['/', '/lernen', '/klassenarbeit', '/lernstand', '/woche/woche']
     assert 'verbindung-popup-slot' not in page.text
     parent = client.get('/eltern').text
     for path in ('/wissen', '/themen', '/klassenarbeit', '/messung/fortschritt#ausfuehrlich', '/recherche', '/setup', '/protokoll', '/hilfe'):
@@ -195,6 +202,12 @@ def test_child_navigation_includes_week_and_parent_features_remain(client, fake_
         # Die Hauptnavigation bleibt stabil; lokale Archiv-Tabs sind erlaubt.
         main_nav = re.search(r'<nav class="simple-nav".*?</nav>', page.text, re.S).group()
         assert 'class="tab-btn"' not in main_nav
+    # Die Kind-Rolle sieht "Meine Welt"; die Klassenarbeit bleibt ohne
+    # Freigabe (cfg.klassenarbeit_kind) aus der Kinder-Kopfzeile heraus.
+    kind_modus_aktivieren(client)
+    nav = re.search(r'<nav class="simple-nav".*?</nav>',
+                    client.get('/').text, re.S).group()
+    assert re.findall(r'href="([^"]+)"', nav) == ['/', '/lernen', '/lernstand', '/welten', '/woche/woche']
 
 
 def test_topic_start_immediately_builds_existing_material(client, fake_llm, fake_cli, app_env, alter_generator):

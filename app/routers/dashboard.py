@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse
 
 from .. import config, db, jobs, kb, quizzes, topics
 from ..services import exam, workflow
-from .shared import render, flash, zurueck
+from .shared import render, flash, zurueck, erfolge_ziel
 from ..woche.pilot_store import parent_summary
 from ..welten.store import current_companion, current_interest
 
@@ -83,7 +83,8 @@ def thema_loeschen(request: Request, topic_id: int):
 
 
 @router.post('/lernstand/thema/{topic_id}/zurueck')
-def thema_zurueck(request: Request, topic_id: int, erneut: str = Form('')):
+def thema_zurueck(request: Request, topic_id: int, erneut: str = Form(''),
+                  ziel: str = Form('')):
     from ..services import learning_hub
     learning_hub.thema_zurueck(topic_id)
     if erneut:
@@ -93,25 +94,25 @@ def thema_zurueck(request: Request, topic_id: int, erneut: str = Form('')):
             flash(request, f'„{thema["label"]}" ist zurück. Los geht’s.')
         return zurueck('/lernen')
     flash(request, 'Das Thema ist zurück in deiner Liste.')
-    return zurueck('/lernstand')
+    return zurueck(erfolge_ziel(ziel))
 
 
 @router.post('/lernstand/thema/{topic_id}/entfernen')
-def thema_entfernen(request: Request, topic_id: int):
+def thema_entfernen(request: Request, topic_id: int, ziel: str = Form('')):
     """Endgültig löschen. Die Rückfrage stellt die Seite selbst (?weg=…),
     damit sie auch ohne JavaScript kommt."""
     from ..services import learning_hub
     learning_hub.thema_entfernen(topic_id)
     flash(request, 'Das Thema ist gelöscht.')
-    return zurueck('/lernstand')
+    return zurueck(erfolge_ziel(ziel))
 
 
 @router.post('/lernstand/arbeit/{exam_id}/entfernen')
-def arbeit_entfernen(request: Request, exam_id: int):
+def arbeit_entfernen(request: Request, exam_id: int, ziel: str = Form('')):
     from ..services import learning_hub
     learning_hub.arbeit_entfernen(exam_id)
     flash(request, 'Die Klassenarbeit ist gelöscht.')
-    return zurueck('/lernstand?tab=arbeiten')
+    return zurueck(erfolge_ziel(ziel, 'arbeiten'))
 
 
 @router.post('/klassenarbeit/{exam_id}/loeschen')
@@ -123,11 +124,11 @@ def arbeit_loeschen(request: Request, exam_id: int):
 
 
 @router.post('/lernstand/arbeit/{exam_id}/zurueck')
-def arbeit_zurueck(request: Request, exam_id: int):
+def arbeit_zurueck(request: Request, exam_id: int, ziel: str = Form('')):
     from ..services import learning_hub
     learning_hub.arbeit_zurueck(exam_id)
     flash(request, 'Die Klassenarbeit ist zurück in deiner Liste.')
-    return zurueck('/klassenarbeit')
+    return zurueck(erfolge_ziel(ziel, 'arbeiten'))
 
 
 @router.get('/lernen/material', response_class=HTMLResponse)

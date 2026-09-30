@@ -105,8 +105,8 @@
   .area-brand { flex: 1; }
   [data-ui-area="child"] .area-brand { flex: 0 1 auto; margin-right: auto; }
   [data-ui-area="child"] .simple-header { gap: .65rem; }
-  [data-ui-area="parent"] .simple-nav { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .35rem; }
-  [data-ui-area="parent"] .simple-nav a { justify-content: flex-start; }
+  [data-ui-area="parent"] .simple-nav { flex-wrap: nowrap; overflow-x: auto; gap: .35rem; }
+  [data-ui-area="parent"] .simple-nav a { flex: none; justify-content: flex-start; }
   [data-ui-area="parent"] .parent-link { padding-inline: .7rem; }
   [data-ui-area="child"] .card { padding: 1.2rem; }
 }
@@ -463,6 +463,14 @@
 
 /* Auf schmalen Handys passen die fuenf Wege nur knapp: enger gesetzt, damit
    "Erfolge" nicht hinter dem Rand liegt und niemand schieben muss. */
+/* Auf dem Handy traegt die Zeile nur noch Schrift: ein Bild mehr heisst
+   ein Weg weniger sichtbar, und ein versteckter Weg ist schlimmer als ein
+   fehlendes Bild. */
+@media(max-width:560px) {
+  [data-ui-area="child"] .simple-nav a img { display: none; }
+  [data-ui-area="child"] .simple-nav a.plans-entry,
+  [data-ui-area="child"] .simple-nav a.welten-entry { padding-left: .6rem; }
+}
 @media(max-width:430px) {
   [data-ui-area="child"] .simple-header .simple-nav { gap: .15rem; }
   [data-ui-area="child"] .simple-nav a {
@@ -473,6 +481,17 @@
 /* Heute, Lernen und Erfolge gehoeren zusammen; Meine Welt und Ziele planen
    sind eigene Welten und stehen nach einem Abstand, beide mit Bild. */
 [data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: 4.4rem; }
+/* "Heute" traegt sein eigenes Tier, wie Lernen, Meine Welt und Ziele planen
+   ihre Bilder tragen. Ohne Bild war es der einzige Reiter aus reiner Schrift. */
+[data-ui-area="child"] .simple-nav a.heute-entry {
+  gap: .45rem; padding-left: .5rem;
+}
+[data-ui-area="child"] .simple-nav a.heute-entry img {
+  /* Heller Kreis wie bei "Ziele planen": der aktive Reiter ist dunkles
+     Indigo, und darauf verschwindet ein brauner Igel. */
+  width: 28px; height: 28px; flex: 0 0 28px; padding: 1px; object-fit: contain;
+  border-radius: 50%; background: #fff;
+}
 [data-ui-area="child"] .simple-nav a.welten-entry {
   gap: .45rem; padding-block: .35rem; padding-left: .5rem;
   color: #4a2f9c; border: 1px solid #d5c9f7; background: #f3efff;
@@ -484,33 +503,41 @@
 [data-ui-area="child"] .simple-nav a.welten-entry img {
   width: 30px; height: 30px; flex: 0 0 30px; object-fit: contain;
 }
-@media(max-width:680px) {
+@media(max-width:820px) {
   [data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: .55rem; }
+  [data-ui-area="child"] .simple-nav a.heute-entry img,
   [data-ui-area="child"] .simple-nav a.welten-entry img { display: none; }
   [data-ui-area="child"] .simple-nav a.welten-entry { padding-left: .42rem; }
 }
 
-/* Mit "Klassenarbeit" sind es sechs Wege. Sie werden nie abgeschnitten:
-   wo die Kopfzeile nicht reicht, bekommt die Navigation eine eigene Zeile
-   und bricht bei Bedarf um — ein Kind soll keinen Reiter suchen muessen. */
+/* Mit "Klassenarbeit" sind es sechs Wege, zwei davon mit Bild. Neben Logo
+   und Werkzeugen passt das auf keiner Breite verlaesslich: zuletzt stand
+   "Ziele planen" halb hinter dem Abmelden-Knopf. Die Navigation bekommt
+   deshalb immer ihre eigene Zeile — und darin bleibt sie eine Reihe. Kein
+   Umbruch, kein Abschneiden; was doch einmal nicht passt (sehr schmales
+   Handy), wird geschoben. */
 [data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: 2rem; }
-/* Sicherheitsnetz: lieber eine zweite Zeile als ein versteckter Reiter. */
-[data-ui-area="child"] .simple-header .simple-nav { flex-wrap: wrap; overflow: visible; row-gap: .4rem; }
-/* Mit "Für Eltern" im Kopf reicht eine Zeile auf keiner Breite: die
-   Navigation steht dann immer in ihrer eigenen Zeile. */
-[data-ui-area="child"] .simple-header:has(.area-switch) { flex-wrap: wrap; row-gap: .6rem; }
-[data-ui-area="child"] .simple-header:has(.area-switch) .brand { flex: 1; }
-[data-ui-area="child"] .simple-header:has(.area-switch) .simple-nav { order: 3; flex-basis: 100%; }
+[data-ui-area="child"] .simple-header { flex-wrap: wrap; row-gap: .6rem; }
+[data-ui-area="child"] .simple-header .brand { flex: 1; }
+[data-ui-area="child"] .simple-header .simple-nav {
+  order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto;
+}
 @media (max-width: 1240px) {
-  [data-ui-area="child"] .simple-header { flex-wrap: wrap; row-gap: .6rem; }
-  [data-ui-area="child"] .simple-header .brand { flex: 1; }
-  [data-ui-area="child"] .simple-header .simple-nav {
-    order: 3; flex-basis: 100%; flex-wrap: wrap; overflow: visible; row-gap: .4rem;
-  }
   [data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: 1rem; }
 }
+/* Zwischen Handy und grossem Bildschirm wird es eng: hier ruecken die Wege
+   zusammen, statt dass der letzte hinter dem Rand verschwindet. */
+@media (max-width: 1100px) {
+  [data-ui-area="child"] .simple-header .simple-nav { gap: .3rem; }
+  [data-ui-area="child"] .simple-nav a { padding: .45rem .7rem; font-size: .92rem; }
+  [data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: .5rem; }
+  [data-ui-area="child"] .simple-nav a.welten-entry img,
+  [data-ui-area="child"] .simple-nav a.plans-entry img,
+  [data-ui-area="child"] .simple-nav a.heute-entry img { width: 24px; height: 24px; flex-basis: 24px; }
+  [data-ui-area="child"] .simple-nav a.exam-entry img { width: 44px; }
+  [data-ui-area="child"] .simple-nav a.learning-entry img { width: 22px; height: 22px; }
+}
 @media (max-width: 680px) {
-  [data-ui-area="child"] .simple-header .simple-nav { flex-wrap: wrap; overflow: visible; row-gap: .3rem; }
   [data-ui-area="child"] .simple-nav .zweite-gruppe { margin-left: 0; }
 }
 

@@ -94,7 +94,18 @@ async def klassenarbeit_kalender(request: Request, exam_id: int):
     except exam_calendar.ExamCalendarError as exc:
         flash(request, str(exc), "warn")
         return zurueck(f"/klassenarbeit/{exam_id}#exam-calendar-title")
-    flash(request, "Dein Plan ist gespeichert. Karo bleibt beim ersten Thema, bis es sicher sitzt.")
+    # Reicht die gewaehlte Zeit nicht, sagt Karo es — aendert aber nichts.
+    # Ein Plan, den ein Kind nicht selbst gewaehlt hat, wird nicht gehalten.
+    from ..services import exam_effort
+    lage = exam_effort.lage(exam_id)
+    if lage["themen"] and not lage["reicht"]:
+        flash(request,
+              f"Gespeichert. Achtung: {lage['gewaehlt']} Minuten sind für deine "
+              f"{lage['offen']} offenen Themen knapp — Karo rechnet mit mindestens "
+              f"{lage['min']}. Es fehlen {lage['fehlend']} Minuten. Du kannst so "
+              "planen; dann beginnt Karo mit dem Wichtigsten.", "warn")
+    else:
+        flash(request, "Dein Plan ist gespeichert. Karo verteilt deine Themen auf deine Lerntage.")
     return zurueck(f"/klassenarbeit/{exam_id}#exam-next-step")
 
 
@@ -113,8 +124,46 @@ def klassenarbeit_themen(request: Request, exam_id: int, themen: str = Form(""))
         all_names = [t['label'] for t in learning_hub.exam_topics(exam_id)]
         with db.tx() as c:
             c.execute("UPDATE exam SET themen=? WHERE id=?", (json.dumps(all_names, ensure_ascii=False), exam_id))
-        flash(request, "Deine Prüfungsthemen sind gespeichert. Wähle jetzt deine Lerntage.")
+        # Ohne geprüfte Aufgaben kann Karo weder einstufen noch üben. Der
+        # Auftrag dafür entsteht hier — vorher entstand gar keiner.
+        from ..services import exam_effort
+        offen = exam_effort.inhalte_anfordern(exam_id)
+        if offen:
+            flash(request, f"Deine Prüfungsthemen sind gespeichert. Karo bereitet gerade "
+                           f"Aufgaben und Erklärungen für {offen} Themen vor — das dauert "
+                           "einen Moment. Wähle solange deine Lerntage.")
+        else:
+            flash(request, "Deine Prüfungsthemen sind gespeichert. Wähle jetzt deine Lerntage.")
     return zurueck(f"/klassenarbeit/{exam_id}#exam-calendar-title")
+
+
+@router.get("/klassenarbeit/{exam_id}/einstufung", response_class=HTMLResponse)
+def klassenarbeit_einstufung(request: Request, exam_id: int):
+    """Ein Thema nach dem anderen einstufen — die Grundlage jeder Schätzung."""
+    from ..services import exam_effort, exam_placement, measurement
+    # Die Seite stösst selbst an, was ihr fehlt. Vorher entstanden Auftraege
+    # nur beim Speichern der Themen — wer sie frueher eingetragen hatte,
+    # wartete hier ewig auf etwas, das nie angefordert wurde.
+    exam_effort.inhalte_anfordern(exam_id)
+    naechstes = exam_placement.naechstes_thema(exam_id)
+    offen = None
+    if naechstes:
+        offen = exam_placement.oeffnen(exam_id, naechstes["topic"]["id"])
+    return measurement.render_einstufung(request, exam_id, naechstes, offen)
+
+
+@router.post("/klassenarbeit/{exam_id}/einstufung/{topic_id}")
+async def klassenarbeit_einstufung_abgeben(request: Request, exam_id: int, topic_id: int):
+    from ..services import exam_placement
+    formular = await request.form()
+    antworten = {key.removeprefix("antwort_"): wert
+                 for key, wert in formular.multi_items()
+                 if key.startswith("antwort_")}
+    try:
+        exam_placement.abgeben(exam_id, topic_id, antworten)
+    except ValueError as exc:
+        flash(request, str(exc), "warn")
+    return zurueck(f"/klassenarbeit/{exam_id}/einstufung")
 
 
 @router.get("/klassenarbeit/{exam_id}/simulation", response_class=HTMLResponse)

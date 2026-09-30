@@ -54,3 +54,30 @@ def test_learning_mascot_asset_exists():
         assert image.format == 'PNG'
         assert 'A' in image.getbands()
         assert image.getchannel('A').getextrema()[0] == 0
+
+
+def test_heute_hat_ein_eigenes_tier(client, fake_llm, fake_cli, app_env):
+    """"Heute" gehoert dem Igel. Fuchs, Eule und Biene sind anderswo zu Hause
+    — zwei Bereiche mit demselben Tier waeren nicht auseinanderzuhalten."""
+    einrichten(client, fake_llm)
+    kind_modus_aktivieren(client)
+    seite = client.get('/')
+    assert seite.status_code == 200
+
+    reiter = re.search(r'<a class="heute-entry" href="/".*?</a>', seite.text).group()
+    assert 'src="/static/karo-igel.svg"' in reiter
+    assert '<span>Heute</span>' in reiter
+
+    inhalt = re.search(r'<main\b.*?</main>', seite.text, re.S).group()
+    assert 'karo-igel' in inhalt
+    assert 'karo-fox' not in inhalt
+    assert 'karo-owl' not in inhalt
+
+    for datei in ('karo-igel.svg', 'karo-igel-jubel.svg'):
+        quelle = (Path(__file__).parents[1] / 'app/static' / datei).read_text(encoding='utf-8')
+        assert quelle.lstrip().startswith('<svg')
+        # Zwei SVG auf einer Seite duerfen sich nicht dieselbe Verlaufs-Kennung
+        # teilen; sonst faerbt das zweite das erste um.
+        assert 'id="igel-jubel-stachel"' in quelle or 'id="igel-stachel"' in quelle
+    assert 'id="igel-stachel"' not in (Path(__file__).parents[1] /
+                                       'app/static/karo-igel-jubel.svg').read_text(encoding='utf-8')

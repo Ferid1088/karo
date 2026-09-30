@@ -428,3 +428,25 @@ CREATE TABLE IF NOT EXISTS family_message (
 CREATE INDEX IF NOT EXISTS idx_family_message_created ON family_message(created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_family_message_feier ON family_message(goal_id)
     WHERE kind='feier' AND withdrawn_at IS NULL;
+
+-- ==========================================================================
+-- Lernzeit: wie lange wirklich gearbeitet wurde
+-- ==========================================================================
+-- Die Lernseiten melden sich im Takt, solange sie offen und sichtbar sind.
+-- Ein Stueck waechst, solange die Schlaege dicht aufeinander folgen; eine
+-- Pause beginnt ein neues. Damit steht hier gemessene Zeit, keine
+-- geschaetzte — fuer Tage ohne solche Stuecke rechnet der Bericht aus den
+-- Zeitstempeln der Aktivitaet und weist das als Schaetzung aus.
+--
+-- `tag` ist der Kalendertag in der eingestellten Zeitzone, damit ein Bericht
+-- nicht bei jeder Abfrage Zeitzonen umrechnen muss. Nur Lernen und Quiz
+-- zaehlen; Klassenarbeits-Planung und Ziele bleiben ihre eigenen Zahlen.
+CREATE TABLE IF NOT EXISTS learning_time (
+    id         INTEGER PRIMARY KEY,
+    topic_id   INTEGER REFERENCES topic(id),
+    tag        TEXT NOT NULL,
+    beginn     TEXT NOT NULL,
+    letzter    TEXT NOT NULL,
+    sekunden   INTEGER NOT NULL DEFAULT 0 CHECK(sekunden >= 0)
+);
+CREATE INDEX IF NOT EXISTS idx_learning_time_tag ON learning_time(tag, topic_id);

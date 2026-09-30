@@ -409,11 +409,49 @@
 
 /* Der Bereichsstreifen trägt seit der gemeinsamen Kopfzeile nur noch Spruch,
    Datum und Profil — ohne Logo und ohne die Wege, die oben stehen. */
-.plans-local-strip { min-height:0; padding-block:.55rem; gap:1rem; justify-content:flex-end; }
-/* Der Spruch steht schraeg; ohne etwas Luft stossen die beiden Zeilen
-   aneinander, sobald der Streifen schmaler ist als frueher. */
-.plans-local-strip .plans-slogan { flex:1; text-align:left; white-space:normal; line-height:1.5; }
-.plans-local-strip .plans-slogan span { display:inline-block; margin-left:.6rem; }
+.plans-local-strip { position:relative; min-height:0; padding-block:.6rem; gap:1rem; justify-content:flex-end; }
+/* Der Spruch gehoert in die Mitte des Streifens, nicht an den linken Rand.
+   Dafuer steht er absolut: Uhr und Profil sind zusammen breiter als der
+   leere Platz links, und mit `flex` waere "mittig" immer die Mitte des
+   Restes, nie die des Streifens. Eine Zeile statt zwei — umbrochen wirkte
+   der Satz wie ein Versehen. */
+.plans-local-strip .plans-slogan {
+  /* `display:grid` aus der Grundregel stellte Satz und Nachsatz
+     uebereinander — in einem 40 Pixel hohen Streifen ergibt das zwei
+     gequetschte Zeilen statt eines Spruchs. */
+  display:block; position:absolute; left:50%; top:50%; z-index:0;
+  transform:translate(-50%,-50%) rotate(-1.5deg);
+  flex:none; margin:0; text-align:center; white-space:nowrap;
+  /* Jetzt wirklich die Hausschrift (siehe static/fonts.css) und gross genug,
+     dass sie als Spruch auftritt statt als Beschriftung. */
+  font:italic 700 1.55rem/1.15 "Baloo 2","Arial Rounded MT Bold",sans-serif;
+  color:#ffb057!important; letter-spacing:.005em;
+  /* Das Leuchten in drei Lagen: ein enger heller Kern traegt die Form, zwei
+     weiche Hoefe daraus das Glimmen. Ein einzelner breiter Schein wuerde die
+     Buchstaben nur verwaschen — genau das war vorher das Problem. */
+  text-shadow:
+    0 0 1px rgba(255,214,150,.95),
+    0 0 8px rgba(255,150,40,.85),
+    0 0 22px rgba(255,120,0,.55),
+    0 2px 3px rgba(0,0,0,.45);
+  animation:plans-slogan-schein 3.4s ease-in-out infinite;
+}
+@keyframes plans-slogan-schein {
+  0%,100% { text-shadow:
+    0 0 1px rgba(255,214,150,.95), 0 0 8px rgba(255,150,40,.85),
+    0 0 22px rgba(255,120,0,.55), 0 2px 3px rgba(0,0,0,.45); }
+  50%     { text-shadow:
+    0 0 1px rgba(255,230,185,1), 0 0 13px rgba(255,170,60,.95),
+    0 0 34px rgba(255,130,10,.7), 0 2px 3px rgba(0,0,0,.45); }
+}
+/* Wer Bewegung abbestellt hat, bekommt das Leuchten ohne Pulsieren. */
+@media(prefers-reduced-motion:reduce){ .plans-local-strip .plans-slogan { animation:none; } }
+.plans-local-strip .plans-slogan span { display:inline; margin-left:.4rem; }
+/* Uhr und Profil liegen ueber dem Spruch, falls es einmal eng wird. */
+.plans-local-strip .plans-clock, .plans-local-strip .plans-profile { position:relative; z-index:1; }
+/* Wird es schmal, stiesse der Spruch mit der Uhr zusammen. Lieber ganz weg
+   als halb unter einer Uhrzeit — gemessen kollidiert er ab etwa 1150px. */
+@media(max-width:1150px){ .plans-local-strip .plans-slogan { display:none; } }
 
 /* Die Wochentabelle ist 850px breit. Die einspaltige Ansicht darf daran
    nicht mitwachsen, sonst wird die ganze Seite breiter als der Bildschirm:

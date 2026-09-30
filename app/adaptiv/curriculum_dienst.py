@@ -164,7 +164,20 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
             "subject": fach, "grade": grade, "topic": safe_topic, "format": format_spec()})
     status = result.get("status")
     if status == "unavailable":
-        raise jobs.PermanentFailure("Das Material ist noch nicht freigegeben oder derzeit nicht verfügbar.")
+        # "Nicht verfuegbar" heisst meistens "gerade nicht": der Dienst
+        # drosselt, wenn viele Themen auf einmal kommen. Das als endgueltig
+        # zu behandeln hat bei siebzehn Prüfungsthemen die ersten vier
+        # Auftraege sofort getoetet, obwohl Sekunden spaeter wieder
+        # ausgeliefert wurde. Endgueltig ist nur, was der Dienst auch so
+        # nennt: was Karo selbst abgelehnt hat, bekommt es nicht wieder.
+        # Die Gesamtdauer deckelt MAX_WAIT_SECONDS weiter oben.
+        if result.get("reason_code") == "rejected_by_client":
+            raise jobs.PermanentFailure(
+                "Für dieses Thema hat der Lehrplan-Dienst nichts Geprüftes mehr: "
+                "Karos Prüfung hat das gelieferte Material abgelehnt.")
+        payload.pop("curriculum_export", None)
+        raise jobs.Deferred(payload, result.get("retry_after")
+                            if type(result.get("retry_after")) is int else 60)
     eid = _export_id(result)
     payload["curriculum_export"] = eid
     if status == "pending":

@@ -11,10 +11,14 @@
   <span class="fortschritt-balken" aria-hidden="true"><i style="width:{{ (100 * safe_count / personal_count)|round|int }}%"></i></span></p>
 {% endif %}
 
+{# Dieselbe Seite liegt unter /lernstand (Kind) und /messung/fortschritt
+   (Eltern). Alle Verweise bleiben deshalb auf der eigenen Adresse — ein
+   festes "/lernstand" warf Eltern beim Reiterwechsel in den Kinderbereich. #}
+{% set basis = path %}
 {% set reiter = 'arbeiten' if tab == 'arbeiten' else 'themen' %}
 <nav class="tabs" aria-label="Archiv">
-  <a class="tab-btn{{ ' active' if reiter == 'themen' }}" href="/lernstand">Themen <span class="archiv-zahl">{{ archiv_themen|length }}</span></a>
-  <a class="tab-btn{{ ' active' if reiter == 'arbeiten' }}" href="/lernstand?tab=arbeiten">Klassenarbeiten <span class="archiv-zahl">{{ archiv_arbeiten|length }}</span></a>
+  <a class="tab-btn{{ ' active' if reiter == 'themen' }}" href="{{ basis }}">Themen <span class="archiv-zahl">{{ archiv_themen|length }}</span></a>
+  <a class="tab-btn{{ ' active' if reiter == 'arbeiten' }}" href="{{ basis }}?tab=arbeiten">Klassenarbeiten <span class="archiv-zahl">{{ archiv_arbeiten|length }}</span></a>
 </nav>
 
 {% if reiter == 'themen' %}
@@ -29,17 +33,18 @@
         <p>{{ t.subject|fachname }}{% if t.grade %} · {{ t.grade }}. Klasse{% endif %}
           {%- if t['gelöscht'] %} · <b class="geloescht-marke">gelöscht</b>{% else %} · <span class="learn-status sicher">gelernt</span>{% endif %}</p>
       </div>
-      {% if nachfrage == 'thema-' ~ t.id %}
+      {% if role == 'parent' %}{# Das Archiv gehoert dem Kind: Eltern sehen es, raeumen es aber nicht auf. #}
+      {% elif nachfrage == 'thema-' ~ t.id %}
       <div class="archiv-aktionen ist-nachfrage">
         <b>Wirklich löschen? Das lässt sich nicht zurückholen.</b>
-        <form method="post" action="/lernstand/thema/{{ t.id }}/entfernen">{{ csrf_input() }}<button class="loeschen-echt" type="submit">Ja, löschen</button></form>
-        <a class="quiet btn" href="/lernstand">Abbrechen</a>
+        <form method="post" action="/lernstand/thema/{{ t.id }}/entfernen">{{ csrf_input() }}<input type="hidden" name="ziel" value="{{ basis }}"><button class="loeschen-echt" type="submit">Ja, löschen</button></form>
+        <a class="quiet btn" href="{{ basis }}">Abbrechen</a>
       </div>
       {% else %}
       <div class="archiv-aktionen">
-        <form method="post" action="/lernstand/thema/{{ t.id }}/zurueck">{{ csrf_input() }}<button class="quiet" type="submit">Zurück zum Lernen</button></form>
+        <form method="post" action="/lernstand/thema/{{ t.id }}/zurueck">{{ csrf_input() }}<input type="hidden" name="ziel" value="{{ basis }}"><button class="quiet" type="submit">Zurück zum Lernen</button></form>
         <form method="post" action="/lernstand/thema/{{ t.id }}/zurueck">{{ csrf_input() }}<input type="hidden" name="erneut" value="ja"><button class="quiet" type="submit">Erneut lernen →</button></form>
-        <a class="loeschen-weg" href="/lernstand?weg=thema-{{ t.id }}">löschen</a>
+        <a class="loeschen-weg" href="{{ basis }}?weg=thema-{{ t.id }}">löschen</a>
       </div>
       {% endif %}
     </article>
@@ -61,17 +66,18 @@
           {%- if e['gelöscht'] %} · <b class="geloescht-marke">gelöscht</b>{% else %} · geschrieben{% endif %}
           {%- if e.themen_zahl %} · {{ e.sicher_zahl }} von {{ e.themen_zahl }} Themen sicher{% endif %}</p>
       </div>
-      {% if nachfrage == 'arbeit-' ~ e.id %}
+      {% if role == 'parent' %}{# Das Archiv gehoert dem Kind: Eltern sehen es, raeumen es aber nicht auf. #}
+      {% elif nachfrage == 'arbeit-' ~ e.id %}
       <div class="archiv-aktionen ist-nachfrage">
         <b>Wirklich löschen? Das lässt sich nicht zurückholen.</b>
-        <form method="post" action="/lernstand/arbeit/{{ e.id }}/entfernen">{{ csrf_input() }}<button class="loeschen-echt" type="submit">Ja, löschen</button></form>
-        <a class="quiet btn" href="/lernstand?tab=arbeiten">Abbrechen</a>
+        <form method="post" action="/lernstand/arbeit/{{ e.id }}/entfernen">{{ csrf_input() }}<input type="hidden" name="ziel" value="{{ basis }}"><button class="loeschen-echt" type="submit">Ja, löschen</button></form>
+        <a class="quiet btn" href="{{ basis }}?tab=arbeiten">Abbrechen</a>
       </div>
       {% else %}
       <div class="archiv-aktionen">
-        {% if e['gelöscht'] %}<form method="post" action="/lernstand/arbeit/{{ e.id }}/zurueck">{{ csrf_input() }}<button class="quiet" type="submit">Zurücknehmen</button></form>
+        {% if e['gelöscht'] %}<form method="post" action="/lernstand/arbeit/{{ e.id }}/zurueck">{{ csrf_input() }}<input type="hidden" name="ziel" value="{{ basis }}"><button class="quiet" type="submit">Zurücknehmen</button></form>
         {% else %}<a class="quiet btn" href="/klassenarbeit/{{ e.id }}">Ansehen</a>{% endif %}
-        <a class="loeschen-weg" href="/lernstand?tab=arbeiten&amp;weg=arbeit-{{ e.id }}">löschen</a>
+        <a class="loeschen-weg" href="{{ basis }}?tab=arbeiten&amp;weg=arbeit-{{ e.id }}">löschen</a>
       </div>
       {% endif %}
     </article>
@@ -90,7 +96,7 @@
     <p class="sub">Eine kompakte Übersicht über Sicherheit und Übung je Thema.</p>
   </div>
   <div class="export-mini">
-    <form method="post" action="/export">{{ csrf_input() }}
+    <form method="post" action="/messung/export">{{ csrf_input() }}
       <button class="ghost" type="submit"
               {{ 'disabled' if not (xlsx_ok and drive_ok and drive_writable) }}>
         Als Google Sheet exportieren

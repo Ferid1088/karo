@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from .. import config, db, faecher
 from ..adaptiv import store as learning_store
 from ..woche import plaene, plaene_store
+from . import learning_time
 
 MODES = {'monat': 'Lernmonat', 'woche': 'Lernwoche', 'tag': 'Lerntag'}
 ANSWER_EVENTS = {'Antwort richtig': True, 'Fehlertyp erkannt': False,
@@ -216,6 +217,32 @@ def build(mode: str = 'monat', raw_date: str = '', back: str = 'monat', base: st
         if day and window_start <= day <= window_end:
             daily[day]['exams'].append({'id': exam['id'], 'minutes': 0, 'subject': exam['subject'], 'exam_day': True})
 
+    # Lernzeit. Gemessen, wo die Lernseiten geschlagen haben; sonst aus den
+    # Zeitstempeln geschaetzt. Beides bleibt getrennt — eine Schaetzung darf
+    # nie wie eine Messung aussehen, und der Bericht sagt es jedem Tag an.
+    zeiten = learning_time.zeitraum(window_start, min(window_end, today))['tage']
+
+    def work(d: date) -> dict:
+        eintrag = zeiten.get(d)
+        if not eintrag:
+            return {'seconds': 0, 'label': '–', 'measured': True, 'known': False}
+        return {'seconds': eintrag['sekunden'], 'label': learning_time.dauer(eintrag['sekunden']),
+                'measured': eintrag['gemessen'], 'known': True}
+
+    def work_span(von: date, bis: date) -> dict:
+        tage = [zeiten[d] for d in _days(von, bis) if d in zeiten]
+        sekunden = sum(t['sekunden'] for t in tage)
+        geschaetzt = any(not t['gemessen'] for t in tage)
+        return {'seconds': sekunden, 'label': learning_time.dauer(sekunden),
+                'measured': all(t['gemessen'] for t in tage) if tage else True,
+                'estimated': geschaetzt, 'days': len(tage),
+                'mixed': geschaetzt and any(t['gemessen'] for t in tage)}
+
+    topic_seconds = defaultdict(int)
+    for d in _days(start, end):
+        for tid, sek in zeiten.get(d, {}).get('themen', {}).items():
+            topic_seconds[tid] += sek
+
     selected = [daily[d] for d in _days(start, end)]
     answers = [a for d in selected for a in d['answers']]
     checks = [t for d in selected for t in d['checks'] if t['scope'] == 'personal']
@@ -229,6 +256,9 @@ def build(mode: str = 'monat', raw_date: str = '', back: str = 'monat', base: st
     states = learning_store.parent_report_states(cutoff)
     # Show the actual topics behind the counts, not an inferred school grade.
     worked_ids = set().union(*(d['active'] for d in selected))
+    # Ein Thema, an dem gemessen gearbeitet wurde, gilt als bearbeitet —
+    # auch ohne beantwortete Frage. Lesen ist Arbeit.
+    worked_ids |= {tid for tid, sek in topic_seconds.items() if sek and tid in topics}
     topic_rows = []
     for tid in worked_ids:
         t = topics[tid]
@@ -236,6 +266,8 @@ def build(mode: str = 'monat', raw_date: str = '', back: str = 'monat', base: st
         topic_rows.append({**t, 'answers': len(attempted),
             'right': sum(a['right'] for a in attempted),
             'retry': sum(not a['right'] for a in attempted),
+            'seconds': topic_seconds.get(tid, 0),
+            'work_label': learning_time.dauer(topic_seconds.get(tid, 0)) if topic_seconds.get(tid) else '–',
             'safe': states.get(tid) == 'MASTERED'})
     topic_rows.sort(key=lambda t: (-t['answers'], t['label'], t['id']))
     order = ('sicher', 'uebt', 'offen')
@@ -246,6 +278,8 @@ def build(mode: str = 'monat', raw_date: str = '', back: str = 'monat', base: st
         return 'sicher' if state == 'MASTERED' else 'uebt' if state or tid in seen else 'offen'
     for row in subject_rows:
         row['topics'] = [t for t in topic_rows if t['scope'] == 'personal' and t['subject'] == row['key']]
+        row['seconds'] = sum(t['seconds'] for t in row['topics'])
+        row['work_label'] = learning_time.dauer(row['seconds']) if row['seconds'] else '–'
         row['percent'] = round(row['right'] / row['answers'] * 100) if row['answers'] else None
         row['ten'] = round(row['right'] / row['answers'] * 10) if row['answers'] else None
         known = [t for t in topics.values() if t['scope'] == 'personal' and t['subject'] == row['key']
@@ -287,6 +321,7 @@ def build(mode: str = 'monat', raw_date: str = '', back: str = 'monat', base: st
                  href=link('woche',g['start']) if mode=='monat' else link('tag',g['start'],'woche',anchor),
                  values=[{'key': s, 'value': sum(a['topic']['subject']==s for a in group_answers)} for s in faecher.FAECHER])
         records = [daily[d] for d in _days(g['start'], g['end'])]
+        g.update(**{'work': work_span(g['start'], g['end'])})
         g.update(right=sum(a['right'] for a in group_answers),
                  checks=sum(len(d['checks']) for d in records),
                  goal_minutes=sum(c['actual_minutes'] for d in records for c in d['goals']),
@@ -349,17 +384,26 @@ def build(mode: str = 'monat', raw_date: str = '', back: str = 'monat', base: st
         for tid in sorted(current['active']):
             t=topics[tid]
             a=[r for r in current['answers'] if r['topic']['id']==tid]
+            sek = zeiten.get(anchor, {}).get('themen', {}).get(tid, 0)
             day_items.append({'label':t['label'],'kind':('Prüfungsvorbereitung' if t['scope']=='exam' else 'Eigenes Thema')+' · '+faecher.NAMEN[t['subject']],
                 'value':f"{sum(x['right'] for x in a)}/{len(a)} richtig" if a else 'Aktivität',
+                'time': learning_time.dauer(sek) if sek else '',
                 'note':'Lerncheck erstmals bestanden' if t in current['checks'] else ''})
+        for tid, sek in sorted(zeiten.get(anchor, {}).get('themen', {}).items(), key=lambda p: -p[1]):
+            # Zeit an einem Thema, das sonst keine Spur hinterlassen hat.
+            if tid in current['active'] or tid not in topics or not sek:
+                continue
+            t = topics[tid]
+            day_items.append({'label':t['label'],'kind':('Prüfungsvorbereitung' if t['scope']=='exam' else 'Eigenes Thema')+' · '+faecher.NAMEN[t['subject']],
+                'value':'Gelesen','time': learning_time.dauer(sek),'note':''})
         for g in current['goals']:
             day_items.append({'label':g['label'],'kind':'Ziele planen · Selbstauskunft',
-                              'value':f"{g['actual_minutes']} Min. gemeldet",'note':'Nachgeholt' if g['is_makeup'] else ''})
+                              'value':f"{g['actual_minutes']} Min. gemeldet",'time':'','note':'Nachgeholt' if g['is_makeup'] else ''})
         for s in current['plans']:
-            day_items.append({'label':s['statement'],'kind':'Zielplanung', 'value':f"{s['planned_minutes']} Min. geplant",'note':''})
+            day_items.append({'label':s['statement'],'kind':'Zielplanung', 'value':f"{s['planned_minutes']} Min. geplant",'time':'','note':''})
         for e in current['exams']:
             day_items.append({'label':faecher.NAMEN[e['subject']], 'kind':'Klassenarbeit' if e.get('exam_day') else 'Prüfungsvorbereitung',
-                              'value':'Prüfungstag' if e.get('exam_day') else f"{e['minutes']} Min. geplant",'note':''})
+                              'value':'Prüfungstag' if e.get('exam_day') else f"{e['minutes']} Min. geplant",'time':'','note':''})
 
     # ---- Visual overview: everything below only re-reads the evidence above. ----
     def day_info(d: date) -> dict:
@@ -372,6 +416,7 @@ def build(mode: str = 'monat', raw_date: str = '', back: str = 'monat', base: st
             'missed': not active and bool(data['plans']) and d < today,
             'answers': len(data['answers']), 'right': sum(a['right'] for a in data['answers']),
             'checks': len(data['checks']), 'goal_minutes': sum(c['actual_minutes'] for c in data['goals']),
+            'work': work(d),
             'exam_day': any(e.get('exam_day') for e in data['exams']),
             'heat': _heat(len(data['answers']), active),
             'href': link('tag', d, back if mode == 'tag' else mode, base_date if mode == 'tag' else anchor)}
@@ -395,6 +440,11 @@ def build(mode: str = 'monat', raw_date: str = '', back: str = 'monat', base: st
                  due_minutes=sum(x['minutes'] for x in due))
     goal_list = list(goal_stats.values())
     goal_due, goal_done = sum(g['due'] for g in goal_list), sum(g['done'] for g in goal_list)
+    period_work = work_span(start, end)
+    # Der Schnitt zaehlt nur Tage, an denen ueberhaupt gearbeitet wurde:
+    # ein Schnitt ueber Ferientage waere keine Auskunft, sondern ein Vorwurf.
+    period_work['average'] = learning_time.dauer(
+        round(period_work['seconds'] / period_work['days'])) if period_work['days'] else '–'
     elapsed_days = sum(1 for d in _days(start, end) if d <= today)
     active_days = sum(bool(d['active'] or d['goals']) for d in selected)
     answer_ten = round(right / len(answers) * 10) if answers else None
@@ -458,6 +508,8 @@ def build(mode: str = 'monat', raw_date: str = '', back: str = 'monat', base: st
         'back_link':link(back,base_date),'answers':len(answers),'personal_answers':len(personal_answers),
         'right':right,'retry':len(answers)-right,'answer_percent':round(right/len(answers)*100) if answers else None,
         'worked_topics':len(worked_ids),'all_checks':len(all_checks),'insights':insights,
+        'work':period_work,'work_topics':[t for t in topic_rows if t['seconds']],
+        'work_pause':learning_time.PAUSE,
         'exam_answers':len(answers)-len(personal_answers),'active_days':active_days,
         'new_secure':len(checks),'goal_reports':sum(g['reports'] for g in goal_stats.values()),
         'goal_minutes':sum(g['minutes'] for g in goal_stats.values()),'goals':list(goal_stats.values()),

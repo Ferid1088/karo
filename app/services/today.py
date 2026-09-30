@@ -26,8 +26,27 @@ def date_label(day: dt.date) -> str:
     return f"{WOCHENTAGE[day.weekday()]}, {day.day}. {MONATE[day.month - 1]}"
 
 
+def local_day(value: str) -> dt.date:
+    """Kalendertag eines gespeicherten Zeitpunkts in der Zeitzone der Familie.
+
+    `db.now()` schreibt UTC, `db.today()` liefert den lokalen Tag. Wer die
+    ersten zehn Zeichen eines UTC-Zeitstempels mit einem lokalen Datum
+    vergleicht, liegt jeden Abend nach 22 Uhr (Sommerzeit) einen Tag daneben:
+    ein Thema, das gerade sicher wurde, stand dann sofort als "gestern" da.
+    """
+    roh = str(value)[:19]
+    try:
+        moment = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return dt.date.fromisoformat(roh[:10])
+    if moment.tzinfo is None:
+        return moment.date()
+    zone = ZoneInfo(getattr(config.load_safe(), "timezone", None) or "Europe/Berlin")
+    return moment.astimezone(zone).date()
+
+
 def relative_day(value: str, today: dt.date) -> str:
-    day = dt.date.fromisoformat(value[:10])
+    day = local_day(value)
     delta = (today - day).days
     if delta <= 0:
         return "heute"
@@ -118,7 +137,7 @@ def last_success(today: dt.date) -> dict | None:
                    WHERE learning_visible=1 AND learned_at IS NOT NULL
                      AND deleted_at IS NULL AND purged_at IS NULL
                    ORDER BY learned_at DESC LIMIT 1""")
-    if not row or (today - dt.date.fromisoformat(row["learned_at"][:10])).days > ERFOLG_TAGE:
+    if not row or (today - local_day(row["learned_at"])).days > ERFOLG_TAGE:
         return None
     return {"label": row["label"], "when": relative_day(row["learned_at"], today)}
 

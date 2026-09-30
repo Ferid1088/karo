@@ -151,18 +151,33 @@ def calendar(exam_id: int) -> list[dict]:
         earlier = simulation_day - dt.timedelta(days=1)
         simulation_day = earlier
 
+    # Themen auf die gewaehlten Lerntage verteilen — nach den Minuten des
+    # Tages und der angekuendigten Reihenfolge, die die Voraussetzungen
+    # traegt. Vorher stand an jedem Lerntag dasselbe erste offene Thema; ein
+    # Kind konnte damit nicht sehen, ob seine Zeit ueberhaupt reicht.
+    from . import exam_effort
+    lerntage = [(tag, int(saved.get(str(tag), 0))) for tag in positive_days
+                if tag >= today and tag != simulation_day]
+    verteilt = exam_effort.verteilung(exam_id, lerntage)
+
     for day in _date_range(today, exam_day, include_end=True):
         is_exam = day == exam_day
         minutes = 0 if is_exam else int(saved.get(str(day), 0))
         is_simulation = bool(simulation_day and day == simulation_day)
         row = None
+        tagesthemen = verteilt.get(str(day), []) if not is_simulation else []
         if minutes > 0 and not is_simulation:
             from .learning_hub import exam_topics
-            row = content[0] if content else {
-                "inhalt": ("Alles sicher – Zeit zum Wiederholen" if exam_topics(exam_id)
-                           else "Zuerst Prüfungsthemen ergänzen"),
-                "topic_id": None,
-            }
+            if tagesthemen:
+                row = {"inhalt": " · ".join(z["label"] for z in tagesthemen),
+                       "topic_id": tagesthemen[0]["topic_id"]}
+            else:
+                row = content[0] if content else None
+                row = row or {
+                    "inhalt": ("Alles sicher – Zeit zum Wiederholen" if exam_topics(exam_id)
+                               else "Zuerst Prüfungsthemen ergänzen"),
+                    "topic_id": None,
+                }
 
         topic_id = row.get("topic_id") if row else None
         topic = topics.get(int(topic_id)) if topic_id else None
@@ -181,6 +196,7 @@ def calendar(exam_id: int) -> list[dict]:
             "is_exam": is_exam,
             "is_learning_day": minutes > 0,
             "is_simulation": is_simulation,
+            "themen": tagesthemen,
             "kind": "simulation" if is_simulation else ("learning" if minutes > 0 else "free"),
         })
     return result

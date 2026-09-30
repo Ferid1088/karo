@@ -1,15 +1,20 @@
 {% extends 'learning_base.html' %}
 {% block title %}Heute – {{ companion_name }}{% endblock %}
+{% block mainclass %}learning-main heute-seite{% endblock %}
 {% block page_styles %}<link rel="stylesheet" href="/static/post.css?v={{ asset_version }}">{% endblock %}
 {% block content %}
 {# "Heute" ist der Tag des Kindes und beantwortet drei Fragen: Was mache ich
    jetzt? Wie viel ist es heute? Was habe ich schon geschafft? Der Tag kommt
    aus "Ziele planen" und dem Lernkalender der Klassenarbeit — es gibt nur
    dieses eine "Heute". #}
-{% set fuchs = '/static/karo-fox-cheer.png' if tag.state in ('fertig', 'unterwegs') else '/static/karo-fox-wave.png' %}
+{# Der Igel ist das Tier von "Heute": Fuchs, Eule und Biene gehoeren zu
+   anderen Bereichen. Wer ein eigenes Foto hinterlegt hat, sieht das Foto —
+   der Igel steht dann daneben, damit die Seite ihr Gesicht behaelt. #}
+{% set igel = '/static/karo-igel-jubel.svg' if tag.state == 'fertig' else '/static/karo-igel.svg' %}
 {% set anzahl = tag['items']|length %}
 <header class="heute-kopf">
-  <img src="{{ learner_photo_url or fuchs }}" alt="" width="64" height="64">
+  <span class="heute-avatar{{ ' hat-foto' if learner_photo_url }}">
+    <img src="{{ learner_photo_url or igel }}" alt="" width="72" height="72"></span>
   <div>
     <p class="heute-datum">{{ tag.date_label }}</p>
     <h1 class="heute-hallo">Hallo{{ ' ' ~ cfg.learner_name if cfg.learner_name else '' }}!</h1>
@@ -19,6 +24,7 @@
     {%- elif tag.state == 'start' %}Heute {{ 'ist es eine kleine Sache' if anzahl == 1 else 'sind es ' ~ anzahl ~ ' kleine Dinge' }}{{ ', etwa ' ~ tag.minutes ~ ' Minuten' if tag.minutes }}.
     {%- else %}Heute ist nichts geplant. Du entscheidest, ob du etwas lernen möchtest.{% endif %}</p>
   </div>
+  {% if learner_photo_url %}<img class="heute-igel" src="{{ igel }}" alt="" width="60" height="60">{% endif %}
 </header>
 
 {% if post_neu %}{% set brief = post_neu[0] %}
@@ -31,10 +37,10 @@
 {% set item = tag.next_item %}
 {% if tag.state == 'fertig' %}
   <p class="eyebrow">GESCHAFFT</p>
-  <div class="fertig-inhalt"><img src="/static/karo-fox-trophy.png" alt="" width="96" height="96">
+  <div class="fertig-inhalt"><img src="/static/karo-igel-jubel.svg" alt="" width="104" height="104">
   <div><h2>Für heute geschafft!</h2>
   <p>Du hast alles erledigt, was heute auf deinem Plan stand. Lust auf etwas ganz anderes?</p>
-  <a class="btn" href="/welten">Meine Welt entdecken →</a></div></div>
+  {% if role == 'child' %}<a class="btn" href="/welten">Meine Welt entdecken →</a>{% endif %}</div></div>
   {% if naechstes and next_action_kind in ('review', 'quiz', 'lesson') %}<a class="subtle-link" href="{{ naechstes.url }}">Noch Lust zu lernen? {{ naechstes.titel }}</a>
   {% elif next_topic %}<a class="subtle-link" href="/lernen/thema/{{ next_topic.id }}">Noch Lust zu lernen? {{ next_topic.label }}</a>{% endif %}
 {% elif item and item.kind == 'arbeit' %}

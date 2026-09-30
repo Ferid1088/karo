@@ -70,7 +70,15 @@
   });
   document.addEventListener('close', event => {
     const sheet = event.target;
-    if (sheet.matches?.('dialog.pr-sheet') && sheet.returnTo?.isConnected) sheet.returnTo.focus({preventScroll:true});
+    if (!sheet.matches?.('dialog.pr-sheet') || !sheet.returnTo?.isConnected) return;
+    // Der Fokus geht zurueck zu dem Element, das den Dialog geoeffnet hat —
+    // aber nur, wenn ihn seither niemand selbst woandershin gesetzt hat.
+    // `close` wird verzoegert zugestellt: wer den Dialog schliesst und sofort
+    // etwas anderes anspringt, bekam den Fokus sonst wieder weggerissen, und
+    // die naechste Taste landete auf dem alten Knopf statt auf dem neuen Ziel.
+    const aktiv = document.activeElement;
+    if (aktiv && aktiv !== document.body && !sheet.contains(aktiv)) return;
+    sheet.returnTo.focus({preventScroll:true});
   }, true);
   window.addEventListener('popstate', () => show(location.href, false));
   // Post von zu Hause: ein Vorschlag landet im Textfeld (dort änderbar) und wählt sein Emoji.

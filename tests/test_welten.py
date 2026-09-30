@@ -276,3 +276,40 @@ def test_parent_can_delete_world_without_touching_learning_database(welt, tmp_pa
     assert store.moment_for_day() is None
     assert not path.exists()
     assert (family[1].data / "karo.db").exists()
+
+
+def test_world_content_is_closed_to_the_parent_password(welt):
+    """"Meine Welt" ist das Tagebuch des Kindes. Wer mit dem Eltern-Passwort
+    angemeldet ist, kommt an den Inhalt nicht heran — nur an Freigabe,
+    Export und Loeschen."""
+    family = welt[0]
+    activate(welt)
+    role(family, "parent")
+    for pfad in ("/welten", "/welten/entdecken", "/welten/jahr",
+                 "/welten/zeitkapseln", "/welten/festhalten"):
+        assert family[0].get(pfad).status_code == 403, pfad
+    assert family[0].post(
+        "/welten/nachdenken", data={"_csrf": "x", "text": "hallo"},
+        follow_redirects=False).status_code == 403
+
+    # Was Eltern brauchen, bleibt offen — und steht im Elternbereich.
+    seite = family[0].get("/welten/eltern")
+    assert seite.status_code == 200
+    assert 'data-ui-area="parent"' in seite.text
+    assert 'href="/welten/jahr"' not in seite.text
+    assert family[0].get("/welten/datenschutz").status_code == 200
+
+    # Und im Kinderbereich taucht der Weg dorthin fuer Eltern nicht auf.
+    heute = family[0].get("/")
+    assert heute.status_code == 200
+    assert 'href="/welten"' not in heute.text
+
+
+def test_child_still_reaches_its_own_world(welt):
+    family = welt[0]
+    activate(welt)
+    role(family, "child")
+    for pfad in ("/welten", "/welten/entdecken", "/welten/jahr",
+                 "/welten/zeitkapseln"):
+        assert family[0].get(pfad).status_code == 200, pfad
+    assert 'href="/welten"' in family[0].get("/").text

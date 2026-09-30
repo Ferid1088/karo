@@ -64,6 +64,11 @@
         {% else %}<span class="pr-wdots" aria-hidden="true">{% for d in report.strip %}<span class="{{ dstate(d) }} {{ 'sel' if d.selected }} {{ 'today' if d.today }}"><i></i><small>{{ d.weekday }}</small></span>{% endfor %}</span>{% endif %}</span>
       <span class="pr-tile-foot"><span>{% if report.future %}noch offen{% elif report.mode == 'tag' %}<b>{{ 'Lerntag' if report.active_days else 'Kein Lerntag' }}</b>{% else %}<b>{{ report.active_days }} von {{ report.elapsed_days }}</b> Tagen{% endif %}</span>{{ chev() }}</span>
     </a>
+    <a class="pr-tile pr-t-time" {{ opener('pr-d-time') }}>
+      <span class="pr-tile-top"><span class="pr-kicker">Lernzeit</span></span>
+      <span class="pr-vis pr-timebig"><b>{{ report.work.label if report.work.seconds else '–' }}</b>{% if report.work.mixed %}<small class="pr-approx">teils geschätzt</small>{% elif report.work.estimated %}<small class="pr-approx">geschätzt</small>{% endif %}</span>
+      <span class="pr-tile-foot"><span>{% if report.mode == 'tag' %}{{ 'gearbeitet' if report.work.seconds else 'nichts erfasst' }}{% elif report.work.days %}<b>{{ report.work.average }}</b> je Lerntag{% else %}noch nichts erfasst{% endif %}</span>{{ chev() }}</span>
+    </a>
     <a class="pr-tile pr-t-answers" {{ opener('pr-d-answers') }}>
       <span class="pr-tile-top"><span class="pr-kicker">Richtig</span></span>
       <span class="pr-vis">{{ ten(report.answer_ten, 'pr-ten-big') }}</span>
@@ -87,7 +92,7 @@
       {% if report.mode == 'tag' %}
         <div class="pr-panel-heading"><h2 id="pr-activity-title">Was an diesem Tag passiert ist</h2><a data-report-link href="{{ report.back_link }}" class="pr-back">Zum Zeitraum</a></div>
         <div class="pr-day-items">
-        {% for item in report.day_items %}<article class="pr-day-item"><div><h3>{{ item.label }}</h3><p>{{ item.kind }}{% if item.note %} · {{ item.note }}{% endif %}</p></div><strong>{{ item.value }}</strong></article>
+        {% for item in report.day_items %}<article class="pr-day-item"><div><h3>{{ item.label }}</h3><p>{{ item.kind }}{% if item.note %} · {{ item.note }}{% endif %}</p></div><strong>{{ item.value }}{% if item.time %}<small class="pr-item-time">{{ item.time }}</small>{% endif %}</strong></article>
         {% else %}<p class="pr-empty">Keine Aktivität erfasst. Das sagt nichts über das Lernen außerhalb von Karo aus.</p>{% endfor %}
         </div>
       {% elif report.mode == 'woche' %}
@@ -95,7 +100,7 @@
           <span class="pr-legend">{% for s in report.subjects %}<span><i class="pr-dot {{ s.key }}" aria-hidden="true"></i>{{ s.name }}</span>{% endfor %}<span><i class="pr-dot pr-hatched" aria-hidden="true"></i>noch nicht richtig</span><span>✓ Lerncheck</span><span>○ geplant</span></span></div>
         <div class="pr-plot">
           {% for group in report.groups %}{% set d = report.strip[loop.index0] %}
-          <a class="pr-chart-group {{ 'pr-today' if d.today }}" data-report-link data-day="{{ d.iso }}" href="{{ group.href }}" aria-label="{{ group.label }}: {{ group.total }} bewertete Antworten, {{ group.right }} richtig. {{ group.checks }} erste Lernchecks bestanden. {{ group.goal_minutes }} Zielminuten gemeldet. Tag anzeigen.">
+          <a class="pr-chart-group {{ 'pr-today' if d.today }}" data-report-link data-day="{{ d.iso }}" href="{{ group.href }}" aria-label="{{ group.label }}: {{ group.total }} bewertete Antworten, {{ group.right }} richtig. {% if group.work.seconds %}{{ group.work.label }} gearbeitet{{ ' (geschätzt)' if not group.work.measured }}. {% endif %}{{ group.checks }} erste Lernchecks bestanden. {{ group.goal_minutes }} Zielminuten gemeldet. Tag anzeigen.">
             <span class="pr-bar-space"><span class="pr-bar-total">{{ '–' if group.future else group.total }}</span>{% for val in group['values']|reverse if val.value %}<span class="pr-bar {{ val.key }}" style="height:{{ val.height }}%" aria-hidden="true"><span class="pr-bar-retry" style="height:{{ val.retry_height }}%"></span></span>{% endfor %}</span>
             <span class="pr-bar-label">{{ group.label }}</span>
             <span class="pr-bar-marks" aria-hidden="true">{{ '✓' if group.checks }}{{ '○' if d.planned and not d.active }}</span>
@@ -109,7 +114,7 @@
         <div class="pr-cal" role="grid" aria-label="Lernkalender">
           {% for w in ['Mo','Di','Mi','Do','Fr','Sa','So'] %}<span class="pr-cal-h" aria-hidden="true">{{ w }}</span>{% endfor %}<span class="pr-cal-h" aria-hidden="true">Woche</span>
           {% for row in report.calendar_rows %}
-            {% for d in row.days %}{% if d %}<a data-report-link href="{{ d.href }}" data-day="{{ d.iso }}" class="pr-cell h{{ d.heat }} {{ 'fut' if d.future }} {{ 'pr-today' if d.today }}" aria-label="{{ d.label }}: {{ d.answers }} Antworten{{ ', Lerncheck bestanden' if d.checks }}{{ ', Plan verpasst' if d.missed }}{{ ', Prüfung' if d.exam_day }}">
+            {% for d in row.days %}{% if d %}<a data-report-link href="{{ d.href }}" data-day="{{ d.iso }}" class="pr-cell h{{ d.heat }} {{ 'fut' if d.future }} {{ 'pr-today' if d.today }}" aria-label="{{ d.label }}: {{ d.answers }} Antworten{% if d.work.known %}, {{ d.work.label }} gearbeitet{{ ' (geschätzt)' if not d.work.measured }}{% endif %}{{ ', Lerncheck bestanden' if d.checks }}{{ ', Plan verpasst' if d.missed }}{{ ', Prüfung' if d.exam_day }}">
               <span class="pr-cd">{{ d.day }}</span>{% if d.checks %}<span class="pr-ck" aria-hidden="true">✓</span>{% endif %}
               <span class="pr-cm">{{ d.answers if d.answers else '' }}</span>
               {% if d.exam_day %}<span class="pr-exm" aria-hidden="true">◆</span>{% elif d.missed %}<span class="pr-miss" aria-hidden="true"></span>{% endif %}</a>
@@ -146,7 +151,7 @@
           <span class="pr-st-big">{% if s.ten is not none %}{{ s.ten }}<small> von 10 richtig</small>{% else %}<small>keine Antworten</small>{% endif %}</span></span>
           {{ ten(s.ten) }}
           {{ mbar(s.mastery) }}
-          <span class="pr-st-foot"><span>{{ s.safe_total }} von {{ s.mastery|length }} Themen sicher</span>{{ chev() }}</span>
+          <span class="pr-st-foot"><span>{{ s.safe_total }} von {{ s.mastery|length }} Themen sicher{% if s.seconds %} · {{ s.work_label }}{% endif %}</span>{{ chev() }}</span>
         </a>
       {% endfor %}
       </div>
@@ -181,10 +186,36 @@
   {% call sheet('pr-d-days', 'Lerntage') %}
     <div class="pr-kpis"><div><b>{{ report.active_days }}{% if report.mode != 'tag' %} von {{ report.elapsed_days }}{% endif %}</b><span>Tage mit Lernaktivität oder Zielmeldung</span></div></div>
     <div class="pr-d-list">{% for d in report.strip if not report.mode == 'monat' or d.active or d.missed %}
-      <a class="pr-drow" data-report-link href="{{ d.href }}"><span class="pr-nm"><span>{{ d.label }}{% if d.answers or d.goal_minutes %}<small>{{ d.answers }} Antworten{% if d.goal_minutes %} · {{ d.goal_minutes }} Zielmin.{% endif %}</small>{% endif %}</span></span>
+      <a class="pr-drow" data-report-link href="{{ d.href }}"><span class="pr-nm"><span>{{ d.label }}{% if d.answers or d.goal_minutes %}<small>{{ d.answers }} Antworten{% if d.work.known %} · {{ d.work.label }}{{ ' ~' if not d.work.measured }} gelernt{% endif %}{% if d.goal_minutes %} · {{ d.goal_minutes }} Zielmin.{% endif %}</small>{% endif %}</span></span>
         <span class="pr-rt">{% if d.future %}{{ badge('off', 'geplant' if d.planned else 'offen') }}{% elif d.active %}{{ badge('good', 'gelernt') }}{% elif d.missed %}{{ badge('warn', 'Plan verpasst') }}{% else %}{{ badge('off', 'frei') }}{% endif %}{{ chev() }}</span></a>
     {% else %}<p class="pr-empty">Noch keine Lerntage in diesem Zeitraum.</p>{% endfor %}</div>
     <p class="pr-d-expl">Aktive Tage enthalten Lernaktivitäten oder Zielmeldungen, nicht bloße Planung. Ein gelber Ring heißt: Es war etwas geplant, aber nichts gemeldet.</p>
+  {% endcall %}
+
+  {% call sheet('pr-d-time', 'Lernzeit') %}
+    <div class="pr-kpis">
+      <div><b>{{ report.work.label if report.work.seconds else '–' }}</b><span>{{ 'an diesem Tag' if report.mode == 'tag' else 'im Zeitraum' }} gearbeitet</span></div>
+      {% if report.mode != 'tag' %}<div><b>{{ report.work.average }}</b><span>je Lerntag</span></div>
+      <div><b>{{ report.work.days }}</b><span>{{ 'Tag' if report.work.days == 1 else 'Tage' }} mit Lernzeit</span></div>{% endif %}
+    </div>
+    {% if report.mode != 'tag' %}
+    <h3 class="pr-d-sec">Nach Tag</h3>
+    <div class="pr-d-list">{% for d in report.strip if d.work.known %}
+      <a class="pr-drow" data-report-link href="{{ d.href }}"><span class="pr-nm"><span>{{ d.label }}<small>{{ d.answers }} Antworten</small></span></span>
+        <span class="pr-rt">{{ d.work.label }}{{ ' ~' if not d.work.measured }}{{ chev() }}</span></a>
+    {% else %}<p class="pr-empty">In diesem Zeitraum wurde noch keine Lernzeit erfasst.</p>{% endfor %}</div>
+    {% endif %}
+    <h3 class="pr-d-sec">Nach Thema</h3>
+    <div class="pr-d-list">{% for t in report.work_topics %}
+      <div class="pr-drow"><span class="pr-nm"><i class="pr-dot {{ t.subject }}" aria-hidden="true"></i><span>{{ t.label }}<small>{{ 'Prüfung' if t.scope == 'exam' else 'eigenes Thema' }}{% if t.answers %} · {{ t.answers }} Antworten{% endif %}</small></span></span>
+        <span class="pr-rt">{{ t.work_label }}</span></div>
+    {% else %}<p class="pr-empty">Noch keine Lernzeit je Thema erfasst.</p>{% endfor %}</div>
+    <h3 class="pr-d-sec">Nach Fach</h3>
+    <div class="pr-d-list">{% for s in report.subjects if s.seconds %}
+      <a class="pr-drow" {{ opener('pr-d-subj-' ~ s.key) }}><span class="pr-nm"><i class="pr-dot {{ s.key }}" aria-hidden="true"></i><span>{{ s.name }}</span></span><span class="pr-rt">{{ s.work_label }}{{ chev() }}</span></a>
+    {% else %}<p class="pr-empty">Noch keine Lernzeit je Fach erfasst.</p>{% endfor %}</div>
+    <p class="pr-d-expl">Gezählt wird die Zeit auf den Lernseiten — Erklärungen, Lernrunden und Fragen. Solange eine Seite offen und sichtbar ist, läuft die Uhr; ein weggeklickter Tab zählt nicht. Klassenarbeits-Planung und die selbst gemeldeten Minuten aus „Ziele planen“ sind eigene Zahlen und stecken hier nicht mit drin.</p>
+    <p class="pr-d-expl">Ein <b>~</b> heißt: an diesem Tag wurde noch nicht gemessen. Die Zahl stammt dann aus den Abständen zwischen den Aktivitäten, Pausen über {{ (report.work_pause / 60)|round|int }} Minuten zählen nicht mit. So eine Schätzung ist eher zu niedrig als zu hoch. Und: Lernen außerhalb von Karo — auf Papier, mit Ihnen am Tisch — steht hier grundsätzlich nicht.</p>
   {% endcall %}
 
   {% call sheet('pr-d-answers', 'Richtig gelöst') %}
@@ -246,12 +277,13 @@
 
   {% if report.mode != 'tag' %}{% call sheet('pr-d-table', 'Die Zahlen zum Verlauf') %}
     <div class="pr-timeline-wrap"><table class="pr-timeline"><caption>{{ 'Woche' if report.mode == 'monat' else 'Tag' }} anklicken für Details</caption><thead><tr><th scope="col">Zeitraum</th>{% for g in report.groups %}<th scope="col"><a data-report-link href="{{ g.href }}">{{ g.label }}</a></th>{% endfor %}</tr></thead><tbody>
+      <tr><th scope="row">Gearbeitet</th>{% for g in report.groups %}<td>{{ (g.work.label ~ ('~' if not g.work.measured else '')) if g.work.seconds else '–' }}</td>{% endfor %}</tr>
       <tr><th scope="row">Richtig / Antworten</th>{% for g in report.groups %}<td>{{ g.right|string + '/' + g.total|string if g.total else '–' }}</td>{% endfor %}</tr>
       <tr class="pr-check-row"><th scope="row">Neue Lernchecks ✓</th>{% for g in report.groups %}<td>{{ g.checks or '–' }}</td>{% endfor %}</tr>
       <tr class="pr-goal-row"><th scope="row">Zielmin. gemeldet</th>{% for g in report.groups %}<td>{{ g.goal_minutes or '–' }}</td>{% endfor %}</tr>
       <tr><th scope="row">Prüfungsmin. geplant</th>{% for g in report.groups %}<td>{{ g.exam_minutes or '–' }}</td>{% endfor %}</tr>
     </tbody></table></div>
-    <p class="pr-d-expl">Antworten sind Übungsversuche, keine Schulnote. Unterschiedlich schwere Aufgaben sind nicht direkt vergleichbar. Zielminuten sind Selbstauskunft, Prüfungsminuten stammen aus der Planung.</p>
+    <p class="pr-d-expl">Antworten sind Übungsversuche, keine Schulnote. Unterschiedlich schwere Aufgaben sind nicht direkt vergleichbar. Zielminuten sind Selbstauskunft, Prüfungsminuten stammen aus der Planung. „Gearbeitet“ ist die Zeit auf den Lernseiten; ein <b>~</b> heißt geschätzt.</p>
   {% endcall %}{% endif %}
 
   {% call sheet('pr-d-post', 'Nachricht an ' ~ kid) %}

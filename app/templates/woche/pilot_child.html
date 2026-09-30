@@ -2,7 +2,7 @@
 {% macro activity_fields(activity) %}{{ csrf_input() }}<input type="hidden" name="plan_id" value="{{ plan.id }}"><input type="hidden" name="revision" value="{{ plan.revision }}"><input type="hidden" name="day" value="{{ day }}"><input type="hidden" name="activity" value="{{ activity }}">{% endmacro %}
 {% macro status_fields() %}{{ csrf_input() }}<input type="hidden" name="plan_id" value="{{ plan.id }}"><input type="hidden" name="version" value="{{ plan.version }}">{% endmacro %}
 {% block weekly %}
-<p><a href="/welten">Meine Interessen &amp; Spielwelten entdecken →</a></p>
+{% if role == 'child' %}<p><a href="/welten">Meine Interessen &amp; Spielwelten entdecken →</a></p>{% endif %}
 {% if not plan %}
 <section class="card"><p>Was möchtest du diese Woche angehen? Legt gemeinsam etwas Kleines fest.</p>{% if role == 'parent' %}<a class="btn" href="/woche/eltern">Gemeinsam vereinbaren</a>{% else %}<p>Für den ersten Wochenplan: Hol einen Erwachsenen dazu. Meldet euch unten ab und mit dem Eltern-Passwort wieder an. Unter „Meine Woche“ könnt ihr dann gemeinsam etwas vereinbaren.</p>{% endif %}</section>
 {% else %}

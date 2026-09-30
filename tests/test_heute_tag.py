@@ -172,3 +172,18 @@ def test_time_capsule_opening_today_shows_only_a_bee_link(client, fake_llm, fake
     client.get(f"/welten/zeitkapseln/{heute}")
     assert welt.capsule(heute)["opened_at"] is not None
     assert "Zeitkapsel" not in client.get("/").text
+
+
+def test_am_spaeten_abend_gelerntes_gilt_noch_als_heute(app_env, monkeypatch):
+    """`db.now()` schreibt UTC, `db.today()` liefert den lokalen Tag. Ohne
+    Umrechnung stand ein Erfolg ab 22 Uhr (Sommerzeit) sofort als "gestern"
+    da — an genau dem Abend, an dem das Kind ihn errungen hat."""
+    from app.services import today as heute
+    app_env.db.init()
+    # 29.09.2026, 22:30 UTC ist in Europe/Berlin bereits der 30.09. um 00:30.
+    assert heute.local_day("2026-09-29T22:30:00+00:00") == date(2026, 9, 30)
+    assert heute.relative_day("2026-09-29T22:30:00+00:00", date(2026, 9, 30)) == "heute"
+    # Und der Vortag bleibt der Vortag.
+    assert heute.relative_day("2026-09-28T22:30:00+00:00", date(2026, 9, 30)) == "gestern"
+    # Ein reines Datum ohne Zeitzone wird nicht verschoben.
+    assert heute.local_day("2026-09-29") == date(2026, 9, 29)

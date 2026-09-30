@@ -6,6 +6,12 @@
   <meta name="referrer" content="same-origin">
   <title>{% block title %}{{ companion_name|default('Karo') }}{% endblock %}</title>
   <script src="/static/themes.js?v={{ asset_version|default('0') }}"></script>
+  {# Hausschrift aus dem eigenen Ordner, vor allen anderen Stilen. Vorgeladen
+     werden die beiden lateinischen Schnitte: sie decken Deutsch samt Umlauten
+     ab und sind da, bevor die Seite zum ersten Mal gezeichnet wird. #}
+  <link rel="preload" href="/static/fonts/baloo2-500-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/baloo2-700-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/fonts.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/karo.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/simple.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/areas.css?v={{ asset_version|default('0') }}-nav-spacing2">
@@ -15,6 +21,10 @@
   {% block page_styles %}{% endblock %}
   <script src="/static/simple.js?v={{ asset_version|default('0') }}" defer></script>
   <script src="/static/drafts.js?v={{ asset_version|default('0') }}" defer></script>
+  {# Lernzeit wird nur auf den Lernseiten des Kindes gemessen — nicht auf
+     "Heute", nicht im Elternbereich und nicht in "Meine Welt". #}
+  {% if lernzeit_messen|default(false) %}<script src="/static/lernzeit.js?v={{ asset_version|default('0') }}"
+          data-lernzeit data-feld="{{ csrf_field }}" data-token="{{ csrf }}" data-takt="{{ lernzeit_takt }}" defer></script>{% endif %}
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📐</text></svg>">
 <script>
   // Pollt eine kleine JSON-Statusroute und lädt die Seite automatisch neu,
@@ -38,7 +48,7 @@
   }
 </script>
 </head>
-<body{% if learning_ui|default(false) %} class="learning-ui{% if path.startswith('/klassenarbeit') %} exam-page{% endif %}"{% endif %}>
+<body class="{{ 'learning-ui ' if learning_ui|default(false) }}{{ 'exam-page ' if learning_ui|default(false) and path.startswith('/klassenarbeit') }}{{ 'nur-ansehen' if nur_ansehen|default(false) }}">
 {% macro csrf_input() -%}
 <input type="hidden" name="{{ csrf_field }}" value="{{ csrf }}">
 {%- endmacro %}
@@ -69,13 +79,13 @@
     <a href="/messung/fortschritt" {{ 'aria-current=page' if path.startswith(('/messung', '/klassenarbeit')) }}>Lernstand</a>
     <a href="/setup" {{ 'aria-current=page' if path.startswith('/setup') }}>Einstellungen</a>
     {% else %}
-    <a href="/" {{ 'aria-current=page' if path == '/' }}>Heute</a>
+    <a class="heute-entry" href="/" {{ 'aria-current=page' if path == '/' }}><img src="/static/karo-igel.svg" alt="" aria-hidden="true" width="26" height="26"><span>Heute</span></a>
     <a class="learning-entry" href="/lernen" {{ 'aria-current=page' if path.startswith(('/lernen', '/lernzyklus', '/quiz', '/material')) }}><img src="/static/karo-owl-book.png" alt="" aria-hidden="true" width="28" height="28"><span>Lernen</span></a>
     {# Die Klassenarbeit ist ein eigener Bereich neben Lernen; ihr
        Prüfungskalender steht in ihrer Unterzeile. #}
     {% if role != 'child' or (cfg is defined and cfg.klassenarbeit_kind) %}<a class="exam-entry" href="/klassenarbeit" {{ 'aria-current=page' if path.startswith('/klassenarbeit') }}><img src="/static/pruefung-duo.jpg" alt="" aria-hidden="true" width="56" height="28"><span>Klassenarbeit</span></a>{% endif %}
     <a href="/lernstand" {{ 'aria-current=page' if path == '/lernstand' }}>Erfolge</a>
-    <a class="welten-entry zweite-gruppe" href="/welten" {{ 'aria-current=page' if path.startswith('/welten') }}><img src="/static/welt-biene.svg" alt="" aria-hidden="true"><span>Meine Welt</span></a>
+    {% if role == 'child' %}<a class="welten-entry zweite-gruppe" href="/welten" {{ 'aria-current=page' if path.startswith('/welten') }}><img src="/static/welt-biene.svg" alt="" aria-hidden="true"><span>Meine Welt</span></a>{% endif %}
     <a class="plans-entry" href="/woche/woche" {{ 'aria-current=page' if path.startswith('/woche') }}><img src="/static/karo-fox-wave.png" alt="" aria-hidden="true"><span>Ziele planen</span></a>
     {% endif %}
   </nav>
@@ -130,6 +140,16 @@
 <main id="inhalt" tabindex="-1" class="simple-main {% block mainclass %}{% endblock %}">
   {% if adult_page and path != '/eltern' and show_nav|default(true) %}
   <a class="back-link" href="/eltern">← Für Eltern</a>
+  {% endif %}
+  {# Eltern im Kinderbereich: ein Hinweis statt Knoepfe, die abgewiesen
+     werden — mit dem Weg nach nebenan, falls sie mitmachen wollen. #}
+  {% if nur_ansehen|default(false) %}
+  <div class="nur-ansehen-hinweis">
+    <span aria-hidden="true">👀</span>
+    <span><b>Sie sehen den Bereich Ihres Kindes.</b>
+      <small>Antworten, Rückmeldungen und Lernzeit bleiben seine Sache — sonst stünde im Lernstand Ihre Arbeit statt seiner.</small></span>
+    <form method="post" action="/eltern/kind-modus">{{ csrf_input() }}<button type="submit">Gemeinsam lernen →</button></form>
+  </div>
   {% endif %}
   {% set flash_msg = request.session.pop('flash', None) %}
   {% set flash_kind = request.session.pop('flash_kind', 'ok') %}

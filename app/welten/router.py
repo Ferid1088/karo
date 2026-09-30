@@ -38,6 +38,23 @@ def parent_only(request: Request):
         raise HTTPException(403, "Das ist ein Eltern-Bereich.")
 
 
+def child_only(request: Request):
+    """„Meine Welt" gehoert dem Kind — mit dem Eltern-Passwort steht sie zu.
+
+    Eltern verwalten den Bereich unter /welten/eltern (Freigabe, Pause,
+    Export, Loeschen) und sehen die kindgerechte Erklaerung unter
+    /welten/datenschutz. Wer hineinschauen will, schaltet die Sitzung im
+    Elternbereich in den Kind-Modus; danach ist die Rolle "child" und der
+    Weg zurueck geht nur ueber ein neues Login. Genau diese Huerde ist der
+    Sinn: ein aufgeschlagenes Tagebuch ist kein Elternwerkzeug.
+    """
+    authenticated(request)
+    if request.session.get("role") != "child":
+        raise HTTPException(
+            403, "„Meine Welt“ gehört dem Kind. Eltern verwalten sie unter "
+                 "„Für Eltern → Meine Welt“.")
+
+
 def _today_date() -> dt.date:
     return dt.date.fromisoformat(world_db.today())
 
@@ -50,14 +67,22 @@ def _world_access(request: Request) -> dict:
 
 
 def _view(request: Request, name: str, status_code: int = 200, **ctx):
+    # Von "Meine Welt" erreichen Eltern nur ihre Verwaltungsseite und die
+    # kindgerechte Erklaerung. Beide gehoeren in den Elternbereich: mit der
+    # Unterzeile des Kinderbereichs zeigten sie auf Jahr und Zeitkapseln,
+    # also auf Seiten, die Eltern gar nicht oeffnen duerfen.
+    eltern = request.session.get("role") == "parent"
+    basis = {
+        "world_page": not eltern,
+        "adult_page": eltern,
+        "world_settings": store.settings(),
+        "mood_labels": MOOD_LABELS,
+    }
     response = render(
         request,
         f"welten/{name}.html",
         status_code=status_code,
-        world_page=True,
-        world_settings=store.settings(),
-        mood_labels=MOOD_LABELS,
-        **ctx,
+        **{**basis, **ctx},
     )
     # "Meine Welt" has no third-party runtime dependencies. Keep its browser
     # policy stricter than legacy learning pages while those are migrated.
@@ -103,7 +128,7 @@ def _remove_media_rows(rows: list[dict]) -> None:
         media.delete_keys(row.get("storage_key"), row.get("thumbnail_key"))
 
 
-@router.get("", dependencies=[Depends(authenticated)])
+@router.get("", dependencies=[Depends(child_only)])
 def home(request: Request):
     cfg = store.settings()
     if request.session.get("role") == "child" and not cfg["enabled"]:
@@ -134,7 +159,7 @@ def privacy(request: Request):
     return _view(request, "privacy")
 
 
-@router.get("/entdecken", dependencies=[Depends(authenticated)])
+@router.get("/entdecken", dependencies=[Depends(child_only)])
 def discover(request: Request):
     cfg = _world_access(request)
     article = editorial.daily_discovery(cfg["age_band"], _today_date())
@@ -147,7 +172,7 @@ def discover(request: Request):
     )
 
 
-@router.post("/entdecken/merken", dependencies=[Depends(authenticated)])
+@router.post("/entdecken/merken", dependencies=[Depends(child_only)])
 async def save_discovery(request: Request):
     cfg = _world_access(request)
     form = await request.form()
@@ -159,7 +184,7 @@ async def save_discovery(request: Request):
     return RedirectResponse("/welten/entdecken", status_code=HTTP_303_SEE_OTHER)
 
 
-@router.post("/nachdenken", dependencies=[Depends(authenticated)])
+@router.post("/nachdenken", dependencies=[Depends(child_only)])
 async def save_reflection(request: Request):
     cfg = _world_access(request)
     form = await request.form()
@@ -188,7 +213,7 @@ async def save_reflection(request: Request):
     return RedirectResponse("/welten", status_code=HTTP_303_SEE_OTHER)
 
 
-@router.get("/festhalten", dependencies=[Depends(authenticated)])
+@router.get("/festhalten", dependencies=[Depends(child_only)])
 def hold_on(request: Request):
     _world_access(request)
     return _view(
@@ -199,7 +224,7 @@ def hold_on(request: Request):
     )
 
 
-@router.post("/festhalten", dependencies=[Depends(authenticated)])
+@router.post("/festhalten", dependencies=[Depends(child_only)])
 async def save_moment(request: Request):
     cfg = _world_access(request)
     form = await request.form()
@@ -256,7 +281,7 @@ async def save_moment(request: Request):
     return RedirectResponse("/welten", status_code=HTTP_303_SEE_OTHER)
 
 
-@router.get("/jahr", dependencies=[Depends(authenticated)])
+@router.get("/jahr", dependencies=[Depends(child_only)])
 def year(request: Request, year: int | None = None):
     _world_access(request)
     current_year = _today_date().year
@@ -304,7 +329,7 @@ def year(request: Request, year: int | None = None):
     )
 
 
-@router.get("/zeitkapseln", dependencies=[Depends(authenticated)])
+@router.get("/zeitkapseln", dependencies=[Depends(child_only)])
 def time_capsules(request: Request):
     _world_access(request)
     items = store.capsules()
@@ -322,7 +347,7 @@ def time_capsules(request: Request):
     )
 
 
-@router.post("/zeitkapseln", dependencies=[Depends(authenticated)])
+@router.post("/zeitkapseln", dependencies=[Depends(child_only)])
 async def create_time_capsule(request: Request):
     cfg = _world_access(request)
     form = await request.form()
@@ -376,7 +401,7 @@ async def create_time_capsule(request: Request):
     return RedirectResponse("/welten/zeitkapseln", status_code=HTTP_303_SEE_OTHER)
 
 
-@router.get("/zeitkapseln/{capsule_id}", dependencies=[Depends(authenticated)])
+@router.get("/zeitkapseln/{capsule_id}", dependencies=[Depends(child_only)])
 def time_capsule(request: Request, capsule_id: int):
     _world_access(request)
     item = store.capsule(capsule_id)
@@ -396,7 +421,7 @@ def time_capsule(request: Request, capsule_id: int):
     )
 
 
-@router.post("/eintrag/{entry_id}/loeschen", dependencies=[Depends(authenticated)])
+@router.post("/eintrag/{entry_id}/loeschen", dependencies=[Depends(child_only)])
 async def delete_entry(request: Request, entry_id: int):
     _world_access(request)
     rows = store.delete_entry(entry_id)
@@ -409,7 +434,7 @@ async def delete_entry(request: Request, entry_id: int):
     return RedirectResponse("/welten/jahr", status_code=HTTP_303_SEE_OTHER)
 
 
-@router.post("/zeitkapseln/{capsule_id}/loeschen", dependencies=[Depends(authenticated)])
+@router.post("/zeitkapseln/{capsule_id}/loeschen", dependencies=[Depends(child_only)])
 async def delete_capsule(request: Request, capsule_id: int):
     _world_access(request)
     rows = store.delete_capsule(capsule_id)
@@ -418,7 +443,7 @@ async def delete_capsule(request: Request, capsule_id: int):
     return RedirectResponse("/welten/zeitkapseln", status_code=HTTP_303_SEE_OTHER)
 
 
-@router.get("/media/{token}", dependencies=[Depends(authenticated)])
+@router.get("/media/{token}", dependencies=[Depends(child_only)])
 def private_media(request: Request, token: str, thumb: int = 0):
     _world_access(request)
     row = store.media_by_token(token)
