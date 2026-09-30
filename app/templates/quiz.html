@@ -25,7 +25,12 @@
     <script>karoAutoRefresh("/quiz/{{ quiz.id }}/status", "{{ signatur }}");</script>
   </div>
 
-{% elif quiz.state == 'bereit' and quiz.modus == 'papier' %}
+{% elif quiz.state == 'bereit' %}
+  {% if quiz.modus == 'papier' %}
+  {# Gedruckt und auf Papier gerechnet wird weiter. Was es nicht mehr gibt:
+     das bearbeitete Blatt fotografieren und die Handschrift von einem Modell
+     ablesen lassen. Die Antworten tippt das Kind hier ein — denselben Weg
+     kennt es vom Bildschirm. #}
   <div class="card">
     <h3>Blatt ausdrucken</h3>
     <div class="actions">
@@ -38,20 +43,14 @@
     Das Lösungsblatt ist für Sie zum Nachsehen — nicht für das Kind.</p>
   </div>
   <div class="card">
-    <h3>Bearbeitetes Blatt fotografieren</h3>
-    <form method="post" action="/quiz/{{ quiz.id }}/blatt"
-          enctype="multipart/form-data" class="actions">
-      {{ csrf_input() }}
-      <input type="file" name="datei" accept="image/*,application/pdf" required
-             style="max-width:260px">
-      <button type="submit">Hochladen und ablesen</button>
-    </form>
-    <p class="hint" style="margin-top:.7rem">Blatt flach hinlegen, von oben
-    fotografieren, keine Schatten. {{ companion_name }} liest nur die Antworten ab und rechnet
-    nichts nach — bewertet wird erst danach.</p>
+    <h3>Antworten eintragen</h3>
+    <p>Rechne in Ruhe auf dem Blatt. Wenn du fertig bist, trag deine Antworten
+    hier unten ein — eine Zeile pro Frage.</p>
+    <p class="hint">Früher konntest du das Blatt abfotografieren. Das gibt es
+    nicht mehr: dafür hätte {{ companion_name }} dein Foto an einen fremden
+    Dienst schicken müssen, und deine Handschrift geht niemanden etwas an.</p>
   </div>
-
-{% elif quiz.state == 'bereit' %}
+  {% endif %}
   <div class="card">
     <p class="hint">Nimm dir Zeit. Eine Zahl oder ein kurzer Satz reicht. Du musst noch nicht alles wissen.</p>
   </div>

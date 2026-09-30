@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 from typing import TypedDict
 
 from . import config, db, jobs, kb, pii, prompts, topics, faecher
@@ -360,136 +359,18 @@ def _konfidenz(wert) -> float:
 
 
 # --------------------------------------------------------------------------
-# Papierweg: Antwortblatt fotografieren
+# Papierweg: gedrucktes Blatt, Antworten am Bildschirm
 # --------------------------------------------------------------------------
-
-ANSWER_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "lesbarkeit": {"type": "string", "enum": ["gut", "teilweise", "schlecht"]},
-        "antworten": {
-            "type": "array", "maxItems": 40,
-            "items": {
-                "type": "object",
-                "properties": {
-                    "position": {"type": "integer"},
-                    "antwort": {"type": ["string", "null"]},
-                    "sicher_gelesen": {"type": "boolean"},
-                },
-                "required": ["position", "antwort", "sicher_gelesen"],
-            },
-        },
-    },
-    "required": ["lesbarkeit", "antworten"],
-}
-
-
-def blatt_hochladen(quiz_id: int, daten: bytes, endung: str) -> int:
-    """Nimmt das Foto des bearbeiteten Fragebogens auf.
-
-    Die Zuordnung ist eindeutig, weil das Bild auf der Seite genau dieser
-    Fragerunde hochgeladen wird — kein Code auf dem Blatt, kein Zuordnen im
-    Nachhinein.
-    """
-    from . import ingest
-
-    quiz = db.q1("SELECT * FROM quiz WHERE id = ?", quiz_id)
-    if quiz is None:
-        raise QuizError("Fragerunde nicht gefunden.")
-    if quiz["state"] not in (STATE_BEREIT, STATE_BEANTWORTET):
-        raise QuizError("Zu dieser Fragerunde passt kein Antwortblatt mehr.")
-
-    aufnahme = ingest.aufnehmen(daten, endung, rolle="bearbeitet")
-    with db.tx() as c:
-        # Frische Pruefung: ingest.aufnehmen() oben ist der Moment, in dem
-        # eine Freigabe dazwischenkommen kann (change.txt P1/Aufgabe 1).
-        aktuell = c.execute("SELECT state FROM quiz WHERE id=?", (quiz_id,)).fetchone()
-        if aktuell is None or aktuell["state"] not in (STATE_BEREIT, STATE_BEANTWORTET):
-            raise QuizError("Zu dieser Fragerunde passt kein Antwortblatt mehr.")
-        c.execute("UPDATE quiz SET blatt_pfad=COALESCE(blatt_pfad, ?) WHERE id=?",
-                  (aufnahme["stored_path"], quiz_id))
-    jobs.enqueue("quiz_read_sheet",
-                 {"quiz_id": quiz_id, "document_id": aufnahme["document_id"]},
-                 dedup_key=f"quiz_read:{quiz_id}:{aufnahme['document_id']}")
-    return aufnahme["document_id"]
-
-
-@jobs.handler("quiz_read_sheet")
-def job_quiz_read_sheet(payload: dict) -> None:
-    """Liest die handschriftlichen Antworten vom fotografierten Blatt."""
-    quiz_id = int(payload["quiz_id"])
-    doc_id = int(payload["document_id"])
-    quiz = db.q1("SELECT * FROM quiz WHERE id = ?", quiz_id)
-    doc = db.q1("SELECT * FROM document WHERE id = ?", doc_id)
-    if quiz is None or doc is None:
-        return
-    if quiz["state"] not in (STATE_BEREIT, STATE_BEANTWORTET):
-        return
-
-    fragen = [dict(r) for r in db.q(
-        "SELECT * FROM question WHERE quiz_id=? ORDER BY position", quiz_id)]
-    if not fragen:
-        return
-
-    cfg = config.load()
-    thema = topics.get(quiz["topic_id"]) or {}
-    liste = "\n".join(f"  {f['position']}. {f['frage'][:200]}" for f in fragen)
-    prompt = f"""Auf dem Bild ist ein bearbeiteter Fragebogen aus dem Fach
-{faecher.name(thema.get("subject"))}, Klassenstufe {cfg.learner_grade} in Deutschland.
-
-Diese Fragen stehen darauf:
-{liste}
-
-Lies zu jeder Nummer die handschriftliche Antwort ab — wörtlich, mit
-Zwischenschritten, wenn welche dastehen. Korrigiere nichts und rechne nichts
-nach; das ist reines Ablesen. Ist ein Feld leer, gib null zurück statt zu
-raten. Setze sicher_gelesen auf false, sobald du bei einem Zeichen raten
-müsstest. Einen Namen auf dem Blatt übernimm nicht."""
-
-    ergebnis = client().complete(
-        purpose="quiz_read_sheet", prompt=prompt, schema=ANSWER_SCHEMA,
-        image_path=Path(doc["stored_path"]), system=prompts.SYSTEM)
-
-    nach_position = {f["position"]: f["id"] for f in fragen}
-    gefunden = 0
-    uebernommen = False
-    with db.tx() as c:
-        # Frische Pruefung: der LLM-Aufruf oben ist wieder der Moment, in
-        # dem eine direkte Freigabe dazwischenkommen kann. Erst danach
-        # `question` beschreiben — sonst wuerden die abgelesenen Antworten
-        # dort noch landen, obwohl die Fragerunde schon freigegeben ist
-        # (change.txt P1). Das Dokument selbst gilt trotzdem als gelesen:
-        # das Foto wurde tatsaechlich ausgewertet, nur eben zu spaet.
-        aktuell = c.execute("SELECT state FROM quiz WHERE id=?", (quiz_id,)).fetchone()
-        quiz_aktiv = aktuell is not None and aktuell["state"] in (STATE_BEREIT, STATE_BEANTWORTET)
-        if quiz_aktiv:
-            for a in ergebnis.data.get("antworten") or []:
-                try:
-                    frage_id = nach_position.get(int(a.get("position")))
-                except (TypeError, ValueError):
-                    continue
-                if frage_id is None:
-                    continue
-                text = (a.get("antwort") or "").strip()
-                c.execute("UPDATE question SET schueler_antwort=? WHERE id=?",
-                          (text[:2000] or None, frage_id))
-                if text:
-                    gefunden += 1
-        c.execute("UPDATE document SET state='gelesen' WHERE id=?", (doc_id,))
-        if quiz_aktiv and gefunden:
-            uebernommen = c.execute(
-                "UPDATE quiz SET state='beantwortet' WHERE id=? AND state IN (?, ?)",
-                (quiz_id, STATE_BEREIT, STATE_BEANTWORTET)).rowcount == 1
-
-    if not quiz_aktiv:
-        return  # anders abgeschlossen, waehrend das Foto gelesen wurde — kein Fehler.
-    if not gefunden:
-        raise QuizError(
-            "Auf dem Foto war keine Antwort lesbar. Blatt flach hinlegen, von "
-            "oben fotografieren, keine Schatten — dann erneut versuchen.")
-    if uebernommen:
-        jobs.enqueue("quiz_check", {"quiz_id": quiz_id},
-                     dedup_key=f"quiz_check:{quiz_id}")
+#
+# Hier stand der Weg „bearbeitetes Blatt fotografieren": das Foto ging an ein
+# Modell, das die Handschrift ablas. Damit ging die Handschrift eines Kindes
+# an einen fremden Dienst, dazu alles, was sonst noch auf dem Blatt und im
+# Bild war. Ablesen ist zudem das Unzuverlaessigste, was ein Modell tun kann —
+# bei unleserlichen Stellen stand am Ende eine geratene Antwort im Protokoll,
+# die das Kind nie gegeben hat.
+#
+# Gedruckt und auf Papier gerechnet wird weiter. Die Antworten tippt das Kind
+# danach in die App; das ist der Weg, den es am Bildschirm ohnehin kennt.
 
 
 # --------------------------------------------------------------------------

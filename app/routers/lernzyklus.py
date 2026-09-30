@@ -1,5 +1,5 @@
 """Task-oriented entry points for the existing learning and review workflow."""
-from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from .. import config, db, security, teaching, topics
@@ -116,13 +116,6 @@ def lernzyklus_quiz(request: Request, topic_id: int, quiz_id: int):
 async def lernzyklus_quiz_antworten(request: Request, topic_id: int, quiz_id: int):
     _check_quiz(topic_id, quiz_id)
     return await workflow.handle_quiz_antworten(request, quiz_id)
-
-
-@router.post("/{topic_id}/quiz/{quiz_id}/blatt")
-async def lernzyklus_quiz_blatt(request: Request, topic_id: int, quiz_id: int,
-                              datei: UploadFile | None = None):
-    _check_quiz(topic_id, quiz_id)
-    return await workflow.handle_quiz_blatt(request, quiz_id, datei)
 
 
 @router.post("/{topic_id}/quiz/{quiz_id}/freigabe")

@@ -10,12 +10,12 @@ from __future__ import annotations
 import dataclasses
 from pathlib import Path
 
-from fastapi import Request, UploadFile
+from fastapi import Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from starlette.concurrency import run_in_threadpool
 
-from .. import (config, db, exam_learning, export, ingest, jobs, kb, materials,
-                quizzes, research, security, teaching, topics)
+from .. import (config, db, exam_learning, export, jobs, kb, materials,
+                quizzes, research, teaching, topics)
 from ..domain import FLAG_ORDER, Flag
 from ..quizzes import QuizError
 from ..teaching import TeachingError
@@ -75,32 +75,6 @@ async def handle_quiz_antworten(request: Request, quiz_id: int):
         flash(request, str(exc), "err")
         return zurueck(f"/quiz/{quiz_id}")
     flash(request, f"{n} Antworten aufgenommen. Die Auswertung läuft.")
-    return zurueck(f"/quiz/{quiz_id}")
-
-
-async def handle_quiz_blatt(request: Request, quiz_id: int,
-                            datei: UploadFile | None = None):
-    formular = await request.form()
-    datei = datei or formular.get("datei")
-    if datei is None or not getattr(datei, "filename", ""):
-        flash(request, "Es wurde keine Datei ausgewählt.", "err")
-        return zurueck(f"/quiz/{quiz_id}")
-
-    endung = Path(datei.filename).suffix.lower()
-    puffer = bytearray()
-    while stueck := await datei.read(1 << 20):
-        puffer.extend(stueck)
-        if len(puffer) > security.MAX_UPLOAD_BYTES:
-            flash(request, "Die Datei ist zu groß.", "err")
-            return zurueck(f"/quiz/{quiz_id}")
-
-    try:
-        await run_in_threadpool(quizzes.blatt_hochladen, quiz_id, bytes(puffer), endung)
-    except (QuizError, ingest.IngestError) as exc:
-        flash(request, str(exc), "err")
-        return zurueck(f"/quiz/{quiz_id}")
-
-    flash(request, f"Antwortblatt aufgenommen. {companion_name(request)} liest es jetzt ab.")
     return zurueck(f"/quiz/{quiz_id}")
 
 

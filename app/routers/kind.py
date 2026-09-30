@@ -7,7 +7,7 @@ anderen Router direkt anzusprechen (KaroRefactoring_Plan.md, Abschnitt 10).
 
 import logging
 import json
-from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from .. import quizzes, teaching
@@ -47,12 +47,6 @@ def quiz_entwurf(request: Request, quiz_id: int, phase: str = Form(...),
     except ValueError:
         raise HTTPException(400, 'Ungültiger Entwurf.')
     return quiz_drafts.save(quiz_id, request.session.get('role'), phase, revision, data, position)
-
-
-@router.post("/quiz/{quiz_id}/blatt")
-async def quiz_blatt(request: Request, quiz_id: int,
-                     datei: UploadFile | None = None):
-    return await workflow.handle_quiz_blatt(request, quiz_id, datei)
 
 
 @router.get("/quiz/{quiz_id}/drucken", response_class=HTMLResponse)
