@@ -135,6 +135,51 @@ def test_z10_dieselbe_erklaerung_wird_nicht_zweimal_gemeldet(app_env):
     assert store.wirkungslose_erklaerungen(app_env.config.load())
 
 
+
+def test_z10_am_ende_einer_sitzung_geht_die_meldung_auf_die_reise(app_env, monkeypatch):
+    """Eine Meldefunktion, die niemand ruft, ist wieder nur eine Zahl.
+
+    Am Ende einer Sitzung hat sich die Wirkung einer Erklaerung zuletzt
+    geaendert — dort haengt der Auftrag.
+    """
+    from app import db
+    from app.adaptiv import curriculum_dienst, sitzung as zustand, store
+    app_env.db.init()
+    store.init()
+    monkeypatch.setattr(curriculum_dienst, "configured", lambda cfg: True)
+    konzept_id = store.konzepte_verfuegbar()[0]["id"]
+    sid = store.sitzung_anlegen(zustand.INPUT_RECEIVED, konzept_id=konzept_id)
+
+    zustand.wechsle(sid, zustand.MATERIAL_ANALYZED)
+    assert not db.q("SELECT id FROM job WHERE type='wirkung_melden'")
+    zustand.wechsle(sid, zustand.DIAGNOSING)
+    zustand.wechsle(sid, zustand.MASTERED, "verstanden")
+
+    auftraege = db.q("SELECT id FROM job WHERE type='wirkung_melden'")
+    assert len(auftraege) == 1
+
+    # Eine zweite Sitzung legt keinen zweiten Auftrag daneben.
+    sid2 = store.sitzung_anlegen(zustand.INPUT_RECEIVED, konzept_id=konzept_id)
+    zustand.wechsle(sid2, zustand.MATERIAL_ANALYZED)
+    zustand.wechsle(sid2, zustand.DIAGNOSING)
+    zustand.wechsle(sid2, zustand.MASTERED, "verstanden")
+    assert len(db.q("SELECT id FROM job WHERE type='wirkung_melden'")) == 1
+
+
+def test_z10_ohne_lehrplan_dienst_gibt_es_niemanden_zu_melden(app_env, monkeypatch):
+    from app import db
+    from app.adaptiv import curriculum_dienst, sitzung as zustand, store
+    app_env.db.init()
+    store.init()
+    monkeypatch.setattr(curriculum_dienst, "configured", lambda cfg: False)
+    sid = store.sitzung_anlegen(zustand.INPUT_RECEIVED,
+                                konzept_id=store.konzepte_verfuegbar()[0]["id"])
+    zustand.wechsle(sid, zustand.MATERIAL_ANALYZED)
+    zustand.wechsle(sid, zustand.DIAGNOSING)
+    zustand.wechsle(sid, zustand.MASTERED, "verstanden")
+    assert not db.q("SELECT id FROM job WHERE type='wirkung_melden'")
+
+
 # ---------------------------------------------------------------- Z3
 
 def _konzept_mit_voraussetzung(app_env):

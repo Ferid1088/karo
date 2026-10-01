@@ -118,6 +118,15 @@ def wechsle(sitzung_id: int, nach_zustand: str, anlass: str = "",
     store.sitzung_aktualisieren(sitzung_id, zustand=nach_zustand, **felder)
     store.ereignis_schreiben(sitzung_id, anlass or f"{von} → {nach_zustand}",
                              von_zustand=von, nach_zustand=nach_zustand)
+    if nach_zustand in ENDZUSTAENDE:
+        # Hier hat sich die Wirkung einer Erklaerung zuletzt geaendert (Z10).
+        # Ein Auftrag reicht: `dedup_key` haelt die Warteschlange kurz, und
+        # gemeldet wird ohnehin nur, was noch nicht gemeldet war. Ohne
+        # Lehrplan-Dienst gibt es niemanden, der die Meldung lesen koennte.
+        from .. import jobs
+        from . import curriculum_dienst          # meldet den Job an
+        if curriculum_dienst.configured(config.load_safe()):
+            jobs.enqueue("wirkung_melden", dedup_key="wirkung_melden")
     return store.sitzung(sitzung_id)
 
 

@@ -109,6 +109,18 @@ def wirkung_melden(cfg) -> int:
     return len(befunde)
 
 
+@jobs.handler("wirkung_melden")
+def job_wirkung_melden(payload: dict) -> dict:
+    """Die Meldung laeuft im Hintergrund, nie im Klick eines Kindes.
+
+    Ohne diesen Auftrag waere `wirkung_melden()` eine Funktion, die niemand
+    ruft — und Z10 waere wieder genau das, was es vorher war: eine Zahl, aus
+    der nichts folgt.
+    """
+    from .. import config
+    return {"gemeldet": wirkung_melden(config.load_safe())}
+
+
 def configured(cfg) -> bool:
     # Incomplete configuration must fail closed, never silently generate locally.
     return any(settings(cfg))
