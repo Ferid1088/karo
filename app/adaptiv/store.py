@@ -39,6 +39,7 @@ _NACHGETRAGENE_SPALTEN = [
     ("lern_aufgabe", "antwort_art", "TEXT NOT NULL DEFAULT 'bruch'"),
     ("lern_aufgabe", "optionen", "TEXT NOT NULL DEFAULT '[]'"),
     ("lern_aufgabe", "aufloesung", "TEXT"),
+    ("lern_aufgabe", "erwartete_sekunden", "INTEGER"),
 ]
 
 

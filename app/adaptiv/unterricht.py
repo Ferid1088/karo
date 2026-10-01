@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from fractions import Fraction
 
-from . import inhalt_store, katalog, sitzung as zustand, store
+from . import inhalt_store, katalog, protokoll, sitzung as zustand, store
 from .normalisierung import normalisiere
 
 #: Schritte innerhalb von DIAGNOSING (§11: Anker, dann produktives Scheitern).
@@ -110,8 +110,35 @@ def _hilfe(konzept_id: int, phase: str | None) -> dict:
     }
 
 
+#: Bildschirme, auf denen das Kind antwortet — nur fuer sie laeuft eine Uhr.
+_MIT_AUFGABE = ("anker", "diagnose", "vorhersage", "aufgabe", "transfer",
+                "voraussetzung", "wiederholung")
+
+
+def _kennung(sitzung: dict, schirm: dict) -> str:
+    """Woran die Uhr erkennt, dass eine andere Aufgabe zu sehen ist."""
+    if schirm.get("art") not in _MIT_AUFGABE:
+        return ""
+    aufgabe = schirm.get("aufgabe") or {}
+    teile = [schirm["art"], str(schirm.get("phase") or ""),
+             str(aufgabe.get("id") or schirm.get("frage") or
+                 schirm.get("voraussetzung") or "")]
+    return "|".join(teile)
+
+
 def bildschirm(sitzung: dict) -> dict:
-    """Was das Kind jetzt sieht — eine Frage, eine Handlung."""
+    """Was das Kind jetzt sieht — eine Frage, eine Handlung.
+
+    Hier beginnt auch die Uhr (Schritt 4a): sichtbar werden und bearbeitet
+    werden faengt an derselben Stelle an. `protokoll.gezeigt` ist idempotent,
+    derselbe Bildschirm zweimal gerendert setzt sie also nicht zurueck.
+    """
+    schirm = _bildschirm(sitzung)
+    protokoll.gezeigt(sitzung["id"], _kennung(sitzung, schirm))
+    return schirm
+
+
+def _bildschirm(sitzung: dict) -> dict:
     konzept_id = sitzung["konzept_id"]
     daten = _daten(sitzung)
     zustand_name = sitzung["zustand"]
@@ -216,8 +243,9 @@ def bildschirm(sitzung: dict) -> dict:
 # Antworten verarbeiten
 # --------------------------------------------------------------------------
 
-def anker_beantwortet(sitzung: dict, antwort: str) -> dict:
+def anker_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     """§11: Der Anker wird nicht benotet — er weckt nur das Vorwissen."""
+    _buchen(sitzung, protokoll.ANKER, antwort=antwort, richtig=None, cfg=cfg)
     store.sitzung_aktualisieren(sitzung["id"], letzte_antwort=antwort or None)
     store.ereignis_schreiben(sitzung["id"], "Anker beantwortet")
     return _merke(sitzung["id"], sitzung, schritt=SCHRITT_AUFGABE,
@@ -249,7 +277,10 @@ def diagnose_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
                       fehlerhinweis="Schreib bitte eine Antwort ins Feld. Bei einer Rechnung "
                                     "nutze eine Zahl, zum Beispiel 2 oder 5/6.")
 
-    if ist_richtig(antwort, loesung):
+    richtig = ist_richtig(antwort, loesung)
+    _buchen(sitzung, protokoll.DIAGNOSE, antwort=antwort, richtig=richtig,
+            cfg=cfg)
+    if richtig:
         ergebnis = zustand.antwort_richtig(sitzung["id"], antwort, cfg=cfg,
                                            darf_abschliessen=bool(daten.get('zweite_diagnose')))
         if ergebnis["zustand"] == zustand.MASTERED:
@@ -288,6 +319,25 @@ def diagnose_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     return _merke(sitzung["id"], ergebnis, fehlerhinweis=None, tipp_stufe=0)
 
 
+def _herkunft(sitzung: dict, cfg=None) -> tuple[str | None, int]:
+    """Fach und Klasse zu dieser Sitzung — fuer die Zeile im Protokoll."""
+    konzept = store.konzept(sitzung.get("konzept_id")) or {}
+    return konzept.get("fach"), konzept.get("klasse_bis") or _klasse(cfg)
+
+
+def _buchen(sitzung: dict, rolle: str, *, aufgabe: dict | None = None,
+            antwort: str | None = None, richtig: bool | None = None,
+            cfg=None) -> None:
+    """Eine beantwortete Aufgabe festhalten (Schritt 4a).
+
+    Hier und nicht im Router: eine Antwort ist eine Antwort, auch wenn sie
+    ueber einen anderen Weg hereinkommt.
+    """
+    fach, klasse = _herkunft(sitzung, cfg)
+    protokoll.antwort_buchen(sitzung, rolle, aufgabe=aufgabe, antwort=antwort,
+                             richtig=richtig, fach=fach, klasse=klasse, cfg=cfg)
+
+
 def _klasse(cfg=None) -> int:
     from .. import config
     return int(getattr(cfg or config.load_safe(), "learner_grade", 6) or 6)
@@ -306,6 +356,10 @@ def weiter(sitzung: dict) -> dict:
 
 def vorhersage_beantwortet(sitzung: dict, antwort: str) -> dict:
     """Die Vorhersage wird nicht benotet — sie macht den Widerspruch sichtbar."""
+    _buchen(sitzung, protokoll.VORHERSAGE,
+            aufgabe=inhalt_store.aufgabe(sitzung["fehlertyp_id"],
+                                         inhalt_store.VORHERSAGE),
+            antwort=antwort, richtig=None)
     store.ereignis_schreiben(sitzung["id"], "Vorhersage abgegeben",
                              nutzdaten={"wahl": antwort})
     return _merke(sitzung["id"], sitzung, vorhergesagt=antwort or "unbekannt")
@@ -318,7 +372,10 @@ def transfer_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     if aufgabe is None:
         return zustand.wechsle_phase(sitzung["id"], zustand.COMPLETE)
 
-    if ist_richtig(antwort, aufgabe["loesung"]):
+    richtig = ist_richtig(antwort, aufgabe["loesung"])
+    _buchen(sitzung, protokoll.TRANSFER, aufgabe=aufgabe, antwort=antwort,
+            richtig=richtig, cfg=cfg)
+    if richtig:
         ergebnis = zustand.antwort_richtig(sitzung["id"], antwort, cfg=cfg)
         if ergebnis["zustand"] == zustand.MASTERED:
             return ergebnis
@@ -336,6 +393,9 @@ def tipp(sitzung: dict) -> dict:
     """Stufenweise mehr verraten — die Hilfe selbst verrät nie die Lösung."""
     daten = _daten(sitzung)
     stufe = int(daten.get("tipp_stufe", 0)) + 1
+    # Ein Tipp ist eine Eingabe: die Uhr laeuft weiter, und die Zeile der
+    # Antwort haelt fest, dass Hilfe im Spiel war.
+    protokoll.tipp_genutzt(sitzung["id"])
     store.ereignis_schreiben(sitzung["id"], "Tipp angefordert",
                              nutzdaten={"stufe": stufe})
     return _merke(sitzung["id"], sitzung, tipp_stufe=stufe)
@@ -355,7 +415,10 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
                       fehlerhinweis="Schreib bitte eine Antwort ins Feld. Bei einer Rechnung "
                                     "nutze eine Zahl, zum Beispiel 2 oder 3/4.")
 
-    if ist_richtig(antwort, aufgabe["loesung"]):
+    richtig = ist_richtig(antwort, aufgabe["loesung"])
+    _buchen(sitzung, protokoll.AUFGABE, aufgabe=aufgabe, antwort=antwort,
+            richtig=richtig, cfg=cfg)
+    if richtig:
         # Die Rechnung allein beendet die selbstständige Phase nicht — der
         # Transfer danach gehört dazu.
         ergebnis = zustand.antwort_richtig(
@@ -407,6 +470,13 @@ def voraussetzung_beantwortet(sitzung: dict, antworten: list[str], cfg=None) -> 
     if not aufgaben:
         # Ohne Aufgaben laesst sich nichts feststellen: dann wie bisher.
         return zustand_modul.eskalieren(sitzung["id"], cfg=cfg)
+
+    # Jede Aufgabe der kurzen Diagnose bekommt ihre eigene Zeile.
+    for aufgabe, antwort in zip(aufgaben, list(antworten) + [""] * len(aufgaben)):
+        _buchen(sitzung, protokoll.VORAUSSETZUNG, aufgabe=aufgabe,
+                antwort=antwort,
+                richtig=ist_richtig(antwort, aufgabe.get("loesung", "")),
+                cfg=cfg)
 
     if vor.pruefen(list(antworten), aufgaben):
         store.ereignis_schreiben(sitzung["id"], "Voraussetzung sitzt — es lag nicht daran")

@@ -7,7 +7,8 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from .. import config, topics, db
-from ..adaptiv import erzeugung, lektionen, sitzung as zustand, store, unterricht
+from ..adaptiv import (erzeugung, lektionen, protokoll,
+                      sitzung as zustand, store, unterricht)
 from ..services import learning_hub, grade_guidance
 from .shared import flash, render, zurueck
 
@@ -334,6 +335,22 @@ def transfer(request: Request, antwort: str = Form("")):
 @exam_router.post("/tipp")
 def tipp(request: Request):
     return _answer(request, "tipp")
+
+
+@router.post("/puls")
+@exam_router.post("/puls")
+def puls(request: Request):
+    """Die Lernseite meldet eine Eingabe — Tippen, Auswaehlen, Tipp oeffnen.
+
+    Leichtgewichtig mit Absicht: kein Rendern, kein Bildschirm, nur die Uhr.
+    Bleibt die Meldung aus, weil die Seite im Hintergrund liegt oder niemand
+    davor sitzt, steht die Uhr nach `adaptiv_pause_sekunden` von selbst
+    (Schritt 4a). Ohne laufende Sitzung passiert gar nichts.
+    """
+    active = _laufende(request)
+    if active is None:
+        return {"aktiv": 0}
+    return {"aktiv": protokoll.puls(active["id"])}
 
 
 @eltern_router.get("", response_class=HTMLResponse)

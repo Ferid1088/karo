@@ -101,6 +101,11 @@ CREATE TABLE IF NOT EXISTS lern_aufgabe (
   typischer_fehler TEXT,
   -- Nicht jede Aufgabe ist ein Bruch: Vorhersage und Transfer sind Auswahlen.
   antwort_art    TEXT NOT NULL DEFAULT 'bruch',
+  -- Wie lange diese Aufgabe ueblicherweise dauert (Schritt 4a). Kommt aus dem
+  -- Curriculum, wenn es etwas dazu sagt; sonst aus `protokoll.erwartung()`.
+  -- Sie begrenzt die aktive Zeit nach oben: eine Aufgabe, die eine halbe
+  -- Stunde offen stand, wurde nicht eine halbe Stunde lang bearbeitet.
+  erwartete_sekunden INTEGER,
   optionen       TEXT NOT NULL DEFAULT '[]',
   aufloesung     TEXT,
   tipps          TEXT NOT NULL DEFAULT '[]',
@@ -250,3 +255,77 @@ CREATE TABLE IF NOT EXISTS lern_voraussetzung (
     UNIQUE(konzept_id, voraussetzung)
 );
 CREATE INDEX IF NOT EXISTS idx_lern_voraussetzung ON lern_voraussetzung(konzept_id);
+
+-- Jede beantwortete Aufgabe, genau eine Zeile (Schritt 4a).
+--
+-- Bisher wusste Karo nur, wie eine Sitzung ausging: `lern_fortschritt` zaehlt
+-- Versuche und Erfolge, `lern_ereignis` haelt Uebergaenge fest. Was ein Kind
+-- auf eine einzelne Aufgabe geantwortet hat und wie lange es daran war, stand
+-- nirgends — und ohne das gibt es weder eine ehrliche Lernzeit noch eine
+-- Wiederholung mit neuen Aufgaben.
+--
+-- Nur anhaengen, nie aendern: eine Zeile beschreibt einen Moment. Wer sie
+-- spaeter korrigiert, hat keinen Verlauf mehr, sondern eine Meinung.
+CREATE TABLE IF NOT EXISTS lern_antwort (
+    id              INTEGER PRIMARY KEY,
+    child_key       TEXT NOT NULL DEFAULT 'installation',
+    sitzung_id      INTEGER REFERENCES lern_sitzung(id),
+    aufgabe_id      INTEGER REFERENCES lern_aufgabe(id),
+    konzept_id      INTEGER REFERENCES lern_konzept(id),
+    fach            TEXT,
+    phase           TEXT,
+    rolle           TEXT NOT NULL,        -- anker, diagnose, vorhersage, aufgabe, transfer, voraussetzung, wiederholung
+    gezeigt_at      TEXT,
+    beantwortet_at  TEXT NOT NULL,
+    antwort         TEXT,
+    richtig         INTEGER,              -- NULL, wo nicht bewertet wird (Anker, Vorhersage)
+    tipp_genutzt    INTEGER NOT NULL DEFAULT 0,
+    -- Aktive Zeit dieser Aufgabe in Sekunden, gedeckelt. Getrennt von
+    -- `learning_time`, das weiter den Elternbericht traegt: das misst
+    -- Anwesenheit, das hier misst Arbeit an einer Aufgabe.
+    aktive_sekunden REAL NOT NULL DEFAULT 0,
+    -- Unter der Mindestzeit beantwortet. Eine Tatsache ueber diese eine
+    -- Antwort — ob ein ganzer Abschnitt nicht ernsthaft war, ergibt sich
+    -- daraus beim Lesen (`protokoll.nicht_ernsthaft`) und wird nicht
+    -- nachtraeglich in alte Zeilen geschrieben.
+    zu_schnell      INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_lern_antwort_kind
+  ON lern_antwort(child_key, beantwortet_at);
+CREATE INDEX IF NOT EXISTS idx_lern_antwort_aufgabe
+  ON lern_antwort(child_key, aufgabe_id);
+
+-- Die Uhr einer laufenden Aufgabe. Eigene Tabelle, nicht `lern_sitzung.daten`:
+-- die Daten werden aus einem im Speicher gehaltenen Stand neu geschrieben
+-- (`unterricht._merke`), und eine Uhr, die dabei still verschwindet, misst
+-- irgendwann falsch statt gar nicht. Hier ueberlebt sie jeden Schreibvorgang.
+CREATE TABLE IF NOT EXISTS lern_uhr (
+    sitzung_id      INTEGER PRIMARY KEY REFERENCES lern_sitzung(id) ON DELETE CASCADE,
+    kennung         TEXT NOT NULL,        -- welche Aufgabe gerade sichtbar ist
+    gezeigt_at      TEXT NOT NULL,
+    letzte_eingabe  TEXT NOT NULL,
+    aktiv_sekunden  REAL NOT NULL DEFAULT 0,
+    tipp_genutzt    INTEGER NOT NULL DEFAULT 0
+);
+
+-- Wiederholung mit Abstand (Z4).
+--
+-- Nach `MASTERED` passierte bisher nichts mehr: kein Termin, keine
+-- Auffrischung, keine Vergessenskurve. Das Kind waehlt den Abstand selbst
+-- (2 bis 5 Tage) — wer den Tag mitbestimmt, haelt ihn eher ein.
+CREATE TABLE IF NOT EXISTS lern_wiederholung (
+    id          INTEGER PRIMARY KEY,
+    child_key   TEXT NOT NULL DEFAULT 'installation',
+    konzept_id  INTEGER NOT NULL REFERENCES lern_konzept(id) ON DELETE CASCADE,
+    sitzung_id  INTEGER REFERENCES lern_sitzung(id),
+    faellig_am  TEXT NOT NULL,            -- lokales Datum, YYYY-MM-DD
+    gewaehlt_am TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'offen',   -- offen, bestanden, nicht_bestanden
+    ergebnis    TEXT NOT NULL DEFAULT '{}',
+    erledigt_am TEXT,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_lern_wiederholung_faellig
+  ON lern_wiederholung(child_key, status, faellig_am);

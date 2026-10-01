@@ -234,4 +234,33 @@
 {% endif %}
 {% endif %}
 </div>
+
+{#- Schritt 4a: die Seite meldet Eingaben, damit die aktive Zeit stimmt.
+    Leichtgewichtig und sparsam: hoechstens alle 15 Sekunden eine Meldung,
+    keine beim ersten Anfassen (das Anzeigen hat die Uhr schon gestartet),
+    und gar keine, solange die Seite im Hintergrund liegt. Ohne JavaScript
+    bleibt es bei „gezeigt bis beantwortet", gedeckelt — die Seite
+    funktioniert auch dann vollstaendig. -#}
+{% if schirm.art in ('anker', 'diagnose', 'vorhersage', 'aufgabe', 'transfer', 'voraussetzung', 'wiederholung') %}
+<script>
+(function () {
+  var ziel = {{ (learning_base ~ '/puls')|tojson }};
+  var feld = {{ csrf_field|tojson }}, wert = {{ csrf|tojson }};
+  var zuletzt = 0, ABSTAND = 15000;
+  function melden() {
+    if (document.hidden) return;              // Hintergrund: die Uhr steht.
+    var jetzt = Date.now();
+    if (jetzt - zuletzt < ABSTAND) return;
+    zuletzt = jetzt;
+    var daten = new FormData();
+    daten.append(feld, wert);
+    fetch(ziel, {method: 'POST', body: daten, credentials: 'same-origin',
+                 keepalive: true}).catch(function () {});
+  }
+  ['input', 'change', 'click', 'keydown'].forEach(function (art) {
+    document.addEventListener(art, melden, {passive: true});
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

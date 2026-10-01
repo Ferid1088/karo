@@ -135,6 +135,17 @@ class Config:
     adaptiv_wirkung_ab: int = 10
     #: Darunter gilt eine Erklaerung als wirkungslos und wird gemeldet.
     adaptiv_wirkung_schwelle: float = 0.3
+    #: Schneller beantwortet heisst geraten — solche Antworten zaehlen 0
+    #: Sekunden aktive Zeit (Schritt 4a).
+    adaptiv_mindest_sekunden: int = 3
+    #: So lange ohne Eingabe, dann steht die Uhr. Das Kind ist dann nicht
+    #: mehr an der Aufgabe, auch wenn die Seite noch offen ist.
+    adaptiv_pause_sekunden: int = 120
+    #: So viele zu schnelle Antworten hintereinander, dann gilt der Abschnitt
+    #: als nicht ernsthaft. Keine Strafe — nur eine ehrliche Zahl.
+    adaptiv_nicht_ernsthaft_serie: int = 3
+    #: So viele neue Aufgaben hat eine Wiederholung (3 bis 5).
+    adaptiv_wiederholung_aufgaben: int = 4
     adaptiv_aehnlichkeit_schwelle: float = 0.82
 
     setup_complete: bool = False

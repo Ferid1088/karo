@@ -50,6 +50,10 @@ def _aufgabe_schreiben(fehlertyp_id: int, rolle: str, aufgabe: dict,
                      else inhalt_store.BRUCH),
         optionen=aufgabe.get("optionen"),
         aufloesung=aufgabe.get("aufloesung"),
+        # Sagt das Curriculum, wie lange die Aufgabe dauert, gilt das. Wer
+        # sie geschrieben hat, weiss es besser als eine Schaetzung nach
+        # Antwortart und Klasse (Schritt 4a).
+        erwartete_sekunden=aufgabe.get("erwartete_sekunden"),
         quelle=quelle, geprueft=False)
 
 

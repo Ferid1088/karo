@@ -119,6 +119,8 @@ def wechsle(sitzung_id: int, nach_zustand: str, anlass: str = "",
     store.ereignis_schreiben(sitzung_id, anlass or f"{von} → {nach_zustand}",
                              von_zustand=von, nach_zustand=nach_zustand)
     if nach_zustand in ENDZUSTAENDE:
+        from . import protokoll
+        protokoll.uhr_beenden(sitzung_id)
         # Hier hat sich die Wirkung einer Erklaerung zuletzt geaendert (Z10).
         # Ein Auftrag reicht: `dedup_key` haelt die Warteschlange kurz, und
         # gemeldet wird ohnehin nur, was noch nicht gemeldet war. Ohne
@@ -140,6 +142,9 @@ def wechsle_phase(sitzung_id: int, nach_phase: str, anlass: str = "") -> dict:
     if von is not None and nach_phase not in PHASEN_UEBERGAENGE.get(von, ()):
         raise UebergangVerboten(f"Phase {von} → {nach_phase} ist nicht vorgesehen.")
     store.sitzung_aktualisieren(sitzung_id, phase=nach_phase)
+    if nach_phase == COMPLETE:
+        from . import protokoll
+        protokoll.uhr_beenden(sitzung_id)
     store.ereignis_schreiben(sitzung_id, anlass or f"Phase {von} → {nach_phase}",
                              von_phase=von, nach_phase=nach_phase)
     return store.sitzung(sitzung_id)
