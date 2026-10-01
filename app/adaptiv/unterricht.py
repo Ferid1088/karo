@@ -117,9 +117,10 @@ _MIT_AUFGABE = ("anker", "diagnose", "vorhersage", "aufgabe", "transfer",
 
 
 def _kennung(sitzung: dict, schirm: dict) -> str:
-    """Woran die Uhr erkennt, dass eine andere Aufgabe zu sehen ist."""
-    if schirm.get("art") not in _MIT_AUFGABE:
-        return ""
+    """Was diesen Bildschirm genau meint — art und Phase allein reichen
+    nicht: gefuehrte und selbststaendige Aufgabe oder beide Diagnose-Fragen
+    teilen sich denselben Bildschirm. Erst die Aufgabe dahinter macht ein
+    abgeschicktes Formular eindeutig."""
     aufgabe = schirm.get("aufgabe") or {}
     teile = [schirm["art"], str(schirm.get("phase") or ""),
              str(aufgabe.get("id") or schirm.get("frage") or
@@ -135,7 +136,21 @@ def bildschirm(sitzung: dict) -> dict:
     derselbe Bildschirm zweimal gerendert setzt sie also nicht zurueck.
     """
     schirm = _bildschirm(sitzung)
-    protokoll.gezeigt(sitzung["id"], _kennung(sitzung, schirm))
+    # Eine Aufgabe, die der Katalog nicht hergibt, darf kein leeres Formular
+    # werden: keine Antwortmoeglichkeit ist ein Dead End. Besser ehrlich —
+    # die generische Seite sagt, dass ein Mensch helfen soll.
+    if (schirm["art"] in ("vorhersage", "transfer", "aufgabe")
+            and not schirm.get("aufgabe")):
+        schirm = {"art": "inhalt_fehlt", "phase": sitzung.get("phase"),
+                  "hilfe": _hilfe(sitzung["konzept_id"],
+                                  sitzung.get("phase"))}
+    # Die Kennung wandert mit ins Formular: beim naechsten POST erkennt der
+    # Router daran, ob die Antwort noch zu dieser Aufgabe gehoert. Nur ein
+    # Bildschirm mit sichtbarer Aufgabe darf die Uhr anstellen.
+    schirm["kennung"] = _kennung(sitzung, schirm)
+    protokoll.gezeigt(sitzung["id"],
+                      schirm["kennung"]
+                      if schirm["art"] in _MIT_AUFGABE else "")
     return schirm
 
 

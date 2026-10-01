@@ -269,7 +269,20 @@ def neu(request: Request):
         entry.get("thema_text", ""), entry.get("topic_id")))
 
 
-def _answer(request: Request, action: str, answer=""):
+# Welche Aktion ein Bildschirm jeweils hergibt. Alles andere ist ein
+# veraltetes Formular und wird nur neu gerendert, nie ausgewertet.
+ERWARTETE_BILDSCHIRME = {"anker": {"anker"}, "diagnose": {"diagnose"},
+                       "vorhersage": {"vorhersage"}, "transfer": {"transfer"},
+                       "aufgabe": {"aufgabe"}, "tipp": {"aufgabe"},
+                       "wiederholung": {"wiederholung_waehlen"},
+                       "voraussetzung": {"voraussetzung"},
+                       "voraussetzung_lernen": {"voraussetzung_lernen"},
+                       "voraussetzung_weiter": {"voraussetzung_zurueck",
+                                               "voraussetzung_geschafft"},
+                       "weiter": {"haken", "regel", "beispiel", "anders"}}
+
+
+def _answer(request: Request, action: str, answer="", kennung=""):
     if _aus():
         return _auswahl(request)
     active = _laufende(request)
@@ -281,17 +294,14 @@ def _answer(request: Request, action: str, answer=""):
     if warning is not None:
         return warning
     screen = unterricht.bildschirm(active)
-    expected = {"anker": {"anker"}, "diagnose": {"diagnose"},
-                "vorhersage": {"vorhersage"}, "transfer": {"transfer"},
-                "aufgabe": {"aufgabe"}, "tipp": {"aufgabe"},
-                "wiederholung": {"wiederholung_waehlen"},
-                "voraussetzung": {"voraussetzung"},
-                "voraussetzung_lernen": {"voraussetzung_lernen"},
-                "voraussetzung_weiter": {"voraussetzung_zurueck",
-                                        "voraussetzung_geschafft"},
-                "weiter": {"haken", "regel", "beispiel", "anders"}}
     # Stale forms cannot skip phases or award additional successes.
-    if screen["art"] not in expected[action]:
+    if screen["art"] not in ERWARTETE_BILDSCHIRME[action]:
+        return _zeige(request, active)
+    # Auch ein noch passender Bildschirm kann inzwischen eine andere Aufgabe
+    # zeigen (Doppelklick, Browser-Zurück, zweiter Tab): geführte und
+    # selbstständige Aufgabe teilen sich denselben Bildschirm. Die Antwort
+    # gehört zur abgeschickten Aufgabe oder zu keiner — nicht zur nächsten.
+    if kennung and screen.get("kennung") and kennung != screen["kennung"]:
         return _zeige(request, active)
     if action == "wiederholung":
         if answer not in [str(n) for n in wiederholung.ABSTAENDE]:
@@ -315,73 +325,75 @@ def _answer(request: Request, action: str, answer=""):
 
 @router.post("/anker")
 @exam_router.post("/anker")
-def anker(request: Request, antwort: str = Form("")):
-    return _answer(request, "anker", antwort)
+def anker(request: Request, antwort: str = Form(""), kennung: str = Form("")):
+    return _answer(request, "anker", antwort, kennung)
 
 
 @router.post("/diagnose")
 @exam_router.post("/diagnose")
-def diagnose(request: Request, antwort: str = Form("")):
-    return _answer(request, "diagnose", antwort)
+def diagnose(request: Request, antwort: str = Form(""), kennung: str = Form("")):
+    return _answer(request, "diagnose", antwort, kennung)
 
 
 @router.post("/weiter")
 @exam_router.post("/weiter")
-def weiter(request: Request):
-    return _answer(request, "weiter")
+def weiter(request: Request, kennung: str = Form("")):
+    return _answer(request, "weiter", kennung=kennung)
 
 
 @router.post("/aufgabe")
 @exam_router.post("/aufgabe")
-def aufgabe(request: Request, antwort: str = Form("")):
-    return _answer(request, "aufgabe", antwort)
+def aufgabe(request: Request, antwort: str = Form(""), kennung: str = Form("")):
+    return _answer(request, "aufgabe", antwort, kennung)
 
 
 @router.post("/vorhersage")
 @exam_router.post("/vorhersage")
-def vorhersage(request: Request, antwort: str = Form("")):
-    return _answer(request, "vorhersage", antwort)
+def vorhersage(request: Request, antwort: str = Form(""), kennung: str = Form("")):
+    return _answer(request, "vorhersage", antwort, kennung)
 
 
 @router.post("/transfer")
 @exam_router.post("/transfer")
-def transfer(request: Request, antwort: str = Form("")):
-    return _answer(request, "transfer", antwort)
+def transfer(request: Request, antwort: str = Form(""), kennung: str = Form("")):
+    return _answer(request, "transfer", antwort, kennung)
 
 
 @router.post("/tipp")
 @exam_router.post("/tipp")
-def tipp(request: Request):
-    return _answer(request, "tipp")
+def tipp(request: Request, kennung: str = Form("")):
+    return _answer(request, "tipp", kennung=kennung)
 
 
 @router.post("/wiederholung")
 @exam_router.post("/wiederholung")
-def wiederholung_waehlen(request: Request, tage: str = Form("")):
+def wiederholung_waehlen(request: Request, tage: str = Form(""),
+                          kennung: str = Form("")):
     """Das Kind waehlt, wann es das noch einmal anschaut (Schritt 4a)."""
-    return _answer(request, "wiederholung", tage)
+    return _answer(request, "wiederholung", tage, kennung)
 
 
 @router.post("/voraussetzung")
 @exam_router.post("/voraussetzung")
 def voraussetzung_antworten(request: Request,
-                            antwort: list[str] = Form(default=[])):
+                            antwort: list[str] = Form(default=[]),
+                            kennung: str = Form("")):
     """Die kurze Diagnose zur Grundlage — jede Aufgabe eine Antwort (Z3)."""
-    return _answer(request, "voraussetzung", antwort)
+    return _answer(request, "voraussetzung", antwort, kennung)
 
 
 @router.post("/voraussetzung/lernen")
 @exam_router.post("/voraussetzung/lernen")
-def voraussetzung_lernen(request: Request):
+def voraussetzung_lernen(request: Request, kennung: str = Form("")):
     """Die Grundlage sitzt nicht: erst sie lernen, dann zurueck (Z3)."""
-    return _answer(request, "voraussetzung_lernen")
+    return _answer(request, "voraussetzung_lernen", kennung=kennung)
 
 
 @router.post("/voraussetzung/weiter")
 @exam_router.post("/voraussetzung/weiter")
-def voraussetzung_weiter(request: Request):
+def voraussetzung_weiter(request: Request, kennung: str = Form("")):
     """Geschaffte Grundlage: zurueck an die Stelle, an der es hakte (Z3)."""
-    return _answer(request, "voraussetzung_weiter")
+    return _answer(request, "voraussetzung_weiter", kennung=kennung)
 
 
 def _wiederholung_eintrag(wid: int) -> dict | None:
@@ -467,6 +479,10 @@ def wiederholung_termin(request: Request, wid: int, tage: str = Form("")):
     if _aus():
         return zurueck("/")
     eintrag = _wiederholung_eintrag(wid)
+    # Nur die nicht bestandene Wiederholung braucht einen neuen Termin —
+    # ein veraltetes Formular plant fuer eine geschaffte sonst nach.
+    if eintrag["status"] != wiederholung.NICHT_BESTANDEN:
+        return zurueck("/")
     if tage in [str(n) for n in wiederholung.ABSTAENDE]:
         wiederholung.planen(eintrag["konzept_id"], int(tage))
         flash(request, "Der Termin steht in deinem Tag.")
