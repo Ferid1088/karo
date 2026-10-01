@@ -114,16 +114,50 @@ def inbox_path() -> Path:
 # Bildaufbereitung
 # --------------------------------------------------------------------------
 
-def _open_pdf(path: Path):
-    """Oeffnet ein PDF und prueft die Seitenzahl. Ruft close() selbst im Fehlerfall."""
-    try:
-        import fitz  # PyMuPDF
-    except ImportError as exc:      # pragma: no cover
-        raise IngestError("PDF-Unterstützung fehlt (PyMuPDF nicht installiert).") from exc
-    try:
-        doc = fitz.open(str(path))
-    except Exception as exc:
-        raise IngestError(f"Das PDF ließ sich nicht öffnen: {exc}") from None
+class _Pdf:
+    """Ein geoeffnetes PDF — duenne Huelle um pypdfium2.
+
+    Hier lag PyMuPDF. Das steht unter der AGPL: wer Karo weitergibt oder als
+    Dienst betreibt, muesste dann den gesamten Quelltext unter dieselbe Lizenz
+    stellen. Fuer eine App, die in fremden Haushalten laufen soll, ist das die
+    falsche Bedingung. pypdfium2 (Apache/BSD) kann dasselbe, was Karo hier
+    braucht: Seiten zaehlen und Seiten zeichnen.
+    """
+
+    def __init__(self, path: Path):
+        try:
+            import pypdfium2
+        except ImportError as exc:      # pragma: no cover
+            raise IngestError("PDF-Unterstützung fehlt (pypdfium2 nicht installiert).") from exc
+        try:
+            self._doc = pypdfium2.PdfDocument(str(path))
+            self.page_count = len(self._doc)
+        except Exception as exc:
+            raise IngestError(f"Das PDF ließ sich nicht öffnen: {exc}") from None
+
+    def seite(self, index: int, dpi: int = 180) -> Image.Image:
+        # pypdfium2 rechnet in Vielfachen von 72 dpi.
+        bild = self._doc[index].render(scale=dpi / 72).to_pil()
+        return bild.convert("RGB")
+
+    def text(self, index: int) -> str:
+        """Die Textebene einer Seite, falls es eine gibt."""
+        seite = self._doc[index]
+        try:
+            return (seite.get_textpage().get_text_range() or "").strip()
+        except Exception:               # noqa: BLE001 - Seite ohne Textebene
+            return ""
+
+    def close(self) -> None:
+        try:
+            self._doc.close()
+        except Exception:               # noqa: BLE001 - schon zu
+            pass
+
+
+def _open_pdf(path: Path) -> _Pdf:
+    """Oeffnet ein PDF und prueft die Seitenzahl. Schliesst selbst im Fehlerfall."""
+    doc = _Pdf(path)
     if doc.page_count == 0:
         doc.close()
         raise IngestError("Das PDF hat keine Seiten.")
@@ -137,8 +171,7 @@ def _open_pdf(path: Path):
 
 
 def _render_pdf_page(doc, index: int) -> Image.Image:
-    pix = doc.load_page(index).get_pixmap(dpi=180)
-    return Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGB")
+    return doc.seite(index)
 
 
 def _load_image_file(path: Path) -> Image.Image:

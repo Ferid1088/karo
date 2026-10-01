@@ -172,3 +172,67 @@ def zuordnen(document_id: int, topic_id: int) -> int:
         cur = c.execute("UPDATE kb_chunk SET topic_id=? WHERE document_id=?",
                         (topic_id, document_id))
         return cur.rowcount
+
+
+# --------------------------------------------------------------------------
+# Rückfall: lesen auf dem Server
+# --------------------------------------------------------------------------
+#
+# Der Normalfall ist das Lesen im Browser — dann bleibt das Blatt auf dem
+# Gerät. Ein alter Browser ohne WASM kann das nicht. Statt diese Familien
+# auszuschließen, liest Karo dann hier: auf **ihrem eigenen** Server, im
+# Container auf ihrem Rechner. Das Bild wird sofort danach gelöscht.
+#
+# Das ist ein anderer Handel als vorher und ein ehrlicher: vorher ging das
+# Foto an einen fremden Dienst und blieb dort. Hier bleibt es im Haushalt und
+# überlebt die Anfrage nicht. Gesagt wird es trotzdem vorher.
+
+TESSERACT = "tesseract"
+
+
+def server_lesen_moeglich() -> bool:
+    import shutil
+    return shutil.which(TESSERACT) is not None
+
+
+def _bild_lesen(pfad, sprachen: str = "deu+eng") -> str:
+    import subprocess
+    try:
+        fertig = subprocess.run(
+            [TESSERACT, str(pfad), "stdout", "-l", sprachen],
+            capture_output=True, timeout=120, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return fertig.stdout.decode("utf-8", "replace") if fertig.returncode == 0 else ""
+
+
+def server_lesen(pfad, *, seiten_grenze: int = 20) -> str:
+    """Liest eine Datei auf dem Server. Der Aufrufer löscht sie danach.
+
+    Bild: Tesseract. PDF: erst die Textebene (schneller und fehlerfrei), für
+    Seiten ohne Textebene die gerenderte Seite durch Tesseract — dieselbe
+    Entscheidung wie im Browser, damit beide Wege dasselbe liefern.
+    """
+    from pathlib import Path
+
+    from . import ingest
+
+    pfad = Path(pfad)
+    if pfad.suffix.lower() != ".pdf":
+        return _bild_lesen(pfad)
+
+    doc = ingest._open_pdf(pfad)
+    try:
+        teile = []
+        for i in range(min(doc.page_count, seiten_grenze)):
+            text = doc.text(i)
+            if len(text) >= 40:
+                teile.append(text)
+                continue
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as tmp:
+                doc.seite(i).save(tmp.name)
+                teile.append(_bild_lesen(tmp.name))
+        return "\n\n".join(t for t in teile if t.strip())
+    finally:
+        doc.close()

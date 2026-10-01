@@ -78,7 +78,7 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
     ):
         return True
     if schulblaetter_kind and (
-        path in {"/wissen", "/wissen/upload", "/wissen/einlesen", "/blatt/text",
+        path in {"/wissen", "/wissen/upload", "/wissen/einlesen", "/blatt/text", "/blatt/serverseitig",
                  "/vorbereitung", "/vorbereitung/",
                  "/vorbereitung/schulmaterial/hochladen",
                  "/vorbereitung/schulmaterial/einlesen"}

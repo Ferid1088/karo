@@ -163,6 +163,59 @@ async def handle_blatt_text(request: Request):
     return JSONResponse(stand)
 
 
+async def handle_blatt_serverseitig(request: Request):
+    """Rückfall: der Browser kann nicht lesen, also liest der Server.
+
+    Auf dem Rechner der Familie, nicht bei einem fremden Dienst — und die
+    Datei wird sofort nach dem Lesen gelöscht. Das steht vorher in der
+    Oberfläche; eine Familie, die das nicht will, tippt den Text ein.
+    """
+    import tempfile
+    from pathlib import Path
+
+    from fastapi.responses import JSONResponse
+
+    formular = await request.form()
+    fach = faecher.schluessel(formular.get("fach"))
+    datei = formular.get("datei")
+    if fach is None or datei is None or not getattr(datei, "filename", ""):
+        return JSONResponse({"fehler": "Fach und Datei werden gebraucht."}, status_code=422)
+    if not blatt_text.server_lesen_moeglich():
+        return JSONResponse(
+            {"fehler": "Auf diesem Server ist keine Lesehilfe installiert. "
+                       "Bitte den Text vom Blatt eintippen."}, status_code=503)
+
+    roh = await datei.read(security.MAX_UPLOAD_BYTES + 1)
+    if len(roh) > security.MAX_UPLOAD_BYTES:
+        return JSONResponse({"fehler": "Die Datei ist zu groß."}, status_code=422)
+
+    endung = Path(datei.filename).suffix.lower() or ".bin"
+    tmp = Path(tempfile.mkdtemp(prefix="karo-lesen-")) / f"blatt{endung}"
+    try:
+        tmp.write_bytes(roh)
+        text = await run_in_threadpool(blatt_text.server_lesen, tmp)
+    finally:
+        # Sofort weg — auch wenn das Lesen scheiterte. Eine Datei, die niemand
+        # mehr braucht, soll nicht herumliegen, bis jemand aufräumt.
+        try:
+            tmp.unlink(missing_ok=True)
+            tmp.parent.rmdir()
+        except OSError:
+            pass
+
+    if len(text.strip()) < 40:
+        return JSONResponse(
+            {"fehler": "Auf dem Blatt war zu wenig lesbar. Neu fotografieren — "
+                       "flach hinlegen, von oben, ohne Schatten — oder den Text eintippen."},
+            status_code=422)
+    doc_id = formular.get("document_id")
+    stand = await run_in_threadpool(
+        blatt_text.aufnehmen, text, fach,
+        document_id=int(doc_id) if doc_id else None,
+        themenname=str(formular.get("themenname") or "").strip()[:200])
+    return JSONResponse({**stand, "text": text})
+
+
 async def handle_blatt_thema(request: Request, doc_id: int):
     """Die Bestätigung eines Menschen: dieses Blatt gehört zu diesem Thema."""
     formular = await request.form()

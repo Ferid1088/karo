@@ -45,6 +45,12 @@ async def blatt_text(request: Request):
     return await preparation.handle_blatt_text(request)
 
 
+@router.post("/blatt/serverseitig")
+async def blatt_serverseitig(request: Request):
+    """Rückfall ohne WASM: der Server liest, die Datei wird sofort gelöscht."""
+    return await preparation.handle_blatt_serverseitig(request)
+
+
 @router.post("/blatt/{doc_id}/thema")
 async def blatt_thema(request: Request, doc_id: int):
     """Die Bestätigung: dieses Blatt gehört zu diesem Thema."""
