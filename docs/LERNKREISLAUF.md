@@ -416,3 +416,8 @@ bevorzugt `store.beste_erklaerung()` die wirksamere; unter
 Gemeldet werden **Konzept, Erklärungs-ID und zwei Zahlen** — kein Kinddatum,
 kein Text einer Antwort. Jede Erklärung wird nur einmal gemeldet
 (`lern_erklaerung_gemeldet`).
+
+Ausgelöst wird die Meldung am Ende jeder Sitzung (`sitzung.wechsle` in einen
+Endzustand) als Hintergrundauftrag `wirkung_melden` — dort hat sich die
+Wirkung zuletzt geändert. Ohne eingerichteten Lehrplan-Dienst wird nichts
+eingereiht: es gäbe niemanden, der die Meldung liest.
