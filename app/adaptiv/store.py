@@ -305,9 +305,55 @@ def beste_erklaerung(fehlertyp_id: int, klasse: int,
     if hoechstens_schwierigkeit is not None:
         sql.append("AND schwierigkeit <= ?")
         params.append(hoechstens_schwierigkeit)
-    sql.append("ORDER BY ABS(klasse - ?), schwierigkeit DESC, version DESC LIMIT 1")
-    params.append(klasse)
+    # Z10: Wirkung schlaegt Reihenfolge — aber erst, wenn sie etwas bedeutet.
+    #
+    # `folge_erfolge/ausgeliefert` wurde seit jeher mitgezaehlt und nirgends
+    # gelesen. Eine Erklaerung, die bei keinem Kind je gewirkt hat, wurde
+    # weiter ausgeliefert. Jetzt zaehlt sie mit — ab `adaptiv_wirkung_ab`
+    # Einsaetzen, darunter ist eine Quote Zufall und keine Aussage.
+    from .. import config
+    ab = max(1, int(getattr(config.load_safe(), "adaptiv_wirkung_ab", 10)))
+    sql.append("""ORDER BY ABS(klasse - ?),
+                     CASE WHEN ausgeliefert >= ?
+                          THEN CAST(folge_erfolge AS REAL) / ausgeliefert
+                          ELSE NULL END DESC NULLS LAST,
+                     schwierigkeit DESC, version DESC LIMIT 1""")
+    params += [klasse, ab]
     return _erklaerung_aufbereiten(db.q1(" ".join(sql), *params))
+
+
+def wirkungslose_erklaerungen(cfg=None) -> list[dict]:
+    """Erklaerungen, die oft genug liefen, um als wirkungslos zu gelten.
+
+    Nur Zahlen, nie ein Kind: Konzept, Fehlertyp, Erklaerungs-ID, wie oft
+    ausgeliefert und wie oft danach eine richtige Antwort kam. Mehr braucht
+    der Lehrplan-Dienst nicht, um sie neu zu schreiben — und mehr bekommt er
+    auch nicht.
+    """
+    from .. import config
+    c = cfg or config.load_safe()
+    ab = max(1, int(getattr(c, "adaptiv_wirkung_ab", 10)))
+    schwelle = float(getattr(c, "adaptiv_wirkung_schwelle", 0.3))
+    # Nicht zweimal dasselbe melden: erst wieder, wenn seit der Meldung
+    # weitere Einsaetze dazugekommen sind.
+    zeilen = db.q(
+        """SELECT e.id, e.fehlertyp_id, e.klasse, e.ausgeliefert, e.folge_erfolge,
+                  f.konzept_id, f.fehler_key, k.konzept_key
+             FROM lern_erklaerung e
+             JOIN lern_fehlertyp f ON f.id = e.fehlertyp_id
+             JOIN lern_konzept k ON k.id = f.konzept_id
+             LEFT JOIN lern_erklaerung_gemeldet g ON g.erklaerung_id = e.id
+            WHERE e.aktiv=1 AND e.archiviert_am IS NULL
+              AND e.ausgeliefert >= ?
+              AND CAST(e.folge_erfolge AS REAL) / e.ausgeliefert < ?
+              AND (g.erklaerung_id IS NULL OR e.ausgeliefert > g.ausgeliefert)
+            ORDER BY CAST(e.folge_erfolge AS REAL) / e.ausgeliefert""",
+        ab, schwelle)
+    return [{"erklaerung_id": z["id"], "konzept_key": z["konzept_key"],
+             "fehler_key": z["fehler_key"], "klasse": z["klasse"],
+             "ausgeliefert": z["ausgeliefert"], "wirkte": z["folge_erfolge"],
+             "wirkquote": round(z["folge_erfolge"] / z["ausgeliefert"], 2)}
+            for z in zeilen]
 
 
 def erklaerungen(fehlertyp_id: int, mit_archivierten: bool = False) -> list[dict]:
@@ -340,6 +386,27 @@ def erklaerung_wirkte(erklaerung_id: int) -> None:
 def erstkontakt_anlegen(konzept_id: int, anker: str, erste_aufgabe: dict,
                         benennung: str, quelle: str = "kuratiert",
                         geprueft: bool = False) -> int:
+def wirkung_gemeldet(erklaerung_ids: list[int]) -> None:
+    """Haelt fest, dass diese Erklaerung gemeldet wurde.
+
+    Ohne das ginge dieselbe Meldung bei jedem Lauf erneut hinaus, und der
+    Dienst bekaeme jeden Tag dieselbe Liste.
+    """
+    if not erklaerung_ids:
+        return
+    with db.tx() as c:
+        for eid in erklaerung_ids:
+            c.execute("""INSERT INTO lern_erklaerung_gemeldet
+                           (erklaerung_id, gemeldet_am, ausgeliefert, folge_erfolge)
+                         SELECT id, ?, ausgeliefert, folge_erfolge
+                           FROM lern_erklaerung WHERE id=?
+                         ON CONFLICT(erklaerung_id) DO UPDATE
+                           SET gemeldet_am=excluded.gemeldet_am,
+                               ausgeliefert=excluded.ausgeliefert,
+                               folge_erfolge=excluded.folge_erfolge""",
+                      (db.now(), eid))
+
+
     with db.tx() as c:
         letzte = c.execute(
             "SELECT MAX(version) AS v FROM lern_erstkontakt WHERE konzept_id=?",

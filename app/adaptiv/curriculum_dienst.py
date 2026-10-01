@@ -78,6 +78,37 @@ def vertrag_passt(cfg) -> tuple[bool, str]:
                    "keine Lieferungen an — der Dienst muss auf denselben Stand gebracht werden.")
 
 
+def wirkung_melden(cfg) -> int:
+    """Wirkungslose Erklaerungen dem Lehrplan-Dienst melden (Z10).
+
+    Es geht ausschliesslich um Zahlen: welches Konzept, welche Fehlvorstellung,
+    welche Erklaerungs-ID, wie oft ausgeliefert und wie oft danach eine
+    richtige Antwort kam. Kein Name, kein Thema eines Kindes, keine Antwort —
+    der Dienst braucht das nicht, um eine Erklaerung neu zu schreiben, und
+    was er nicht braucht, bekommt er nicht.
+
+    Gibt zurueck, wie viele gemeldet wurden.
+    """
+    from . import store
+    if not configured(cfg):
+        return 0
+    befunde = store.wirkungslose_erklaerungen(cfg)
+    if not befunde:
+        return 0
+    passt, grund = vertrag_passt(cfg)
+    if not passt:
+        betrieb_melden(grund)
+        return 0
+    try:
+        request(cfg, "POST", "/v1/explanations/feedback",
+                {"format": FORMAT_ID, "befunde": befunde})
+    except Exception as fehler:          # noqa: BLE001 - eine Meldung darf nichts aufhalten
+        betrieb_melden(f"Wirkungsmeldung an den Lehrplan-Dienst nicht moeglich: {fehler}")
+        return 0
+    store.wirkung_gemeldet([b["erklaerung_id"] for b in befunde])
+    return len(befunde)
+
+
 def configured(cfg) -> bool:
     # Incomplete configuration must fail closed, never silently generate locally.
     return any(settings(cfg))

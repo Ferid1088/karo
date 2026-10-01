@@ -221,3 +221,15 @@ CREATE TABLE IF NOT EXISTS lern_fortschritt (
 );
 CREATE INDEX IF NOT EXISTS idx_lern_fortschritt_kind
   ON lern_fortschritt(child_key, letzte_aktivitaet);
+
+-- Schon gemeldete Erklaerungen (Z10).
+--
+-- Ohne diese Tabelle ginge dieselbe Meldung bei jedem Lauf erneut hinaus.
+-- Gemerkt wird der Stand bei der Meldung: erst wenn weitere Einsaetze
+-- dazugekommen sind, ist eine zweite Meldung eine neue Aussage.
+CREATE TABLE IF NOT EXISTS lern_erklaerung_gemeldet (
+    erklaerung_id INTEGER PRIMARY KEY REFERENCES lern_erklaerung(id) ON DELETE CASCADE,
+    gemeldet_am   TEXT NOT NULL,
+    ausgeliefert  INTEGER,
+    folge_erfolge INTEGER
+);

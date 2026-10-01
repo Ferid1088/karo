@@ -130,6 +130,11 @@ class Config:
     #: Stand als 3 im Code — die einzige Schwelle des adaptiven Wegs, an der
     #: eine Familie nichts drehen konnte.
     adaptiv_unbekannte_antworten: int = 3
+    #: Ab so vielen Einsaetzen wird die Wirkung einer Erklaerung zur Aussage.
+    #: Darunter ist eine Quote Zufall (Z10).
+    adaptiv_wirkung_ab: int = 10
+    #: Darunter gilt eine Erklaerung als wirkungslos und wird gemeldet.
+    adaptiv_wirkung_schwelle: float = 0.3
     adaptiv_aehnlichkeit_schwelle: float = 0.82
 
     setup_complete: bool = False
