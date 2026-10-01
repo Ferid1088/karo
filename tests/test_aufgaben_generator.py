@@ -171,3 +171,61 @@ def test_ein_kleiner_als_ist_kein_markup(text):
     Erklaerungen — ein Browser liest „< b" nicht als Element.
     """
     assert schemas.enthaelt_markup(text) is False, text
+
+
+# ------------------------------------------ Gleichungen mit Unbekannter
+
+@pytest.mark.parametrize("gleichung,erwartet", [
+    ("10x - 4 = 8x + 10", ("x", "7")),
+    ("6x − 4 = 2x + 8", ("x", "3")),
+    ("x - 6 = 10", ("x", "16")),
+    ("3y + 2 = 11", ("y", "3")),
+])
+def test_lineare_gleichungen_werden_geloest(gleichung, erwartet):
+    """Gesucht ist x, nicht ein Zahlenwert — „ausrechnen" reicht hier nicht."""
+    assert aufgaben.loesen(gleichung) == erwartet
+
+
+def test_eine_gleichung_ohne_eindeutige_loesung_wird_gemeldet():
+    with pytest.raises(aufgaben.VorlageUnbrauchbar, match="keine eindeutige"):
+        aufgaben.loesen("2x + 1 = 2x + 5")
+
+
+def test_ohne_unbekannte_ist_der_loeser_nicht_zustaendig():
+    assert aufgaben.loesen("1/2 + 1/3 = 5/6") is None
+    assert aufgaben.loesen("3 + 4") is None
+
+
+def test_eine_gleichungsvorlage_wird_zur_fertigen_aufgabe():
+    """Der Fall, der den Generator ausgelöst hat."""
+    vorlage = {"vorlage": "{a}x - {b} = {c}x + {d}", "frage": "Löse: {aufgabe}",
+               "bedingungen": ["a > c", "b < 20", "d < 20", "(b + d) % (a - c) == 0"]}
+    fertig = aufgaben.bauen(vorlage, seed="MA.GLEICHUNGEN:1",
+                            fehler_key="vorzeichen_vergessen")
+    assert fertig["loesung"].startswith("x = ")
+    # Die Loesung stimmt wirklich: eingesetzt geht die Gleichung auf.
+    from fractions import Fraction
+    x = Fraction(fertig["loesung"].split("=", 1)[1].strip())
+    a, b, c, d = (fertig["belegung"][k] for k in "abcd")
+    assert a * x - b == c * x + d
+
+
+def test_eine_aufloesung_darf_einen_widerspruch_vorrechnen():
+    """„Nach Abziehen von 2x steht 4 = 9, und das ist falsch."
+
+    Eine Prüfung, die diesen Satz verbietet, verbietet das Vorrechnen eines
+    Widerspruchs — eine der ältesten Beweisformen im Unterricht.
+    """
+    geprueft = schemas._aufgabe_pruefen(
+        {"frage": "Welche Umformung stimmt?", "loesung": "A",
+         "optionen": ["A", "B"],
+         "aufloesung": "Bei B steht nach dem Abziehen 4 = 9, und das ist falsch."},
+        "vorhersage")
+    assert "4 = 9" in geprueft["aufloesung"]
+
+
+def test_eine_regel_darf_weiter_nicht_falsch_rechnen():
+    """Der Riegel bleibt dort, wo eine Aussage wahr sein muss."""
+    with pytest.raises(schemas.InhaltUngueltig, match="nachgerechnet"):
+        schemas._nachrechnen("Rechne so: 2 + 2 = 5.", "fehlertyp[0].erklaerung.regel")
+    schemas._nachrechnen("Rechne so: 2 + 2 = 4.", "fehlertyp[0].erklaerung.regel")

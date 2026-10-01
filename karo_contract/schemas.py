@@ -171,7 +171,14 @@ HILFE_PHASEN = ("HOOK", "RULE", "WORKED_EXAMPLE", "GUIDED_TASK",
 #: Bewusst NICHT dabei: `beschreibung`, `haken`, `typischer_fehler` und die
 #: bekannten falschen Antworten — die beschreiben eine Fehlvorstellung.
 #: „1/2 + 1/3 = 2/5" gehoert dort hin und ist als Rechnung natuerlich falsch.
-_NACHZURECHNEN = ("regel", "erkenntnis", "aufloesung")
+#:
+#: `aufloesung` stand hier und ist wieder raus. Sie erklaert, warum eine
+#: Auswahl richtig und eine andere falsch ist — und dabei zitiert sie die
+#: falsche: „Nach Abziehen von 2x steht 4 = 9, und das ist falsch." Eine
+#: Pruefung, die genau diesen Satz verbietet, verbietet das Vorrechnen eines
+#: Widerspruchs. Das ist eine der aeltesten Beweisformen im Mathematik-
+#: unterricht.
+_NACHZURECHNEN = ("regel", "erkenntnis")
 
 
 def _nachrechnen(text: Any, pfad: str) -> None:
@@ -237,7 +244,8 @@ def _aufgabe_pruefen(daten: Any, rolle: str, seed: str = "", fehler_key: str = "
             sauber[feld] = [str(w).strip() for w in werte if str(w).strip()]
     for schritt in sauber.get("schritte", []):
         _nachrechnen(schritt, f"{rolle}.schritte")
-    _nachrechnen(sauber.get("aufloesung"), f"{rolle}.aufloesung")
+    # `aufloesung` wird NICHT nachgerechnet: sie erklaert, warum eine Auswahl
+    # falsch ist, und zitiert dabei die falsche Rechnung. Siehe _NACHZURECHNEN.
     return sauber
 
 

@@ -215,7 +215,15 @@ def bauen(vorlage: dict, *, seed: int | str = 0, fehler_key: str = "") -> dict:
     bereich = tuple(vorlage.get("bereich") or (1, 12))
     belegung = belegen(muster, bedingungen, seed=seed, bereich=bereich)
     aufgabe = einsetzen(muster, belegung)
-    loesung = ausrechnen(aufgabe)
+    # Erst fragen, ob eine Unbekannte gesucht ist: „4x − 3 = 9" laesst sich
+    # nicht ausrechnen, nur loesen. Genau an dieser Vorlagenart haengt das
+    # Thema, das den ganzen Generator ausgeloest hat.
+    geloest = loesen(aufgabe)
+    if geloest:
+        variable, wert_ = geloest
+        loesung = f"{variable} = {wert_}"
+    else:
+        loesung = ausrechnen(aufgabe)
 
     satz = str(vorlage.get("frage") or "{aufgabe}")
     frage = satz.replace("{aufgabe}", aufgabe)
@@ -227,3 +235,63 @@ def bauen(vorlage: dict, *, seed: int | str = 0, fehler_key: str = "") -> dict:
     if fehler and fehler != loesung:
         fertig["typischer_fehler"] = fehler
     return fertig
+
+
+# --------------------------------------------------------------------------
+# Gleichungen mit einer Unbekannten
+# --------------------------------------------------------------------------
+#
+# „{a}x − {b} = {c}x + {d}" ist die haeufigste Vorlage ueberhaupt, und sie
+# laesst sich nicht „ausrechnen": gesucht ist x, nicht ein Zahlenwert. Ohne
+# das hier waere der Generator ausgerechnet fuer das Thema unbrauchbar, das
+# ihn ausgeloest hat — „Lineare Gleichungen loesen".
+#
+# Geloest wird nur, was wirklich linear ist: beide Seiten der Form
+# „Zahl·x + Zahl". Alles andere bleibt ungeloest und sagt das auch.
+
+_VARIABLE = re.compile(r"(?<![a-zA-Z])([a-z])(?![a-zA-Z])")
+
+
+def _linear_teilen(seite: str, variable: str) -> tuple[Fraction, Fraction]:
+    """Eine Seite in (Faktor vor der Variablen, Konstante) zerlegen."""
+    text = (seite.replace("−", "-").replace("–", "-").replace("·", "*")
+                 .replace("×", "*").replace(" ", ""))
+    faktor = Fraction(0)
+    konstante = Fraction(0)
+    # In Summanden zerlegen, Vorzeichen behalten.
+    for teil in re.findall(r"[+-]?[^+-]+", text):
+        if not teil:
+            continue
+        vorzeichen = -1 if teil.startswith("-") else 1
+        rumpf = teil.lstrip("+-")
+        if variable in rumpf:
+            zahl = rumpf.replace(variable, "").replace("*", "").strip()
+            faktor += vorzeichen * (Fraction(zahl) if zahl else Fraction(1))
+        else:
+            try:
+                konstante += vorzeichen * Fraction(rumpf)
+            except (ValueError, ZeroDivisionError):
+                raise VorlageUnbrauchbar(f"„{seite}“ ist nicht linear.") from None
+    return faktor, konstante
+
+
+def loesen(gleichung: str) -> tuple[str, str] | None:
+    """Loest „a·x + b = c·x + d" nach x. Gibt (variable, loesung) zurueck.
+
+    None, wenn es keine Gleichung mit genau einer Unbekannten ist — dann
+    ist dieser Weg nicht zustaendig.
+    """
+    if "=" not in gleichung:
+        return None
+    variablen = set(_VARIABLE.findall(gleichung))
+    if len(variablen) != 1:
+        return None
+    variable = variablen.pop()
+    links, _, rechts = gleichung.partition("=")
+    fl, kl = _linear_teilen(links, variable)
+    fr, kr = _linear_teilen(rechts, variable)
+    faktor, konstante = fl - fr, kr - kl
+    if faktor == 0:
+        raise VorlageUnbrauchbar(
+            f"„{gleichung}“ hat keine eindeutige Lösung — die Unbekannte fällt weg.")
+    return variable, _als_text(konstante / faktor)
