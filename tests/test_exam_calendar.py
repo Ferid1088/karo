@@ -149,6 +149,9 @@ def test_simulation_questions_are_gated_until_simulation_day(
     einrichten(client, fake_llm)
     app_env.config.update(klassenarbeit_kind=True, adaptive_learning_enabled=True)
     exam_id, topic_id = _exam_with_topic(app_env)
+    # Ohne diese Zeile gilt das reale Datum — und ab dem Prüfungstag selbst
+    # ist der Kalender nicht mehr aenderbar.
+    monkeypatch.setattr("app.db.today", lambda: "2026-09-27")
     exam_calendar.save_days(exam_id, {
         "2026-09-28": 20,
         "2026-09-30": 25,

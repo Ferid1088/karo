@@ -10,11 +10,15 @@ from .test_app import _bis_rot
 
 def plan_anlegen(app_env, topic_id):
     from app import exam_plan
+    import datetime as dt
     db = app_env.db
     topic = db.q1("SELECT * FROM topic WHERE id=?", topic_id)
+    # Die Arbeit liegt in der Zukunft — ein fester Tag wuerde mit der Zeit
+    # in der Vergangenheit liegen und der Lernkalender unterdrueckt werden.
+    exam_tag = (dt.date.fromisoformat(db.today()) + dt.timedelta(days=7)).isoformat()
     with db.tx() as c:
         exam_id = c.execute("INSERT INTO exam(subject, exam_date, themen, created_at) VALUES (?, ?, ?, ?)",
-                            ("mathematik", "2026-10-01", json.dumps([topic["label"]]), db.now())).lastrowid
+                            ("mathematik", exam_tag, json.dumps([topic["label"]]), db.now())).lastrowid
         c.execute("INSERT INTO exam_plan(exam_id, state, tagesplan, created_at) VALUES (?, 'bereit', ?, ?)",
                   (exam_id, json.dumps([
                       {"tag": "Montag", "inhalt": "Brüche addieren", "topic_code": topic["code"], "minuten": 15},
