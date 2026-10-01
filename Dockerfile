@@ -45,8 +45,12 @@ WORKDIR /srv
 # iframe anzeigt. Alles nur auf 127.0.0.1 erreichbar und nur waehrend eine
 # Anmeldung tatsaechlich laeuft — siehe app/media/notebooklm.py und
 # docker-compose.yml.
+# tesseract-ocr samt deu/eng: der Rueckfall fuer Browser ohne WASM. Dann
+# liest Karo das Blatt hier — auf dem Rechner der Familie, nicht bei einem
+# fremden Dienst — und loescht die Datei sofort danach.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl gnupg fonts-dejavu-core \
+        tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng \
     && if [ "$MIT_MP4" = "1" ]; then \
         apt-get install -y --no-install-recommends ffmpeg; \
        fi \
@@ -97,6 +101,15 @@ RUN pip install --no-cache-dir -r requirements.txt \
         && chown -R karo:karo /opt/playwright-browsers \
         && rm -rf /var/lib/apt/lists/*; \
        fi
+
+# Die Browser-Dateien fuer OCR und PDF (Tesseract-WASM, Sprachdaten deu+eng,
+# pdf.js, heic2any): feste Fassungen, jede gegen eine eingecheckte SHA-256
+# geprueft. Stimmt eine nicht, bricht der Bau hier ab — lieber kein Image als
+# eines mit einem WASM-Modul, das niemand geprueft hat. Eigene Ebene vor
+# COPY app, damit eine Aenderung am Quelltext den Download nicht wiederholt.
+COPY tools/ocr-assets.json tools/fetch_ocr_assets.py ./tools/
+RUN python tools/fetch_ocr_assets.py --ziel /srv/app/static \
+    && chown -R karo:karo /srv/app
 
 COPY --chown=karo:karo app ./app
 COPY --chown=karo:karo karo_contract ./karo_contract

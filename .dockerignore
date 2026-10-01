@@ -23,3 +23,9 @@ README.md
 Makefile
 sicherung/
 *.tar.gz
+
+# Die OCR-/PDF-Dateien holt der Bau selbst (tools/fetch_ocr_assets.py) und
+# prueft sie dabei. Sie sollen nicht aus dem Arbeitsverzeichnis in den
+# Build-Kontext wandern: dort waeren sie ungeprueft und 21 MB gross.
+app/static/ocr/
+app/static/pdfjs/

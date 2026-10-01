@@ -1,0 +1,62 @@
+{
+  "_kommentar": [
+    "Feste Fassungen und Pruefsummen der Dateien, die der Browser fuer OCR und PDF braucht.",
+    "Sie liegen NICHT im Repository: tools/fetch_ocr_assets.py holt sie beim Image-Bau und",
+    "prueft jede Datei gegen diese Liste. Stimmt eine Pruefsumme nicht, bricht der Bau ab.",
+    "Zur Laufzeit laedt der Browser alles nur von unserem eigenen Server — kein CDN.",
+    "Eine Fassung erhoehen heisst: Pruefsumme neu eintragen, sonst faellt der Bau durch."
+  ],
+  "npm": [
+    {
+      "name": "tesseract.js",
+      "version": "7.0.0",
+      "sha256": "9a93bf51c3387f945d10a24bf8b3a4bf2e45c7c7161b8242aafbaf9d3c4b606a",
+      "dateien": {
+        "package/dist/tesseract.min.js": "ocr/tesseract.min.js",
+        "package/dist/worker.min.js": "ocr/worker.min.js"
+      }
+    },
+    {
+      "name": "tesseract.js-core",
+      "version": "6.1.2",
+      "sha256": "1b5863e7d912de9fc639222a38ede7876b2344565f8ad8d9527b242b0d793e24",
+      "dateien": {
+        "package/tesseract-core-simd-lstm.wasm.js": "ocr/tesseract-core-simd-lstm.wasm.js",
+        "package/tesseract-core-simd-lstm.wasm": "ocr/tesseract-core-simd-lstm.wasm",
+        "package/tesseract-core-lstm.wasm.js": "ocr/tesseract-core-lstm.wasm.js",
+        "package/tesseract-core-lstm.wasm": "ocr/tesseract-core-lstm.wasm"
+      }
+    },
+    {
+      "name": "pdfjs-dist",
+      "version": "6.3.289",
+      "sha256": "06f25e887adc6489f04c9fcb14198c77e4e5623a59a0bba5c4cea5838a4f1241",
+      "dateien": {
+        "package/build/pdf.min.mjs": "pdfjs/pdf.min.mjs",
+        "package/build/pdf.worker.min.mjs": "pdfjs/pdf.worker.min.mjs"
+      }
+    },
+    {
+      "name": "heic2any",
+      "version": "0.0.4",
+      "sha256": "510dbabc44f5940689b1779fff552584a1c4df434c0cc83c3be3258b2ace1995",
+      "dateien": {
+        "package/dist/heic2any.min.js": "ocr/heic2any.min.js"
+      }
+    }
+  ],
+  "tessdata": {
+    "repo": "tesseract-ocr/tessdata_fast",
+    "tag": "4.1.0",
+    "sprachen": {
+      "deu.traineddata": {
+        "ziel": "ocr/deu.traineddata",
+        "sha256": "19d219bbb6672c869d20a9636c6816a81eb9a71796cb93ebe0cb1530e2cdb22d"
+      },
+      "eng.traineddata": {
+        "ziel": "ocr/eng.traineddata",
+        "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2"
+      }
+    }
+  }
+}

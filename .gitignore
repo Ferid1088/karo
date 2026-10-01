@@ -26,3 +26,17 @@ karo/
 # Sicherungen enthalten config.json und session.key
 sicherung/
 *.tar.gz
+
+# Browser-Dateien fuer OCR und PDF (rund 21 MB). Sie kommen beim Image-Bau aus
+# festen npm-/Release-Fassungen und werden dabei gegen tools/ocr-assets.json
+# geprueft — siehe tools/fetch_ocr_assets.py. Nicht ins Repository.
+app/static/ocr/
+app/static/pdfjs/
+
+# Echte Blaetter fuer die lokale OCR-Messung (make ocr-report). Sie bleiben auf
+# dem Rechner der Familie — weder Blatt noch Text gehen je ins Repository.
+ocr-proben/
+
+# Die synthetischen Proben baut tests/ocr_fixtures/erzeugen.py bei Bedarf.
+tests/ocr_fixtures/*.png
+tests/ocr_fixtures/*.pdf
