@@ -144,7 +144,9 @@ class _Pdf:
         """Die Textebene einer Seite, falls es eine gibt."""
         seite = self._doc[index]
         try:
-            return (seite.get_textpage().get_text_range() or "").strip()
+            # `get_text_bounded()`, nicht `get_text_range()`: letzteres leitet
+            # ohne Argumente still hierher um und warnt dabei.
+            return (seite.get_textpage().get_text_bounded() or "").strip()
         except Exception:               # noqa: BLE001 - Seite ohne Textebene
             return ""
 

@@ -30,7 +30,10 @@ jobs:
       - name: Run full pytest suite
         env:
           PYTHONPATH: .
-        run: pytest -q
+        # Ohne -q: pytest.ini setzt es schon, und zweimal -q verschluckt die
+        # Zusammenfassung — dann steht im Protokoll nicht einmal, wie viele
+        # Tests liefen. Genau das hat hier lange niemand gemerkt.
+        run: pytest -rs
 
   # Karo allein gruen zu sehen hat nicht gereicht: die laufende Fassung des
   # Lehrplan-Dienstes lieferte ein Pflichtfeld nicht, und jede Lieferung wurde
