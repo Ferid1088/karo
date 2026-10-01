@@ -177,9 +177,14 @@ TEACHING-Phasen:
 HOOK → RULE → WORKED_EXAMPLE → GUIDED_TASK ⇄ ADAPTATION
                                      ↓
                                INDEPENDENT_TASK ⇄ ADAPTATION
-                                     ↓
-                                 COMPLETE
+                                     ↖︎ (richtiger Transfer ohne genug
+                                        Belege: neue Runde, neue Aufgabe)
 ```
+
+`COMPLETE` ist kein Ziel mehr: ein richtiger Transfer mit zu wenig
+Erfolgsbelegen startet die nächste `INDEPENDENT_TASK`-Runde mit einer neuen
+Aufgabe. Sitzungen, die vor dieser Änderung auf COMPLETE geparkt waren,
+werden beim nächsten Bildschirm in eine solche Runde überführt.
 
 #### 4. Diagnose (`DIAGNOSING`)
 
@@ -241,8 +246,10 @@ Richtig gerechnet beendet die Phase **nicht**. Danach kommt der **Transfer**
 (`art: "transfer"`): derselbe Gedanke an einer anderen Struktur, ohne
 Rechnen. Das ist der Mini-Test.
 
-- Transfer richtig → Erfolg; bei erreichter Schwelle `MASTERED`, sonst
-  `COMPLETE`
+- Transfer richtig → Erfolg; bei erreichter Schwelle `MASTERED`, sonst eine
+  **neue** selbstständige Runde: erst eine ungestellte geprüfte Aufgabe,
+  dann eine nachgerechnete Variante des Generators — nie dieselbe, solange
+  beides hergibt. Der Bildschirm sagt „Fast geschafft", nicht „verstanden".
 - Transfer falsch → Runde zählt (`runde_gescheitert`), Hinweis, erneut
 - falsch in der selbstständigen Phase → **immer** `ADAPTATION`, unabhängig
   davon, ob es dieselbe Fehlvorstellung war

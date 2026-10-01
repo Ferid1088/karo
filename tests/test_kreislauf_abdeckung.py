@@ -116,8 +116,19 @@ def test_jede_domain_bildschirm_art_hat_einen_template_zweig(app_env):
                "voraussetzung_titel": "Grundlage", "voraussetzung_lernen": True}))
     arten.setdefault(schirm["art"], None)
 
+    # „geschafft" gehoert zu MASTERED mit gewaehltem oder gesichertem
+    # Termin — nie mehr zu einem offenen Zustand.
+    from app.adaptiv import wiederholung
+    wiederholung.planen(konzept_id, 3)
+    schirm = unterricht._bildschirm(sitzung(zustand=zustand.MASTERED,
+                                          phase=None, daten={}))
+    arten.setdefault(schirm["art"], None)
+
     zweige = _template_zweige()
-    fehlend = {a: wo for a, wo in arten.items() if a not in zweige}
+    # "unbekannt" ist das Sentinel der Domain fuer nicht vorgesehene
+    # Kombinationen — es faellt absichtlich in den ehrlichen else-Zweig.
+    fehlend = {a: wo for a, wo in arten.items()
+               if a not in zweige and a != "unbekannt"}
     assert not fehlend, (
         f"Bildschirm-Arten ohne Template-Zweig (faellen in den "
         f"Generik-Zweig): {sorted(fehlend)}")
@@ -298,3 +309,150 @@ def test_termin_formular_ignoriert_eine_geschaffte_wiederholung(
         "SELECT COUNT(*) AS n FROM lern_wiederholung")["n"]
     assert nachher == vorher
     assert wiederholung.offen_fuer(konzept_id) is None
+
+
+# --------------------------------------------------------------------------
+# Runde statt Parkplatz: richtiger Transfer ohne genug Belege
+# --------------------------------------------------------------------------
+
+def _bis_zur_selbstaendigen_aufgabe(client, fake_llm, app_env,
+                                    treffer=5, runden=3):
+    """Bis zur ersten selbststaendigen Aufgabe — mit Schwellen, die das
+    Verhalten nach dem Transfer sichtbar machen."""
+    from app.adaptiv import sitzung as zustand, inhalt_store, store, unterricht
+    app_env.db.init()
+    store.init()
+    app_env.config.update(adaptiv_mastery_treffer=treffer,
+                          adaptiv_max_lehrrunden=runden)
+    token = _kind_im_browser(client, fake_llm, app_env)
+    client.post("/lernen/adaptiv/start",
+                data={"_csrf": token, "thema": "brueche"})
+    s = zustand.laufende()
+    s = unterricht.anker_beantwortet(s, "x")
+    s = unterricht.diagnose_beantwortet(s, "2/5")
+    s = unterricht.vorhersage_beantwortet(s, "groesser")
+    for _ in range(3):
+        s = unterricht.weiter(s)
+    loesung = inhalt_store.aufgabe(s["fehlertyp_id"],
+                                   inhalt_store.GEFUEHRT)["loesung"]
+    s = unterricht.aufgabe_beantwortet(s, loesung)
+    assert s["phase"] == zustand.INDEPENDENT_TASK
+    return s
+
+
+def test_richtiger_transfer_ohne_beleg_startet_neue_runde(
+        client, fake_llm, fake_cli, app_env):
+    """Treffer=5: ein richtiger Transfer mit zu wenig Belegen gibt keine
+    Pause auf COMPLETE, sondern eine neue Runde mit einer neuen Aufgabe —
+    jede Runde eine andere, und „verstanden" erst bei MASTERED."""
+    from app.adaptiv import sitzung as zustand, unterricht
+    s = _bis_zur_selbstaendigen_aufgabe(client, fake_llm, app_env)
+
+    gestellte, arten, mutmacher = [], [], []
+    for _ in range(10):                     # Schutz gegen jeden Stillstand
+        assert s["phase"] != zustand.COMPLETE          # kein Parkplatz
+        schirm = unterricht.bildschirm(s)
+        arten.append(schirm["art"])
+        assert schirm["art"] == "aufgabe"
+        assert schirm["phase"] == zustand.INDEPENDENT_TASK
+        gestellte.append(schirm["aufgabe"]["frage"])
+        mutmacher.append(schirm.get("aufmunterung"))
+        s = unterricht.aufgabe_beantwortet(s, schirm["aufgabe"]["loesung"])
+        schirm = unterricht.bildschirm(s)
+        arten.append(schirm["art"])
+        assert schirm["art"] == "transfer"   # richtige Uebung → Transfer
+        s = unterricht.transfer_beantwortet(s, schirm["aufgabe"]["loesung"])
+        if s["zustand"] == zustand.MASTERED:
+            break
+    assert s["zustand"] == zustand.MASTERED
+    # Jede selbststaendige Runde stellt eine andere Aufgabe.
+    assert len(gestellte) >= 2
+    assert len(gestellte) == len(set(gestellte))
+    # Erst die Extra-Runde verspricht „fast geschafft" — nie „verstanden".
+    assert mutmacher[0] is None
+    assert all(m == "Fast geschafft — eine neue Aufgabe wartet noch."
+               for m in mutmacher[1:])
+    assert "geschafft" not in arten
+
+
+def test_rundengrenze_gilt_auch_in_extra_runden(
+        client, fake_llm, fake_cli, app_env):
+    """Die Extra-Runde ist keine Endlosschleife: jede falsche Antwort zaehlt
+    eine Runde — bei adaptiv_max_lehrrunden eskaliert Karo wie immer."""
+    from app.adaptiv import sitzung as zustand, inhalt_store, unterricht
+    s = _bis_zur_selbstaendigen_aufgabe(client, fake_llm, app_env,
+                                        treffer=5, runden=2)
+    selbst = inhalt_store.aufgabe(s["fehlertyp_id"],
+                                  inhalt_store.SELBSTSTAENDIG)
+    s = unterricht.aufgabe_beantwortet(s, selbst["loesung"])
+    transfer = inhalt_store.aufgabe(s["fehlertyp_id"], inhalt_store.TRANSFER)
+    s = unterricht.transfer_beantwortet(s, transfer["loesung"])
+    assert s["zustand"] == zustand.TEACHING
+    assert s["phase"] == zustand.INDEPENDENT_TASK      # Extra-Runde
+
+    # Nenner > 60 kommt als Generator-Ergebnis nicht vor — sicher falsch.
+    s = unterricht.aufgabe_beantwortet(s, "123/456")   # falsch — Runde 1
+    assert s["phase"] == zustand.ADAPTATION
+    s = unterricht.weiter_nach_adaptation(s)
+    s = unterricht.aufgabe_beantwortet(s, "123/456")   # falsch — Runde 2
+    assert s["zustand"] == zustand.ESCALATED
+
+
+def test_geparkte_alt_sitzung_bekommt_ihre_runde(
+        client, fake_llm, fake_cli, app_env):
+    """Eine Sitzung auf COMPLETE aus der Parkplatz-Zeit: offen, unfertig und
+    auf „verstanden" geparkt. Der naechste Bildschirm repariert sie — das
+    Konzept bleibt neu startbar und spielbar bis MASTERED."""
+    from app.adaptiv import sitzung as zustand, store, unterricht
+    s = _bis_zur_selbstaendigen_aufgabe(client, fake_llm, app_env)
+    store.sitzung_aktualisieren(s["id"], phase=zustand.COMPLETE,
+                              daten={"gerechnet": True})
+
+    seite = client.get("/lernen/adaptiv")
+    # „verstanden und sicher gelöst" ist der Abschlusstext — hier gelogen.
+    assert "sicher gelöst" not in seite.text
+    assert "Gut gemacht" not in seite.text
+    assert "Fast geschafft" in seite.text
+
+    s = store.sitzung(s["id"])
+    assert s["phase"] == zustand.INDEPENDENT_TASK
+    # Und sie spielt sich normal zu Ende — bis MASTERED.
+    schirm = unterricht.bildschirm(s)
+    assert schirm["art"] == "aufgabe"
+    for _ in range(6):
+        s = unterricht.aufgabe_beantwortet(s, schirm["aufgabe"]["loesung"])
+        s = unterricht.transfer_beantwortet(
+            s, unterricht.bildschirm(s)["aufgabe"]["loesung"])
+        if s["zustand"] == zustand.MASTERED:
+            break
+        schirm = unterricht.bildschirm(s)
+    assert s["zustand"] == zustand.MASTERED
+    # Das Konzept sperrt sich nicht: keine offene Sitzung bleibt haengen.
+    assert zustand.laufende() is None
+
+
+def test_kein_offener_zustand_zeigt_geschafft(
+        client, fake_llm, fake_cli, app_env):
+    """„verstanden" gibt es erst bei MASTERED: ueber alle offenen
+    Zustand/Phase-Kombinationen hinweg erzeugt `bildschirm` nie den
+    Abschluss-Bildschirm — die COMPLETE-Reparatur eingeschlossen."""
+    from app.adaptiv import sitzung as zustand, store, unterricht
+    app_env.db.init()
+    store.init()
+    _kind_im_browser(client, fake_llm, app_env)
+    konzept_id = store.konzepte_verfuegbar()[0]["id"]
+    fehlertyp_id = store.fehlertypen(konzept_id)[0]["id"]
+    s = unterricht.starte(konzept_id, "Brüche")
+    store.sitzung_aktualisieren(s["id"], zustand=zustand.TEACHING,
+                                fehlertyp_id=fehlertyp_id)
+
+    for phase in list(zustand.PHASEN) + [None]:
+        store.sitzung_aktualisieren(s["id"], phase=phase, daten={})
+        schirm = unterricht.bildschirm(store.sitzung(s["id"]))
+        assert schirm["art"] != "geschafft", phase
+
+    for z in zustand.ZUSTAENDE:
+        store.sitzung_aktualisieren(s["id"], zustand=z, phase=None, daten={})
+        schirm = unterricht.bildschirm(store.sitzung(s["id"]))
+        if z not in zustand.ENDZUSTAENDE:
+            assert schirm["art"] != "geschafft", z

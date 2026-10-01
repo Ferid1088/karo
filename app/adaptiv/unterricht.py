@@ -12,6 +12,7 @@ import datetime as dt
 from fractions import Fraction
 
 from . import inhalt_store, katalog, protokoll, sitzung as zustand, store
+from . import varianten
 from .normalisierung import normalisiere
 
 #: Schritte innerhalb von DIAGNOSING (§11: Anker, dann produktives Scheitern).
@@ -123,8 +124,8 @@ def _kennung(sitzung: dict, schirm: dict) -> str:
     abgeschicktes Formular eindeutig."""
     aufgabe = schirm.get("aufgabe") or {}
     teile = [schirm["art"], str(schirm.get("phase") or ""),
-             str(aufgabe.get("id") or schirm.get("frage") or
-                 schirm.get("voraussetzung") or "")]
+             str(aufgabe.get("id") or aufgabe.get("frage")
+                 or schirm.get("frage") or schirm.get("voraussetzung") or "")]
     return "|".join(teile)
 
 
@@ -135,6 +136,12 @@ def bildschirm(sitzung: dict) -> dict:
     werden faengt an derselben Stelle an. `protokoll.gezeigt` ist idempotent,
     derselbe Bildschirm zweimal gerendert setzt sie also nicht zurueck.
     """
+    if (sitzung["zustand"] == zustand.TEACHING
+            and sitzung["phase"] == zustand.COMPLETE):
+        # Altlast aus der Zeit, als COMPLETE ein Parkplatz war: die Sitzung
+        # ist offen und nicht beherrscht — sie bekommt ihre naechste Runde,
+        # statt „verstanden" vorzugaukeln.
+        sitzung = _naechste_uebungsrunde(sitzung)
     schirm = _bildschirm(sitzung)
     # Eine Aufgabe, die der Katalog nicht hergibt, darf kein leeres Formular
     # werden: keine Antwortmoeglichkeit ist ein Dead End. Besser ehrlich —
@@ -264,15 +271,12 @@ def _bildschirm(sitzung: dict) -> dict:
     if phase == zustand.INDEPENDENT_TASK and daten.get("gerechnet"):
         # Transfer: dieselbe Einsicht an einer anderen Struktur, ohne Rechnen.
         return {"art": "transfer", "phase": phase,
-                "aufgabe": inhalt_store.aufgabe(fehlertyp_id,
-                                                inhalt_store.TRANSFER),
+                "aufgabe": _transfer_aufgabe(sitzung),
                 "fehlerhinweis": daten.get("fehlerhinweis"),
                 "hilfe": _hilfe(konzept_id, phase)}
 
     if phase in (zustand.GUIDED_TASK, zustand.INDEPENDENT_TASK):
-        rolle = (inhalt_store.GEFUEHRT if phase == zustand.GUIDED_TASK
-                 else inhalt_store.SELBSTSTAENDIG)
-        aufgabe = inhalt_store.aufgabe(fehlertyp_id, rolle)
+        aufgabe = _uebungsaufgabe(sitzung, phase)
         tipps = (aufgabe or {}).get("tipps") or []
         stufe = int(daten.get("tipp_stufe", 0))
         return {"art": "aufgabe", "phase": phase, "aufgabe": aufgabe,
@@ -281,6 +285,7 @@ def _bildschirm(sitzung: dict) -> dict:
                         if phase == zustand.GUIDED_TASK else None,
                 "tipps": tipps[:stufe], "tipp_offen": stufe < len(tipps),
                 "fehlerhinweis": daten.get("fehlerhinweis"),
+                "aufmunterung": daten.get("aufmunterung"),
                 "hilfe": _hilfe(konzept_id, phase)}
 
     if phase == zustand.ADAPTATION:
@@ -289,12 +294,83 @@ def _bildschirm(sitzung: dict) -> dict:
                 "bild": (erklaerung or {}).get("visualisierung_alternativ"),
                 "hilfe": _hilfe(konzept_id, phase)}
 
-    return {"art": "geschafft", "phase": phase, "hilfe": _hilfe(konzept_id, None)}
+    # Jede andere Kombination ist nicht vorgesehen: lieber ein ehrlicher
+    # „Karo weiss nicht weiter"-Bildschirm als ein falsches „geschafft".
+    return {"art": "unbekannt", "phase": phase, "hilfe": _hilfe(konzept_id, None)}
 
 
 # --------------------------------------------------------------------------
 # Antworten verarbeiten
 # --------------------------------------------------------------------------
+
+def _uebungsaufgabe(sitzung: dict, phase: str) -> dict | None:
+    """Welche Uebungsaufgabe diese Runde stellt.
+
+    Die gefuehrte ist immer die erste gepruefte. Die selbststaendige ist in
+    der ersten Runde ebenfalls die erste gepruefte; eine Extra-Runde nach
+    richtigem Transfer zeigt die Aufgabe, die dafuer ausgewaehlt und in der
+    Sitzung festgehalten wurde — sie bleibt ueber Neuladen dieselbe.
+    """
+    rolle = (inhalt_store.GEFUEHRT if phase == zustand.GUIDED_TASK
+             else inhalt_store.SELBSTSTAENDIG)
+    if rolle == inhalt_store.SELBSTSTAENDIG:
+        gespeichert = _daten(sitzung).get("selbst_aufgabe")
+        if gespeichert:
+            return gespeichert
+    return inhalt_store.aufgabe(sitzung["fehlertyp_id"], rolle)
+
+
+def _transfer_aufgabe(sitzung: dict) -> dict | None:
+    """Die Transferfrage der Runde — nach einer Runde, die sass, die
+    naechste gepruefte, nicht noch einmal dieselbe."""
+    gezeigt = set(_daten(sitzung).get("transfer_gezeigt") or [])
+    kandidaten = inhalt_store.aufgaben(sitzung["fehlertyp_id"],
+                                       inhalt_store.TRANSFER)
+    for aufgabe in kandidaten:
+        if aufgabe["frage"] not in gezeigt:
+            return aufgabe
+    return kandidaten[0] if kandidaten else None
+
+
+def _neue_selbstaufgabe(sitzung: dict) -> dict | None:
+    """Eine selbststaendige Aufgabe, die diese Sitzung noch nicht gestellt
+    hat: erst eine ungestellte gepruefte aus dem Katalog, dann eine
+    nachgerechnete Variante des Generators. Erst wenn beides versagt — zum
+    Beispiel eine Aufgabenart, die der Generator nicht nachbauen kann — kommt
+    die erste noch einmal: lieber bekannt als ein Dead End.
+    """
+    gezeigt = set(_daten(sitzung).get("selbst_gezeigt") or [])
+    # Was das Kind schon beantwortet hat, zaehlt auch ohne Marker — eine
+    # Altsitzung aus der Parkplatz-Zeit kennt `selbst_gezeigt` nicht.
+    gesehen = protokoll.gesehene_aufgaben(
+        sitzung["konzept_id"], sitzung.get("child_key") or store.CHILD_KEY)
+    kandidaten = inhalt_store.aufgaben(sitzung["fehlertyp_id"],
+                                       inhalt_store.SELBSTSTAENDIG)
+    frisch = [a for a in kandidaten
+              if a["frage"] not in gezeigt and a["id"] not in gesehen]
+    if frisch:
+        return frisch[0]
+    for vorlage in kandidaten:
+        for variante in varianten.varianten(vorlage, 8):
+            if variante["frage"] not in gezeigt:
+                return variante
+    return kandidaten[0] if kandidaten else None
+
+
+def _naechste_uebungsrunde(sitzung: dict) -> dict:
+    """Richtig, aber noch nicht sicher genug: noch eine selbststaendige
+    Runde mit einer neuen Aufgabe — „verstanden" gibt es erst bei MASTERED.
+    """
+    neu = _neue_selbstaufgabe(sitzung)
+    gezeigt = list(_daten(sitzung).get("selbst_gezeigt") or [])
+    if neu and neu.get("frage"):
+        gezeigt.append(neu["frage"])
+    _merke(sitzung["id"], sitzung,
+           gerechnet=None, tipp_stufe=0, fehlerhinweis=None,
+           selbst_aufgabe=neu, selbst_gezeigt=gezeigt,
+           aufmunterung="Fast geschafft — eine neue Aufgabe wartet noch.")
+    return zustand.wechsle_phase(sitzung["id"], zustand.INDEPENDENT_TASK)
+
 
 def anker_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     """§11: Der Anker wird nicht benotet — er weckt nur das Vorwissen."""
@@ -420,10 +496,9 @@ def vorhersage_beantwortet(sitzung: dict, antwort: str) -> dict:
 
 def transfer_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     """Derselbe Gedanke an einer anderen Struktur — ohne Rechnen."""
-    aufgabe = inhalt_store.aufgabe(sitzung["fehlertyp_id"],
-                                   inhalt_store.TRANSFER)
+    aufgabe = _transfer_aufgabe(sitzung)
     if aufgabe is None:
-        return zustand.wechsle_phase(sitzung["id"], zustand.COMPLETE)
+        return _naechste_uebungsrunde(sitzung)
 
     richtig = ist_richtig(antwort, aufgabe["loesung"])
     _buchen(sitzung, protokoll.TRANSFER, aufgabe=aufgabe, antwort=antwort,
@@ -432,7 +507,13 @@ def transfer_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
         ergebnis = zustand.antwort_richtig(sitzung["id"], antwort, cfg=cfg)
         if ergebnis["zustand"] == zustand.MASTERED:
             return ergebnis
-        return zustand.wechsle_phase(sitzung["id"], zustand.COMPLETE)
+        # Richtig, aber noch nicht sicher: der gestellte Transfer zaehlt als
+        # gesehen, dann folgt die naechste Runde — COMPLETE ist kein
+        # Parkplatz.
+        gezeigt = list(_daten(sitzung).get("transfer_gezeigt") or [])
+        gezeigt.append(aufgabe["frage"])
+        sitzung = _merke(sitzung["id"], ergebnis, transfer_gezeigt=gezeigt)
+        return _naechste_uebungsrunde(sitzung)
 
     ergebnis = zustand.runde_gescheitert(sitzung["id"], antwort, cfg=cfg)
     if ergebnis["zustand"] == zustand.ESCALATED:
@@ -459,7 +540,7 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     phase = sitzung["phase"]
     rolle = (inhalt_store.GEFUEHRT if phase == zustand.GUIDED_TASK
              else inhalt_store.SELBSTSTAENDIG)
-    aufgabe = inhalt_store.aufgabe(sitzung["fehlertyp_id"], rolle)
+    aufgabe = _uebungsaufgabe(sitzung, phase)
     if aufgabe is None:
         return sitzung
 
@@ -482,6 +563,12 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
         ergebnis = _merke(sitzung["id"], ergebnis, tipp_stufe=0,
                           fehlerhinweis=None)
         if phase == zustand.GUIDED_TASK:
+            # Die erste selbststaendige Aufgabe gilt ab jetzt als gestellt —
+            # die Extra-Runde danach muss eine andere waehlen.
+            naechste = inhalt_store.aufgabe(sitzung["fehlertyp_id"],
+                                            inhalt_store.SELBSTSTAENDIG)
+            _merke(sitzung["id"], ergebnis,
+                   selbst_gezeigt=[(naechste or {}).get("frage") or ""])
             return zustand.wechsle_phase(sitzung["id"], zustand.INDEPENDENT_TASK)
         return _merke(sitzung["id"], ergebnis, gerechnet=True)
 

@@ -52,9 +52,11 @@ PHASEN_UEBERGAENGE: dict[str, tuple[str, ...]] = {
     RULE: (WORKED_EXAMPLE,),
     WORKED_EXAMPLE: (GUIDED_TASK,),
     GUIDED_TASK: (INDEPENDENT_TASK, ADAPTATION),
-    INDEPENDENT_TASK: (COMPLETE, ADAPTATION),
+    INDEPENDENT_TASK: (INDEPENDENT_TASK, ADAPTATION),
     ADAPTATION: (GUIDED_TASK, INDEPENDENT_TASK),
-    COMPLETE: (),
+    # COMPLETE ist kein Parkplatz mehr: geparkte Sitzungen aus der Zeit vor
+    # dieser Aenderung bekommen ihre fehlende Runde, statt offen zu haengen.
+    COMPLETE: (INDEPENDENT_TASK,),
 }
 
 
