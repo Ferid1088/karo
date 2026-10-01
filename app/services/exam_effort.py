@@ -187,6 +187,10 @@ def thema_stand(thema: str, fach: str, klasse: int | None) -> dict:
                        ("curriculum_seconds", "sekunden")):
         if type(nutzlast.get(feld)) is int:
             stand[name] = nutzlast[feld]
+    # Der Lehrplan-Dienst hat sein Tageskontingent aufgebraucht und nennt eine
+    # Uhrzeit. Die gehoert hin: sonst sieht es aus wie „gleich fertig".
+    if nutzlast.get("curriculum_pausiert_bis"):
+        stand["ab"] = str(nutzlast["curriculum_pausiert_bis"])
     return stand
 
 

@@ -152,24 +152,98 @@ Danach anhalten und auf meine Freigabe warten.
 
 ---
 
-## Schritt 4 – Fehlende Lernregeln umsetzen
+## Schritt 3a – Dringend: Kontingent schützen (curriculum-team)
 
 ```text
-Ziel: Die in LERNKREISLAUF.md freigegebenen Entscheidungen umsetzen.
-Meine Entscheidungen: <HIER DEINE ANTWORTEN AUS SCHRITT 3 EINFÜGEN>
+Ziel: Keine sinnlosen Modellaufrufe mehr, wenn das Kontingent erschöpft ist.
 
-Vorgaben, falls noch nicht vorhanden:
-- Mastery-Wert pro Kind und Konzept (Elo: Kind gegen Aufgabe), deterministisch, erklärbar.
-- Schnell (hohe Trefferquote ohne Hilfe): Schritte überspringen, höhere Schwierigkeit.
-- Langsam: andere Erklärung, kleinere Schritte, mehr Beispiele; nach wiederholtem Scheitern
-  Voraussetzung prüfen.
-- Gleiche Fehlvorstellung zweimal: gezielte Erklärung zu genau dieser Fehlvorstellung.
-- Wiederholung mit Abstand: siehe Schritt 4a.
-- Grenzen: nie unter die Untergrenze, Abschluss immer auf Zielniveau.
-- Antwortzeit nur schwach gewichten.
-Jede Regel mit eigenem Test. LERNKREISLAUF.md aktualisieren.
+1. Harte Fehlerklasse "kontingent_erschoepft"
+   - Erkennen: claude CLI "session limit"/"usage limit", API 429 mit Quota-Hinweis,
+     "insufficient_quota", "rate limit" mit Reset-Angabe. Als eigene Ausnahme, nicht als
+     normaler Fehler.
+   - Sobald erkannt: globale Pause in der Datenbank (Tabelle provider_pause: provider,
+     bis, grund, erkannt_am), gilt für ALLE Prozesse (api, agent, admin).
+   - Reset-Zeit aus der Meldung lesen (z. B. "resets 2:40pm UTC"); fehlt sie: 60 Minuten,
+     danach jeweils verdoppelt bis höchstens zum nächsten Tag 06:00 Europe/Berlin.
+   - Während der Pause: kein einziger Modellaufruf. Aufträge werden zurückgestellt
+     (kein Versuch verbraucht, kein Fehler gezählt, kein Ablehnungszähler).
+   - Nach der Pause: genau EIN Probeaufruf; klappt er, läuft die Warteschlange weiter,
+     sonst neue Pause.
+2. Tagesgrenze: KCTEAM_DAILY_AGENT_CALLS=400 setzen (in .env/Compose, nicht im Code).
+3. Sichtbarkeit: Admin zeigt "Pausiert bis …, Grund …"; Karo zeigt den Eltern beim Thema
+   "wird vorbereitet, voraussichtlich ab …".
+4. Tests: Session-Limit-Meldung → Pause, während der Pause 0 Aufrufe, Reset-Zeit gelesen,
+   Rückfall ohne Reset-Zeit, Probeaufruf, Aufträge verlieren keinen Versuch.
+5. Deployment selbst übernehmen (Backup, bauen, neu starten, SHA prüfen). Bericht: Anzahl
+   Fehlaufrufe der letzten 24 h vorher/nachher.
 ```
-**Fertig, wenn:** jede Regel hat einen Test, Dokument = Code.
+**Fertig, wenn:** nach einem Limit kommt bis zum Reset kein einziger Aufruf mehr.
+
+---
+
+## Schritt 3b – Dringend: Zahlen rechnet der Code (curriculum-team + karo_contract)
+
+```text
+Ziel: Keine Lektion scheitert mehr an Rechnungen, die nicht aufgehen.
+
+1. Aufgabenteilung im Lektionsautor
+   - Das Modell erzeugt nur Sprache und Struktur: Aufgabenvorlagen mit Platzhaltern
+     (z. B. "{a}/{b} + {c}/{d}") und Bedingungen (b ≠ d, kgV ≤ 24, Ergebnis ≤ 2 …).
+   - Alle Zahlen, Rechnungen und Lösungen erzeugt deterministischer Code (Aufgaben-Generator
+     auf Basis von karo_contract/rechnen.py) – mit festem Seed pro Lektion, damit
+     reproduzierbar.
+   - typischer_fehler: Wo für einen Fehlertyp eine Fehlerfunktion existiert (z. B. "Zähler
+     und Nenner einzeln addiert"), rechnet der Code auch die typische falsche Antwort aus.
+     Registry der Fehlerfunktionen in karo_contract. Ohne Fehlerfunktion darf das Modell
+     sie vorschlagen; der Validator prüft sie.
+   - Gilt für alle Fächer/Aufgaben mit Zahlen (Mathe, Physik, Chemie-Rechnungen). Reine
+     Textaufgaben bleiben wie bisher.
+2. Der Validator (_nachrechnen) bleibt aktiv und prüft die fertige Ausgabe noch einmal.
+3. Messen: Fehlerquote des Lektionsautors je Thema vorher/nachher, insbesondere
+   "Gleichungen lösen" (vorher 261 von 262 fehlgeschlagen).
+4. Tests: Generator erfüllt alle Bedingungen, Lösungen stimmen, typischer Fehler stimmt,
+   gleicher Seed = gleiche Aufgaben, Validator fängt absichtlich falsche Ausgabe ab.
+```
+**Fertig, wenn:** „Gleichungen lösen“ liefert eine geprüfte Lektion, Fehlerquote im Bericht.
+
+---
+
+## Schritt 4 – Lernregeln umsetzen (Entscheidungen aus LERNKREISLAUF.md)
+
+```text
+Ziel: Die Entscheidungen zu Z1–Z10 aus docs/LERNKREISLAUF.md umsetzen.
+Grundsatz: Der ADAPTIVE Weg (app/adaptiv/) ist ab jetzt der einzige Lernweg.
+
+Z1 Elo: NICHT einführen. Die Zählregel (2 richtige inkl. Transfer) bleibt.
+Z2 Schneller: bleibt wie es ist (Diagnose 2× richtig → direkt MASTERED).
+Z3 Voraussetzungen: concept_prerequisites aus dem Curriculum-Dienst mit importieren
+   (Vertrag/karo_contract erweitern, Version anheben wie im README beschrieben).
+   Vor einer Eskalation prüft Karo die Voraussetzungen mit einer kurzen Diagnose:
+   Voraussetzung nicht sicher → erst die Voraussetzung lernen, dann zurück.
+   Voraussetzungen sicher und es klappt trotzdem nicht → Eskalation zum Menschen wie bisher.
+Z4 Wiederholung: wird in Schritt 4a gebaut (eigene Tabelle, 2–5 Tage, "Heute").
+Z5 Antwortzeit: wird in Schritt 4a gebaut (lern_antwort); nur für aktive Zeit und
+   Zufallsklick-Erkennung, nicht für die Bewertung.
+Z6/Z7 Ein Weg, klare Begriffe:
+   - Klassischen Weg (teaching.py/quizzes.py) EINFRIEREN: keine neuen Funktionen.
+     docs/ABLOESUNG_KLASSISCH.md: Plan, wie er schrittweise durch den adaptiven Weg ersetzt
+     wird (welche Themen, was fehlt noch, Reihenfolge). Er ruft zur Laufzeit ein Modell auf
+     und widerspricht damit der Grundregel.
+   - Begriffe in der ganzen Oberfläche: "Ersteinschätzung" (Einstufung vor der
+     Klassenarbeit), "verstanden" (Konzept MASTERED), "Thema sicher" (alle Konzepte des
+     Themas verstanden UND wiederholt). Das Wort/die Farbe "grün" nur noch für "Thema sicher".
+Z8: Die Grenze "3 unbekannte Antworten" in die Konfiguration (Standard 3).
+Z9 Lernplan-Reihenfolge: zuerst Voraussetzungen, dann rot vor gelb; die angekündigte
+   Reihenfolge entscheidet nur bei Gleichstand.
+Z10 Wirkung von Erklärungen nutzen: Ab einer Mindestzahl von Einsätzen (Konfig, z. B. 10)
+   bevorzugt beste_erklaerung() Erklärungen mit höherer Wirkquote. Liegt eine Erklärung
+   darunter (Konfig, z. B. 30 %), meldet Karo das dem Curriculum-Dienst zum Neuschreiben –
+   nur Konzept, Erklärungs-ID und Zahlen, keine Kinderdaten.
+
+Jede Regel mit eigenem Test. LERNKREISLAUF.md aktualisieren (Liste "Zur Entscheidung" als
+"entschieden" markieren).
+```
+**Fertig, wenn:** jede Entscheidung hat einen Test, Dokument = Code.
 
 ---
 

@@ -116,3 +116,55 @@ def test_ein_gescheitertes_thema_sieht_nicht_aus_wie_ein_laufendes(app_env, monk
     themen = exam_effort.inhalte_stand(exam_id)["themen"]
     assert [t["stand"] for t in themen] == ["gescheitert"]
     assert "Kontingent" in themen[0]["grund"]
+
+
+def test_eltern_sehen_ab_wann_es_weitergeht(client, fake_llm, fake_cli, app_env, monkeypatch):
+    """Erschöpftes Kontingent beim Dienst: nicht „gleich fertig", sondern eine Uhrzeit.
+
+    Ohne diese Angabe sieht ein stehender Auftrag aus wie ein laufender, und
+    eine Familie sieht alle 15 Sekunden nach.
+    """
+    import json
+
+    from app import db
+    from app.services import exam, exam_effort
+    from .test_app import einrichten
+    einrichten(client, fake_llm)
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
+    monkeypatch.setattr("app.adaptiv.lektionen.fuer_thema", lambda *a, **k: None)
+    exam_id = exam.create_exam("2099-05-05", manual_topics="Satz des Thales",
+                               subject="mathematik").exam_id
+    exam_effort.inhalte_anfordern(exam_id)
+    auftrag = db.q1("SELECT id, payload FROM job WHERE type='lektion_erzeugen' ORDER BY id LIMIT 1")
+    nutzlast = json.loads(auftrag["payload"]) | {"curriculum_pausiert_bis": "2026-10-01T14:40:00"}
+    with db.tx() as c:
+        c.execute("UPDATE job SET payload=? WHERE id=?", (json.dumps(nutzlast), auftrag["id"]))
+
+    themen = exam_effort.inhalte_stand(exam_id)["themen"]
+    assert themen[0]["stand"] == "laeuft" and themen[0]["ab"] == "2026-10-01T14:40:00"
+    seite = client.get("/eltern/lernfortschritt")
+    assert "Tageskontingent aufgebraucht" in seite.text
+    assert "ab 14:40 Uhr" in seite.text
+
+
+def test_der_dienst_meldet_die_pause_an_karo(app_env, monkeypatch):
+    """Die Angabe kommt aus der Antwort des Dienstes, nicht aus einer Vermutung."""
+    import time
+
+    from app import config, jobs
+    from app.adaptiv import curriculum_dienst as cd, store
+    app_env.db.init()
+    store.init()
+    app_env.config.update(curriculum_url="http://127.0.0.1:8088", curriculum_key="kc_test_secret")
+
+    def dienst(cfg, method, path, body=None):
+        if path == "/v1/meta":
+            return {"contract_version": cd.CONTRACT_VERSION, "git_sha": "test", "formats": []}
+        return {"status": "pending", "export_id": 5, "retry_after": 300,
+                "paused_until": "2026-10-01T14:40:00+00:00"}
+
+    monkeypatch.setattr(cd, "request", dienst)
+    with pytest.raises(jobs.Deferred) as warten:
+        cd.prepare(config.load(), {"curriculum_started": time.time()},
+                   "Satz des Thales", "Mathematik", 8)
+    assert warten.value.payload["curriculum_pausiert_bis"] == "2026-10-01T14:40:00"

@@ -58,7 +58,9 @@
             {%- elif t.stand == 'morgen' %}morgen vorbereitet
             {%- elif t.stand == 'gescheitert' %}nicht geklappt
             {%- else %}noch nicht begonnen{% endif %}</td>
-        <td>{% if t.stand == 'morgen' %}Das Tagespensum ist voll. Karo bestellt es morgen früh.
+        <td>{% if t.ab %}Der Lehrplan-Dienst hat sein Tageskontingent aufgebraucht.
+              Es geht voraussichtlich ab {{ t.ab[11:16] }} Uhr weiter.
+            {%- elif t.stand == 'morgen' %}Das Tagespensum ist voll. Karo bestellt es morgen früh.
             {%- elif t.stand == 'gescheitert' %}{{ t.grund|klartext }}
             {%- elif t.platz %}Platz {{ t.platz }} von {{ t.warten }} in der Warteschlange{% if t.sekunden %},
               etwa {{ (t.sekunden / 60)|round|int }} Minuten{% endif %}

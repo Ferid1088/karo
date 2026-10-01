@@ -246,6 +246,11 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
         for feld in ("position", "waiting", "seconds"):
             if type(result.get(feld)) is int:
                 payload[f"curriculum_{feld}"] = result[feld]
+        # Der Dienst sagt, ab wann es weitergeht, wenn sein Kontingent
+        # erschoepft ist. „Wird vorbereitet" ohne diese Angabe hiesse fuer
+        # eine Familie: alle 15 Sekunden nachsehen, bis morgen frueh.
+        if isinstance(result.get("paused_until"), str):
+            payload["curriculum_pausiert_bis"] = result["paused_until"][:19]
         delay = result.get("retry_after", 15)
         raise jobs.Deferred(payload, delay if type(delay) is int else 15)
     if status != "ready":
