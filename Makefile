@@ -79,6 +79,17 @@ publish:
 		-t $(DOCKERHUB_REPO):$(VERSION) -t $(DOCKERHUB_REPO):latest --push .
 	@echo "Veröffentlicht: $(DOCKERHUB_REPO):$(VERSION) und :latest (linux/amd64, linux/arm64)"
 
+# Misst die Trefferquote beim Lesen von Blaettern — ausschliesslich lokal, an
+# echten Blaettern dieser Familie. Sie bleiben in OCR_PROBEN (von .gitignore
+# ausgeschlossen); ins Repository kommt nur die Kennzahl. Laeuft im Container,
+# weil dort tesseract und pypdfium2 liegen.
+OCR_PROBEN ?= $(HOME)/karo-ocr-proben
+.PHONY: ocr-report
+ocr-report:
+	@test -d "$(OCR_PROBEN)" || (echo "Kein Probenordner: $(OCR_PROBEN)"; 	  echo "Blaetter dort ablegen (sie bleiben dort) oder OCR_PROBEN=... setzen."; exit 2)
+	docker compose cp tools/ocr_report.py karo:/srv/tools/ocr_report.py
+	docker run --rm -v "$(OCR_PROBEN)":/proben:ro -v $(VOLUME):/data 	  -v "$$PWD/tools":/srv/tools:ro -v "$$PWD/app":/srv/app:ro 	  -w /srv karo:local python tools/ocr_report.py --quelle /proben --db /data/karo.db 	  --bericht /dev/stdout
+
 # Die Sprachdateien liegen bewusst nicht im Image: wer nur den HTML-Modus
 # benutzt, lädt nie etwas herunter.
 STIMME ?= de_DE-thorsten-medium

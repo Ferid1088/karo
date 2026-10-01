@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ast
 import inspect
+import re
 from pathlib import Path
 
 import pytest
@@ -92,14 +93,16 @@ def test_die_handschrift_wird_nirgends_mehr_abgelesen():
     """`quiz_read_sheet` ist weg — samt Job, Route und Knopf."""
     for pfad, quelle in _python_dateien():
         assert "quiz_read_sheet" not in quelle, pfad
-    # Kein Formular laedt mehr ein bearbeitetes Blatt hoch. `/blatt/text` und
-    # `/blatt/<id>/thema` sind etwas anderes: dort geht Text hin, kein Bild
-    # (siehe app/blatt_text.py) — deshalb hier ausgenommen.
+    # Kein Formular schickt mehr ein bearbeitetes Blatt an eine Ablese-Route.
+    # Gesucht wird nach dem Ziel eines Formulars, nicht nach der Zeichenfolge:
+    # `/static/blatt-lesen.js` liest auf dem Geraet, und `/blatt/text` nimmt
+    # Text entgegen — beides ist das Gegenteil davon.
+    erlaubt = {"/blatt/text", "/blatt/serverseitig"}
+    ziel = re.compile(r'action="(/[^"]*blatt[^"]*)"')
     for pfad in sorted((APP / "templates").rglob("*.html")):
-        text = pfad.read_text(encoding="utf-8")
-        ohne_textweg = text.replace("/blatt/text", "").replace("/blatt/{{ doc.id }}/thema", "")
-        assert "/blatt" not in ohne_textweg, f"{pfad.name} lädt noch ein Antwortblatt hoch"
-        assert 'enctype="multipart/form-data"' not in text or "/blatt" not in text, pfad.name
+        for gefunden in ziel.findall(pfad.read_text(encoding="utf-8")):
+            sauber = re.sub(r"\{\{[^}]*\}\}", "<id>", gefunden)
+            assert sauber in erlaubt or sauber.endswith("/thema"), (pfad.name, gefunden)
 
     from app import quizzes
     assert not hasattr(quizzes, "blatt_hochladen")
