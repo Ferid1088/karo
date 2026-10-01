@@ -233,3 +233,292 @@ def test_aktive_zeit_laesst_sich_nach_fach_und_zeitraum_fragen(app_env):
     assert protokoll.aktive_zeit(von=heute, bis=heute, fach="englisch") == 0
     gestern = str(dt.date.today() - dt.timedelta(days=1))
     assert protokoll.aktive_zeit(von=gestern, bis=gestern) == 0
+
+
+# ---------------------------------------------------------------- c) Wiederholung
+
+def test_das_kind_waehlt_den_abstand_selbst(app_env):
+    from app.adaptiv import wiederholung
+    konzept_id = _konzept(app_env)
+    heute = dt.date(2026, 5, 4)
+
+    moeglichkeiten = wiederholung.auswahl(konzept_id, heute)
+
+    assert [m["tage"] for m in moeglichkeiten] == [2, 3, 4, 5]
+    assert moeglichkeiten[0]["datum"] == "2026-05-06"
+    assert sum(1 for m in moeglichkeiten if m["empfohlen"]) == 1
+
+
+def test_vor_einer_klassenarbeit_wird_der_tag_davor_vorgeschlagen(app_env):
+    from app import db
+    from app.adaptiv import wiederholung
+    _konzept(app_env)
+    heute = dt.date(2026, 5, 4)
+    with db.tx() as c:                      # Arbeit am Freitag, also Donnerstag üben
+        c.execute("INSERT INTO exam (subject, exam_date, titel, created_at) "
+                  "VALUES ('mathematik', '2026-05-08', 'Brüche', ?)", (db.now(),))
+
+    assert wiederholung.vorschlag(heute=heute) == 3      # 4. + 3 Tage = 7. Mai
+    empfohlen = [m for m in wiederholung.auswahl(heute=heute) if m["empfohlen"]]
+    assert empfohlen[0]["datum"] == "2026-05-07"
+
+
+def test_eine_arbeit_ausserhalb_der_auswahl_verschiebt_nichts(app_env):
+    from app import db
+    from app.adaptiv import wiederholung
+    _konzept(app_env)
+    heute = dt.date(2026, 5, 4)
+    with db.tx() as c:                      # erst in drei Wochen
+        c.execute("INSERT INTO exam (subject, exam_date, titel, created_at) "
+                  "VALUES ('mathematik', '2026-05-25', 'Brüche', ?)", (db.now(),))
+
+    assert wiederholung.vorschlag(heute=heute) == 3      # die Mitte, wie sonst
+
+
+def test_eine_verpasste_wiederholung_bleibt_offen_stehen(app_env):
+    from app.adaptiv import wiederholung
+    konzept_id = _konzept(app_env)
+    wiederholung.planen(konzept_id, 2, heute=dt.date(2026, 5, 1))   # fällig am 3.
+
+    offen = wiederholung.offene(bis=dt.date(2026, 5, 9))
+
+    assert len(offen) == 1
+    assert offen[0]["faellig_am"] == "2026-05-03"
+    assert offen[0]["verpasst"] is True
+    # Und sie ist vor dem Termin noch nicht dran:
+    assert wiederholung.offene(bis=dt.date(2026, 5, 2)) == []
+
+
+def test_bestanden_macht_das_konzept_gefestigt(app_env):
+    from app.adaptiv import wiederholung
+    konzept_id = _konzept(app_env)
+    termin = wiederholung.planen(konzept_id, 3, heute=dt.date(2026, 5, 1))
+
+    assert not wiederholung.gefestigt(konzept_id)
+    wiederholung.abschliessen(termin["id"], bestanden_=True,
+                              ergebnis_daten={"richtig": 4, "gesamt": 4})
+
+    assert wiederholung.gefestigt(konzept_id)
+    assert wiederholung.offene(bis=dt.date(2026, 5, 9)) == []
+
+
+def test_nicht_bestanden_ist_kein_minus(app_env):
+    from app.adaptiv import wiederholung
+    konzept_id = _konzept(app_env)
+    termin = wiederholung.planen(konzept_id, 3, heute=dt.date(2026, 5, 1))
+    wiederholung.abschliessen(termin["id"], bestanden_=False,
+                              ergebnis_daten={"richtig": 2, "gesamt": 4})
+
+    assert not wiederholung.gefestigt(konzept_id)
+    # Danach waehlt das Kind wieder: ein neuer Termin, kein Abzug.
+    neu = wiederholung.planen(konzept_id, 2, heute=dt.date(2026, 5, 4))
+    assert neu["id"] != termin["id"] and neu["faellig_am"] == "2026-05-06"
+    assert wiederholung.eintrag(termin["id"])["status"] == "nicht_bestanden"
+
+
+def test_die_wiederholung_stellt_neue_aufgaben(app_env):
+    """Dieselbe Aufgabe noch einmal misst Erinnerung, nicht Koennen."""
+    from app.adaptiv import protokoll, unterricht, wiederholung
+    konzept_id = _konzept(app_env)
+    sitzung = unterricht.starte(konzept_id, "Brüche")
+    unterricht.bildschirm(sitzung)
+    sitzung = unterricht.anker_beantwortet(sitzung, "weiß nicht")
+    unterricht.bildschirm(sitzung)
+    unterricht.diagnose_beantwortet(sitzung, "2/5")
+
+    aufgaben = wiederholung.pruefaufgaben(konzept_id)
+    gesehen = protokoll.gesehene_aufgaben(konzept_id)
+
+    assert 3 <= len(aufgaben) <= 5
+    assert all(a.get("id") is None or a["id"] not in gesehen for a in aufgaben)
+    assert all(a.get("frage") and a.get("loesung") for a in aufgaben)
+
+
+def test_varianten_rechnen_ihre_loesung_selbst_nach(app_env):
+    import random
+    from fractions import Fraction
+    from app.adaptiv import varianten
+    vorlage = {"frage": "Rechne: 1/2 + 1/3", "loesung": "5/6", "antwort_art": "bruch"}
+
+    neue = varianten.varianten(vorlage, 3, zufall=random.Random(7))
+
+    assert len(neue) == 3
+    assert all(v["frage"] != vorlage["frage"] for v in neue)
+    for v in neue:
+        zahlen = v["frage"].rsplit(":", 1)[-1]
+        links, rechts = zahlen.split("+")
+        assert Fraction(links.strip()) + Fraction(rechts.strip()) == Fraction(v["loesung"])
+
+
+def test_ohne_erkennbares_muster_erfindet_der_generator_nichts(app_env):
+    from app.adaptiv import varianten
+    assert varianten.varianten({"frage": "Warum ist das so?", "loesung": "ja"}) == []
+
+
+def test_bestanden_ist_nur_wer_alle_neuen_aufgaben_kann(app_env):
+    from app.adaptiv import wiederholung
+    aufgaben = [{"frage": "1/2 + 1/4", "loesung": "3/4"},
+                {"frage": "1/3 + 1/6", "loesung": "1/2"}]
+
+    gut = wiederholung.auswerten(aufgaben, ["6/8", "1/2"])     # gekürzt zählt
+    halb = wiederholung.auswerten(aufgaben, ["3/4", "2/9"])
+
+    assert gut["bestanden"] and gut["richtig"] == 2
+    assert not halb["bestanden"] and halb["richtig"] == 1
+
+
+def test_der_check_legt_seine_aufgaben_einmal_fest(app_env):
+    """Neuladen darf nicht andere Aufgaben zeigen als die gerade beantworteten."""
+    from app.adaptiv import wiederholung
+    konzept_id = _konzept(app_env)
+    termin = wiederholung.planen(konzept_id, 2, heute=dt.date(2026, 5, 1))
+
+    erste = wiederholung.check_aufgaben(termin["id"])
+    zweite = wiederholung.check_aufgaben(termin["id"])
+
+    assert erste and erste == zweite
+    assert wiederholung.eintrag(termin["id"])["ergebnis"]["aufgaben"] == erste
+
+
+def test_die_aufgaben_des_checks_bleiben_im_ergebnis(app_env):
+    from app.adaptiv import wiederholung
+    konzept_id = _konzept(app_env)
+    termin = wiederholung.planen(konzept_id, 2, heute=dt.date(2026, 5, 1))
+    gestellt = wiederholung.check_aufgaben(termin["id"])
+
+    ergebnis = wiederholung.auswerten(gestellt, [a["loesung"] for a in gestellt])
+    eintrag = wiederholung.abschliessen(termin["id"], bestanden_=ergebnis["bestanden"],
+                                        ergebnis_daten={"richtig": ergebnis["richtig"]})
+
+    assert eintrag["status"] == "bestanden"
+    assert eintrag["ergebnis"]["aufgaben"] == gestellt    # nichts geht verloren
+    assert eintrag["ergebnis"]["richtig"] == len(gestellt)
+
+
+def test_faellige_wiederholung_steht_unter_heute(app_env):
+    """Am richtigen lokalen Tag — nicht frueher, nicht spaeter."""
+    from app.adaptiv import wiederholung
+    from app.services import today
+    konzept_id = _konzept(app_env)
+    wiederholung.planen(konzept_id, 2, heute=dt.date(2026, 5, 1))   # fällig am 3.
+
+    vorher = today.mein_tag(dt.date(2026, 5, 2))
+    assert not [i for i in vorher["items"] if i["kind"] == "wiederholung"]
+
+    tag = today.mein_tag(dt.date(2026, 5, 3))
+
+    treffer = [i for i in tag["items"] if i["kind"] == "wiederholung"]
+    assert len(treffer) == 1
+    assert treffer[0]["title"].startswith("Wiederholen:")
+    assert treffer[0]["done"] is False
+    assert treffer[0]["verpasst"] is False
+
+
+def test_verpasste_wiederholung_bleibt_unter_heute_stehen(app_env):
+    from app.adaptiv import wiederholung
+    from app.services import today
+    konzept_id = _konzept(app_env)
+    wiederholung.planen(konzept_id, 2, heute=dt.date(2026, 5, 1))   # fällig am 3.
+
+    tag = today.mein_tag(dt.date(2026, 5, 9))                    # eine Woche später
+
+    treffer = [i for i in tag["items"] if i["kind"] == "wiederholung"]
+    assert len(treffer) == 1
+    assert treffer[0]["done"] is False
+    assert treffer[0]["verpasst"] is True
+
+
+def test_ein_heute_bestandener_check_steht_abgehakt_da(app_env):
+    from app.adaptiv import wiederholung
+    from app.services import today
+    from app.woche import plaene
+    konzept_id = _konzept(app_env)
+    heute = plaene.today()
+    termin = wiederholung.planen(konzept_id, 2, heute=heute - dt.timedelta(days=2))
+    aufgaben = wiederholung.check_aufgaben(termin["id"])
+    ergebnis = wiederholung.auswerten(aufgaben, [a["loesung"] for a in aufgaben])
+    wiederholung.abschliessen(termin["id"], bestanden_=ergebnis["bestanden"])
+
+    treffer = [i for i in today.mein_tag(heute)["items"] if i["kind"] == "wiederholung"]
+
+    assert len(treffer) == 1
+    assert treffer[0]["done"] is True
+
+
+# ------------------------------------------------- der Weg durch die App
+
+def _kind_und_faelliger_termin(client, fake_llm, fake_cli, app_env):
+    """Kind angemeldet, adaptiver Weg an, eine Wiederholung faellig."""
+    from app.adaptiv import wiederholung
+    from app.woche import plaene
+    from .test_app import einrichten, kind_modus_aktivieren
+    einrichten(client, fake_llm)
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
+    kind_modus_aktivieren(client)
+    konzept_id = _konzept(app_env)
+    heute = plaene.today()
+    termin = wiederholung.planen(konzept_id, 2,
+                                 heute=heute - dt.timedelta(days=2))
+    return termin, konzept_id
+
+
+def test_faellige_wiederholung_erscheint_auf_der_heute_seite(client, fake_llm,
+                                                            fake_cli, app_env):
+    termin, _ = _kind_und_faelliger_termin(client, fake_llm, fake_cli, app_env)
+
+    seite = client.get("/")
+
+    assert "Wiederholen:" in seite.text
+    assert f"/lernen/adaptiv/wiederholung/{termin['id']}" in seite.text
+
+
+def test_bestandener_check_festigt_das_konzept(client, fake_llm, fake_cli,
+                                              app_env):
+    from app.adaptiv import wiederholung
+    from .conftest import csrf_from
+    termin, konzept_id = _kind_und_faelliger_termin(client, fake_llm, fake_cli,
+                                                    app_env)
+
+    seite = client.get(f"/lernen/adaptiv/wiederholung/{termin['id']}")
+    assert "kurzer Check" in seite.text
+    token = csrf_from(seite.text)
+
+    aufgaben = wiederholung.check_aufgaben(termin["id"])
+    seite = client.post(f"/lernen/adaptiv/wiederholung/{termin['id']}",
+                        data={"_csrf": token,
+                              "antwort": [a["loesung"] for a in aufgaben]})
+
+    assert "gefestigt" in seite.text
+    assert wiederholung.gefestigt(konzept_id)
+    assert wiederholung.eintrag(termin["id"])["status"] == "bestanden"
+
+
+def test_verpatzter_check_endet_in_auffrischung_und_neuer_wahl(
+        client, fake_llm, fake_cli, app_env):
+    """Kein Minus: kurz auffrischen, dann waehlt das Kind wieder selbst."""
+    from app.adaptiv import wiederholung
+    from .conftest import csrf_from
+    termin, konzept_id = _kind_und_faelliger_termin(client, fake_llm, fake_cli,
+                                                    app_env)
+    seite = client.get(f"/lernen/adaptiv/wiederholung/{termin['id']}")
+    token = csrf_from(seite.text)
+
+    aufgaben = wiederholung.check_aufgaben(termin["id"])
+    seite = client.post(f"/lernen/adaptiv/wiederholung/{termin['id']}",
+                        data={"_csrf": token,
+                              "antwort": ["falsch"] * len(aufgaben)})
+
+    assert "noch einmal an" in seite.text                     # Auffrischung
+    assert wiederholung.eintrag(termin["id"])["status"] == "nicht_bestanden"
+    assert not wiederholung.gefestigt(konzept_id)
+
+    seite = client.post(
+        f"/lernen/adaptiv/wiederholung/{termin['id']}/auffrischung",
+        data={"_csrf": token, "antwort": "egal"})
+    assert "noch einmal machen" in seite.text                 # neue Wahl
+
+    client.post(f"/lernen/adaptiv/wiederholung/{termin['id']}/termin",
+                data={"_csrf": token, "tage": "3"})
+
+    neu = wiederholung.offen_fuer(konzept_id)
+    assert neu is not None and neu["id"] != termin["id"]

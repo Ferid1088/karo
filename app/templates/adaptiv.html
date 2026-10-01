@@ -190,6 +190,23 @@
   </form>
 </section>
 
+{% elif schirm.art == 'wiederholung_waehlen' %}
+{#- Schritt 4a: verstanden ist der Anfang. Das Kind waehlt selbst, wann es
+    das noch einmal anschaut — wer den Termin mitbestimmt, haelt ihn eher
+    ein. Der Vorschlag ist markiert, nicht vorausgewaehlt. -#}
+<section class="card">
+  <p>Gut gemacht! Du hast „{{ learning_title }}“ verstanden und sicher gelöst.</p>
+  <p><strong>Damit es sitzt:</strong> Wann willst du es noch einmal anschauen?
+     Dauert nur ein paar Minuten.</p>
+  <form method="post" action="{{ learning_base }}/wiederholung?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+    <div class="actions">
+      {% for m in schirm.auswahl %}
+      <button type="submit" name="tage" value="{{ m.tage }}">In {{ m.tage }} Tagen · {{ m.datum_label }}{{ ' · Vorschlag' if m.empfohlen }}</button>
+      {% endfor %}
+    </div>
+  </form>
+</section>
+
 {% elif schirm.art == 'eskaliert' %}
 <section class="card">
   <p>Das war jetzt ein paar Mal knifflig — das liegt nicht an dir.</p>
@@ -203,6 +220,7 @@
 {% else %}
 <section class="card">
   <p>Gut gemacht! Du hast „{{ learning_title }}“ verstanden und sicher gelöst.</p>
+  {% if schirm.wiederholung_am %}<p>Am {{ schirm.wiederholung_am }} schaut ihr es noch einmal kurz an — es steht schon in deinem Tag.</p>{% endif %}
   <div class="actions">
     <form method="post" action="{{ learning_base }}/neu?sitzung={{ sitzung.id }}">{{ csrf_input() }}<button type="submit">Noch einmal</button></form>
     <a class="btn ghost" href="{{ learning_back }}">Zurück</a>
@@ -241,7 +259,7 @@
     und gar keine, solange die Seite im Hintergrund liegt. Ohne JavaScript
     bleibt es bei „gezeigt bis beantwortet", gedeckelt — die Seite
     funktioniert auch dann vollstaendig. -#}
-{% if schirm.art in ('anker', 'diagnose', 'vorhersage', 'aufgabe', 'transfer', 'voraussetzung', 'wiederholung') %}
+{% if schirm.art in ('anker', 'diagnose', 'vorhersage', 'aufgabe', 'transfer', 'voraussetzung', 'wiederholung_waehlen') %}
 <script>
 (function () {
   var ziel = {{ (learning_base ~ '/puls')|tojson }};

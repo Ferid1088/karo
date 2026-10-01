@@ -8,6 +8,7 @@ bewusst keinen Modellaufruf (§1, A3).
 
 from __future__ import annotations
 
+import datetime as dt
 from fractions import Fraction
 
 from . import inhalt_store, katalog, protokoll, sitzung as zustand, store
@@ -112,7 +113,7 @@ def _hilfe(konzept_id: int, phase: str | None) -> dict:
 
 #: Bildschirme, auf denen das Kind antwortet — nur fuer sie laeuft eine Uhr.
 _MIT_AUFGABE = ("anker", "diagnose", "vorhersage", "aufgabe", "transfer",
-                "voraussetzung", "wiederholung")
+                "voraussetzung", "wiederholung_waehlen")
 
 
 def _kennung(sitzung: dict, schirm: dict) -> str:
@@ -159,8 +160,25 @@ def _bildschirm(sitzung: dict) -> dict:
         return {"art": "eskaliert", "hilfe": _hilfe(konzept_id, None),
                 "phase": None}
     if zustand_name == zustand.MASTERED:
+        # Schritt 4a: verstanden ist der Anfang, nicht das Ende. Bevor das
+        # Kind weitergeht, waehlt es selbst, wann es das noch einmal
+        # anschaut — wer den Termin mitbestimmt, haelt ihn eher ein.
+        from . import wiederholung as wdh
+        termin = wdh.offen_fuer(konzept_id)
+        if termin is None and not wdh.gefestigt(konzept_id):
+            return {"art": "wiederholung_waehlen", "phase": None,
+                    "auswahl": wdh.auswahl(konzept_id),
+                    "hilfe": _hilfe(konzept_id, None)}
+        wiederholung_am = (termin or {}).get("faellig_am")
+        if wiederholung_am:
+            from ..services.today import date_label
+            try:
+                wiederholung_am = date_label(
+                    dt.date.fromisoformat(wiederholung_am))
+            except ValueError:
+                pass
         return {"art": "geschafft", "hilfe": _hilfe(konzept_id, None),
-                "phase": None}
+                "phase": None, "wiederholung_am": wiederholung_am}
 
     if zustand_name == zustand.DIAGNOSING:
         erstkontakt = katalog.erstkontakt_fuer(konzept_id) or {}
@@ -487,6 +505,15 @@ def voraussetzung_beantwortet(sitzung: dict, antworten: list[str], cfg=None) -> 
     store.ereignis_schreiben(sitzung["id"], "Voraussetzung fehlt — wird zuerst gelernt",
                              nutzdaten={"konzept_id": lokal})
     return _merke(sitzung["id"], sitzung, voraussetzung_lernen=True)
+
+
+def wiederholung_gewaehlt(sitzung: dict, tage: int) -> dict:
+    """Das Kind hat seinen Tag gewaehlt (Schritt 4a)."""
+    from . import wiederholung as wdh
+    wdh.planen(sitzung["konzept_id"], int(tage), sitzung_id=sitzung["id"])
+    store.ereignis_schreiben(sitzung["id"], "Wiederholung geplant",
+                             nutzdaten={"tage": int(tage)})
+    return store.sitzung(sitzung["id"])
 
 
 def zurueck_von_voraussetzung(sitzung: dict) -> dict:

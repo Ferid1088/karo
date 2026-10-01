@@ -76,6 +76,34 @@ def _exam_fach(exam_id: int) -> str | None:
     return row["subject"] if row else None
 
 
+def _wiederholung_items(today: dt.date) -> list[dict]:
+    """Faellige Wiederholungen als eigene Eintraege (Schritt 4a).
+
+    Verpasste bleiben stehen, bis sie gemacht sind — sie rutschen nicht
+    lautlos aus dem Plan. Was heute schon bestanden wurde, steht abgehakt
+    da, solange der Tag noch heute ist.
+    """
+    if not db.q1("SELECT 1 FROM sqlite_master WHERE type='table'"
+                 " AND name='lern_wiederholung'"):
+        return []
+    from ..adaptiv import wiederholung
+    items = []
+    for e in wiederholung.fuer_tag(today):
+        items.append({
+            "kind": "wiederholung",
+            "key": f"wdh-{e['id']}",
+            "title": f"Wiederholen: {e['konzept_label']}",
+            "minutes": 5,                       # ein kurzer Check, ca. 5 Minuten
+            "done": bool(e.get("erledigt")),
+            "wid": e["id"],
+            "verpasst": bool(e.get("verpasst")),
+            # Heute ist fachuebergreifend, zeigt das Fach aber immer mit an.
+            "tag": f"Wiederholung · {faecher.name(e['fach'])}"
+                   + (" · noch offen" if e.get("verpasst") else ""),
+        })
+    return items
+
+
 def _exam_item(today: dt.date) -> dict | None:
     from . import exam_calendar
     task = exam_calendar.today_task()
@@ -110,6 +138,9 @@ def activity_days() -> set[str]:
     # Die Lernsitzungen gibt es erst, wenn das adaptive Lernen einmal lief.
     if db.q1("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lern_sitzung'"):
         sql.append("SELECT substr(updated_at,1,13) FROM lern_sitzung WHERE runden>0 OR versuche>0")
+    if db.q1("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lern_wiederholung'"):
+        # Auch ein kurzer Check ist ein Lerntag.
+        sql.append("SELECT substr(erledigt_am,1,13) FROM lern_wiederholung WHERE status IS NOT 'offen'")
     zone = ZoneInfo(getattr(config.load_safe(), "timezone", None) or "Europe/Berlin")
     days = set()
     for row in db.q(" UNION ".join(sql)):
@@ -181,6 +212,7 @@ def mein_tag(today: dt.date | None = None, choice: str = "", role: str | None = 
     exam_item = _exam_item(today) if exams_visible else None
     if exam_item:
         items.append(exam_item)
+    items.extend(_wiederholung_items(today))
     items.extend(_goal_items(today))
     done = sum(item["done"] for item in items)
     minutes = sum(item["minutes"] for item in items)

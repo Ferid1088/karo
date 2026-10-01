@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 
 from .. import config, topics, db
 from ..adaptiv import (erzeugung, lektionen, protokoll,
-                      sitzung as zustand, store, unterricht)
+                      sitzung as zustand, store, unterricht, wiederholung)
 from ..services import learning_hub, grade_guidance
 from .shared import flash, render, zurueck
 
@@ -68,7 +68,8 @@ def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
     request.session["learning_session:" + ctx["learning_base"]] = sitzung["id"]
     screen = unterricht.bildschirm(sitzung)
     steps = {"anker": 1, "diagnose": 1, "vorhersage": 2, "haken": 2,
-             "regel": 2, "beispiel": 3, "anders": 2, "transfer": 6, "geschafft": 6}
+             "regel": 2, "beispiel": 3, "anders": 2, "transfer": 6,
+             "wiederholung_waehlen": 6, "geschafft": 6}
     step = steps.get(screen["art"], 5 if sitzung.get("phase") == "INDEPENDENT_TASK" else 4)
     return render(request, "adaptiv.html", sitzung=sitzung, schirm=screen,
                   learning_title=entry.get("thema_text") or concept.get("label", "Dein Thema"),
@@ -281,11 +282,16 @@ def _answer(request: Request, action: str, answer: str = ""):
     expected = {"anker": {"anker"}, "diagnose": {"diagnose"},
                 "vorhersage": {"vorhersage"}, "transfer": {"transfer"},
                 "aufgabe": {"aufgabe"}, "tipp": {"aufgabe"},
+                "wiederholung": {"wiederholung_waehlen"},
                 "weiter": {"haken", "regel", "beispiel", "anders"}}
     # Stale forms cannot skip phases or award additional successes.
     if screen["art"] not in expected[action]:
         return _zeige(request, active)
-    if action == "weiter":
+    if action == "wiederholung":
+        if answer not in [str(n) for n in wiederholung.ABSTAENDE]:
+            return _zeige(request, active)
+        result = unterricht.wiederholung_gewaehlt(active, int(answer))
+    elif action == "weiter":
         result = (unterricht.weiter_nach_adaptation(active)
                   if active["phase"] == zustand.ADAPTATION else unterricht.weiter(active))
     elif action == "tipp":
@@ -335,6 +341,102 @@ def transfer(request: Request, antwort: str = Form("")):
 @exam_router.post("/tipp")
 def tipp(request: Request):
     return _answer(request, "tipp")
+
+
+@router.post("/wiederholung")
+@exam_router.post("/wiederholung")
+def wiederholung_waehlen(request: Request, tage: str = Form("")):
+    """Das Kind waehlt, wann es das noch einmal anschaut (Schritt 4a)."""
+    return _answer(request, "wiederholung", tage)
+
+
+def _wiederholung_eintrag(wid: int) -> dict | None:
+    eintrag = wiederholung.eintrag(wid)
+    if eintrag is None:
+        raise HTTPException(404, "Diese Wiederholung gibt es nicht.")
+    return eintrag
+
+
+@router.get("/wiederholung/{wid}", response_class=HTMLResponse)
+def wiederholung_check(request: Request, wid: int):
+    """Der kurze Check am faelligen Tag (Schritt 4a)."""
+    if _aus():
+        return zurueck("/")
+    eintrag = _wiederholung_eintrag(wid)
+    if eintrag["status"] != wiederholung.OFFEN:
+        return zurueck("/")
+    eintrag = wiederholung.check_beginnen(wid)
+    return render(request, "adaptiv_wiederholung.html", eintrag=eintrag,
+                  konzept=store.konzept(eintrag["konzept_id"]) or {},
+                  schirm={"art": "check",
+                          "aufgaben": eintrag["ergebnis"].get("aufgaben", [])},
+                  **_context(request))
+
+
+@router.post("/wiederholung/{wid}", response_class=HTMLResponse)
+def wiederholung_pruefen(request: Request, wid: int,
+                         antwort: list[str] = Form(default=[])):
+    """Die Antworten des Checks auswerten.
+
+    Bestanden festigt das Konzept. Nicht bestanden ist kein Minus: kurze
+    Auffrischung, dann waehlt das Kind wieder seinen Tag.
+    """
+    if _aus():
+        return zurueck("/")
+    eintrag = _wiederholung_eintrag(wid)
+    if eintrag["status"] != wiederholung.OFFEN:
+        return zurueck("/")
+    aufgaben = (eintrag["ergebnis"].get("aufgaben")
+                or wiederholung.check_aufgaben(wid))
+    ergebnis = wiederholung.auswerten(aufgaben, antwort)
+    eintrag = wiederholung.abschliessen(
+        wid, bestanden_=ergebnis["bestanden"],
+        ergebnis_daten={"richtig": ergebnis["richtig"],
+                        "gesamt": ergebnis["gesamt"],
+                        "antworten": ergebnis["aufgaben"]})
+    if ergebnis["bestanden"]:
+        schirm = {"art": "gefestigt", "richtig": ergebnis["richtig"],
+                  "gesamt": ergebnis["gesamt"]}
+    else:
+        schirm = {"art": "auffrischung", "ergebnis": ergebnis,
+                  "auffrischung": wiederholung.auffrischung(eintrag["konzept_id"]),
+                  "auswahl": wiederholung.auswahl(eintrag["konzept_id"])}
+    return render(request, "adaptiv_wiederholung.html", eintrag=eintrag,
+                  konzept=store.konzept(eintrag["konzept_id"]) or {},
+                  schirm=schirm, **_context(request))
+
+
+@router.post("/wiederholung/{wid}/auffrischung", response_class=HTMLResponse)
+def wiederholung_auffrischung(request: Request, wid: int,
+                              antwort: str = Form("")):
+    """Die gefuehrte Aufgabe der Auffrischung — danach waehlt das Kind neu."""
+    if _aus():
+        return zurueck("/")
+    eintrag = _wiederholung_eintrag(wid)
+    if eintrag["status"] != wiederholung.NICHT_BESTANDEN:
+        return zurueck("/")
+    auffrischung = wiederholung.auffrischung(eintrag["konzept_id"])
+    aufgabe = auffrischung.get("aufgabe") or {}
+    schirm = {"art": "neuer_termin", "hat_aufgabe": bool(aufgabe),
+              "aufgabe_richtig": (unterricht.ist_richtig(
+                  antwort, aufgabe.get("loesung", "")) if aufgabe else None),
+              "aufgabe_loesung": aufgabe.get("loesung", ""),
+              "auswahl": wiederholung.auswahl(eintrag["konzept_id"])}
+    return render(request, "adaptiv_wiederholung.html", eintrag=eintrag,
+                  konzept=store.konzept(eintrag["konzept_id"]) or {},
+                  schirm=schirm, **_context(request))
+
+
+@router.post("/wiederholung/{wid}/termin")
+def wiederholung_termin(request: Request, wid: int, tage: str = Form("")):
+    """Nach der Auffrischung waehlt das Kind wieder zwei bis fuenf Tage."""
+    if _aus():
+        return zurueck("/")
+    eintrag = _wiederholung_eintrag(wid)
+    if tage in [str(n) for n in wiederholung.ABSTAENDE]:
+        wiederholung.planen(eintrag["konzept_id"], int(tage))
+        flash(request, "Der Termin steht in deinem Tag.")
+    return zurueck("/")
 
 
 @router.post("/puls")

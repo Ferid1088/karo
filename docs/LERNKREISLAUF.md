@@ -145,8 +145,9 @@ Rangfolge:
 „Probe durchführen" wandert damit hinter „Gleichungen lösen", auch wenn die
 Lehrkraft es andersherum aufgeschrieben hat.
 
-**Was weiter nicht passiert:** keine Umsortierung nach Schwierigkeit, keine
-Wiederholung mit Abstand (Z4, vertagt).
+**Was weiter nicht passiert:** keine Umsortierung nach Schwierigkeit. Die
+Wiederholung mit Abstand läuft über „Heute", nicht über den Lernplan
+(Z4, entschieden — siehe unten).
 
 **Ausgang:** `exam_schedule_day` mit Minuten je Tag und Thema.
 
@@ -327,6 +328,7 @@ geht es nicht; danach greift die Rundengrenze.
 | Weg | Abschluss | Was gespeichert wird |
 |---|---|---|
 | adaptiv | `MASTERED` („verstanden") | `lern_fortschritt.mastery='sicher'` je Konzept+Fehlertyp |
+| adaptiv | Wiederholung bestanden („gefestigt") | `lern_wiederholung.status='bestanden'`, siehe Z4 |
 | adaptiv | `ESCALATED` | `braucht_mensch=1`, erscheint im Elternbereich |
 | klassisch | `gelernt` | `lesson.finished_at`, Flagge grün („Thema sicher") |
 | klassisch | `abgebrochen` | `abbruch_grund`, für Menschen lesbar |
@@ -370,12 +372,34 @@ mit zwei geprüften Aufgaben, ob die Voraussetzung sitzt:
 `unterricht.bildschirm/voraussetzung_beantwortet`.
 
 ### Z4 — Wiederholung mit Abstand
-**Vertagt auf Schritt 4a.** Eine Vergessenskurve ohne Termine ist eine
-Behauptung; Termine ohne Kalenderanbindung sind eine zweite Liste.
+**Entschieden (Schritt 4a):** mit Terminen, die das Kind selbst waehlt —
+zwei bis fuenf Tage nach `MASTERED` (`adaptiv/wiederholung.py`, Tabelle
+`lern_wiederholung`). Steht eine Klassenarbeit an, ist der Tag davor als
+Vorschlag markiert, solange er in der Auswahl liegt.
+
+* **Faellig heisst auf dem Plan:** fällige Wiederholungen stehen unter
+  „Heute" als eigene Einträge („Wiederholen: …, ca. 5 Minuten",
+  `services/today.py`). Verpasste bleiben stehen, bis sie gemacht sind.
+* **Der Check stellt neue Aufgaben:** drei bis fünf auf Zielniveau, nie
+  dieselbe noch einmal — dieselbe Aufgabe misst Erinnerung, nicht Koennen.
+  Zuerst gepruefte, noch nie gestellte; fehlen welche, rechnet
+  `adaptiv/varianten.py` Varianten selbst nach (nur Muster, die Karo sicher
+  kann — sonst nichts). Erst danach kommt eine bekannte Aufgabe wieder.
+* **Bestanden → gefestigt; nicht bestanden → kein Minus:** kurze
+  Auffrischung (andere Erklaerung, gefuehrte Aufgabe), danach waehlt das
+  Kind wieder zwei bis fuenf Tage.
+
+Der Check ist bewusst **keine** Sitzung im Zustandsautomaten — er haengt an
+`lern_wiederholung`, seine Aufgaben und Antworten liegen in `ergebnis`, und
+die Uhr des adaptiven Wegs laeuft dort nicht (die Einheit ist laengst vorbei).
 
 ### Z5 — Antwortzeit
-**Vertagt auf Schritt 4a**, zusammen mit Z4. Gemessen wird dann je Antwort —
-oder gar nicht.
+**Entschieden (Schritt 4a):** gemessen wird je Antwort in `lern_antwort`
+(`adaptiv/protokoll.py`) — `gezeigt_at`, letzte Eingabe (`/puls`),
+`beantwortet_at`, daraus `aktive_sekunden`, gedeckelt auf das Doppelte von
+`erwartete_sekunden`. Eine offene App ohne Eingabe ergibt 0; eine Serie zu
+schneller Antworten markiert den Abschnitt als „nicht ernsthaft"
+(`adaptiv_nicht_ernsthaft_serie`). Bewertet wird damit nichts.
 
 ### Z6 — Zwei Fortschrittsbegriffe
 **Entschieden:** Trennung festschreiben, nicht zusammenführen. Aus zwei

@@ -59,6 +59,14 @@
   <h2>{{ item.title }}</h2>
   <p>Das hast du dir für heute vorgenommen. Danach trägst du ein, wie lange du dran warst.</p>
   <form method="post" action="/woche/ziele/{{ item.goal_id }}/start">{{ csrf_input() }}<button type="submit">Los geht’s →</button></form>
+{% elif item and item.kind == 'wiederholung' %}
+  {#- Schritt 4a: der kurze Check nach Abstand. Neue Aufgaben, wenige
+      Minuten, kein Minus — verpasst bleibt einfach stehen. -#}
+  <p class="eyebrow">JETZT</p>
+  <span class="learn-status bearbeitung">{{ item.tag }} · ca. {{ item.minutes }} Minuten</span>
+  <h2>{{ item.title }}</h2>
+  <p>{{ 'Das wartet schon ein paar Tage auf dich — ein kurzer Check genügt.' if item.verpasst else 'Ein kurzer Check, ob es noch sitzt. Neue Aufgaben, keine von früher.' }}</p>
+  <a class="btn" href="/lernen/adaptiv/wiederholung/{{ item.wid }}">Check starten →</a>
 {% elif naechstes and next_action_kind in ('review', 'quiz', 'lesson') %}
   <p class="eyebrow">JETZT</p>
   {% if naechstes.fach %}<span class="learn-status bearbeitung">{{ naechstes.fach }}</span>{% endif %}

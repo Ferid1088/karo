@@ -1,0 +1,95 @@
+{% extends "learning_base.html" %}
+{% block title %}Wiederholen – {{ companion_name }}{% endblock %}
+{% block content %}
+{#- Schritt 4a: der kurze Check nach Abstand. Drei bis fuenf NEUE Aufgaben
+    auf Zielniveau — dieselbe Aufgabe noch einmal muesste Erinnerung, nicht
+    Koennen. Kein Minus: nicht bestanden heisst auffrischen und neu waehlen. -#}
+{% macro termin_wahl(wid, auswahl) -%}
+<form method="post" action="/lernen/adaptiv/wiederholung/{{ wid }}/termin">{{ csrf_input() }}
+  <div class="actions">
+    {% for m in auswahl %}
+    <button type="submit" name="tage" value="{{ m.tage }}">In {{ m.tage }} Tagen · {{ m.datum_label }}{{ ' · Vorschlag' if m.empfohlen }}</button>
+    {% endfor %}
+  </div>
+</form>
+{%- endmacro %}
+<div style="max-width:36rem;margin:0 auto">
+<a class="back-link" href="/">← Zum Tag</a>
+<h1>{{ konzept.label }}</h1>
+
+{% if schirm.art == 'check' %}
+{% if schirm.aufgaben %}
+<section class="card">
+  <p>Ein kurzer Check, ob „{{ konzept.label }}“ noch sitzt.
+     {{ schirm.aufgaben|length }} Aufgaben — keine davon hattest du schon.</p>
+  <form method="post" action="/lernen/adaptiv/wiederholung/{{ eintrag.id }}">{{ csrf_input() }}
+    {% for aufgabe in schirm.aufgaben %}
+    <p><strong>{{ aufgabe.frage }}</strong></p>
+    <input type="text" name="antwort" aria-label="Antwort auf Aufgabe {{ loop.index }}"
+           placeholder="Deine Antwort …" maxlength="1000"{{ ' autofocus' if loop.first }}>
+    {% endfor %}
+    <button type="submit">Fertig</button>
+  </form>
+</section>
+{% else %}
+{#- Kein erfundener Check: ohne gepruefte Aufgaben wird nichts gestellt. -#}
+<section class="card">
+  <p>Zu „{{ konzept.label }}“ gibt es gerade keine Check-Aufgaben.
+     Schau später noch einmal vorbei.</p>
+  <div class="actions"><a class="btn" href="/">Zum Tag</a></div>
+</section>
+{% endif %}
+
+{% elif schirm.art == 'gefestigt' %}
+<section class="card">
+  <p><strong>Sitzt!</strong> Du hast „{{ konzept.label }}“ auch nach ein paar
+     Tagen noch gekonnt — {{ schirm.richtig }} von {{ schirm.gesamt }} richtig.</p>
+  <p>Das Thema gilt jetzt als gefestigt.</p>
+  <div class="actions"><a class="btn" href="/">Zum Tag</a></div>
+</section>
+
+{% elif schirm.art == 'auffrischung' %}
+<section class="card">
+  <p>Ein Teil war noch nicht wieder da — das ist normal und kein Problem.
+     Schauen wir es kurz noch einmal an.</p>
+  {% if schirm.ergebnis %}
+  <ul>
+    {% for e in schirm.ergebnis.aufgaben %}
+    <li>{{ e.frage }} — deine Antwort: {{ e.antwort or '—' }}{{ ' ✓' if e.richtig }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% if schirm.auffrischung.erklaerung %}
+<section class="card">
+  <h2>Anders erklärt</h2>
+  <p>{{ schirm.auffrischung.erklaerung.inhalt.get('regel') or schirm.auffrischung.erklaerung.inhalt.get('haken') or schirm.auffrischung.erklaerung.get('text', '') }}</p>
+</section>
+{% endif %}
+{% if schirm.auffrischung.aufgabe %}
+<section class="card">
+  <p><strong>{{ schirm.auffrischung.aufgabe.frage }}</strong></p>
+  {% for schritt in schirm.auffrischung.aufgabe.schritte %}<p class="hint">{{ schritt.text }}</p>{% endfor %}
+  <form method="post" action="/lernen/adaptiv/wiederholung/{{ eintrag.id }}/auffrischung">{{ csrf_input() }}
+    <input type="text" name="antwort" aria-label="Deine Antwort" placeholder="Deine Antwort …" maxlength="1000" autofocus>
+    <button type="submit">Prüfen</button>
+  </form>
+</section>
+{% else %}
+<section class="card">
+  <p>Wann willst du es noch einmal versuchen?</p>
+  {{ termin_wahl(eintrag.id, schirm.auswahl) }}
+</section>
+{% endif %}
+
+{% elif schirm.art == 'neuer_termin' %}
+<section class="card">
+  {% if schirm.hat_aufgabe %}
+  <p>{{ 'Genau — das war’s.' if schirm.aufgabe_richtig else 'Die Lösung wäre „' ~ schirm.aufgabe_loesung ~ '“ gewesen. Schau sie dir in Ruhe an.' }}</p>
+  {% endif %}
+  <p>Wann willst du den Check noch einmal machen?</p>
+  {{ termin_wahl(eintrag.id, schirm.auswahl) }}
+</section>
+{% endif %}
+</div>
+{% endblock %}
