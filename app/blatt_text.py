@@ -123,11 +123,28 @@ def vorschlaege(text: str, fach: str, themenname: str = "") -> list[dict]:
             continue
         # Der eingetippte Name wiegt schwerer als der Fließtext: er ist die
         # Angabe eines Menschen, der Text nur das, was zufällig draufsteht.
-        punkte = len(thema & aus_text) + 3 * len(thema & aus_name)
-        if punkte:
-            bewertet.append({**t, "punkte": punkte})
-    bewertet.sort(key=lambda t: (-t["punkte"], t["label"]))
-    return bewertet[:TOP]
+        treffer = len(thema & aus_text) + 3 * len(thema & aus_name)
+        if not treffer:
+            continue
+        # Wie viel vom Thema getroffen wurde, nicht nur wie viele Wörter.
+        # „Bruchzahlen notieren" ganz zu treffen sagt mehr als ein Wort aus
+        # „Bruchteile bei verschiedenen Ganzen" — vorher entschied bei
+        # Gleichstand das Alphabet, und das richtige Thema fiel aus den Top 3.
+        anteil = len(thema & (aus_text | aus_name)) / len(thema)
+        bewertet.append({**t, "punkte": treffer, "anteil": round(anteil, 2)})
+    # Gleiche Bezeichnung nur einmal: doppelte Themen im Katalog füllten sonst
+    # alle drei Plätze mit derselben Antwort.
+    bewertet.sort(key=lambda t: (-(t["punkte"] + 2 * t["anteil"]), len(t["label"]), t["label"]))
+    gesehen, ergebnis = set(), []
+    for t in bewertet:
+        schluessel = normalisiere_thema(t["label"])
+        if schluessel in gesehen:
+            continue
+        gesehen.add(schluessel)
+        ergebnis.append(t)
+        if len(ergebnis) >= TOP:
+            break
+    return ergebnis
 
 
 def aufnehmen(text: str, fach: str, *, document_id: int | None = None,

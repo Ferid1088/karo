@@ -61,15 +61,23 @@ def lesen(pfad: Path) -> tuple[str, str]:
 
 
 def erwartet(db: sqlite3.Connection, name: str) -> list[str]:
-    """Das Thema, das fuer dieses Blatt schon bestaetigt in der Datenbank steht."""
+    """Das Thema, das fuer dieses Blatt schon bestaetigt in der Datenbank steht.
+
+    Gesucht wird ueber beide Namen: den urspruenglichen Dateinamen und den
+    Namen, unter dem die Datei abgelegt wurde (eine sha256-Summe). Wer den
+    Probenordner aus `/data/scans` fuellt, hat nur den zweiten.
+    """
     db.row_factory = sqlite3.Row
     zeilen = db.execute(
         """SELECT DISTINCT coalesce(t.label, d.themenname) AS label
              FROM document d
              LEFT JOIN kb_chunk k ON k.document_id = d.id
              LEFT JOIN topic t ON t.id = k.topic_id
-            WHERE d.source_name = ? AND coalesce(t.label, d.themenname) IS NOT NULL""",
-        (name,)).fetchall()
+            WHERE (d.source_name = ?
+                   OR d.stored_path LIKE ?
+                   OR d.sha256 = ?)
+              AND coalesce(t.label, d.themenname) IS NOT NULL""",
+        (name, f"%/{name}", Path(name).stem)).fetchall()
     return [z["label"] for z in zeilen]
 
 
@@ -117,9 +125,27 @@ def main(argv: list[str] | None = None) -> int:
         if not soll:
             topf["ohne_erwartung"] += 1
             continue
-        vorschlaege = blatt_text.vorschlaege(text, "mathematik")[:TOP]
-        namen = {v["label"].lower() for v in vorschlaege}
-        if any(s.lower() in namen for s in soll):
+        # Das Fach des Blattes, nicht pauschal Mathematik: ein deutsches Blatt
+        # gegen den Mathematik-Katalog zu messen waere eine Zahl ueber nichts.
+        fach = db.execute(
+            """SELECT subject FROM document
+                WHERE source_name = ? OR stored_path LIKE ? OR sha256 = ?
+                LIMIT 1""", (pfad.name, f"%/{pfad.name}", pfad.stem)).fetchone()
+        # Genau wie im Betrieb: erst Kopfzeilen weg, dann vorschlagen. Sonst
+        # misst der Bericht einen Weg, den es so nicht gibt.
+        sauber = blatt_text.kopf_entfernen(text)
+        vorschlaege = blatt_text.vorschlaege(
+            sauber, (fach["subject"] if fach and fach["subject"] else "mathematik"))[:TOP]
+        # Treffer heisst: haette die Familie mit einem Klick bestaetigt? Also
+        # derselbe Massstab, den Karo selbst benutzt (`topics.passende`):
+        # Teilzeichenkette in beide Richtungen. „Bruchteile" statt
+        # „Bruchteile eines Ganzen" ist sachlich richtig — den Katalog
+        # trennschaerfer zu machen ist eine andere Aufgabe als Lesen.
+        def passt(a: str, b: str) -> bool:
+            a, b = a.strip().lower(), b.strip().lower()
+            return bool(a) and bool(b) and (a in b or b in a)
+
+        if any(passt(v["label"], s) for v in vorschlaege for s in soll):
             topf["treffer"] += 1
 
     print(f"\n{len(dateien)} Blaetter aus {quelle}\n")
@@ -137,18 +163,37 @@ def main(argv: list[str] | None = None) -> int:
               f"   (ohne hinterlegtes Thema: {t['ohne_erwartung']}, "
               f"zu wenig Text: {t['zu_wenig_text']})")
 
+    # Unter zehn Blättern je Art ist jede Prozentzahl eine Anekdote. Das muss
+    # im Bericht stehen, nicht nur im Kopf dessen, der ihn erzeugt hat.
+    KNAPP = 10
     bericht = Path(args.bericht)
     bericht.parent.mkdir(parents=True, exist_ok=True)
     bericht.write_text(
         "# Trefferquote beim Lesen von Blättern\n\n"
         "Gemessen lokal mit `make ocr-report` an echten Blättern dieser Familie.\n"
         "Die Blätter und ihr Text bleiben auf dem Rechner — hier steht nur die Zahl.\n"
-        f"Zielwert: richtiges Thema unter den Top {TOP} in ≥ {ZIEL:.0%}.\n\n"
-        "| Art | bewertbare Blätter | Trefferquote |\n|---|---|---|\n"
-        + "".join(f"| {a} | {n} | {('%.0f %%' % (q * 100)) if q is not None else '— keine Proben'} |\n"
-                 for a, q, n in zeilen),
+        f"Zielwert: richtiges Thema unter den Top {TOP} in ≥ {ZIEL:.0%}.\n"
+        f"Als Treffer zählt, was die Familie mit einem Klick bestätigt hätte —\n"
+        "derselbe Maßstab, den Karo selbst benutzt (Teilzeichenkette in beide Richtungen).\n\n"
+        "| Art | bewertbare Blätter | Trefferquote | belastbar? |\n|---|---|---|---|\n"
+        + "".join(
+            f"| {a} | {n} | "
+            f"{('%.0f %%' % (q * 100)) if q is not None else '— keine Proben'} | "
+            f"{'ja' if (q is not None and n >= KNAPP) else ('zu wenige Proben' if q is not None else '—')} |\n"
+            for a, q, n in zeilen),
         encoding="utf-8")
-    print(f"\nKennzahl geschrieben: {bericht.relative_to(WURZEL)}")
+    try:
+        wo = bericht.relative_to(WURZEL)
+    except ValueError:
+        wo = bericht
+    print(f"\nKennzahl geschrieben: {wo}")
+    knapp = [a for a, q, n in zeilen if q is not None and n < KNAPP]
+    if knapp:
+        print(f"Achtung: zu wenige Proben für {', '.join(knapp)} "
+              f"(unter {KNAPP}) — die Zahl trägt noch nicht.")
+    fehlend = [a for a, q, n in zeilen if q is None]
+    if fehlend:
+        print(f"Keine Proben für: {', '.join(fehlend)}.")
 
     gemessen = [q for _, q, n in zeilen if q is not None and n]
     if gemessen and min(gemessen) < ZIEL:
