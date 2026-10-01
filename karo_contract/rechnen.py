@@ -131,6 +131,57 @@ def wert(ausdruck: str) -> Fraction | None:
         return None
 
 
+#: Rechenzeichen zaehlen auch mit Leerzeichen dazwischen: „x − 6" ist eine
+#: Rechnung, egal wie sie gesetzt ist.
+_OPERATOR_DAVOR = set("+-−–—*/·×:^")
+#: Buchstaben nur direkt am Zeichen: „2x" ist eine Unbekannte, „Rechne 2"
+#: ist ein Satzanfang. Ohne diese Unterscheidung bliebe jede Aufgabe
+#: ungeprueft, die mit einem Wort beginnt — und das tun fast alle.
+_BUCHSTABEN = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+                  "ÄÖÜäöüß")
+
+
+def _steht_fuer_sich(text: str, start: int) -> bool:
+    """Faengt hier wirklich die ganze linke Seite an?
+
+    `x − 6 = 10` ist eine richtige Aufgabe. Der Mustervergleich findet darin
+    aber „6 = 10", weil die linke Seite mit einer Ziffer beginnen muss — und
+    6 ist nun einmal nicht 10. Genau daran sind im Betrieb 261 von 262
+    Versuchen zu „Lineare Gleichungen loesen" gescheitert: nicht das Modell
+    hatte unrecht, sondern die Pruefung.
+
+    Steht davor ein Rechenzeichen oder direkt daneben eine Unbekannte, ist
+    das Gefundene nur ein Ausschnitt. Dann wird nicht nachgerechnet — lieber
+    ungeprueft als falsch geprueft.
+    """
+    if start > 0 and text[start - 1] in _BUCHSTABEN:
+        return False                      # „2x", „3a": eine Unbekannte
+    i = start - 1
+    while i >= 0 and text[i].isspace():
+        i -= 1
+    if i < 0 or text[i] not in _OPERATOR_DAVOR:
+        return True
+    if text[i] == ":":
+        # Der Doppelpunkt ist beides: Geteiltzeichen und Satzzeichen.
+        # „12 : 4 = 3" ist eine Rechnung, „Rechne so: 3 * 3 = 9" ist ein
+        # Satz mit einer Rechnung dahinter — und die gehoert geprueft.
+        j = i - 1
+        while j >= 0 and text[j].isspace():
+            j -= 1
+        if j < 0 or not (text[j].isdigit() or text[j] == ")"):
+            return True
+    return False
+
+
+def gleichungen(text: str) -> list[tuple[str, str]]:
+    """Die nachrechenbaren Gleichungen eines Textes, ohne die Ausschnitte."""
+    gefunden = []
+    for treffer in _GLEICHUNG.finditer(str(text)):
+        if _steht_fuer_sich(text, treffer.start(1)):
+            gefunden.append((treffer.group(1), treffer.group(2)))
+    return gefunden
+
+
 def stimmt(text: str | None) -> bool | None:
     """Prüft jede nachrechenbare Gleichung in einem Text.
 
@@ -139,7 +190,7 @@ def stimmt(text: str | None) -> bool | None:
     if not text:
         return None
     geprueft = False
-    for links, rechts in _GLEICHUNG.findall(str(text)):
+    for links, rechts in gleichungen(str(text)):
         a, b = wert(links), wert(rechts)
         if a is None or b is None:
             continue
