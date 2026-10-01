@@ -22,7 +22,7 @@ from .schemas import InhaltUngueltig
 
 #: Muss auf beiden Seiten gleich sein. Karo prueft das vor jedem Auftrag
 #: gegen `GET /v1/meta` des Dienstes.
-CONTRACT_VERSION = "karo-adaptiv-v1.1"
+CONTRACT_VERSION = "karo-adaptiv-v1.2"
 
 __all__ = ["CONTRACT_VERSION", "FORMAT_ID", "InhaltUngueltig", "VertragVerletzt",
            "faecher", "huelle", "komponenten", "normalisierung", "pruefe",
