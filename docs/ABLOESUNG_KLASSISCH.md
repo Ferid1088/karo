@@ -62,7 +62,8 @@ Ding anders:
 |---|---|---|
 | die erste Abfrage, bevor gelernt wird (klassisch *und* vor der Klassenarbeit) | **Ersteinschätzung** | — |
 | eine einzelne Fehlvorstellung ist überwunden (adaptiv, `MASTERED`) | **verstanden** | — |
-| ein ganzes Thema ist belegt sicher (`topic_flag = gruen`) | **Thema sicher** | grün |
+| ein ganzes Thema ist belegt sicher (`topic_flag = gruen`, und seit
+Schritt 4a: die Wiederholung bestanden) | **Thema sicher** | grün |
 
 **Grün gibt es nur für „Thema sicher".** Eine verstandene Fehlvorstellung
 ist kein grünes Thema: sie ist ein Schritt dorthin. Zwei richtige Antworten

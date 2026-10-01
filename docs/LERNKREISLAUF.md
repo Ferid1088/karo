@@ -396,6 +396,11 @@ Vorschlag markiert, solange er in der Auswahl liegt.
 * **Bestanden → gefestigt; nicht bestanden → kein Minus:** kurze
   Auffrischung (andere Erklaerung, gefuehrte Aufgabe), danach waehlt das
   Kind wieder zwei bis fuenf Tage.
+* **Erst gefestigt heisst „Thema sicher":** ein verstandenes Thema steht
+  jetzt als **verstanden** in der Liste und wird erst nach der bestandenen
+  Wiederholung sicher (`services/learning_hub.py`). Damit streicht auch der
+  Lernplan es nicht vorzeitig aus der Zeit — vorher war „sicher" ein
+  Versprechen, das die Klassenarbeit kassiert.
 
 Der Check ist bewusst **keine** Sitzung im Zustandsautomaten — er haengt an
 `lern_wiederholung`, seine Aufgaben und Antworten liegen in `ergebnis`, und
