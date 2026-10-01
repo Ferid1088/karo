@@ -40,3 +40,7 @@ ocr-proben/
 # Die synthetischen Proben baut tests/ocr_fixtures/erzeugen.py bei Bedarf.
 tests/ocr_fixtures/*.png
 tests/ocr_fixtures/*.pdf
+
+# Entsteht beim `pip install -e .` (der Lehrplan-Dienst installiert
+# karo_contract so). Ein Bauartefakt, kein Quelltext.
+*.egg-info/
