@@ -20,7 +20,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest httpx
+          pip install pytest httpx playwright
+      # Die Geraetematrix fuer das Lesen von Blaettern laeuft gegen echte
+      # Engines: iOS laesst mit `capture` kein PDF aus der Dateien-App zu, und
+      # das sieht man nur in WebKit. Ohne diese Zeile werden die Tests still
+      # uebersprungen — ein uebersprungener Geraetetest ist kein Geraetetest.
+      - name: Browser-Engines
+        run: python -m playwright install --with-deps chromium firefox webkit
       - name: Run full pytest suite
         env:
           PYTHONPATH: .
