@@ -242,6 +242,18 @@ def test_exam_plan_stays_on_topic_until_adaptive_mastery(app_env, monkeypatch):
         "INPUT_RECEIVED", eingabe_id=input_id)
     adaptiv_store.sitzung_aktualisieren(session_id, zustand="MASTERED")
 
+    # Verstanden ist noch nicht sicher (Z7): der Kalender bleibt beim Thema,
+    # bis die Wiederholung es bestaetigt hat.
+    zwischen = exam_calendar.calendar(exam_id)
+    normal = [item for item in zwischen if item["is_learning_day"] and not item["is_simulation"]]
+    assert normal and normal[0]["topic_id"] == first_id
+
+    adaptiv_store.init()
+    from app.adaptiv import lektionen, wiederholung
+    konzept_id = lektionen.fuer_thema("Brüche addieren", "mathematik")["konzept_id"]
+    termin = wiederholung.planen(konzept_id, 2)
+    wiederholung.abschliessen(termin["id"], bestanden_=True)
+
     # Ein sicheres Thema faellt aus der Planung heraus, das naechste rueckt vor.
     after = exam_calendar.calendar(exam_id)
     normal = [item for item in after if item["is_learning_day"] and not item["is_simulation"]]

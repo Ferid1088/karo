@@ -7,7 +7,7 @@
 {% elif not cfg.legacy_lesson_generation_enabled %}
 {# Der alte Erzeugungsweg ist abgeschaltet — eine tote Schaltflaeche waere
    schlimmer als keine. Das Thema bleibt sichtbar, der Weg dorthin nicht. #}
-{% elif t.learning_started_at or t.learning_status == 'bearbeitung' or t in gruppen.bearbeitung %}
+{% elif t.learning_started_at or t.learning_status in ('bearbeitung', 'verstanden') or t in gruppen.bearbeitung %}
 <a class="btn" href="/lernzyklus/{{ t.id }}">Weiterlernen →</a>
 {% else %}<form method="post" action="/lernzyklus/{{ t.id }}/beginnen">{{ csrf_input() }}<button type="submit">Thema anfangen →</button></form>{% endif %}
 {% if cfg.adaptive_learning_enabled %}

@@ -41,7 +41,7 @@
     <article class="topics-card state-{{ t.learning_status }}" aria-labelledby="topic-title-{{ t.id }}" data-topic-id="{{ t.id }}">
       <div class="topics-card-top">
         <span class="topics-symbol" aria-hidden="true">{% if t.subject|lower == 'mathematik' %}½{% elif t.subject|lower in ['deutsch','englisch','französisch'] %}Aa{% else %}<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v15M12 5C8 2 4 3 2 4v15c4-2 7-1 10 1 3-2 6-3 10-1V4c-2-1-6-2-10 1Z"/></svg>{% endif %}</span>
-        <span class="topics-badge">{% if t.learning_status == 'sicher' %}<span aria-hidden="true">✓</span> Sicher{% elif t.learning_status == 'bearbeitung' %}Am Lernen{% else %}Neu{% endif %}</span>
+        <span class="topics-badge">{% if t.learning_status == 'sicher' %}<span aria-hidden="true">✓</span> Sicher{% elif t.learning_status == 'verstanden' %}Verstanden{% elif t.learning_status == 'bearbeitung' %}Am Lernen{% else %}Neu{% endif %}</span>
         {% if nachfrage != t.id|string %}
         <details class="topics-menu">
           <summary aria-label="Optionen für {{ t.label }}"><span aria-hidden="true">···</span></summary>
@@ -51,7 +51,7 @@
       </div>
       <p class="topics-subject">{{ t.subject|fachname }}{% if t.content_level %} · {{ t.content_level }}{% endif %}</p>
       <h2 id="topic-title-{{ t.id }}">{{ t.label }}</h2>
-      <p class="topics-hint">{% if t.learning_status == 'sicher' %}Das kannst du schon. Wiederholen hält dich fit.{% elif t.learning_status == 'bearbeitung' %}Mach in deinem Tempo weiter.{% else %}Entdecke das Thema mit Karo.{% endif %}</p>
+      <p class="topics-hint">{% if t.learning_status == 'sicher' %}Das kannst du schon. Wiederholen hält dich fit.{% elif t.learning_status == 'verstanden' %}Verstanden hast du es. Sicher wird es mit der Wiederholung.{% elif t.learning_status == 'bearbeitung' %}Mach in deinem Tempo weiter.{% else %}Entdecke das Thema mit Karo.{% endif %}</p>
       {% if nachfrage == t.id|string %}
       <div class="karte-nachfrage">
         <b>Dieses Thema weglegen?</b>
@@ -67,7 +67,7 @@
         <input type="hidden" name="topic_id" value="{{ t.id }}">
         <input type="hidden" name="thema" value="{{ t.label }}">
         <input type="hidden" name="modus" value="bildschirm">
-        <button class="quiet" type="submit" aria-label="{{ 'Weiterlernen' if t.learning_status == 'bearbeitung' else 'Wiederholen' if t.learning_status == 'sicher' else 'Starten' }}: {{ t.label }}">{{ 'Weiterlernen' if t.learning_status == 'bearbeitung' else 'Wiederholen' if t.learning_status == 'sicher' else 'Starten' }} <span aria-hidden="true">→</span></button>
+        <button class="quiet" type="submit" aria-label="{{ 'Weiterlernen' if t.learning_status in ('bearbeitung', 'verstanden') else 'Wiederholen' if t.learning_status == 'sicher' else 'Starten' }}: {{ t.label }}">{{ 'Weiterlernen' if t.learning_status in ('bearbeitung', 'verstanden') else 'Wiederholen' if t.learning_status == 'sicher' else 'Starten' }} <span aria-hidden="true">→</span></button>
       </form>
       {% endif %}
     </article>

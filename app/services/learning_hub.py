@@ -6,7 +6,7 @@ import json
 import uuid
 
 from .. import db, faecher, topics
-from ..adaptiv import lektionen, store
+from ..adaptiv import lektionen, store, wiederholung
 
 
 def create_topic(label: str, subject: str, grade: int | None = None,
@@ -124,9 +124,16 @@ def decorate(rows: list[dict]) -> list[dict]:
         # Old topic.grade values came from a form, not a curriculum check.
         t['grade'] = concept['klasse_bis'] if concept else None
         state = store.topic_mastery(t['id'])
-        t['learning_status'] = ('sicher' if state == 'MASTERED' else
+        # Schritt 4a: verstanden ist noch nicht sicher. „Thema sicher" wird
+        # ein Thema erst, wenn das Kind es nach ein paar Tagen noch einmal
+        # konnte — vorher waere es ein Versprechen, das die Klassenarbeit
+        # kassiert.
+        fest = bool(concept and wiederholung.gefestigt(concept['id']))
+        t['learning_status'] = ('sicher' if state == 'MASTERED' and fest else
+                                'verstanden' if state == 'MASTERED' else
                                 'bearbeitung' if state or t.get('learning_started_at') else 'neu')
-        t['status_label'] = {'sicher': 'Sicher', 'bearbeitung': 'In Bearbeitung', 'neu': 'Neu'}[t['learning_status']]
+        t['status_label'] = {'sicher': 'Sicher', 'verstanden': 'Verstanden',
+                             'bearbeitung': 'In Bearbeitung', 'neu': 'Neu'}[t['learning_status']]
     return rows
 
 

@@ -522,3 +522,29 @@ def test_verpatzter_check_endet_in_auffrischung_und_neuer_wahl(
 
     neu = wiederholung.offen_fuer(konzept_id)
     assert neu is not None and neu["id"] != termin["id"]
+
+
+def test_verstanden_ist_noch_nicht_thema_sicher(app_env):
+    """Z7 und Z4 zusammen: „Thema sicher" wartet auf die Wiederholung.
+
+    Sonst verspricht die Oberflaeche Sicherheit, die erst die Klassenarbeit
+    widerlegt — und der Lernplan streicht das Thema vorzeitig aus der Zeit.
+    """
+    from app.adaptiv import sitzung as zustand, store, unterricht, wiederholung
+    from app.services import learning_hub
+    from app import topics
+    konzept_id = _konzept(app_env)
+    konzept = store.konzept(konzept_id)
+    topic_id = topics.anlegen(konzept["label"], subject=konzept["fach"])
+    sitzung = unterricht.starte(konzept_id, konzept["label"], topic_id)
+    zustand.wechsle(sitzung["id"], zustand.MASTERED, "verstanden")
+
+    zeile = learning_hub.decorate([dict(topics.get(topic_id))])[0]
+    assert zeile["learning_status"] == "verstanden"
+    assert zeile["status_label"] == "Verstanden"
+
+    termin = wiederholung.planen(konzept_id, 2)
+    wiederholung.abschliessen(termin["id"], bestanden_=True)
+
+    zeile = learning_hub.decorate([dict(topics.get(topic_id))])[0]
+    assert zeile["learning_status"] == "sicher"

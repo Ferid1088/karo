@@ -29,11 +29,13 @@
 .topics-card { display: flex; flex-direction: column; min-width: 0; padding: 1.1rem; border: 1px solid #d5e0f2; border-radius: 18px; background: linear-gradient(155deg, #f3f7ff, #fff 55%); box-shadow: 0 3px 0 #dfe6f3; }
 .topics-card.state-bearbeitung { background: linear-gradient(155deg, #fff6db, #fff 55%); }
 .topics-card.state-sicher { background: linear-gradient(155deg, #e5f8ed, #fff 55%); }
+.topics-card.state-verstanden { background: linear-gradient(155deg, #e6f1ff, #fff 55%); }
 .topics-card-top { display: flex; align-items: center; gap: .6rem; }
 .topics-symbol { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 12px; background: white; color: #5443d5; border: 1px solid #e2e6f5; font-size: 1.5rem; font-weight: 800; }
 .topics-badge { padding: .2rem .6rem; border-radius: 8px; background: #e5edff; color: #2353a0; font-size: .76rem; font-weight: 800; }
 .state-bearbeitung .topics-badge { background: #fff0bf; color: #745000; }
 .state-sicher .topics-badge { background: #d5f3e2; color: #12613f; }
+.state-verstanden .topics-badge { background: #d9ecff; color: #1b5890; }
 .topics-menu { position: relative; margin: 0 0 0 auto; padding: 0; border: 0; background: none; }
 .topics-menu summary { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 10px; color: #526687; list-style: none; font-size: 1.35rem; font-weight: 800; cursor: pointer; }
 .topics-menu summary::-webkit-details-marker { display: none; }
