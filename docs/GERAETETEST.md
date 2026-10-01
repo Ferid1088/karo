@@ -1,5 +1,15 @@
 # Gerätetest: Blatt lesen
 
+> **Status: offen.** Kein Kästchen ist abgehakt, und keines darf von Karo
+> abgehakt werden. Was hier steht, lässt sich nur mit einem echten Gerät in
+> der Hand prüfen — ob die Kamera aufgeht, ob der Text von echtem Papier
+> brauchbar ist, ob das zweite Blatt die 21 MB nicht erneut lädt. Ein Haken,
+> den eine Maschine setzt, wäre an genau diesen Stellen eine Behauptung.
+>
+> Automatisch geprüft ist, was sich automatisch prüfen lässt: sechs
+> Gerätekonfigurationen in `tests/test_blatt_lesen_browser.py` (Chromium,
+> Firefox, WebKit, iPad, iPhone, Android-Tablet), und sie laufen in der CI.
+
 Die Playwright-Tests prüfen, was sich automatisch prüfen lässt: dass die
 Knöpfe dastehen, dass der Datei-Knopf PDFs zulässt, dass der Hinweis vor der
 Kamera kommt. Was sie **nicht** prüfen können, ist, ob Ihr Kind mit dem iPad

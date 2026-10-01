@@ -156,12 +156,15 @@ def main(argv: list[str] | None = None) -> int:
             zeilen.append((art, None, 0))
             print(f"  {art:<9} keine Proben")
             continue
-        bewertbar = t["gesamt"] - t["ohne_erwartung"]
+        # Zwei verschiedene Fehler, zwei verschiedene Zahlen. Ein Blatt, aus
+        # dem kein Text kam, sagt nichts ueber die Themenzuordnung — es als
+        # Danebengriff zu zaehlen waere so falsch, wie es zu verschweigen.
+        bewertbar = t["gesamt"] - t["ohne_erwartung"] - t["zu_wenig_text"]
         quote = (t["treffer"] / bewertbar) if bewertbar else 0.0
         zeilen.append((art, quote, bewertbar))
-        print(f"  {art:<9} {t['treffer']}/{bewertbar} = {quote:.0%}"
-              f"   (ohne hinterlegtes Thema: {t['ohne_erwartung']}, "
-              f"zu wenig Text: {t['zu_wenig_text']})")
+        print(f"  {art:<9} Zuordnung {t['treffer']}/{bewertbar} = {quote:.0%}"
+              f"   ·  nicht lesbar: {t['zu_wenig_text']}/{t['gesamt']}"
+              f"   ·  ohne hinterlegtes Thema: {t['ohne_erwartung']}")
 
     # Unter zehn Blättern je Art ist jede Prozentzahl eine Anekdote. Das muss
     # im Bericht stehen, nicht nur im Kopf dessen, der ihn erzeugt hat.
@@ -178,9 +181,21 @@ def main(argv: list[str] | None = None) -> int:
         "| Art | bewertbare Blätter | Trefferquote | belastbar? |\n|---|---|---|---|\n"
         + "".join(
             f"| {a} | {n} | "
-            f"{('%.0f %%' % (q * 100)) if q is not None else '— keine Proben'} | "
-            f"{'ja' if (q is not None and n >= KNAPP) else ('zu wenige Proben' if q is not None else '—')} |\n"
-            for a, q, n in zeilen),
+            f"{('%.0f %%' % (q * 100)) if q is not None and n else '— keine Proben'} | "
+            f"{'ja' if (q is not None and n >= KNAPP) else ('zu wenige Proben' if n else '—')} |\n"
+            for a, q, n in zeilen)
+        + "\n## Datenlage\n\n"
+        + "".join(
+            f"- **{a}**: {zaehler[a]['gesamt']} Blätter vorhanden, davon "
+            f"{zaehler[a]['zu_wenig_text']} nicht lesbar und "
+            f"{zaehler[a]['ohne_erwartung']} ohne hinterlegtes Thema → {n} bewertbar\n"
+            if a in zaehler and zaehler[a]["gesamt"]
+            else f"- **{a}**: keine Proben vorhanden\n"
+            for a, q, n in zeilen)
+        + f"\nUnter {KNAPP} bewertbaren Blättern je Art ist jede Prozentzahl eine Anekdote.\n"
+        "Nicht lesbare Blätter zählen nicht in die Trefferquote: aus ihnen kam kein\n"
+        "Text, über den sich etwas zuordnen ließe. Eine Quote, die beides vermischt,\n"
+        "sagt nichts — deshalb stehen beide Zahlen getrennt.\n",
         encoding="utf-8")
     try:
         wo = bericht.relative_to(WURZEL)
@@ -195,11 +210,16 @@ def main(argv: list[str] | None = None) -> int:
     if fehlend:
         print(f"Keine Proben für: {', '.join(fehlend)}.")
 
-    gemessen = [q for _, q, n in zeilen if q is not None and n]
-    if gemessen and min(gemessen) < ZIEL:
-        print(f"Unter dem Zielwert von {ZIEL:.0%}.")
-        return 1
-    return 0
+    # Der Rueckgabewert sagt „Ziel belegt" oder „nicht belegt" — nicht
+    # „keine schlechte Zahl gesehen". Eine Kategorie ohne Proben und eine
+    # Kategorie mit drei Proben belegen beide gar nichts.
+    unbelegt = [a for a, q, n in zeilen if n < KNAPP]
+    verfehlt = [a for a, q, n in zeilen if n >= KNAPP and q < ZIEL]
+    if verfehlt:
+        print(f"Unter dem Zielwert von {ZIEL:.0%}: {', '.join(verfehlt)}.")
+    if unbelegt:
+        print(f"Nicht belegt (unter {KNAPP} Proben): {', '.join(unbelegt)}.")
+    return 1 if (verfehlt or unbelegt) else 0
 
 
 if __name__ == "__main__":
