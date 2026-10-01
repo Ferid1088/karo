@@ -233,3 +233,20 @@ CREATE TABLE IF NOT EXISTS lern_erklaerung_gemeldet (
     ausgeliefert  INTEGER,
     folge_erfolge INTEGER
 );
+
+-- Voraussetzungen eines Konzepts (Vertrag 1.4, Z3).
+--
+-- Der Lehrplan-Dienst fuehrt sie seit jeher, Karo konnte sie nicht sehen.
+-- Ohne sie blieb bei einem Kind, das haengt, nur die Eskalation — auch wenn
+-- in Wahrheit nur eine Voraussetzung fehlte. Die Voraussetzung steht als
+-- Konzeptschluessel des Dienstes da, nicht als lokale ID: sie kann noch
+-- fehlen, wenn das Konzept selbst schon da ist.
+CREATE TABLE IF NOT EXISTS lern_voraussetzung (
+    id            INTEGER PRIMARY KEY,
+    konzept_id    INTEGER NOT NULL REFERENCES lern_konzept(id) ON DELETE CASCADE,
+    voraussetzung TEXT NOT NULL,          -- concept_id beim Lehrplan-Dienst
+    titel         TEXT,
+    created_at    TEXT NOT NULL,
+    UNIQUE(konzept_id, voraussetzung)
+);
+CREATE INDEX IF NOT EXISTS idx_lern_voraussetzung ON lern_voraussetzung(konzept_id);

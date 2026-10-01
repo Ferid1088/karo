@@ -17,14 +17,15 @@ landen. Das Paket haengt an nichts aus `app/` und an keiner Datenbank.
 from __future__ import annotations
 
 from . import faecher, huelle, komponenten, normalisierung, rechnen, schemas
-from .huelle import FORMAT_ID, VertragVerletzt
+from .huelle import FORMAT_ID, VertragVerletzt, voraussetzungen
 from .schemas import InhaltUngueltig
 
 #: Muss auf beiden Seiten gleich sein. Karo prueft das vor jedem Auftrag
 #: gegen `GET /v1/meta` des Dienstes.
-CONTRACT_VERSION = "karo-adaptiv-v1.3"
+CONTRACT_VERSION = "karo-adaptiv-v1.4"
 
 __all__ = ["CONTRACT_VERSION", "FORMAT_ID", "InhaltUngueltig", "VertragVerletzt",
+           "voraussetzungen",
            "faecher", "huelle", "komponenten", "normalisierung", "pruefe",
            "pruefe_lektion", "rechnen", "schemas"]
 

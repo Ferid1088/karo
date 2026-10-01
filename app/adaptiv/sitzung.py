@@ -180,22 +180,51 @@ def runde_gescheitert(sitzung_id: int, antwort: str | None = None,
     return store.sitzung(sitzung_id)
 
 
-def eskalieren(sitzung_id: int) -> dict:
+def eskalieren(sitzung_id: int, cfg=None) -> dict:
     """§7: Eskalation ist ein normaler Ausgang, kein Fehlerzustand.
 
     Danach wird keine weitere Erklärung mehr ausgeliefert, und der Fehlertyp
     ist im Profil als „braucht einen Menschen“ markiert.
+
+    Davor steht seit Z3 eine Frage: liegt es am Konzept — oder an einer
+    Voraussetzung? Wer Brüche nicht erweitern kann, scheitert beim Addieren
+    an etwas, das zwei Schritte davor liegt. Dafür einen Menschen zu holen
+    ist zu viel für ein Problem, das Karo selbst lösen kann.
     """
+    from . import voraussetzung as vor
+
     sitzung = store.sitzung(sitzung_id)
     if sitzung is None:
         raise UebergangVerboten(f"Sitzung {sitzung_id} gibt es nicht.")
     if sitzung["zustand"] == ESCALATED:
         return sitzung
+
+    daten = dict(sitzung.get("daten") or {})
+    if sitzung["konzept_id"] and not daten.get("voraussetzung_geprueft"):
+        offen = vor.offene(sitzung["konzept_id"], store.fortschritt_scope(sitzung))
+        if offen:
+            # Erst die Voraussetzung, dann zurück. Kein Mensch nötig.
+            daten["voraussetzung_geprueft"] = True
+            daten["voraussetzung_offen"] = offen[0]["voraussetzung"]
+            daten["voraussetzung_lokal"] = offen[0]["lokal"]
+            daten["voraussetzung_titel"] = offen[0].get("titel") or ""
+            store.sitzung_aktualisieren(sitzung_id, daten=daten)
+            store.ereignis_schreiben(
+                sitzung_id, "Voraussetzung fehlt — erst die, dann zurück",
+                nutzdaten={"voraussetzung": offen[0]["voraussetzung"]})
+            return store.sitzung(sitzung_id)
     ergebnis = wechsle(sitzung_id, ESCALATED, "nach erfolglosen Runden eskaliert")
     if sitzung["konzept_id"]:
         store.fortschritt_buchen(sitzung["konzept_id"], sitzung["fehlertyp_id"],
                                  mastery="braucht_mensch", braucht_mensch=True,
                                  child_key=store.fortschritt_scope(sitzung))
+        # Was Karo nicht unterrichten kann, gehört in die Meldung: sonst
+        # sucht der Mensch den Grund beim Kind.
+        ohne = vor.fehlende_ohne_lektion(sitzung["konzept_id"])
+        if ohne:
+            store.ereignis_schreiben(
+                sitzung_id, "Voraussetzung fehlt in der Bibliothek",
+                nutzdaten={"voraussetzungen": [v["voraussetzung"] for v in ohne]})
     return ergebnis
 
 

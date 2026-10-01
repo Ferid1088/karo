@@ -95,6 +95,13 @@ def neu_starten(konzept_id: int) -> dict:
 # Bildschirm zusammenstellen
 # --------------------------------------------------------------------------
 
+def _voraussetzungsaufgaben(konzept_id: int | None) -> list[dict]:
+    if not konzept_id:
+        return []
+    from . import voraussetzung as vor
+    return vor.diagnoseaufgaben(int(konzept_id))
+
+
 def _hilfe(konzept_id: int, phase: str | None) -> dict:
     """02 §5/§6: Hilfe ist ein Nachschlagen, in jeder Phase außer COMPLETE."""
     return {
@@ -109,6 +116,17 @@ def bildschirm(sitzung: dict) -> dict:
     daten = _daten(sitzung)
     zustand_name = sitzung["zustand"]
     phase = sitzung["phase"]
+
+    # Z3: Eine fehlende Voraussetzung sticht jede Phase. Sie wurde festgestellt,
+    # bevor eskaliert wurde — weitermachen hiesse, an derselben Stelle noch
+    # einmal zu scheitern.
+    if daten.get("voraussetzung_offen"):
+        return {"art": "voraussetzung", "phase": phase,
+                "voraussetzung": daten.get("voraussetzung_titel") or daten["voraussetzung_offen"],
+                "konzept_id": daten.get("voraussetzung_lokal"),
+                "aufgaben": _voraussetzungsaufgaben(daten.get("voraussetzung_lokal")),
+                "fehlerhinweis": daten.get("fehlerhinweis"),
+                "hilfe": _hilfe(konzept_id, None)}
 
     if zustand_name == zustand.ESCALATED:
         return {"art": "eskaliert", "hilfe": _hilfe(konzept_id, None),
@@ -372,6 +390,44 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     return _merke(sitzung["id"], ergebnis,
                   tipp_stufe=int(daten.get("tipp_stufe", 0)) + 1,
                   fehlerhinweis="Noch nicht. Schau dir das Bild noch einmal an.")
+
+
+def voraussetzung_beantwortet(sitzung: dict, antworten: list[str], cfg=None) -> dict:
+    """Die kurze Diagnose zur Voraussetzung auswerten (Z3).
+
+    Sitzt sie, war sie nicht der Grund — dann eskaliert Karo wie bisher.
+    Sitzt sie nicht, lernt das Kind erst sie; die Sitzung wird dafuer auf das
+    Voraussetzungskonzept umgestellt und kommt danach hierher zurueck.
+    """
+    from . import sitzung as zustand_modul, voraussetzung as vor
+
+    daten = _daten(sitzung)
+    lokal = daten.get("voraussetzung_lokal")
+    aufgaben = _voraussetzungsaufgaben(lokal)
+    if not aufgaben:
+        # Ohne Aufgaben laesst sich nichts feststellen: dann wie bisher.
+        return zustand_modul.eskalieren(sitzung["id"], cfg=cfg)
+
+    if vor.pruefen(list(antworten), aufgaben):
+        store.ereignis_schreiben(sitzung["id"], "Voraussetzung sitzt — es lag nicht daran")
+        _merke(sitzung["id"], sitzung, voraussetzung_offen=None,
+               voraussetzung_lokal=None, voraussetzung_titel=None)
+        return zustand_modul.eskalieren(store.sitzung(sitzung["id"])["id"], cfg=cfg)
+
+    store.ereignis_schreiben(sitzung["id"], "Voraussetzung fehlt — wird zuerst gelernt",
+                             nutzdaten={"konzept_id": lokal})
+    return _merke(sitzung["id"], sitzung, voraussetzung_lernen=True)
+
+
+def zurueck_von_voraussetzung(sitzung: dict) -> dict:
+    """Nach der Voraussetzung zurueck an die Stelle, an der es hakte."""
+    daten = _daten(sitzung)
+    if not daten.get("voraussetzung_offen"):
+        return sitzung
+    store.ereignis_schreiben(sitzung["id"], "Zurueck vom Voraussetzungskonzept")
+    return _merke(sitzung["id"], sitzung, voraussetzung_offen=None,
+                  voraussetzung_lokal=None, voraussetzung_titel=None,
+                  voraussetzung_lernen=None, tipp_stufe=0, fehlerhinweis=None)
 
 
 def weiter_nach_adaptation(sitzung: dict) -> dict:

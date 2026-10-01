@@ -135,3 +135,125 @@ def test_z10_dieselbe_erklaerung_wird_nicht_zweimal_gemeldet(app_env):
     assert store.wirkungslose_erklaerungen(app_env.config.load())
 
 
+# ---------------------------------------------------------------- Z3
+
+def _konzept_mit_voraussetzung(app_env):
+    """Ein Konzept, dem eine importierte Voraussetzung vorausgeht."""
+    from app import db
+    from app.adaptiv import store
+    store.init()
+    konzepte = store.konzepte_verfuegbar()
+    ziel = konzepte[0]["id"]
+    # Ein zweites Konzept als Voraussetzung, so wie ein Import es anlegt.
+    with db.tx() as c:
+        vid = c.execute(
+            """INSERT INTO lern_konzept (fach, thema_key, konzept_key, label,
+                   klasse_von, klasse_bis, stichworte, quelle, geprueft_am, aktiv, created_at)
+               VALUES ('mathematik','brueche','vorab','Brüche erweitern',5,6,'[]',
+                       'curriculum',?,1,?)""", (db.now(), db.now())).lastrowid
+        # geprueft_am und aktiv: ungepruefte Inhalte liefert Karo keinem Kind
+        # aus — auch nicht als Voraussetzungsdiagnose.
+        ft = c.execute("""INSERT INTO lern_fehlertyp (konzept_id, fehler_key, label,
+                              beschreibung, geprueft_am, aktiv, created_at)
+                          VALUES (?, 'erweitern-falsch', 'falsch erweitert', 'x', ?, 1, ?)""",
+                       (vid, db.now(), db.now())).lastrowid
+        for pos, (frage, loesung) in enumerate((("1/2 = ?/4", "2/4"), ("1/3 = ?/9", "3/9"))):
+            c.execute("""INSERT INTO lern_aufgabe (fehlertyp_id, rolle, position, frage,
+                             loesung, typischer_fehler, geprueft_am, aktiv, created_at)
+                         VALUES (?, 'selbststaendig', ?, ?, ?, '', ?, 1, ?)""",
+                      (ft, pos, frage, loesung, db.now(), db.now()))
+        c.execute("""INSERT INTO lern_curriculum_import (fingerprint, konzept_id, provenance, created_at)
+                     VALUES ('fp-vorab', ?, ?, ?)""",
+                  (vid, '{"concept_id": "MA.BRUECHE.ERWEITERN"}', db.now()))
+    store.voraussetzungen_sichern(
+        ziel, [{"concept_id": "MA.BRUECHE.ERWEITERN", "title": "Brüche erweitern"}])
+    return ziel, vid
+
+
+def test_z3_voraussetzungen_kommen_aus_der_lieferung(app_env):
+    """Geprüft, nicht geraten — und ohne Feld bleibt alles wie vorher."""
+    import karo_contract
+    app_env.db.init()
+    geliefert = {"prerequisites": [{"concept_id": "MA.BRUECHE.ERWEITERN",
+                                    "title": "Brüche erweitern"}]}
+    assert karo_contract.voraussetzungen(geliefert)[0]["concept_id"] == "MA.BRUECHE.ERWEITERN"
+    assert karo_contract.voraussetzungen({}) == []
+    assert karo_contract.voraussetzungen({"prerequisites": "unsinn"}) == []
+    assert karo_contract.voraussetzungen({"prerequisites": [{"title": "ohne id"}]}) == []
+
+
+def test_z3_vor_der_eskalation_wird_die_voraussetzung_geprueft(app_env):
+    """Wer Brüche nicht erweitern kann, scheitert beim Addieren zwei Schritte davor."""
+    from app.adaptiv import sitzung, store, unterricht
+    app_env.db.init()
+    ziel, vid = _konzept_mit_voraussetzung(app_env)
+
+    s = unterricht.starte(ziel)
+    ergebnis = sitzung.eskalieren(s["id"])
+    # Kein Mensch — erst die Voraussetzung.
+    assert ergebnis["zustand"] != sitzung.ESCALATED
+    daten = dict(ergebnis["daten"] or {})
+    assert daten["voraussetzung_offen"] == "MA.BRUECHE.ERWEITERN"
+    assert daten["voraussetzung_lokal"] == vid
+
+    bildschirm = unterricht.bildschirm(ergebnis)
+    assert bildschirm["art"] == "voraussetzung"
+    assert bildschirm["voraussetzung"] == "Brüche erweitern"
+    assert len(bildschirm["aufgaben"]) == 2
+
+
+def test_z3_sitzt_die_voraussetzung_eskaliert_karo_wie_bisher(app_env):
+    from app.adaptiv import sitzung, store, unterricht
+    app_env.db.init()
+    ziel, vid = _konzept_mit_voraussetzung(app_env)
+    s = unterricht.starte(ziel)
+    s = sitzung.eskalieren(s["id"])
+
+    aufgaben = unterricht.bildschirm(s)["aufgaben"]
+    richtig = [a["loesung"] for a in aufgaben]
+    ergebnis = unterricht.voraussetzung_beantwortet(s, richtig)
+    assert ergebnis["zustand"] == sitzung.ESCALATED, "es lag nicht an der Voraussetzung"
+
+
+def test_z3_fehlt_die_voraussetzung_wird_sie_zuerst_gelernt(app_env):
+    from app.adaptiv import sitzung, unterricht
+    app_env.db.init()
+    ziel, vid = _konzept_mit_voraussetzung(app_env)
+    s = unterricht.starte(ziel)
+    s = sitzung.eskalieren(s["id"])
+
+    ergebnis = unterricht.voraussetzung_beantwortet(s, ["99/99", "88/88"])
+    assert ergebnis["zustand"] != sitzung.ESCALATED
+    assert dict(ergebnis["daten"] or {})["voraussetzung_lernen"] is True
+
+    # Und danach geht es zurück an die Stelle, an der es hakte.
+    zurueck = unterricht.zurueck_von_voraussetzung(ergebnis)
+    assert not dict(zurueck["daten"] or {}).get("voraussetzung_offen")
+
+
+def test_z3_eine_halbe_voraussetzung_zaehlt_nicht(app_env):
+    """Eine von zwei richtig ist ein Anfang, keine Sicherheit."""
+    from app.adaptiv import voraussetzung as vor
+    app_env.db.init()
+    aufgaben = [{"loesung": "2/4"}, {"loesung": "3/9"}]
+    assert vor.pruefen(["2/4", "3/9"], aufgaben) is True
+    assert vor.pruefen(["2/4", "falsch"], aufgaben) is False
+    assert vor.pruefen(["2/4"], aufgaben) is False
+
+
+def test_z3_ohne_importierte_voraussetzung_wird_eskaliert(app_env):
+    """Ein Lernweg ins Leere wäre schlimmer als ein Mensch."""
+    from app import db
+    from app.adaptiv import sitzung, store, unterricht
+    app_env.db.init()
+    store.init()
+    ziel = store.konzepte_verfuegbar()[0]["id"]
+    store.voraussetzungen_sichern(ziel, [{"concept_id": "MA.GIBTS.NICHT", "title": "fehlt"}])
+    s = unterricht.starte(ziel)
+    ergebnis = sitzung.eskalieren(s["id"])
+    assert ergebnis["zustand"] == sitzung.ESCALATED
+    # Der Mensch erfährt, woran es lag.
+    ereignisse = db.q("SELECT anlass, nutzdaten FROM lern_ereignis WHERE sitzung_id=?", s["id"])
+    assert any("Voraussetzung fehlt in der Bibliothek" in e["anlass"] for e in ereignisse)
+
+

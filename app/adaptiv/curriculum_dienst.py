@@ -197,6 +197,10 @@ def import_lesson(cfg, result: dict, thema: str, fach: str, grade: int) -> int:
     lesson["konzept"]["konzept_key"] = "curriculum-" + fingerprint
     concept_id = erzeugung.speichern(lesson, fach=fach, quelle="curriculum")
     store.curriculum_import_sichern(fingerprint, concept_id, provenance)
+    # Voraussetzungen kommen mit der Lieferung (Vertrag 1.4, Z3). Ohne sie
+    # bleibt bei einem Kind, das haengt, nur die Eskalation — auch wenn in
+    # Wahrheit nur eine Voraussetzung fehlt.
+    store.voraussetzungen_sichern(concept_id, karo_contract.voraussetzungen(result))
     return concept_id
 
 

@@ -356,6 +356,57 @@ def wirkungslose_erklaerungen(cfg=None) -> list[dict]:
             for z in zeilen]
 
 
+def voraussetzungen_sichern(konzept_id: int, eintraege: list[dict]) -> int:
+    """Die Voraussetzungen eines Konzepts aus der Lieferung festhalten (Z3)."""
+    if not eintraege:
+        return 0
+    with db.tx() as c:
+        c.execute("DELETE FROM lern_voraussetzung WHERE konzept_id=?", (konzept_id,))
+        for e in eintraege:
+            c.execute("""INSERT OR IGNORE INTO lern_voraussetzung
+                           (konzept_id, voraussetzung, titel, created_at)
+                         VALUES (?,?,?,?)""",
+                      (konzept_id, e["concept_id"], e.get("title") or None, db.now()))
+    return len(eintraege)
+
+
+def voraussetzungen(konzept_id: int) -> list[dict]:
+    """Was vor diesem Konzept sitzen sollte.
+
+    `lokal` ist die Konzept-ID in Karo, falls die Voraussetzung schon
+    importiert wurde — sonst None. Dann weiss Karo zwar, dass sie fehlt,
+    kann sie aber noch nicht unterrichten.
+    """
+    return [dict(z) for z in db.q(
+        """SELECT v.voraussetzung, v.titel,
+                  (SELECT i.konzept_id FROM lern_curriculum_import i
+                    WHERE json_extract(i.provenance, '$.concept_id') = v.voraussetzung
+                    LIMIT 1) AS lokal
+             FROM lern_voraussetzung v WHERE v.konzept_id=?
+            ORDER BY v.id""", konzept_id)]
+
+
+def wirkung_gemeldet(erklaerung_ids: list[int]) -> None:
+    """Haelt fest, dass diese Erklaerung gemeldet wurde.
+
+    Ohne das ginge dieselbe Meldung bei jedem Lauf erneut hinaus, und der
+    Dienst bekaeme jeden Tag dieselbe Liste.
+    """
+    if not erklaerung_ids:
+        return
+    with db.tx() as c:
+        for eid in erklaerung_ids:
+            c.execute("""INSERT INTO lern_erklaerung_gemeldet
+                           (erklaerung_id, gemeldet_am, ausgeliefert, folge_erfolge)
+                         SELECT id, ?, ausgeliefert, folge_erfolge
+                           FROM lern_erklaerung WHERE id=?
+                         ON CONFLICT(erklaerung_id) DO UPDATE
+                           SET gemeldet_am=excluded.gemeldet_am,
+                               ausgeliefert=excluded.ausgeliefert,
+                               folge_erfolge=excluded.folge_erfolge""",
+                      (db.now(), eid))
+
+
 def erklaerungen(fehlertyp_id: int, mit_archivierten: bool = False) -> list[dict]:
     sql = "SELECT * FROM lern_erklaerung WHERE fehlertyp_id=?"
     if not mit_archivierten:
@@ -386,27 +437,6 @@ def erklaerung_wirkte(erklaerung_id: int) -> None:
 def erstkontakt_anlegen(konzept_id: int, anker: str, erste_aufgabe: dict,
                         benennung: str, quelle: str = "kuratiert",
                         geprueft: bool = False) -> int:
-def wirkung_gemeldet(erklaerung_ids: list[int]) -> None:
-    """Haelt fest, dass diese Erklaerung gemeldet wurde.
-
-    Ohne das ginge dieselbe Meldung bei jedem Lauf erneut hinaus, und der
-    Dienst bekaeme jeden Tag dieselbe Liste.
-    """
-    if not erklaerung_ids:
-        return
-    with db.tx() as c:
-        for eid in erklaerung_ids:
-            c.execute("""INSERT INTO lern_erklaerung_gemeldet
-                           (erklaerung_id, gemeldet_am, ausgeliefert, folge_erfolge)
-                         SELECT id, ?, ausgeliefert, folge_erfolge
-                           FROM lern_erklaerung WHERE id=?
-                         ON CONFLICT(erklaerung_id) DO UPDATE
-                           SET gemeldet_am=excluded.gemeldet_am,
-                               ausgeliefert=excluded.ausgeliefert,
-                               folge_erfolge=excluded.folge_erfolge""",
-                      (db.now(), eid))
-
-
     with db.tx() as c:
         letzte = c.execute(
             "SELECT MAX(version) AS v FROM lern_erstkontakt WHERE konzept_id=?",

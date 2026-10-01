@@ -51,6 +51,32 @@ def pruefe_huelle(antwort: dict, fach: str | None) -> None:
         raise VertragVerletzt("Format oder Inhaltsversion fehlt.")
 
 
+def voraussetzungen(antwort: dict) -> list[dict]:
+    """Die Voraussetzungen aus der Lieferung — geprueft, nie geraten.
+
+    Der Dienst fuehrt Voraussetzungsketten seit jeher; der Abnehmer konnte
+    sie nicht sehen. Ohne sie bleibt bei einem Kind, das haengt, nur die
+    Eskalation — auch wenn in Wahrheit nur eine Voraussetzung fehlt.
+
+    Fehlt das Feld, ist die Antwort aelter als Vertrag 1.4. Das ist kein
+    Fehler: dann gibt es eben keine Voraussetzungen, und Karo verhaelt sich
+    wie vorher.
+    """
+    roh = antwort.get("prerequisites")
+    if not isinstance(roh, list):
+        return []
+    sauber = []
+    for eintrag in roh[:20]:
+        if not isinstance(eintrag, dict):
+            continue
+        kid = str(eintrag.get("concept_id") or "").strip()[:120]
+        if not kid:
+            continue
+        sauber.append({"concept_id": kid,
+                       "title": str(eintrag.get("title") or "").strip()[:200]})
+    return sauber
+
+
 def pruefe_einordnung(antwort: dict) -> tuple[int, int]:
     """Die Klasseneinordnung der Huelle. Gibt (von, bis) zurueck.
 
