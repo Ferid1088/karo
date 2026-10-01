@@ -29,9 +29,9 @@
     <p>Deine {{ e.topics|length }} Prüfungsthemen stehen. Karo fragt dich jetzt zu jedem
     Thema zwei Aufgaben — daraus weiß es, wie lange du wofür brauchst.
     {% if e.einstufung.fertig %}Du hast schon {{ e.einstufung.fertig }} von {{ e.einstufung.moeglich }} geschafft.{% endif %}</p>
-    <a class="btn" href="/klassenarbeit/{{ e.id }}/einstufung">{{ 'Einstufung fortsetzen' if e.einstufung.fertig else 'Einstufung starten' }} →</a>
+    <a class="btn" href="/klassenarbeit/{{ e.id }}/einstufung">{{ 'Ersteinschätzung fortsetzen' if e.einstufung.fertig else 'Ersteinschätzung starten' }} →</a>
   {% elif e.einstufung.ohne_aufgaben and not e.einstufung.fertig %}
-    <h2>Karo bereitet deine Einstufung vor</h2>
+    <h2>Karo bereitet deine Ersteinschätzung vor</h2>
     <p>Für deine {{ e.topics|length }} Themen erstellt Karo gerade geprüfte Aufgaben{% if e.inhalte.laeuft %} ({{ e.inhalte.laeuft }} laufen){% endif %}.
     Sobald sie da sind, fragt Karo dich ab und weiß dann, wie lange du wofür brauchst.</p>
     <a class="btn" href="/klassenarbeit/{{ e.id }}/einstufung">Nachsehen →</a>

@@ -189,11 +189,11 @@ def test_mit_gesetztem_schalter_ist_der_alte_weg_unveraendert(
     assert f'action="/lernzyklus/{topic_id}/quiz/starten"' in karte
     assert 'aria-label="Starten: Brüche vergleichen"' in karte
 
-    # Die Erzeugung selbst bleibt hinter der Themenprüfung — aber sie ist
+    # Die Erzeugung selbst bleibt hinter der Ersteinschätzung — aber sie ist
     # wieder erreichbar, statt am Schalter abzuprallen.
     token = csrf_from(seite.text)
     r = client.post(f"/lernzyklus/{topic_id}/start", data={"_csrf": token})
-    assert "Bitte zuerst die Themenprüfung abschließen" in r.text
+    assert "Bitte zuerst die Ersteinschätzung abschließen" in r.text
 
     with app_env.db.tx() as c:
         c.execute("INSERT INTO quiz (topic_id, anlass, state, created_at) "

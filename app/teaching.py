@@ -511,7 +511,7 @@ def nach_freigabe(lesson_id: int, topic_id: int, *, auto_weiter: bool = True) ->
             c.execute("UPDATE lesson SET state='gelernt', finished_at=? WHERE id=?",
                       (db.now(), lesson_id))
         return {"weiter": False, "erfolg": True,
-                "grund": "Das Thema sitzt. Die Lerneinheit ist abgeschlossen."}
+                "grund": "Das Thema ist sicher. Die Lerneinheit ist abgeschlossen."}
 
     if lesson["runden"] >= lesson["max_runden"]:
         grund = (f"Nach {lesson['max_runden']} Runden hat es nicht "

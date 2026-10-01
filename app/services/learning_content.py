@@ -1,4 +1,4 @@
-"""Lerninhalte werden nach der ersten bestätigten Themenprüfung angeboten."""
+"""Lerninhalte werden nach der bestätigten Ersteinschätzung angeboten."""
 from .. import db, quizzes
 
 

@@ -22,11 +22,11 @@ def test_content_creation_moves_to_child_topic_after_first_check(
     kind_modus_aktivieren(client)
     token = csrf_from(client.get('/lernen').text)
     page = client.get(f'/lernzyklus/{topic_id}')
-    assert 'Erste Prüfung starten' in page.text
+    assert 'Ersteinschätzung starten' in page.text
     assert action not in page.text
     assert action not in client.get('/lernen?tab=neu').text
     blocked = client.post(f'/lernzyklus/{topic_id}/start', data={'_csrf': token})
-    assert 'Bitte zuerst die Themenprüfung abschließen' in blocked.text
+    assert 'Bitte zuerst die Ersteinschätzung abschließen' in blocked.text
     assert not app_env.db.q('SELECT id FROM lesson')
     response = client.post(f'/lernzyklus/{topic_id}/quiz/starten', data={'_csrf': token})
     assert response.status_code == 200

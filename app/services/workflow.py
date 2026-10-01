@@ -146,7 +146,7 @@ def after_quiz_release(ergebnis: quizzes.FreigabeErgebnis, quiz_id: int) -> Next
 
     return NextAction(
         kind="review_cycle", url=f"/lernzyklus/{ergebnis['topic_id']}",
-        reason="Themenprüfung außerhalb einer Lernrunde")
+        reason="Ersteinschätzung außerhalb einer Lernrunde")
 
 
 @jobs.handler("quiz_released")

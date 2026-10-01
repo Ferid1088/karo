@@ -83,7 +83,7 @@ def lernzyklus_start(request: Request, topic_id: int, ausgabe: str = Form("")):
     if _aus():
         return zurueck("/lernen")
     if not learning_content.can_create(topic_id):
-        flash(request, "Bitte zuerst die Themenprüfung abschließen und die Bewertungen bestätigen.", "warn")
+        flash(request, "Bitte zuerst die Ersteinschätzung abschließen und die Bewertungen bestätigen.", "warn")
         return zurueck(f"/lernzyklus/{topic_id}")
     learning_progress.start(topic_id)
     try:

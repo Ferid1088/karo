@@ -74,7 +74,7 @@ def test_beide_richtig_ergibt_gruen_und_senkt_die_zeit(app_env):
     assert exam_placement.ergebnis(exam_id) == {thema["id"]: "gruen"}
     nachher = exam_effort.bedarf(exam_id)
     assert nachher["themen"][0]["vorwissen"] == "gruen"
-    assert nachher["themen"][0]["quelle"] == "in der Einstufung gezeigt"
+    assert nachher["themen"][0]["quelle"] == "in der Ersteinschätzung gezeigt"
     assert nachher["eingestuft"] == 1
     # Was sitzt, braucht weniger Zeit — genau darum geht es.
     assert nachher["min"] < vorher["min"]
@@ -124,7 +124,7 @@ def test_die_einstufung_schlaegt_den_namensabgleich(app_env):
                            {str(i): "nein" for i in range(len(offen["questions"]))})
     zeile = exam_effort.bedarf(exam_id)["themen"][0]
     assert zeile["vorwissen"] == "rot"
-    assert zeile["quelle"] == "in der Einstufung gezeigt"
+    assert zeile["quelle"] == "in der Ersteinschätzung gezeigt"
 
 
 def test_abgegeben_bleibt_abgegeben(app_env):

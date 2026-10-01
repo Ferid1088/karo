@@ -15,7 +15,7 @@ router = APIRouter(prefix="/lernen/adaptiv", tags=["adaptiv"])
 exam_router = APIRouter(prefix="/klassenarbeit/{exam_id}/lernen", tags=["exam-learning"])
 eltern_router = APIRouter(prefix="/eltern/lernfortschritt", tags=["adaptiv"])
 STAND_LABELS = {"offen": "noch offen", "im_aufbau": "im Aufbau",
-                "sicher": "sitzt", "braucht_mensch": "braucht Begleitung"}
+                "sicher": "verstanden", "braucht_mensch": "braucht Begleitung"}
 
 
 def _aus() -> bool:

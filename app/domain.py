@@ -50,14 +50,14 @@ class Flag(str, Enum):
     WEISS = "weiss"      # noch nicht geprüft
     ROT = "rot"          # Verständnislücke
     GELB = "gelb"        # wackelig
-    GRUEN = "gruen"      # sitzt
+    GRUEN = "gruen"      # Thema sicher
 
 
 FLAG_LABELS = {
     Flag.WEISS.value: "noch nicht geprüft",
     Flag.ROT.value: "Lücke",
     Flag.GELB.value: "wackelig",
-    Flag.GRUEN.value: "sitzt",
+    Flag.GRUEN.value: "Thema sicher",
 }
 
 FLAG_SYMBOLS = {

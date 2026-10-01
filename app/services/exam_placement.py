@@ -13,7 +13,7 @@ Die Flagge ist bewusst vorsichtig. Eine einzelne richtige Antwort macht ein
 Thema nicht "sicher" — sie zeigt nur, dass es nicht bei null anfängt:
 
 ===========  =================================================
-beide richtig  gruen — das sitzt, kurze Wiederholung genügt
+beide richtig  gruen — Thema sicher, kurze Wiederholung genügt
 eine richtig   gelb  — im Prinzip verstanden, noch wacklig
 keine richtig  rot   — hier liegt Arbeit
 eine Aufgabe   gelb bei richtig, rot bei falsch (nie gruen)

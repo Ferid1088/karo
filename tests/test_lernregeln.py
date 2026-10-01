@@ -307,3 +307,77 @@ def test_z9_bei_gleichstand_entscheidet_die_ankuendigung(app_env, monkeypatch):
     assert sortiert == ["zuerst angekündigt", "danach angekündigt"]
 
 
+# ---------------------------------------------------------------- Z6 / Z7
+
+def _ablösung() -> str:
+    import pathlib
+    return (pathlib.Path(__file__).resolve().parents[1]
+            / "docs" / "ABLOESUNG_KLASSISCH.md").read_text(encoding="utf-8")
+
+
+def test_z6_der_klassische_weg_ist_eingefroren():
+    """Eingefroren heißt: jede Änderung ist eine Entscheidung.
+
+    Wird dieser Test rot, ist das kein Fehler im Test. Entweder gehört die
+    Änderung in den adaptiven Weg — oder sie ist eine bewusste Fehlerbehebung
+    und die neue Zahl wird in `docs/ABLOESUNG_KLASSISCH.md` eingetragen,
+    mitsamt Begründung.
+    """
+    import hashlib
+    import pathlib
+    import re
+
+    wurzel = pathlib.Path(__file__).resolve().parents[1]
+    notiert = dict(re.findall(r"\|\s*`(app/[\w/]+\.py)`\s*\|\s*`([0-9a-f]{64})`\s*\|",
+                              _ablösung()))
+
+    assert set(notiert) == {"app/teaching.py", "app/quizzes.py"}
+    for datei, summe in notiert.items():
+        ist = hashlib.sha256((wurzel / datei).read_bytes()).hexdigest()
+        assert ist == summe, f"{datei} hat sich geändert — siehe ABLOESUNG_KLASSISCH.md"
+
+
+def test_z7_jeder_maßstab_hat_sein_eigenes_wort(app_env):
+    """Drei Maßstäbe trugen „sitzt" und dieselbe Farbe. Jetzt nicht mehr."""
+    from app import domain
+    from app.routers import adaptiv
+
+    # Ein ganzes Thema, belegt über Tage.
+    assert domain.FLAG_LABELS[domain.Flag.GRUEN.value] == "Thema sicher"
+    # Eine einzelne Fehlvorstellung, adaptiv überwunden.
+    assert adaptiv.STAND_LABELS["sicher"] == "verstanden"
+    # Und keins von beiden benutzt das Wort des anderen.
+    assert "sicher" not in adaptiv.STAND_LABELS["sicher"]
+    assert "verstanden" not in domain.FLAG_LABELS.values()
+
+
+def test_z7_gruen_gehoert_nur_dem_thema(app_env):
+    """Die Farbe ist für das Thema reserviert — ein verstandener Denkfehler
+    ist ein Schritt dorthin, nicht das Ziel."""
+    from app.routers import adaptiv
+
+    for wort in adaptiv.STAND_LABELS.values():
+        assert "grün" not in wort.lower() and "gruen" not in wort.lower(), wort
+
+
+def test_z7_die_abgeloesten_woerter_stehen_nirgends_mehr(app_env):
+    """Dieselbe Sache zweimal benannt ist schlimmer als unbenannt."""
+    import pathlib
+
+    wurzel = pathlib.Path(__file__).resolve().parents[1] / "app"
+    treffer = []
+    for pfad in list(wurzel.rglob("*.py")) + list(wurzel.rglob("*.html")):
+        text = pfad.read_text(encoding="utf-8")
+        for altes_wort in ("Themenprüfung", "Erste Prüfung starten"):
+            if altes_wort in text:
+                treffer.append(f"{pfad.name}: {altes_wort}")
+    assert not treffer, treffer
+
+
+def test_z6_die_ablöseschritte_stehen_geschrieben():
+    """Ohne Reihenfolge wird aus „eingefroren" stilles Liegenlassen."""
+    text = _ablösung()
+    assert "Ersteinschätzung" in text and "verstanden" in text
+    assert "Thema sicher" in text
+    for datei in ("app/teaching.py", "app/quizzes.py"):
+        assert datei in text

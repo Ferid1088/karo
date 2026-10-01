@@ -15,9 +15,11 @@ denn sie messen verschieden, zählen verschieden und hören verschieden auf:
 | Fortschritt | `lern_fortschritt` je Konzept/Fehlertyp | `topic_flag` je Thema |
 | Abbruch | nach 3 erfolglosen Runden → `ESCALATED` | nach `max_lernrunden` → `abgebrochen` |
 | Modellaufrufe im Ablauf | **keine** | Fragen schreiben, Material erzeugen |
+| Stand seit Schritt 4 | **der Lernweg** | eingefroren, siehe `ABLOESUNG_KLASSISCH.md` |
 
-Der adaptive Weg ist der neuere und der engere. Der klassische trägt heute
-noch den Alltag. Beide enden bei einem Menschen, wenn es nicht reicht.
+Der adaptive Weg ist der neuere und der engere. Der klassische trägt noch
+den Alltag, wächst aber nicht mehr. Beide enden bei einem Menschen, wenn es
+nicht reicht.
 
 ---
 
@@ -38,9 +40,11 @@ Sinnwörter, höchstens drei. Kein Treffer → **kein Vorschlag**, und das wird
 gesagt. Für Blatt-Text macht `blatt_text.vorschlaege()` dasselbe gegen den
 Themenkatalog, gewichtet nach Anteil des getroffenen Themas.
 
-**Was es nicht gibt:** eine Rangfolge nach Voraussetzungen. Der Docstring in
-`lektionen.empfehlungen()` sagt das selbst: „eine echte Voraussetzungskette
-gehört in den Katalog und nicht in eine Heuristik".
+**Was es nicht gibt:** eine Rangfolge der *Vorschläge* nach Voraussetzungen.
+Der Docstring in `lektionen.empfehlungen()` sagt das selbst: „eine echte
+Voraussetzungskette gehört in den Katalog und nicht in eine Heuristik". Die
+Kette gibt es inzwischen (Z3) — sie wirkt aber erst im Lernplan (3) und vor
+der Eskalation, nicht beim Erkennen des Themas.
 
 **Ausgang:** ein `konzept_id` (adaptiv) oder ein `topic` (klassisch) — oder
 die ehrliche Auskunft, dass es dazu nichts gibt.
@@ -125,14 +129,24 @@ wie „Lücke", aber teurer als „wackelig". Dazu ein stiller Zuschlag von 20 %
 (`ZUSCHLAG = 1.2`), gerundet auf 5 Minuten (`STUFE`).
 
 Verteilt wird der Reihe nach (`exam_effort.verteilung()`): sichere Themen
-fallen raus, der Rest wird in der angekündigten Reihenfolge auf die gewählten
-Tage gelegt, ein Thema darf über mehrere Tage laufen. Reicht die Zeit nicht,
+fallen raus, der Rest wird in der **Lernreihenfolge** auf die gewählten Tage
+gelegt, ein Thema darf über mehrere Tage laufen. Reicht die Zeit nicht,
 bleibt der Rest **unverteilt und sichtbar** — der Kalender sagt es, statt
 heimlich zu kürzen.
 
-**Was nicht passiert:** keine Umsortierung nach Schwierigkeit, keine
-Wiederholung mit Abstand, keine Rücksicht auf Voraussetzungen. Die
-angekündigte Reihenfolge gewinnt.
+**Die Lernreihenfolge** (`exam_effort._lernreihenfolge()`, Z9), in dieser
+Rangfolge:
+
+1. ist ein Thema **Voraussetzung** eines anderen Themas derselben Arbeit,
+   kommt es zuerst (aus `lern_voraussetzung`, also aus dem Katalog)
+2. dann die Flagge: rot vor weiß vor gelb vor grün
+3. bei Gleichstand die angekündigte Reihenfolge
+
+„Probe durchführen" wandert damit hinter „Gleichungen lösen", auch wenn die
+Lehrkraft es andersherum aufgeschrieben hat.
+
+**Was weiter nicht passiert:** keine Umsortierung nach Schwierigkeit, keine
+Wiederholung mit Abstand (Z4, vertagt).
 
 **Ausgang:** `exam_schedule_day` mit Minuten je Tag und Thema.
 
@@ -242,13 +256,20 @@ Danach zurück an die Stelle, an der es hakte: war es die selbstständige
 Aufgabe, geht es dorthin zurück, sonst zur geführten
 (`weiter_nach_adaptation`, gemerkt in `war_selbststaendig`).
 
-**Was es nicht gibt:** einen Rücksprung zu einer Voraussetzung.
+**Rücksprung zu einer Voraussetzung:** nicht hier, sondern eine Stufe
+später — erst wenn die Runden aufgebraucht sind (siehe Eskalation).
 
 #### Abschluss, Beherrschung, Eskalation
 
 - **Beherrschung** (`sitzung.beherrscht`): `adaptiv_mastery_treffer`, Standard
   **2**, Minimum 2 — „eine richtige Antwort ist nie Beherrschung". Erst dann
   `MASTERED` und `mastery='sicher'`.
+- **Voraussetzung zuerst** (`adaptiv/voraussetzung.py`, Z3): bevor
+  eskaliert wird, prüft Karo mit zwei geprüften Aufgaben, ob die
+  Voraussetzungen des Konzepts sitzen. Sitzt eine nicht, wird sie gelernt und
+  das Kind kommt danach zurück — es wird **nicht** eskaliert. Sitzt sie, oder
+  fehlt sie in der Bibliothek, geht es wie bisher weiter, und das Protokoll
+  sagt, was davon zutraf.
 - **Eskalation** (`sitzung.eskalieren`): nach `adaptiv_max_lehrrunden`,
   Standard **3**, erfolglosen Runden. Jede erfolglose Runde läuft zwingend
   durch `runde_gescheitert()`, und die eskaliert selbst — es gibt keinen Weg
@@ -305,9 +326,9 @@ geht es nicht; danach greift die Rundengrenze.
 
 | Weg | Abschluss | Was gespeichert wird |
 |---|---|---|
-| adaptiv | `MASTERED` | `lern_fortschritt.mastery='sicher'` je Konzept+Fehlertyp |
+| adaptiv | `MASTERED` („verstanden") | `lern_fortschritt.mastery='sicher'` je Konzept+Fehlertyp |
 | adaptiv | `ESCALATED` | `braucht_mensch=1`, erscheint im Elternbereich |
-| klassisch | `gelernt` | `lesson.finished_at`, Flagge grün |
+| klassisch | `gelernt` | `lesson.finished_at`, Flagge grün („Thema sicher") |
 | klassisch | `abgebrochen` | `abbruch_grund`, für Menschen lesbar |
 
 **Lernzeit** wird unabhängig davon gemessen (`services/learning_time.py`):
@@ -317,79 +338,81 @@ Nur für die Kindrolle.
 
 ---
 
-## Zur Entscheidung
+## Entschieden (Schritt 4)
 
-Hier laufen Code und Absicht auseinander, oder eine Regel fehlt. **Nichts
-davon habe ich angefasst.** Die Nummern sind zum Draufzeigen.
+Die Nummern bleiben, damit man weiter draufzeigen kann. Was unter
+**Entschieden** steht, steht jetzt auch im Code; wo eine Entscheidung
+vertagt wurde, steht das Datum des nächsten Schritts.
 
-### Z1 — Es gibt keinen Mastery-Wert pro Kind und Konzept
-Schritt 4 setzt einen Elo-artigen Wert voraus („Kind gegen Aufgabe,
-deterministisch, erklärbar"). Den gibt es nicht. Heute: ein Zähler
-(`erfolge`) gegen eine feste Schwelle (2) im adaptiven Weg, eine
-Fensterregel über Antworten im klassischen. Beide kennen keine
-Aufgabenschwierigkeit. **Entscheidung:** Elo einführen — oder die
-Zählregeln als ausreichend erklären und Schritt 4 entsprechend kürzen?
+### Z1 — Kein Mastery-Wert pro Kind und Konzept
+Elo-artige Werte brauchen Aufgabenschwierigkeiten, die niemand belegt hat.
+**Entschieden:** kein Elo. Die Zählregel bleibt — zwei richtige Antworten,
+davon eine Übertragung (`mastery_treffer`). Sie ist erklärbar, und das ist
+hier mehr wert als Feinauflösung.
 
 ### Z2 — „Schneller" gibt es nicht
-Die Phasenfolge HOOK → RULE → WORKED_EXAMPLE → GUIDED_TASK ist fest. Ein
-Kind, das die Diagnose sofort zweimal richtig löst, ist `MASTERED` und
-überspringt damit alles — aber es gibt kein „überspringt die Erklärung,
-bekommt schwerere Aufgaben". Schwierigkeitsstufen bei Aufgaben existieren
-nicht. **Entscheidung:** Überspringen einzelner Phasen, oder reicht der
-Sprung von der Diagnose direkt zu `MASTERED`?
+**Entschieden:** der Sprung von der Ersteinschätzung direkt zu *verstanden*
+reicht. Wer zweimal richtig antwortet, sieht die Erklärung nie. Einzelne
+Phasen zu überspringen hieße, Schwierigkeitsstufen zu erfinden, die der
+Katalog nicht führt.
 
-### Z3 — Es gibt keine Voraussetzungen in Karo
-Weder der adaptive noch der klassische Weg kann „zurück zur Voraussetzung".
-Der Lehrplan-Dienst führt Voraussetzungsketten (`concept_prerequisites`),
-Karo nutzt sie nicht. `lektionen.empfehlungen()` sagt im Docstring selbst,
-dass das fehlt. **Entscheidung:** Voraussetzungen vom Dienst mitimportieren
-und bei wiederholtem Scheitern dorthin zurückspringen — oder weiterhin
-eskalieren und einen Menschen holen?
+### Z3 — Voraussetzungen
+**Entschieden:** mitimportieren und zurückspringen. Der Dienst liefert
+`prerequisites` mit jeder Lektion (Vertrag 1.4), Karo legt sie in
+`lern_voraussetzung` ab. Bevor eskaliert wird, prüft `adaptiv/voraussetzung.py`
+mit zwei geprüften Aufgaben, ob die Voraussetzung sitzt:
 
-### Z4 — Es gibt keine Wiederholung mit Abstand
-Nach `MASTERED` oder `gelernt` passiert nichts mehr. Kein Termin, keine
-Auffrischung, keine Vergessenskurve. Die Flagge bleibt grün, bis zufällig
-wieder geübt wird. **Entscheidung:** Wiederholungstermine einführen (wo?
-eigene Tabelle, oder über den Kalender der Klassenarbeit) — oder bewusst
-darauf verzichten?
+* sitzt sie nicht → erst sie lernen, dann zurück zum Thema
+* sitzt sie → eskalieren wie bisher, es lag nicht daran
+* ist sie nicht in der Bibliothek → eskalieren, und das Protokoll sagt warum
 
-### Z5 — Antwortzeit wird nirgends gemessen
-Schritt 4 nennt „Antwortzeit nur schwach gewichten". Gewichtet wird sie
-gar nicht; gemessen wird nur Gesamtlernzeit je Tag, nicht je Aufgabe.
-**Entscheidung:** Zeit je Antwort erfassen — oder streichen?
+**Zuständig:** `adaptiv/voraussetzung.py`, `sitzung.eskalieren`,
+`unterricht.bildschirm/voraussetzung_beantwortet`.
 
-### Z6 — Zwei Fortschrittsbegriffe nebeneinander
-`lern_fortschritt` (Konzept+Fehlertyp, adaptiv) und `topic_flag` (Thema,
-klassisch) wissen nichts voneinander. Ein Kind kann im adaptiven Weg eine
-Fehlvorstellung sicher beherrschen, während das Thema klassisch rot bleibt —
-und umgekehrt. Die Einstufung vor der Klassenarbeit (2a) ist eine **dritte**
-Quelle. **Entscheidung:** zusammenführen, oder die Trennung festschreiben
-und in der Oberfläche erklären?
+### Z4 — Wiederholung mit Abstand
+**Vertagt auf Schritt 4a.** Eine Vergessenskurve ohne Termine ist eine
+Behauptung; Termine ohne Kalenderanbindung sind eine zweite Liste.
 
-### Z7 — „Grün" ist in den beiden Wegen etwas anderes
-Adaptiv: zwei richtige Antworten zu **einer Fehlvorstellung**. Klassisch:
-zwei fehlerfreie **Übungstage** und drei richtige Antworten zum **Thema**.
-Einstufung: zwei von zwei Aufgaben an **einem** Tag. Drei Maßstäbe, ein
-Wort, eine Farbe. **Entscheidung:** angleichen, oder die Unterschiede
-benennen (z. B. verschiedene Begriffe in der Oberfläche)?
+### Z5 — Antwortzeit
+**Vertagt auf Schritt 4a**, zusammen mit Z4. Gemessen wird dann je Antwort —
+oder gar nicht.
 
-### Z8 — Die Grenze „3 unbekannte Antworten" steht im Code
-`unterricht.diagnose_beantwortet` eskaliert nach drei nicht im Katalog
-gefundenen Antworten. Diese 3 ist die einzige Schwelle des adaptiven Wegs,
-die **nicht** konfigurierbar ist (`max_runden` und `mastery_treffer` sind
-es). **Entscheidung:** in die Konfiguration, oder absichtlich fest?
+### Z6 — Zwei Fortschrittsbegriffe
+**Entschieden:** Trennung festschreiben, nicht zusammenführen. Aus zwei
+verschieden gemessenen Zahlen eine zu rechnen ergäbe eine dritte, die keine
+von beiden ist. Stattdessen ist der klassische Weg **eingefroren**: er läuft
+weiter, wächst aber nicht mehr. Welche Dateien das betrifft, was noch fehlt
+und in welcher Reihenfolge abgelöst wird, steht in
+`docs/ABLOESUNG_KLASSISCH.md`; der Stand der beiden Dateien ist dort als
+Prüfsumme festgehalten und wird getestet.
 
-### Z9 — Der Lernplan kennt die Reihenfolge der Themen nicht
-`exam_effort.verteilung()` legt die Themen in der angekündigten Reihenfolge
-auf die Tage. Steht „Probe durchführen" vor „Gleichungen lösen", wird in
-dieser Reihenfolge gelernt. Der Kommentar in `exam_effort.py` erwähnt
-Voraussetzungen, die Verteilung berücksichtigt sie nicht. **Entscheidung:**
-nach Flagge sortieren (rot zuerst), nach Voraussetzungen, oder bei der
-angekündigten Reihenfolge bleiben?
+### Z7 — „Grün" war dreimal etwas anderes
+**Entschieden:** verschiedene Begriffe, eine Farbe:
 
-### Z10 — Eine Erklärung wird gemessen, aber nichts folgt daraus
-`store.erklaerung_wirkte()` zählt, wenn nach einer Erklärung richtig
-geantwortet wurde. Diese Zahl wird nirgends gelesen: eine Erklärung, die
-nie wirkt, wird weiter ausgeliefert. **Entscheidung:** auswerten (schlechte
-Erklärungen ersetzen lassen) — oder die Zählung entfernen, statt eine
-Messung zu führen, die folgenlos bleibt?
+| gemeint ist | Wort | Farbe |
+|---|---|---|
+| die erste Abfrage, bevor gelernt wird | **Ersteinschätzung** | — |
+| eine Fehlvorstellung ist überwunden (`MASTERED`) | **verstanden** | — |
+| ein Thema ist belegt sicher (`topic_flag = gruen`) | **Thema sicher** | grün |
+
+Grün gibt es nur für die letzte Zeile.
+
+### Z8 — Die Grenze „3 unbekannte Antworten"
+**Entschieden:** in die Einstellungen (`adaptiv_unbekannte_antworten`,
+Vorgabe 3, mindestens 1). Eine Familie mit einem Kind, das gern ausführlich
+antwortet, soll das verstellen können, ohne den Code anzufassen.
+
+### Z9 — Reihenfolge im Lernplan
+**Entschieden:** erst Voraussetzungen, dann rot vor weiß vor gelb vor grün;
+die angekündigte Reihenfolge entscheidet nur noch bei Gleichstand.
+`exam_effort._lernreihenfolge()`. „Probe durchführen" kommt damit nach
+„Gleichungen lösen", auch wenn die Lehrkraft es andersherum aufgeschrieben hat.
+
+### Z10 — Wirkung einer Erklärung
+**Entschieden:** auswerten. Ab `adaptiv_wirkung_ab` Einsätzen (Vorgabe 10)
+bevorzugt `store.beste_erklaerung()` die wirksamere; unter
+`adaptiv_wirkung_schwelle` (Vorgabe 30 %) meldet
+`curriculum_dienst.wirkung_melden()` sie dem Lehrplan-Dienst zur Überarbeitung.
+Gemeldet werden **Konzept, Erklärungs-ID und zwei Zahlen** — kein Kinddatum,
+kein Text einer Antwort. Jede Erklärung wird nur einmal gemeldet
+(`lern_erklaerung_gemeldet`).

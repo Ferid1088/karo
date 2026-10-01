@@ -14,7 +14,7 @@
 {{ csrf_input() }}<p>Nimm dir Zeit. Du musst noch nicht alles wissen.</p>
 {% if topic.can_create_content %}<input type="hidden" name="erneut" value="ja">{% endif %}
 <details class="options"><summary>Lieber auf Papier?</summary><label for="modus">Antworten</label><select id="modus" name="modus"><option value="bildschirm">Am Bildschirm</option><option value="papier">Auf Papier zum Ausdrucken</option></select></details>
-<button type="submit">{{ 'Erste Prüfung starten' if not topic.can_create_content else 'Noch einmal prüfen' }}</button>
+<button type="submit">{{ 'Ersteinschätzung starten' if not topic.can_create_content else 'Noch einmal prüfen' }}</button>
 </form>
 </section>
 {% if not topic.can_create_content %}<section class="card">{% with content_topic=topic %}{% include "lerninhalte_form.html" %}{% endwith %}</section>{% endif %}

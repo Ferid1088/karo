@@ -313,7 +313,7 @@ def test_exam_upload_to_confirmed_exam_stays_separate(client, fake_llm, fake_cli
     response = client.post('/klassenarbeit', data={'_csrf': token,
         'exam_date': '2026-10-15', 'themen': 'Brüche addieren', 'fach': 'mathematik'})
     # Nach dem Eintragen der Themen fragt Karo zuerst ab, was schon sitzt.
-    assert 'Einstufung' in response.text
+    assert 'Ersteinschätzung' in response.text
     eid = app_env.db.q1('SELECT id FROM exam ORDER BY id DESC LIMIT 1')['id']
     assert learning_hub.exam_topics(eid)[0]['id'] != personal
     assert [t['id'] for t in learning_hub.personal_topics()] == [personal]

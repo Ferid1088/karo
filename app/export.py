@@ -46,7 +46,7 @@ STATUS_EMOJI = {
     Flag.WEISS.value: "⚪",
 }
 STATUS_LABEL = {
-    Flag.GRUEN.value: "sicher (mehrfach unabhängig richtig gemacht)",
+    Flag.GRUEN.value: "Thema sicher (mehrfach unabhängig richtig gemacht)",
     Flag.GELB.value: "relativ sicher",
     Flag.ROT.value: "unsicher",
     Flag.WEISS.value: "noch nicht genug Beweise",
@@ -62,7 +62,7 @@ NAECHSTER_SCHRITT = {
 def _bedeutung(flag: str) -> str:
     """Was die Flagge fuer die Lernbegleitung heisst — in einem Satz."""
     return {
-        Flag.GRUEN.value: "sitzt — nur noch kurz wiederholen",
+        Flag.GRUEN.value: "Thema sicher — nur noch kurz wiederholen",
         Flag.GELB.value: "wackelig — weiter üben",
         Flag.ROT.value: "Verständnislücke — erklären lassen",
         Flag.WEISS.value: "noch nicht geprüft",
@@ -204,7 +204,7 @@ def schreiben() -> str | None:
         ["Wie die Flaggen entstehen:"],
         ["  Lücke (rot)      2× derselbe Verständnisfehler in den letzten 5 Antworten"],
         ["  wackelig (gelb)  gemischtes Bild — der Normalzustand beim Lernen"],
-        ["  sitzt (grün)     die letzten 2 Übungstage fehlerfrei, mind. 3× richtig"],
+        ["  Thema sicher (grün)  die letzten 2 Übungstage fehlerfrei, mind. 3× richtig"],
         ["  noch nicht geprüft (weiß)  weniger als 2 verwertbare Antworten"],
         [],
         ["Ein Rechenfehler oder eine Flüchtigkeit löst nie eine Lücke aus —"],
