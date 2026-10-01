@@ -126,6 +126,10 @@ class Config:
     # (A5: endliche Wiederholungen, A8: Beherrschung wird verdient).
     adaptiv_max_lehrrunden: int = 3
     adaptiv_mastery_treffer: int = 2
+    #: Wie oft eine Antwort unerkannt bleiben darf, bevor ein Mensch ran muss.
+    #: Stand als 3 im Code — die einzige Schwelle des adaptiven Wegs, an der
+    #: eine Familie nichts drehen konnte.
+    adaptiv_unbekannte_antworten: int = 3
     adaptiv_aehnlichkeit_schwelle: float = 0.82
 
     setup_complete: bool = False

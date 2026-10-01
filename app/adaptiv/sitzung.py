@@ -76,6 +76,15 @@ def mastery_treffer(cfg=None) -> int:
     return max(2, int(getattr(_cfg(cfg), "adaptiv_mastery_treffer", 2)))
 
 
+def unbekannte_antworten(cfg=None) -> int:
+    """Wie oft eine Antwort unerkannt bleiben darf (Z8).
+
+    Stand als 3 im Code. Jede andere Schwelle des adaptiven Wegs war
+    einstellbar, diese nicht — ohne Grund.
+    """
+    return max(1, int(getattr(_cfg(cfg), "adaptiv_unbekannte_antworten", 3)))
+
+
 def beherrscht(erfolge: int, cfg=None) -> bool:
     return erfolge >= mastery_treffer(cfg)
 

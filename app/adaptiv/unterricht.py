@@ -250,7 +250,7 @@ def diagnose_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
         store.ereignis_schreiben(sitzung["id"], "Fehler nicht im Katalog",
                                  nutzdaten={"antwort": antwort})
         attempts = int(daten.get('unbekannte_antworten', 0)) + 1
-        if attempts >= 3:
+        if attempts >= zustand.unbekannte_antworten(cfg):
             return zustand.eskalieren(sitzung['id'])
         return _merke(sitzung["id"], sitzung,
                       unbekannte_antworten=attempts,
