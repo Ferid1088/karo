@@ -550,3 +550,9 @@ Läuft Karo voraus, ist das nicht schlimm: es merkt den Unterschied an
 `GET /v1/meta`, stellt seine Aufträge zurück und sagt es im Elternbereich.
 Was es nie tut, ist ablehnen — eine Ablehnung zählt beim Dienst gegen das
 Thema.
+
+> **Ein Tag wird nie verschoben.** Wer ihn bewegt, ändert, was ein bereits
+> gebautes Image installiert hat — und Docker merkt es nicht: die pip-Ebene
+> hängt am Text der `requirements.txt`, nicht am Inhalt des Tags. Der Dienst
+> lief danach weiter mit dem alten Paket, meldete aber die neue Fassung.
+> Jede Änderung am Vertrag bekommt eine neue Nummer und einen neuen Tag.
