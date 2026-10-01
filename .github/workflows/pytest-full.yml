@@ -27,6 +27,12 @@ jobs:
       # uebersprungen — ein uebersprungener Geraetetest ist kein Geraetetest.
       - name: Browser-Engines
         run: python -m playwright install --with-deps chromium firefox webkit
+      # Der Rauchtest fuer den Server-Rueckfall liest drei selbst erzeugte
+      # Dateien. Ohne tesseract wurde er uebersprungen — und ein
+      # uebersprungener Rauchtest hat noch nie Rauch gemeldet.
+      - name: Lesehilfe fuer den Server-Rueckfall
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends
+             tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng
       - name: Run full pytest suite
         env:
           PYTHONPATH: .
