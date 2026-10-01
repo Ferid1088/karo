@@ -62,7 +62,7 @@ def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
     ctx = _context(request)
     entry = store.eingabe(sitzung["eingabe_id"]) or {}
     concept = store.konzept(sitzung["konzept_id"]) or {}
-    warning = _grade_gate(request, concept, entry.get('thema_text', ''), entry.get('topic_id'))
+    warning = _grade_gate(request, concept, entry.get('thema_text') or '', entry.get('topic_id'))
     if warning is not None:
         return warning
     request.session["learning_session:" + ctx["learning_base"]] = sitzung["id"]
@@ -262,7 +262,7 @@ def neu(request: Request):
         return _zeige(request, active)
     entry = store.eingabe(active["eingabe_id"]) or {}
     warning = _grade_gate(request, store.konzept(active['konzept_id']),
-                          entry.get('thema_text', ''), entry.get('topic_id'))
+                          entry.get('thema_text') or '', entry.get('topic_id'))
     if warning is not None:
         return warning
     return _zeige(request, unterricht.starte(active["konzept_id"],
@@ -290,7 +290,7 @@ def _answer(request: Request, action: str, answer="", kennung=""):
         return zurueck(_context(request)["learning_base"])
     entry = store.eingabe(active['eingabe_id']) or {}
     warning = _grade_gate(request, store.konzept(active['konzept_id']),
-                          entry.get('thema_text', ''), entry.get('topic_id'))
+                          entry.get('thema_text') or '', entry.get('topic_id'))
     if warning is not None:
         return warning
     screen = unterricht.bildschirm(active)

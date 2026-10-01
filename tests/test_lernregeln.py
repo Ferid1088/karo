@@ -440,6 +440,40 @@ def test_z3_der_umweg_verdoppelt_sich_nicht(
         "SELECT COUNT(*) AS n FROM lern_sitzung WHERE konzept_id=?", vid)["n"] == anzahl
 
 
+def test_z3_ein_laufender_umweg_bekommt_seinen_rueckweg(
+        client, fake_llm, fake_cli, app_env):
+    """Liegt schon eine offene Sitzung auf dem Voraussetzungskonzept, wird sie
+    weitergefuehrt statt verdoppelt — aber MIT Rueckweg-Marker. Ohne ihn
+    landete der Umweg bei MASTERED auf der Terminwahl und die wartende
+    Sitzung fand nie mehr zurueck."""
+    import json
+    from app.adaptiv import sitzung as zustand, store, unterricht
+    token, vid, s = _sitzung_mit_offener_voraussetzung(client, fake_llm, app_env)
+    # Eine liegengebliebene, offene Sitzung auf dem Voraussetzungskonzept.
+    alt = unterricht.starte(vid)
+
+    client.post("/lernen/adaptiv/voraussetzung",
+                data={"_csrf": token, "antwort": ["falsch", "falsch"]})
+    client.post("/lernen/adaptiv/voraussetzung/lernen", data={"_csrf": token})
+
+    alt_nach = app_env.db.q1("SELECT * FROM lern_sitzung WHERE id=?", alt["id"])
+    assert json.loads(alt_nach["daten"])["voraussetzung_detour"] == s["id"]
+    assert app_env.db.q1(
+        "SELECT COUNT(*) AS n FROM lern_sitzung WHERE konzept_id=?", vid)["n"] == 1
+
+    zustand.wechsle(alt["id"], zustand.MASTERED, "test")
+    for f in store.fehlertypen(vid):
+        store.fortschritt_buchen(vid, f["id"], mastery="sicher")
+
+    seite = client.get("/lernen/adaptiv")
+    assert "zurück zu" in seite.text                 # voraussetzung_geschafft
+    seite = client.post("/lernen/adaptiv/voraussetzung/weiter",
+                        data={"_csrf": token})
+    alt2 = app_env.db.q1("SELECT daten FROM lern_sitzung WHERE id=?", s["id"])
+    assert not json.loads(alt2["daten"]).get("voraussetzung_offen")
+    assert 'name="antwort"' in seite.text           # kein Dead End
+
+
 def test_z3_ende_zu_ende_vom_scheitern_ueber_den_umweg_zurueck(
         client, fake_llm, fake_cli, app_env):
     """Lernen → dreimal gescheitert → Grundlage pruefen → lernen → weiter."""

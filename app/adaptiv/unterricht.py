@@ -666,7 +666,10 @@ def voraussetzung_lernen_starten(sitzung: dict) -> dict:
     eintrag = store.eingabe(sitzung.get("eingabe_id")) or {}
     letzte = store.letzte_fuer_thema(eintrag.get("topic_id"), int(lokal))
     if letzte and letzte["zustand"] not in zustand.ENDZUSTAENDE:
-        return letzte                                   # laeuft bereits
+        # Auch ein weitergefuehrter Umweg braucht den Rueckweg-Marker —
+        # sonst landet er bei MASTERED auf der Terminwahl und die wartende
+        # Sitzung findet nie mehr den Weg zurueck.
+        return _merke(letzte["id"], letzte, voraussetzung_detour=sitzung["id"])
     if letzte and letzte["zustand"] == zustand.ESCALATED:
         # Trug auch die Grundlage nicht, hilft ein Mensch. Erst die
         # Merker loeschen — eskaliert darf nicht noch offen wirken.
