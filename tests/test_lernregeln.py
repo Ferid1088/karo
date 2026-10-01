@@ -257,3 +257,53 @@ def test_z3_ohne_importierte_voraussetzung_wird_eskaliert(app_env):
     assert any("Voraussetzung fehlt in der Bibliothek" in e["anlass"] for e in ereignisse)
 
 
+# ---------------------------------------------------------------- Z9
+
+def test_z9_rot_kommt_vor_gelb(app_env, monkeypatch):
+    """Ein rotes Thema wartete hinter einem gelben, nur weil es weiter unten stand."""
+    from app.services import exam_effort
+    app_env.db.init()
+    zeilen = [
+        {"topic_id": 1, "label": "gelbes Thema", "vorwissen": "gelb"},
+        {"topic_id": 2, "label": "rotes Thema", "vorwissen": "rot"},
+        {"topic_id": 3, "label": "sicheres Thema", "vorwissen": "gruen"},
+        {"topic_id": 4, "label": "neues Thema", "vorwissen": "weiss"},
+    ]
+    monkeypatch.setattr(exam_effort, "_konzept_schluessel", lambda t: [])
+    monkeypatch.setattr(exam_effort, "_konzept_ids", lambda t: [])
+    sortiert = [z["label"] for z in exam_effort._lernreihenfolge(zeilen)]
+    assert sortiert == ["rotes Thema", "neues Thema", "gelbes Thema", "sicheres Thema"]
+
+
+def test_z9_die_voraussetzung_kommt_vor_allem_anderen(app_env, monkeypatch):
+    """„Probe durchführen" setzt „Gleichungen lösen" voraus — nicht umgekehrt."""
+    from app.services import exam_effort
+    app_env.db.init()
+    zeilen = [
+        {"topic_id": 1, "label": "Probe durchführen", "vorwissen": "rot"},
+        {"topic_id": 2, "label": "Gleichungen lösen", "vorwissen": "gelb"},
+    ]
+    monkeypatch.setattr(exam_effort, "_konzept_schluessel",
+                        lambda t: {1: ["MA.PROBE"], 2: ["MA.GLEICHUNG"]}[t])
+    monkeypatch.setattr(exam_effort, "_konzept_ids", lambda t: [t])
+    monkeypatch.setattr("app.adaptiv.store.voraussetzungen",
+                        lambda kid: [{"voraussetzung": "MA.GLEICHUNG"}] if kid == 1 else [])
+    sortiert = [z["label"] for z in exam_effort._lernreihenfolge(zeilen)]
+    # Obwohl „Probe" rot ist und zuerst angekündigt wurde.
+    assert sortiert == ["Gleichungen lösen", "Probe durchführen"]
+
+
+def test_z9_bei_gleichstand_entscheidet_die_ankuendigung(app_env, monkeypatch):
+    """Die Liste bleibt die Liste — sie ist nur nicht mehr das erste Wort."""
+    from app.services import exam_effort
+    app_env.db.init()
+    zeilen = [
+        {"topic_id": 1, "label": "zuerst angekündigt", "vorwissen": "rot"},
+        {"topic_id": 2, "label": "danach angekündigt", "vorwissen": "rot"},
+    ]
+    monkeypatch.setattr(exam_effort, "_konzept_schluessel", lambda t: [])
+    monkeypatch.setattr(exam_effort, "_konzept_ids", lambda t: [])
+    sortiert = [z["label"] for z in exam_effort._lernreihenfolge(zeilen)]
+    assert sortiert == ["zuerst angekündigt", "danach angekündigt"]
+
+

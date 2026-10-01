@@ -89,7 +89,7 @@ def themen(exam_id: int) -> list[dict]:
     zeilen = []
     for t in exam_topics(exam_id):
         if t["id"] in eingestuft:
-            flagge, quelle = eingestuft[t["id"]], "in der Einstufung gezeigt"
+            flagge, quelle = eingestuft[t["id"]], "in der Ersteinschätzung gezeigt"
         elif t["learning_status"] == "sicher":
             flagge, quelle = "gruen", "in dieser Prüfung gezeigt"
         else:
@@ -110,7 +110,76 @@ def themen(exam_id: int) -> list[dict]:
             "max_roh": oben * ZUSCHLAG,
             "sicher": t["learning_status"] == "sicher",
         })
-    return zeilen
+    return _lernreihenfolge(zeilen)
+
+
+#: Z9: Was zuerst drankommt. Niedrig heisst frueher.
+_DRINGLICHKEIT = {"rot": 0, "weiss": 1, "gelb": 2, "gruen": 3}
+
+
+def _lernreihenfolge(zeilen: list[dict]) -> list[dict]:
+    """Erst Voraussetzungen, dann rot vor gelb — die Ankuendigung entscheidet zuletzt.
+
+    Vorher lag die angekuendigte Reihenfolge obenauf. Stand „Probe
+    durchfuehren" vor „Gleichungen loesen", wurde die Probe zuerst geuebt —
+    sie setzt das Loesen aber voraus. Und ein rotes Thema wartete hinter
+    einem gelben, nur weil es weiter unten auf dem Blatt stand.
+
+    Die Ankuendigung verschwindet nicht: sie entscheidet bei Gleichstand.
+    Mehr soll sie auch nicht, sie ist eine Liste und keine Didaktik.
+    """
+    from ..adaptiv import store
+
+    # Welche Themen sind Voraussetzung fuer ein anderes Thema dieser Arbeit?
+    vorher: dict[int, set[str]] = {}
+    schluessel: dict[str, int] = {}
+    for i, z in enumerate(zeilen):
+        z["_ankuendigung"] = i
+        for k in _konzept_schluessel(z["topic_id"]):
+            schluessel[k] = z["topic_id"]
+    for z in zeilen:
+        noetig = set()
+        for kid in _konzept_ids(z["topic_id"]):
+            for v in store.voraussetzungen(kid):
+                noetig.add(v["voraussetzung"])
+        vorher[z["topic_id"]] = noetig
+
+    ist_voraussetzung = {
+        z["topic_id"]: any(k in vorher[anderes]
+                           for k in _konzept_schluessel(z["topic_id"])
+                           for anderes in vorher if anderes != z["topic_id"])
+        for z in zeilen}
+
+    return sorted(zeilen, key=lambda z: (
+        0 if ist_voraussetzung.get(z["topic_id"]) else 1,
+        _DRINGLICHKEIT.get(z["vorwissen"], 9),
+        z["_ankuendigung"]))
+
+
+def _konzept_ids(topic_id: int) -> list[int]:
+    """Die Karo-Konzepte hinter einem Prüfungsthema."""
+    from .. import db
+    return [r["konzept_id"] for r in db.q(
+        """SELECT DISTINCT i.konzept_id FROM lern_eingabe e
+             JOIN lern_curriculum_import i ON i.konzept_id = e.konzept_id
+            WHERE e.topic_id = ?""", topic_id)]
+
+
+def _konzept_schluessel(topic_id: int) -> list[str]:
+    """Deren Konzeptschluessel beim Lehrplan-Dienst."""
+    from .. import db
+    import json as _json
+    schluessel = []
+    for r in db.q("""SELECT i.provenance FROM lern_eingabe e
+                       JOIN lern_curriculum_import i ON i.konzept_id = e.konzept_id
+                      WHERE e.topic_id = ?""", topic_id):
+        try:
+            kid = _json.loads(r["provenance"] or "{}").get("concept_id")
+        except (ValueError, TypeError):
+            kid = None
+        if kid:
+            schluessel.append(kid)
+    return schluessel
 
 
 def inhalte_anfordern(exam_id: int) -> int:
@@ -228,7 +297,7 @@ def bedarf(exam_id: int) -> dict:
     # gesehen, und Karo rechnet dann nur vorsichtshalber mit dem vollen
     # Aufwand. Die Oberflaeche muss diesen Unterschied sagen duerfen.
     belegt = sum(1 for z in zeilen if z["vorwissen"] != "weiss")
-    eingestuft = sum(1 for z in zeilen if z["quelle"] == "in der Einstufung gezeigt")
+    eingestuft = sum(1 for z in zeilen if z["quelle"] == "in der Ersteinschätzung gezeigt")
     return {"min": unten, "max": oben, "themen": zeilen,
             "offen": sum(1 for z in zeilen if not z["sicher"]),
             "belegt": belegt, "ohne_beleg": len(zeilen) - belegt,
