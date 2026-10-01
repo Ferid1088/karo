@@ -926,6 +926,36 @@ def _aufgabe_schema(mit_fehler: bool = False, mit_optionen: bool = False) -> dic
     eigenschaften = {
         "frage": {"type": "string"},
         "loesung": {"type": "string"},
+        # Zahlen rechnet der Code. Ein Sprachmodell ist gut darin, eine
+        # Aufgabe zu formulieren, und schlecht darin, sie zu rechnen — im
+        # Betrieb standen schoene Aufgabenstellungen neben Rechnungen, die
+        # nicht aufgingen. Mit einer Vorlage wird die Loesung gerechnet
+        # statt behauptet (karo_contract/aufgaben.py).
+        "vorlage": {
+            "type": "object",
+            "description": "Bei Rechenaufgaben STATT frage/loesung: eine "
+                           "Vorlage mit Platzhaltern. Karo würfelt die Zahlen "
+                           "und rechnet die Lösung selbst aus.",
+            "properties": {
+                "vorlage": {"type": "string",
+                            "description": "Rechenausdruck mit Platzhaltern, "
+                                           "z. B. „{a}/{b} + {c}/{d}“"},
+                "frage": {"type": "string",
+                          "description": "Der Satz drumherum, mit {aufgabe} "
+                                         "als Platz für den Ausdruck"},
+                "bedingungen": {
+                    "type": "array", "maxItems": 8, "items": {"type": "string"},
+                    "description": "Was für die Zahlen gelten muss, z. B. "
+                                   "„b != d“, „a < b“, „kgv(b,d) <= 24“. "
+                                   "Erlaubt sind + - * / % ( ) < > == != and "
+                                   "or sowie kgv, ggt, abs, min, max.",
+                },
+                "bereich": {"type": "array", "maxItems": 2,
+                            "items": {"type": "integer"},
+                            "description": "Von/bis für die Zahlen, Standard 1 bis 12"},
+            },
+            "required": ["vorlage"],
+        },
         "tipps": {"type": "array", "maxItems": 3, "items": {"type": "string"},
                   "description": "Hinweise, die zum Denken führen, nicht zur "
                                  "Lösung"},
@@ -1134,6 +1164,19 @@ So wird unterrichtet:
   Fehlvorstellung bei GENAU dieser Aufgabe ergibt. Nicht die Lösung. Daran
   erkennt Karo später dieselbe Fehlvorstellung wieder — ist das Feld falsch,
   erkennt Karo beim nächsten Kind nichts.
+- Rechenaufgaben: gib eine „vorlage" an, keine ausgerechneten Zahlen. Du
+  schreibst den Satz und die Bedingungen, Karo würfelt die Zahlen und rechnet
+  die Lösung selbst aus. Beispiel:
+
+      "vorlage": {{"vorlage": "{{a}}/{{b}} + {{c}}/{{d}}",
+                  "frage": "Rechne {{aufgabe}}.",
+                  "bedingungen": ["b != d", "a < b", "c < d", "kgv(b,d) <= 24"]}}
+
+  Die Bedingungen sind der didaktische Teil: sie entscheiden, wie schwer die
+  Aufgabe wird. Erlaubt sind + - * / % ( ) sowie < > == != and or und die
+  Funktionen kgv, ggt, abs, min, max. Füll „frage" und „loesung" trotzdem
+  lesbar aus — Karo ersetzt beides durch das Gerechnete.
+  Ohne Zahlen (Zuordnen, Begründen, Sprache) lässt du „vorlage" weg.
 - Jede Erklärung: ein Haken, der an die eigene Antwort anknüpft; eine
   Erkenntnis, die das Kind selbst zieht; eine Regel als Handlung. Kein „das
   ist falsch". Kein Lob, keine Emojis, keine Fachwörter vor dem Bild.

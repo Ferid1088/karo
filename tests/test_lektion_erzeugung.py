@@ -197,7 +197,11 @@ def test_der_auftrag_zeigt_nur_metadaten_der_komponenten(app_env):
     for k in komponenten.alle():
         assert k.id in text, k.id
         assert k.renderer not in text, f"{k.id} verrät seinen Renderer"
-    assert "<" not in text.replace("<=", "")       # kein Markup im Auftrag
+    # Kein Markup im Auftrag. Geprueft wird mit demselben Muster wie beim
+    # Inhalt — ein blankes „<" ist kein Markup, sondern ein Kleiner-als:
+    # „a < b" steht als Bedingung in der Aufgabenvorlage.
+    from karo_contract.schemas import enthaelt_markup
+    assert not enthaelt_markup(text)
 
 
 def test_der_auftrag_verlangt_alle_aufgabenrollen(app_env):

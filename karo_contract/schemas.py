@@ -32,8 +32,12 @@ AUFGABE_FELDER = ("frage", "loesung")
 
 #: Markup, Skript oder Style — nichts davon darf je in einem Inhalt stehen.
 _MARKUP = re.compile(
-    r"<\s*/?\s*[a-z!]"          # <div, </p, <svg, <!--
-    r"|&lt;\s*/?\s*[a-z]"       # maskiertes Markup
+    # Ohne Leerzeichen hinter dem Zeichen: „<div" ist ein Element, „a < b"
+    # ist ein Kleiner-als. Ein Browser liest „< div" nicht als Element —
+    # vorher tat diese Pruefung es, und damit war jede Bedingung „a < b"
+    # in einer Aufgabe oder Erklaerung verboten.
+    r"</?[a-z!]"                # <div, </p, <svg, <!--
+    r"|&lt;/?[a-z]"             # maskiertes Markup
     r"|javascript\s*:"
     r"|\bon(?:error|load|click)\s*="
     r"|@import\b|\burl\s*\(",
@@ -177,9 +181,31 @@ def _nachrechnen(text: Any, pfad: str) -> None:
             f"aufgeht: {str(text)[:80]}")
 
 
-def _aufgabe_pruefen(daten: Any, rolle: str) -> dict:
+def _vorlage_einsetzen(daten: dict, rolle: str, seed: str, fehler_key: str) -> dict:
+    """Liegt eine Vorlage bei, rechnet der Code — statt zu glauben.
+
+    Das Modell darf weiter eine Frage und eine Loesung mitschicken; sie
+    werden ersetzt. Ein Sprachmodell formuliert gut und rechnet schlecht,
+    und was gerechnet ist, kann nicht falsch behauptet sein.
+    """
+    muster = daten.get("vorlage")
+    if not isinstance(muster, dict) or not muster.get("vorlage"):
+        return daten
+    from . import aufgaben
+    try:
+        gebaut = aufgaben.bauen(muster, seed=f"{seed}:{rolle}", fehler_key=fehler_key)
+    except aufgaben.VorlageUnbrauchbar as fehler:
+        raise InhaltUngueltig(f"„{rolle}.vorlage“ ergibt keine Aufgabe: {fehler}") from None
+    ersetzt = {**daten, "frage": gebaut["frage"], "loesung": gebaut["loesung"]}
+    if gebaut.get("typischer_fehler"):
+        ersetzt["typischer_fehler"] = gebaut["typischer_fehler"]
+    return ersetzt
+
+
+def _aufgabe_pruefen(daten: Any, rolle: str, seed: str = "", fehler_key: str = "") -> dict:
     if not isinstance(daten, dict):
         raise InhaltUngueltig(f"Aufgabe „{rolle}“ fehlt.")
+    daten = _vorlage_einsetzen(daten, rolle, seed, fehler_key)
     sauber = {f: _text(daten, f, f"{rolle}.{f}") for f in AUFGABE_FELDER}
     _nachrechnen(sauber["frage"], f"{rolle}.frage")
     if rechnen.loesung_stimmt(sauber["frage"], sauber["loesung"]) is False:
@@ -215,7 +241,7 @@ def _aufgabe_pruefen(daten: Any, rolle: str) -> dict:
     return sauber
 
 
-def _fehlertyp_pruefen(daten: Any, nr: int) -> dict:
+def _fehlertyp_pruefen(daten: Any, nr: int, saat: str = "") -> dict:
     if not isinstance(daten, dict):
         raise InhaltUngueltig(f"Fehlertyp {nr} ist kein Objekt.")
     sauber = {f: _text(daten, f, f"fehlertyp[{nr}].{f}")
@@ -250,8 +276,14 @@ def _fehlertyp_pruefen(daten: Any, nr: int) -> dict:
     aufgaben = daten.get("aufgaben")
     if not isinstance(aufgaben, dict):
         raise InhaltUngueltig(f"„fehlertyp[{nr}].aufgaben“ fehlt.")
-    sauber["aufgaben"] = {rolle: _aufgabe_pruefen(aufgaben.get(rolle), rolle)
-                          for rolle in AUFGABEN_ROLLEN}
+    # Der Seed haengt am Fehlertyp, nicht am Zufall: dieselbe Lektion hat
+    # immer dieselben Zahlen. Sonst stuende in der Datenbank eine andere
+    # Aufgabe als im Lernmaterial, und ein Fehlerbericht waere nicht
+    # nachzustellen.
+    seed = f"{saat}:{sauber['key']}"
+    sauber["aufgaben"] = {
+        rolle: _aufgabe_pruefen(aufgaben.get(rolle), rolle, seed, sauber["key"])
+        for rolle in AUFGABEN_ROLLEN}
     return sauber
 
 
@@ -280,7 +312,9 @@ def pruefe_lektion(daten: Any) -> dict:
     if not isinstance(fehlertypen, list) or not fehlertypen:
         raise InhaltUngueltig("„fehlertypen“ fehlt — ein Fehlertyp ist die "
                               "Einheit des Inhalts (§2).")
-    geprueft = [_fehlertyp_pruefen(f, i) for i, f in enumerate(fehlertypen)]
+    # Die Saat kommt aus dem Konzept: dieselbe Lektion, dieselben Zahlen.
+    saat = sauber_konzept.get("konzept_key") or sauber_konzept.get("label") or ""
+    geprueft = [_fehlertyp_pruefen(f, i, saat) for i, f in enumerate(fehlertypen)]
     schluessel = [f["key"] for f in geprueft]
     doppelt = {k for k in schluessel if schluessel.count(k) > 1}
     if doppelt:
