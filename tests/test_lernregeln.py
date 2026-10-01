@@ -302,6 +302,187 @@ def test_z3_ohne_importierte_voraussetzung_wird_eskaliert(app_env):
     assert any("Voraussetzung fehlt in der Bibliothek" in e["anlass"] for e in ereignisse)
 
 
+# ------------------------------------------------- Z3 im Browser
+
+def _kind_im_browser(client, fake_llm, app_env):
+    """Eingerichtet, adaptiver Weg an, Kind-Modus — bereit zum Posten."""
+    from .conftest import csrf_from
+    from .test_app import einrichten, kind_modus_aktivieren
+    einrichten(client, fake_llm)
+    app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
+    kind_modus_aktivieren(client)
+    return csrf_from(client.get("/lernen/adaptiv").text)
+
+
+def _sitzung_mit_offener_voraussetzung(client, fake_llm, app_env):
+    """Eine laufende Sitzung, bei der die Voraussetzung offen ist (Z3)."""
+    from app.adaptiv import sitzung
+    token = _kind_im_browser(client, fake_llm, app_env)
+    ziel, vid = _konzept_mit_voraussetzung(app_env)
+    client.post("/lernen/adaptiv/start", data={"_csrf": token, "thema": "brueche"})
+    ergebnis = sitzung.eskalieren(sitzung.laufende()["id"])
+    assert dict(ergebnis["daten"] or {}).get("voraussetzung_offen")
+    return token, vid, ergebnis
+
+
+def test_z3_voraussetzung_hat_ihren_eigenen_bildschirm(
+        client, fake_llm, fake_cli, app_env):
+    """Kein Geschafft-Fallback: Grundlage und ihre Aufgaben sind sichtbar."""
+    token, vid, s = _sitzung_mit_offener_voraussetzung(client, fake_llm, app_env)
+
+    seite = client.get("/lernen/adaptiv")
+    assert "Bevor wir weitermachen" in seite.text
+    assert "Brüche erweitern" in seite.text
+    assert "1/2 = ?/4" in seite.text and "1/3 = ?/9" in seite.text
+    assert "kein Fehler" in seite.text
+    assert "Gut gemacht" not in seite.text
+    assert 'action="/lernen/adaptiv/voraussetzung' in seite.text
+
+    # Neuladen veraendert den Zustand nicht (A6).
+    seite = client.get("/lernen/adaptiv")
+    assert "1/2 = ?/4" in seite.text
+
+
+def test_z3_sitzt_sie_eskaliert_der_http_weg(
+        client, fake_llm, fake_cli, app_env):
+    """Die Grundlage sitzt — es lag nicht daran: eskalieren wie bisher."""
+    from app.adaptiv import sitzung
+    token, vid, s = _sitzung_mit_offener_voraussetzung(client, fake_llm, app_env)
+    client.get("/lernen/adaptiv")
+
+    seite = client.post("/lernen/adaptiv/voraussetzung",
+                        data={"_csrf": token, "antwort": ["2/4", "3/9"]})
+    assert "liegt nicht an dir" in seite.text
+    stand = app_env.db.q1("SELECT zustand FROM lern_sitzung WHERE id=?", s["id"])
+    assert stand["zustand"] == sitzung.ESCALATED
+
+
+def test_z3_fehlt_sie_startet_der_umweg_und_kehrt_zurueck(
+        client, fake_llm, fake_cli, app_env):
+    """Kein Dead End: falsche Diagnose → Umweg lernen → zurueck an die Stelle."""
+    import json
+    from app.adaptiv import sitzung as zustand, store
+    token, vid, s = _sitzung_mit_offener_voraussetzung(client, fake_llm, app_env)
+    client.get("/lernen/adaptiv")
+
+    seite = client.post("/lernen/adaptiv/voraussetzung",
+                        data={"_csrf": token, "antwort": ["falsch", "falsch"]})
+    # Die Bruecke zum Umweg — nicht dasselbe Formular noch einmal.
+    assert "fehlt noch ein Stück" in seite.text
+    assert 'action="/lernen/adaptiv/voraussetzung/lernen' in seite.text
+
+    seite = client.get("/lernen/adaptiv")
+    assert "fehlt noch ein Stück" in seite.text      # Neuladen bleibt stehen
+
+    seite = client.post("/lernen/adaptiv/voraussetzung/lernen",
+                        data={"_csrf": token})
+    umweg = app_env.db.q1("SELECT * FROM lern_sitzung ORDER BY id DESC LIMIT 1")
+    assert umweg["konzept_id"] == vid and umweg["zustand"] == "DIAGNOSING"
+    assert json.loads(umweg["daten"])["voraussetzung_detour"] == s["id"]
+    assert "Gut gemacht" not in seite.text           # der Umweg rendert normal
+
+    # Umweg geschafft: erst zurueck an die Stelle, an der es hakte.
+    zustand.wechsle(umweg["id"], zustand.MASTERED, "test")
+    for f in store.fehlertypen(vid):
+        store.fortschritt_buchen(vid, f["id"], mastery="sicher")
+
+    seite = client.get("/lernen/adaptiv")
+    assert "zurück zu" in seite.text                 # voraussetzung_geschafft
+
+    seite = client.post("/lernen/adaptiv/voraussetzung/weiter",
+                        data={"_csrf": token})
+    alt = app_env.db.q1("SELECT daten FROM lern_sitzung WHERE id=?", s["id"])
+    assert not json.loads(alt["daten"]).get("voraussetzung_offen")
+    # Die Sitzung laeuft weiter — die Ankerfrage wartet.
+    assert 'name="antwort"' in seite.text
+    assert "Bevor wir weitermachen" not in seite.text
+
+
+def test_z3_sitzt_sie_inzwischen_geht_es_direkt_weiter(
+        client, fake_llm, fake_cli, app_env):
+    """Ist die Grundlage anderswo sicher geworden, fragt die Bruecke nicht zweimal."""
+    import json
+    from app.adaptiv import store
+    token, vid, s = _sitzung_mit_offener_voraussetzung(client, fake_llm, app_env)
+    client.get("/lernen/adaptiv")
+
+    seite = client.post("/lernen/adaptiv/voraussetzung",
+                        data={"_csrf": token, "antwort": ["falsch", "falsch"]})
+    assert "fehlt noch ein Stück" in seite.text
+
+    for f in store.fehlertypen(vid):
+        store.fortschritt_buchen(vid, f["id"], mastery="sicher")
+
+    seite = client.get("/lernen/adaptiv")
+    assert "sitzt jetzt" in seite.text               # voraussetzung_zurueck
+    assert 'action="/lernen/adaptiv/voraussetzung/weiter' in seite.text
+
+    seite = client.post("/lernen/adaptiv/voraussetzung/weiter",
+                        data={"_csrf": token})
+    alt = app_env.db.q1("SELECT daten FROM lern_sitzung WHERE id=?", s["id"])
+    assert not json.loads(alt["daten"]).get("voraussetzung_offen")
+
+
+def test_z3_der_umweg_verdoppelt_sich_nicht(
+        client, fake_llm, fake_cli, app_env):
+    """Laeuft der Umweg schon, startet kein zweiter."""
+    token, vid, s = _sitzung_mit_offener_voraussetzung(client, fake_llm, app_env)
+    client.post("/lernen/adaptiv/voraussetzung",
+                data={"_csrf": token, "antwort": ["falsch", "falsch"]})
+
+    client.post("/lernen/adaptiv/voraussetzung/lernen", data={"_csrf": token})
+    anzahl = app_env.db.q1(
+        "SELECT COUNT(*) AS n FROM lern_sitzung WHERE konzept_id=?", vid)["n"]
+    # Auf der wartenden Sitzung direkt noch einmal „lernen" gedrueckt.
+    client.post(f"/lernen/adaptiv/voraussetzung/lernen?sitzung={s['id']}",
+                data={"_csrf": token})
+    assert app_env.db.q1(
+        "SELECT COUNT(*) AS n FROM lern_sitzung WHERE konzept_id=?", vid)["n"] == anzahl
+
+
+def test_z3_ende_zu_ende_vom_scheitern_ueber_den_umweg_zurueck(
+        client, fake_llm, fake_cli, app_env):
+    """Lernen → dreimal gescheitert → Grundlage pruefen → lernen → weiter."""
+    from app.adaptiv import sitzung as zustand, store
+    from .test_adaptiv_lektion import _bis_zur_gefuehrten_aufgabe
+
+    token = _kind_im_browser(client, fake_llm, app_env)
+    ziel, vid = _konzept_mit_voraussetzung(app_env)
+    client.post("/lernen/adaptiv/start", data={"_csrf": token, "thema": "brueche"})
+
+    _bis_zur_gefuehrten_aufgabe(client, token)
+    seite = None
+    for _ in range(3):
+        seite = client.post("/lernen/adaptiv/aufgabe",
+                            data={"_csrf": token, "antwort": "2/6"})
+        if "Bevor wir weitermachen" not in seite.text:
+            client.post("/lernen/adaptiv/weiter", data={"_csrf": token})
+    assert "Bevor wir weitermachen" in seite.text    # die Voraussetzung, ...
+    assert "Brüche erweitern" in seite.text          # ... nicht der Mensch
+    assert "liegt nicht an dir" not in seite.text
+
+    seite = client.post("/lernen/adaptiv/voraussetzung",
+                        data={"_csrf": token, "antwort": ["falsch", "falsch"]})
+    assert "fehlt noch ein Stück" in seite.text
+
+    client.post("/lernen/adaptiv/voraussetzung/lernen", data={"_csrf": token})
+    umweg = app_env.db.q1("SELECT * FROM lern_sitzung ORDER BY id DESC LIMIT 1")
+    assert umweg["konzept_id"] == vid
+
+    zustand.wechsle(umweg["id"], zustand.MASTERED, "test")
+    for f in store.fehlertypen(vid):
+        store.fortschritt_buchen(vid, f["id"], mastery="sicher")
+
+    seite = client.get("/lernen/adaptiv")
+    assert "zurück zu" in seite.text
+    seite = client.post("/lernen/adaptiv/voraussetzung/weiter",
+                        data={"_csrf": token})
+    # Zurueck da, wo es hakte — die Adaptation wartet noch auf das Kind.
+    assert "Nochmal probieren" in seite.text
+    seite = client.post("/lernen/adaptiv/weiter", data={"_csrf": token})
+    assert 'name="antwort"' in seite.text            # dieselbe Aufgabe weiter
+
+
 # ---------------------------------------------------------------- Z9
 
 def test_z9_rot_kommt_vor_gelb(app_env, monkeypatch):

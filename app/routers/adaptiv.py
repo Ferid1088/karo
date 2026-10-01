@@ -69,6 +69,8 @@ def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
     screen = unterricht.bildschirm(sitzung)
     steps = {"anker": 1, "diagnose": 1, "vorhersage": 2, "haken": 2,
              "regel": 2, "beispiel": 3, "anders": 2, "transfer": 6,
+             "voraussetzung": 5, "voraussetzung_lernen": 5,
+             "voraussetzung_zurueck": 5, "voraussetzung_geschafft": 6,
              "wiederholung_waehlen": 6, "geschafft": 6}
     step = steps.get(screen["art"], 5 if sitzung.get("phase") == "INDEPENDENT_TASK" else 4)
     return render(request, "adaptiv.html", sitzung=sitzung, schirm=screen,
@@ -267,7 +269,7 @@ def neu(request: Request):
         entry.get("thema_text", ""), entry.get("topic_id")))
 
 
-def _answer(request: Request, action: str, answer: str = ""):
+def _answer(request: Request, action: str, answer=""):
     if _aus():
         return _auswahl(request)
     active = _laufende(request)
@@ -283,6 +285,10 @@ def _answer(request: Request, action: str, answer: str = ""):
                 "vorhersage": {"vorhersage"}, "transfer": {"transfer"},
                 "aufgabe": {"aufgabe"}, "tipp": {"aufgabe"},
                 "wiederholung": {"wiederholung_waehlen"},
+                "voraussetzung": {"voraussetzung"},
+                "voraussetzung_lernen": {"voraussetzung_lernen"},
+                "voraussetzung_weiter": {"voraussetzung_zurueck",
+                                        "voraussetzung_geschafft"},
                 "weiter": {"haken", "regel", "beispiel", "anders"}}
     # Stale forms cannot skip phases or award additional successes.
     if screen["art"] not in expected[action]:
@@ -291,6 +297,12 @@ def _answer(request: Request, action: str, answer: str = ""):
         if answer not in [str(n) for n in wiederholung.ABSTAENDE]:
             return _zeige(request, active)
         result = unterricht.wiederholung_gewaehlt(active, int(answer))
+    elif action == "voraussetzung_lernen":
+        result = unterricht.voraussetzung_lernen_starten(active)
+    elif action == "voraussetzung_weiter":
+        result = (unterricht.voraussetzung_weiter_zum_thema(active)
+                  if screen["art"] == "voraussetzung_geschafft"
+                  else unterricht.zurueck_von_voraussetzung(active))
     elif action == "weiter":
         result = (unterricht.weiter_nach_adaptation(active)
                   if active["phase"] == zustand.ADAPTATION else unterricht.weiter(active))
@@ -348,6 +360,28 @@ def tipp(request: Request):
 def wiederholung_waehlen(request: Request, tage: str = Form("")):
     """Das Kind waehlt, wann es das noch einmal anschaut (Schritt 4a)."""
     return _answer(request, "wiederholung", tage)
+
+
+@router.post("/voraussetzung")
+@exam_router.post("/voraussetzung")
+def voraussetzung_antworten(request: Request,
+                            antwort: list[str] = Form(default=[])):
+    """Die kurze Diagnose zur Grundlage — jede Aufgabe eine Antwort (Z3)."""
+    return _answer(request, "voraussetzung", antwort)
+
+
+@router.post("/voraussetzung/lernen")
+@exam_router.post("/voraussetzung/lernen")
+def voraussetzung_lernen(request: Request):
+    """Die Grundlage sitzt nicht: erst sie lernen, dann zurueck (Z3)."""
+    return _answer(request, "voraussetzung_lernen")
+
+
+@router.post("/voraussetzung/weiter")
+@exam_router.post("/voraussetzung/weiter")
+def voraussetzung_weiter(request: Request):
+    """Geschaffte Grundlage: zurueck an die Stelle, an der es hakte (Z3)."""
+    return _answer(request, "voraussetzung_weiter")
 
 
 def _wiederholung_eintrag(wid: int) -> dict | None:

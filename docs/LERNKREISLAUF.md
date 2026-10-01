@@ -368,8 +368,16 @@ mit zwei geprüften Aufgaben, ob die Voraussetzung sitzt:
 * sitzt sie → eskalieren wie bisher, es lag nicht daran
 * ist sie nicht in der Bibliothek → eskalieren, und das Protokoll sagt warum
 
+Im Browser hat der Zustand ein eigenes Gesicht (`voraussetzung`): kurze,
+kindgerechte Begründung („kein Fehler, keine Strafe"), dann die zwei
+Aufgaben. Sitzt die Grundlage nicht, laeuft sie als eigene Lernrunde im
+selben Thema (`voraussetzung_detour` merkt sich die wartende Sitzung);
+danach geht es an die Stelle zurueck, an der es hakte — nicht an den
+Anfang und nicht zum Menschen.
+
 **Zuständig:** `adaptiv/voraussetzung.py`, `sitzung.eskalieren`,
-`unterricht.bildschirm/voraussetzung_beantwortet`.
+`unterricht.bildschirm/voraussetzung_beantwortet/voraussetzung_lernen_starten`,
+`zurueck_von_voraussetzung`.
 
 ### Z4 — Wiederholung mit Abstand
 **Entschieden (Schritt 4a):** mit Terminen, die das Kind selbst waehlt —

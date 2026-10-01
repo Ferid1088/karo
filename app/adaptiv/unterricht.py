@@ -149,17 +149,37 @@ def _bildschirm(sitzung: dict) -> dict:
     # bevor eskaliert wurde — weitermachen hiesse, an derselben Stelle noch
     # einmal zu scheitern.
     if daten.get("voraussetzung_offen"):
+        lokal = daten.get("voraussetzung_lokal")
+        titel = daten.get("voraussetzung_titel") or daten["voraussetzung_offen"]
+        hilfe = _hilfe(lokal or konzept_id, None)
+        if daten.get("voraussetzung_lernen"):
+            # Der Umweg laeuft oder ist geschafft. Sitzt die Grundlage, geht
+            # es an die Stelle zurueck, an der es hakte.
+            from . import voraussetzung as vor
+            sitzt = bool(lokal) and vor.sitzt(int(lokal))
+            return {"art": "voraussetzung_zurueck" if sitzt
+                    else "voraussetzung_lernen",
+                    "phase": phase, "voraussetzung": titel,
+                    "konzept_id": lokal, "hilfe": hilfe}
         return {"art": "voraussetzung", "phase": phase,
-                "voraussetzung": daten.get("voraussetzung_titel") or daten["voraussetzung_offen"],
-                "konzept_id": daten.get("voraussetzung_lokal"),
-                "aufgaben": _voraussetzungsaufgaben(daten.get("voraussetzung_lokal")),
+                "voraussetzung": titel,
+                "konzept_id": lokal,
+                "aufgaben": _voraussetzungsaufgaben(lokal),
                 "fehlerhinweis": daten.get("fehlerhinweis"),
-                "hilfe": _hilfe(konzept_id, None)}
+                "hilfe": hilfe}
 
     if zustand_name == zustand.ESCALATED:
         return {"art": "eskaliert", "hilfe": _hilfe(konzept_id, None),
                 "phase": None}
     if zustand_name == zustand.MASTERED:
+        # Z3: Ein geschaffter Umweg fuehrt erst zurueck an die Stelle, an der
+        # es hakte — den Wiederholungstermin waehlt das Kind dort.
+        if daten.get("voraussetzung_detour"):
+            ziel = store.sitzung(daten["voraussetzung_detour"]) or {}
+            konzept = store.konzept(ziel["konzept_id"]) if ziel.get("konzept_id") else None
+            return {"art": "voraussetzung_geschafft", "phase": None,
+                    "thema": (konzept or {}).get("label", ""),
+                    "hilfe": _hilfe(konzept_id, None)}
         # Schritt 4a: verstanden ist der Anfang, nicht das Ende. Bevor das
         # Kind weitergeht, waehlt es selbst, wann es das noch einmal
         # anschaut — wer den Termin mitbestimmt, haelt ihn eher ein.
@@ -487,6 +507,8 @@ def voraussetzung_beantwortet(sitzung: dict, antworten: list[str], cfg=None) -> 
     aufgaben = _voraussetzungsaufgaben(lokal)
     if not aufgaben:
         # Ohne Aufgaben laesst sich nichts feststellen: dann wie bisher.
+        _merke(sitzung["id"], sitzung, voraussetzung_offen=None,
+               voraussetzung_lokal=None, voraussetzung_titel=None)
         return zustand_modul.eskalieren(sitzung["id"], cfg=cfg)
 
     # Jede Aufgabe der kurzen Diagnose bekommt ihre eigene Zeile.
@@ -525,6 +547,45 @@ def zurueck_von_voraussetzung(sitzung: dict) -> dict:
     return _merke(sitzung["id"], sitzung, voraussetzung_offen=None,
                   voraussetzung_lokal=None, voraussetzung_titel=None,
                   voraussetzung_lernen=None, tipp_stufe=0, fehlerhinweis=None)
+
+
+def voraussetzung_lernen_starten(sitzung: dict) -> dict:
+    """Der Umweg (Z3): erst die fehlende Grundlage lernen, dann zurueck.
+
+    Die wartende Sitzung bleibt offen; die Grundlage laeuft als eigene
+    Lernrunde im selben Thema, damit das Resume sie findet. Laeuft sie
+    schon, wird sie nicht verdoppelt. Trug auch sie nicht, hilft ein
+    Mensch statt eines zweiten Umwegs.
+    """
+    daten = _daten(sitzung)
+    lokal = daten.get("voraussetzung_lokal")
+    if not daten.get("voraussetzung_offen") or not lokal:
+        return sitzung
+    eintrag = store.eingabe(sitzung.get("eingabe_id")) or {}
+    letzte = store.letzte_fuer_thema(eintrag.get("topic_id"), int(lokal))
+    if letzte and letzte["zustand"] not in zustand.ENDZUSTAENDE:
+        return letzte                                   # laeuft bereits
+    if letzte and letzte["zustand"] == zustand.ESCALATED:
+        # Trug auch die Grundlage nicht, hilft ein Mensch. Erst die
+        # Merker loeschen — eskaliert darf nicht noch offen wirken.
+        ziel = zurueck_von_voraussetzung(sitzung)
+        return zustand.eskalieren(ziel["id"])
+    if letzte and letzte["zustand"] == zustand.MASTERED:
+        return zurueck_von_voraussetzung(sitzung)       # geschafft genug
+    store.ereignis_schreiben(sitzung["id"], "Voraussetzung wird gelernt",
+                             nutzdaten={"konzept_id": int(lokal)})
+    umweg = starte(int(lokal), daten.get("voraussetzung_titel") or "",
+                   topic_id=eintrag.get("topic_id"))
+    return _merke(umweg["id"], umweg, voraussetzung_detour=sitzung["id"])
+
+
+def voraussetzung_weiter_zum_thema(sitzung: dict) -> dict:
+    """Vom geschafften Umweg zurueck an die Stelle, an der es hakte (Z3)."""
+    ziel_id = _daten(sitzung).get("voraussetzung_detour")
+    ziel = store.sitzung(ziel_id) if ziel_id else None
+    if ziel is None:
+        return sitzung
+    return zurueck_von_voraussetzung(ziel)
 
 
 def weiter_nach_adaptation(sitzung: dict) -> dict:

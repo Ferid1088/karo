@@ -207,6 +207,50 @@
   </form>
 </section>
 
+{% elif schirm.art == 'voraussetzung' %}
+{#- Z3: bevor ein Mensch geholt wird, wird kurz geprueft, ob die Grundlage
+    sitzt. Kein Test, keine Strafe — nur herausfinden, woran es klemmt. -#}
+<section class="card">
+  <p>Bevor wir weitermachen, schauen wir kurz, ob etwas von vorher schon sitzt:
+     <strong>„{{ schirm.voraussetzung }}“</strong>. Das ist kein Fehler und keine
+     Strafe — es zeigt nur, woran es gerade klemmt.</p>
+  <form method="post" action="{{ learning_base }}/voraussetzung?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+    {% for aufgabe in schirm.aufgaben %}
+    <p><strong>{{ aufgabe.frage }}</strong></p>
+    <input type="text" name="antwort" aria-label="Deine Antwort" placeholder="Deine Antwort …" maxlength="1000"{% if loop.first %} autofocus{% endif %}>
+    {% endfor %}
+    <button type="submit">{{ 'Fertig' if schirm.aufgaben else 'Weiter' }}</button>
+  </form>
+</section>
+
+{% elif schirm.art == 'voraussetzung_lernen' %}
+<section class="card">
+  <p>Da fehlt noch ein Stück — gut, dass wir es gemerkt haben!</p>
+  <p>Erst lernen wir kurz „{{ schirm.voraussetzung }}“, dann geht es weiter
+     mit „{{ learning_title }}“.</p>
+  <form method="post" action="{{ learning_base }}/voraussetzung/lernen?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+    <button type="submit">Jetzt „{{ schirm.voraussetzung }}“ lernen</button>
+  </form>
+</section>
+
+{% elif schirm.art == 'voraussetzung_zurueck' %}
+<section class="card">
+  <p>„{{ schirm.voraussetzung }}“ sitzt jetzt — da klemmt nichts mehr.</p>
+  <p>Weiter geht es genau da, wo du warst: „{{ learning_title }}“.</p>
+  <form method="post" action="{{ learning_base }}/voraussetzung/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+    <button type="submit">Weiter mit „{{ learning_title }}“</button>
+  </form>
+</section>
+
+{% elif schirm.art == 'voraussetzung_geschafft' %}
+<section class="card">
+  <p>Geschafft! „{{ learning_title }}“ hast du verstanden — genau das hat vorher gefehlt.</p>
+  <p>Jetzt geht es zurück zu „{{ schirm.thema }}“.</p>
+  <form method="post" action="{{ learning_base }}/voraussetzung/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+    <button type="submit">Weiter mit „{{ schirm.thema }}“</button>
+  </form>
+</section>
+
 {% elif schirm.art == 'eskaliert' %}
 <section class="card">
   <p>Das war jetzt ein paar Mal knifflig — das liegt nicht an dir.</p>
