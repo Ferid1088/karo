@@ -224,12 +224,15 @@ def antworten(child_key: str = CHILD_KEY, von: str | None = None,
               sitzung_id: int | None = None) -> list[dict]:
     sql = "SELECT * FROM lern_antwort WHERE child_key=?"
     params: list = [child_key]
+    # `beantwortet_at` ist UTC; `von`/`bis` sind lokale Kalendertage — ohne
+    # 'localtime' faellt eine Antwort um lokale Mitternacht in den falschen
+    # Tag.
     if von:
-        sql += " AND beantwortet_at >= ?"
+        sql += " AND datetime(beantwortet_at, 'localtime') >= ?"
         params.append(str(von))
     if bis:
         # Einschliesslich des ganzen Tages: ein Datum ohne Uhrzeit meint den Tag.
-        sql += " AND beantwortet_at <= ?"
+        sql += " AND datetime(beantwortet_at, 'localtime') <= ?"
         params.append(str(bis) + ("T23:59:59" if len(str(bis)) == 10 else ""))
     if fach:
         sql += " AND fach=?"
