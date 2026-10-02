@@ -30,8 +30,10 @@ from .routers import (adaptiv, auth, eltern, kind, admin, dashboard,
                       lernzyklus, vorbereitung, messung, post)
 from .woche import router as woche
 from .welten import router as welten
+from .observability import logging as obs_logging
+from .observability.middleware import RequestObservability
 
-security.configure_logging(os.environ.get("KARO_LOG_LEVEL", "INFO"))
+obs_logging.configure(os.environ.get("KARO_LOG_LEVEL", "INFO"))
 log = logging.getLogger("karo")
 
 BASE = Path(__file__).parent
@@ -147,7 +149,7 @@ MAX_BODY_BYTES = 30 * 1024 * 1024
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    security.configure_logging(os.environ.get("KARO_LOG_LEVEL", "INFO"))
+    obs_logging.configure(os.environ.get("KARO_LOG_LEVEL", "INFO"))
     if not security.selftest_redaction():
         raise RuntimeError("Schwärzung der Protokolle funktioniert nicht — Abbruch.")
     db.init()
@@ -371,4 +373,7 @@ class SecurityHeaders:
 
 
 app.add_middleware(SecurityHeaders)
+# Zuletzt registriert liegt sie aussen: jede Antwort — auch die der
+# Gate-Middleware — traegt dann ihre request_id.
+app.add_middleware(RequestObservability)
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")

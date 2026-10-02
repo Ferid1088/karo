@@ -147,11 +147,15 @@ class RedactingFormatter(logging.Formatter):
 LOG_FORMAT = "%(asctime)s %(levelname)-7s %(name)s  %(message)s"
 
 
-def configure_logging(level: str = "INFO") -> None:
+def configure_logging(level: str = "INFO",
+                      formatter: logging.Formatter | None = None) -> None:
     """Ersetzt jede Formatter-Instanz durch die schwaerzende Variante.
 
     Deckt auch die Handler ab, die uvicorn ueber dictConfig anlegt, und wird
-    beim Start nach dem Aufbau von uvicorn erneut aufgerufen.
+    beim Start nach dem Aufbau von uvicorn erneut aufgerufen. `formatter`
+    darf eine eigenen Format liefern (z. B. JSON) — geschwärzt wird er
+    trotzdem, er muss nur von `RedactingFormatter` erben oder die Zeile
+    selbst durch `redact` schicken.
     """
     # Ohne dies faellt sys.stderr/-stdout unter nohup/cron auf die ASCII-
     # Systemumgebung zurueck und jede Logzeile mit „…“ oder Umlaut crasht
@@ -163,7 +167,7 @@ def configure_logging(level: str = "INFO") -> None:
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="backslashreplace")
 
-    fmt = RedactingFormatter(LOG_FORMAT)
+    fmt = formatter or RedactingFormatter(LOG_FORMAT)
 
     root = logging.getLogger()
     if not root.handlers:

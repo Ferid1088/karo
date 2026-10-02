@@ -185,7 +185,8 @@ def runde_gescheitert(sitzung_id: int, antwort: str | None = None,
         sitzung_id, runden=runden, versuche=(sitzung["versuche"] or 0) + 1,
         letzte_antwort=antwort)
     store.ereignis_schreiben(sitzung_id, "Lehrrunde ohne Erfolg",
-                             nutzdaten={"runde": runden})
+                             nutzdaten={"runde": runden,
+                                        "grenze": max_runden(cfg)})
     if sitzung["konzept_id"]:
         store.fortschritt_buchen(sitzung["konzept_id"], sitzung["fehlertyp_id"],
                                  versuch=True, wiederholung=True,
@@ -261,7 +262,6 @@ def antwort_richtig(sitzung_id: int, antwort: str | None = None, cfg=None,
     store.sitzung_aktualisieren(
         sitzung_id, versuche=(sitzung["versuche"] or 0) + 1,
         letzte_antwort=antwort)
-    store.ereignis_schreiben(sitzung_id, "Antwort richtig")
 
     if sitzung["erklaerung_id"]:
         # §19: Eine Erklärung wird an der nächsten Antwort gemessen.
@@ -276,7 +276,16 @@ def antwort_richtig(sitzung_id: int, antwort: str | None = None, cfg=None,
                                  child_key=store.fortschritt_scope(sitzung))
         erfolge = (stand or {}).get("erfolge", 0)
 
-    if beherrscht(erfolge, cfg) and darf_abschliessen:
+    # Das Mastery-Gate mit Zahlen, nicht nur mit Ausgang: warum es
+    # MASTERED wurde — oder warum noch nicht — steht dann im Ereignis.
+    gemeistert = beherrscht(erfolge, cfg) and darf_abschliessen
+    store.ereignis_schreiben(
+        sitzung_id, "Antwort richtig",
+        nutzdaten={"erfolge": erfolge, "schwelle": mastery_treffer(cfg),
+                   "abschluss_erlaubt": darf_abschliessen,
+                   "gemeistert": gemeistert})
+
+    if gemeistert:
         if sitzung["konzept_id"]:
             store.fortschritt_buchen(sitzung["konzept_id"],
                                      sitzung["fehlertyp_id"], mastery="sicher",

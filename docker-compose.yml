@@ -45,6 +45,18 @@ services:
       - TZ=Europe/Berlin
       - CLAUDE_CODE_MAX_OUTPUT_TOKENS=32000
 
+    # Die App schreibt eine JSON-Zeile pro Logeintrag nach stdout, der
+    # Docker-Treiber sammelt sie. Ohne Grenze wuerde ein Dauerfehler
+    # (z. B. ein Timeout im Sekundentakt) die Platte fuellen:
+    # höchstens 3 Dateien à 20 MB, der Rest rotiert weg. Fachliche
+    # Lern-Historie steht nicht hier, sondern dauerhaft in der Datenbank
+    # (lern_ereignis, lern_antwort) — sie ueberlebt die Rotation.
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
     restart: unless-stopped
 
 volumes:

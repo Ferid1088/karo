@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import logging
 import os
 import time
 from urllib.error import HTTPError, URLError
@@ -24,6 +25,8 @@ from . import komponenten, schemas, store
 FORMAT_ID = karo_contract.FORMAT_ID
 MAX_WAIT_SECONDS = 24 * 60 * 60
 MAX_RESPONSE_BYTES = 2_000_000
+
+log = logging.getLogger("karo.curriculum")
 
 
 def settings(cfg) -> tuple[str, str]:
@@ -154,23 +157,58 @@ def request(cfg, method: str, path: str, body: dict | None = None) -> dict:
     req = Request(url + path, data=data, method=method, headers={
         "Authorization": "Bearer " + key, "Content-Type": "application/json",
         "Accept": "application/json"})
+    gestartet = time.monotonic()
+    status_code: int | None = None
     try:
         with build_opener(_NoRedirect()).open(req, timeout=8) as response:
+            status_code = getattr(response, "status", None)
             raw = response.read(MAX_RESPONSE_BYTES + 1)
         if len(raw) > MAX_RESPONSE_BYTES:
+            _request_log(method, path, gestartet, status=status_code,
+                         fehler="zu_gross")
             raise jobs.PermanentFailure("Curriculum-Antwort ist zu groß.")
         result = json.loads(raw)
     except HTTPError as exc:
+        status_code = exc.code
+        _request_log(method, path, gestartet, status=exc.code)
         if exc.code in (408, 429) or exc.code >= 500:
             raise RuntimeError("Curriculum-Dienst ist vorübergehend nicht erreichbar.") from None
         raise jobs.PermanentFailure(f"Curriculum-Anfrage abgewiesen (HTTP {exc.code}).") from None
-    except (URLError, TimeoutError, OSError):
+    except (URLError, TimeoutError, OSError) as exc:
+        _request_log(method, path, gestartet, fehler=type(exc).__name__)
         raise RuntimeError("Curriculum-Dienst ist vorübergehend nicht erreichbar.") from None
-    except (ValueError, UnicodeError):
+    except (ValueError, UnicodeError) as exc:
+        _request_log(method, path, gestartet, fehler=type(exc).__name__)
         raise jobs.PermanentFailure("Curriculum-Dienst liefert kein gültiges JSON.") from None
     if not isinstance(result, dict):
+        _request_log(method, path, gestartet, status=status_code,
+                     fehler="format")
         raise jobs.PermanentFailure("Curriculum-Antwort hat ein ungültiges Format.")
+    _request_log(method, path, gestartet, status=status_code)
     return result
+
+
+def _request_log(method: str, path: str, gestartet: float,
+                 status: int | None = None, fehler: str | None = None) -> None:
+    """Ein Logziel pro Dienst-Anfrage: Weg, Dauer, Ausgang — kein Key.
+
+    `path` ist der konstante Endpunkt (`/v1/exports` u. a.); die URL mit
+    Host und der Schluessel im Header bleiben aus dem Log. Ein Fehler beim
+    Schreiben haelt den Dienstaufruf nicht auf.
+    """
+    try:
+        eintrag = {"event": "curriculum_request", "service": "curriculum-api",
+                   "method": method, "path": path,
+                   "duration_ms": round((time.monotonic() - gestartet) * 1000, 1)}
+        if status is not None:
+            eintrag["status_code"] = status
+        if fehler:
+            eintrag["error_type"] = fehler
+        schreiber = (log.warning if fehler or (status or 200) >= 400
+                     else log.info)
+        schreiber("curriculum %s %s", method, path, extra={"fach": eintrag})
+    except Exception:
+        pass
 
 
 def _export_id(result: dict) -> int:
