@@ -1,0 +1,68 @@
+/* Material-Paket: Seitenliste mit Vorschau, Reihenfolge-Knöpfen und dem
+   Einlesen-Button — auf dem Handy gestapelt, am Rand nebeneinander. */
+
+.paket-zone .actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+
+.paket-liste { display: grid; gap: .6rem; margin: .8rem 0; }
+
+.paket-seite {
+  display: flex; align-items: center; gap: .8rem;
+  padding: .55rem .7rem;
+  border: 1px solid var(--border, #dce6f4); border-radius: 14px;
+  background: var(--surface, #fff);
+}
+.paket-thumb {
+  width: 64px; height: 84px; object-fit: cover; border-radius: 8px;
+  border: 1px solid var(--border, #dce6f4); background: #f4f6fb;
+}
+.paket-seite-info { flex: 1; min-width: 0; }
+.paket-seite-info small {
+  display: block; color: var(--faint, #60738d);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.paket-seite-knoepfe { display: flex; gap: .35rem; }
+.paket-seite-knoepfe button {
+  min-width: 40px; min-height: 40px; padding: .3rem .55rem;
+  font-weight: 700;
+}
+.paket-seite-knoepfe button:disabled { opacity: .35; }
+
+.paket-liest { text-align: center; padding: 2rem 1.4rem; }
+.paket-liest-balken {
+  margin: 1.2rem auto 0; max-width: 260px; height: 10px;
+  border-radius: 999px; background: var(--learn-blue-soft, #e8f0ff);
+  overflow: hidden;
+}
+.paket-liest-balken span {
+  display: block; width: 40%; height: 100%; border-radius: 999px;
+  background: var(--learn-blue, #356ff2);
+  animation: paket-wandern 1.4s ease-in-out infinite alternate;
+}
+@keyframes paket-wandern {
+  from { transform: translateX(0); }
+  to   { transform: translateX(160%); }
+}
+
+.paket-themen { border: 0; padding: 0; margin: 0 0 .8rem; }
+.paket-themen legend { font-weight: 700; margin-bottom: .5rem; }
+.paket-thema {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .55rem .7rem; margin-bottom: .4rem;
+  border: 1px solid var(--border, #dce6f4); border-radius: 12px;
+  background: var(--surface, #fff); cursor: pointer;
+}
+.paket-thema input { width: 1.2rem; height: 1.2rem; }
+.paket-thema small { color: var(--faint, #60738d); }
+
+.paket-seiten { display: flex; flex-wrap: wrap; gap: .8rem; margin: .8rem 0; }
+.paket-seiten .paket-seite { flex-direction: column; align-items: stretch; width: 110px; }
+.paket-seiten .paket-thumb { width: 100%; height: 130px; }
+.paket-seite-nr { font-size: .85rem; font-weight: 700; }
+
+.paket-fertig { margin: .4rem 0 1rem; padding-left: 1.2rem; }
+.paket-form-reihe { margin-top: .8rem; }
+
+@media (max-width: 560px) {
+  .paket-seite { flex-wrap: wrap; }
+  .paket-seite-knoepfe { width: 100%; }
+}

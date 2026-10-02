@@ -46,8 +46,11 @@ def test_themen_und_termin_werden_eingetippt_ohne_modell(
     vorher = len(fake_llm.calls)
 
     seite = client.get("/klassenarbeit/neu")
-    assert "Themenblatt hochladen" not in seite.text
     assert 'name="themen"' in seite.text
+    # Der Upload ist zurück — das Blatt wird im Browser gelesen, nur Text
+    # geht weiter (routers/lernmaterial.py). Ein Foto an ein Modell gibt
+    # es weiterhin nicht; das Anlegen hier braucht ohnehin keins.
+    assert "Themenblatt" in seite.text
 
     r = client.post("/klassenarbeit", data={
         "_csrf": csrf_from(seite.text), "fach": "mathematik",

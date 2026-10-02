@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS document (
     source_name   TEXT NOT NULL,
     stored_path   TEXT NOT NULL,
     mime          TEXT NOT NULL,
-    rolle         TEXT NOT NULL DEFAULT 'wissen',  -- 'wissen' | 'bearbeitet'
+    rolle         TEXT NOT NULL DEFAULT 'wissen',  -- 'wissen' | 'bearbeitet' | 'material' (Paket-Seiten)
     doc_type      TEXT,                 -- AB | HA | Test | KA | Buch | Loesung
     captured_on   TEXT,
     state         TEXT NOT NULL DEFAULT 'neu',
@@ -450,3 +450,39 @@ CREATE TABLE IF NOT EXISTS learning_time (
     sekunden   INTEGER NOT NULL DEFAULT 0 CHECK(sekunden >= 0)
 );
 CREATE INDEX IF NOT EXISTS idx_learning_time_tag ON learning_time(tag, topic_id);
+
+-- ==========================================================================
+-- Materialpaket: mehrere Seiten gehoeren zusammen
+-- ==========================================================================
+-- Ein Arbeitsblatt ist selten eine Seite. Der Upload sammelt deshalb nicht
+-- Dateien, sondern SEITEN: ein PDF wird im Browser in seine Seiten zerlegt,
+-- mehrere Fotos werden zu einem Paket. Gelesen wird auf dem Geraet (WASM)
+-- oder auf dem Familienserver — das Bild geht nie an ein Modell; hier liegt
+-- nur der bereits geschwaerzte Text.
+CREATE TABLE IF NOT EXISTS material_paket (
+    id          INTEGER PRIMARY KEY,
+    zweck       TEXT NOT NULL,            -- lernen | klassenarbeit
+    subject     TEXT,                     -- Fach aus dem aktiven Reiter
+    state       TEXT NOT NULL DEFAULT 'analyse',
+    -- analyse | bereit | uebernommen | fehler
+    ergebnis    TEXT NOT NULL DEFAULT '{}',  -- JSON: fach, themen, gewaehlt
+    fehler      TEXT,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS material_seite (
+    id          INTEGER PRIMARY KEY,
+    paket_id    INTEGER NOT NULL REFERENCES material_paket(id) ON DELETE CASCADE,
+    position    INTEGER NOT NULL,
+    document_id INTEGER REFERENCES document(id),
+    quell_name  TEXT,                    -- Dateiname nur als Anzeige, nie als Pfad
+    art         TEXT,                    -- foto | pdf-text | pdf-ocr | server
+    text        TEXT,                    -- gelesener Text, bereits geschwaerzt
+    konfidenz   REAL,
+    state       TEXT NOT NULL DEFAULT 'offen',  -- offen | gelesen | fehler
+    fehler      TEXT,
+    created_at  TEXT NOT NULL,
+    UNIQUE (paket_id, position)
+);
+CREATE INDEX IF NOT EXISTS idx_material_seite_paket ON material_seite(paket_id, position);

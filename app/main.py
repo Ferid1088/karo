@@ -27,7 +27,7 @@ from starlette.status import HTTP_303_SEE_OTHER
 from . import config, db, jobs, security
 from .config import ConfigUnreadable
 from .routers import (adaptiv, auth, eltern, kind, admin, dashboard,
-                      lernzyklus, vorbereitung, messung, post)
+                      lernmaterial, lernzyklus, vorbereitung, messung, post)
 from .woche import router as woche
 from .welten import router as welten
 from .observability import logging as obs_logging
@@ -167,6 +167,7 @@ app = FastAPI(title="Karo", lifespan=lifespan,
 
 app.include_router(auth.router)
 app.include_router(dashboard.router)
+app.include_router(lernmaterial.router)
 app.include_router(lernzyklus.router)
 app.include_router(adaptiv.router)
 app.include_router(adaptiv.exam_router)

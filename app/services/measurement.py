@@ -170,10 +170,19 @@ def render_klassenarbeit_kalender(request: Request, monat: str = ""):
 
 def render_klassenarbeit_neu(request: Request, draft: dict | None = None):
     """Beide Wege zu einer neuen Arbeit: selbst eintragen oder Blatt hochladen."""
-    from .. import exam_plan
+    from .. import exam_plan, material_paket
+    entwurf = dict(draft or {})
+    # Aus der Material-Prüfung zurück: die bestätigten Themen stehen schon
+    # im Feld, bleiben aber gewöhnlicher Text — Termin, Fach und das Anlegen
+    # entscheidet weiterhin das Formular.
+    material_id = str(request.query_params.get("material") or "")
+    if material_id.isdigit() and not entwurf.get("themen"):
+        themen = material_paket.gewaehlte_themen(int(material_id))
+        if themen:
+            entwurf["themen"] = "\n".join(themen)
     return render(request, "klassenarbeit_neu.html",
                   adult_page=not config.load().klassenarbeit_kind,
-                  scan=exam_plan.offene_scan(), draft=draft or {})
+                  scan=exam_plan.offene_scan(), draft=entwurf)
 
 
 def render_klassenarbeit_detail(request: Request, exam_id: int):

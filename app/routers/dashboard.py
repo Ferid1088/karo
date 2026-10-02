@@ -131,17 +131,9 @@ def arbeit_zurueck(request: Request, exam_id: int, ziel: str = Form('')):
     return zurueck(erfolge_ziel(ziel, 'arbeiten'))
 
 
-@router.get('/lernen/material', response_class=HTMLResponse)
-def lernmaterial(request: Request):
-    from .shared import aktives_fach
-    fach = aktives_fach(request, request.query_params.get('fach'))
-    return render(request, 'learning_upload.html', fach=fach)
-
-
-# Hier standen „/lernen/material" (Foto hochladen) und sein Status: das Blatt
-# ging an ein Modell, das die Themen ablas. Jetzt tippt das Kind sie ab —
-# siehe app/llm/base.py. Das Lesen kommt zurück, sobald es auf dem Gerät
-# läuft (docs/Karo_Prompts_Schritt_fuer_Schritt.MD, Schritt 2).
+# Die Seiten-Uploads leben in routers/lernmaterial.py: GET /lernen/material
+# und das Paket dahinter. Hier war frueher die Abtipp-Seite — jetzt der
+# Einstieg in den Upload, der im Browser gelesen wird (Schritt 2).
 
 
 @router.post('/lernen/material/uebernehmen')

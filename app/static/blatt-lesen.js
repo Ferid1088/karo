@@ -175,6 +175,87 @@
     return ergebnisse;
   }
 
+  /* ------------------------------------------------- Paket: Bild + Text */
+
+  // Für den Seiten-Upload (`material-paket.js`): die Vorschau braucht das
+  // Bild jeder Seite, der Server speichert es als Dokument — nur der Text
+  // dazu kommt aus OCR. `paketSeiten` rendert und liest die Textebene;
+  // OCR läuft erst beim Einlesen (`paketOcr`), weil die Vorschau vorher
+  // schon da sein soll.
+
+  function canvasZuJpeg(canvas) {
+    return new Promise((fertig) => {
+      canvas.toBlob((b) => fertig(b), "image/jpeg", 0.85);
+    });
+  }
+
+  // Farbiges, verkleinertes Abbild — Vorschau und Ablage. `aufbereiten`
+  // macht daraus erst beim Lesen das Graustufenbild für Tesseract.
+  function farbCanvas(quelle) {
+    const breite = quelle.width || quelle.naturalWidth;
+    const hoehe = quelle.height || quelle.naturalHeight;
+    const faktor = Math.min(1, MAX_KANTE / Math.max(breite, hoehe));
+    const c = document.createElement("canvas");
+    c.width = Math.round(breite * faktor);
+    c.height = Math.round(hoehe * faktor);
+    c.getContext("2d").drawImage(quelle, 0, 0, c.width, c.height);
+    return c;
+  }
+
+  async function paketPdfSeiten(datei, melde) {
+    melde("PDF wird geöffnet …");
+    const pdfjs = await import(PDFJS + "pdf.min.mjs");
+    pdfjs.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.mjs";
+    const doc = await pdfjs.getDocument({ data: await datei.arrayBuffer() }).promise;
+    if (doc.numPages > MAX_SEITEN) {
+      throw new Error("Das PDF hat " + doc.numPages + " Seiten — es passen nur " + MAX_SEITEN + " in ein Paket.");
+    }
+    const seiten = doc.numPages;
+    const ergebnisse = [];
+    for (let n = 1; n <= seiten; n++) {
+      melde("Seite " + n + " von " + seiten + " …");
+      const seite = await doc.getPage(n);
+      const skala = seite.getViewport({ scale: 1 });
+      const faktor = Math.min(2, MAX_KANTE / Math.max(skala.width, skala.height));
+      const ansicht = seite.getViewport({ scale: faktor });
+      const c = document.createElement("canvas");
+      c.width = Math.round(ansicht.width);
+      c.height = Math.round(ansicht.height);
+      await seite.render({ canvasContext: c.getContext("2d"), viewport: ansicht }).promise;
+      const inhalt = await seite.getTextContent();
+      const text = inhalt.items.map((i) => i.str).join(" ").trim();
+      ergebnisse.push({
+        seite: n, canvas: c, jpeg: await canvasZuJpeg(c),
+        art: text.length >= MIN_ZEICHEN ? "pdf-text" : "pdf-ocr",
+        text: text.length >= MIN_ZEICHEN ? text : "", konfidenz: text.length >= MIN_ZEICHEN ? 1 : 0,
+      });
+    }
+    return ergebnisse;
+  }
+
+  async function paketSeiten(datei, kopfProzent, melde) {
+    const name = (datei.name || "").toLowerCase();
+    if (datei.type === "application/pdf" || name.endsWith(".pdf")) {
+      return await paketPdfSeiten(datei, melde);
+    }
+    let bild = datei;
+    if (/heic|heif/.test(datei.type) || /\.hei[cf]$/.test(name)) {
+      bild = await heicUmwandeln(datei, melde);
+    }
+    const canvas = farbCanvas(await alsBitmap(bild));
+    return [{ seite: 1, canvas: canvas, jpeg: await canvasZuJpeg(canvas),
+              art: "foto", text: "", konfidenz: 0 }];
+  }
+
+  // Erst beim Einlesen: Textebene schon da? dann nichts zu tun — sonst OCR.
+  async function paketOcr(seite, kopfProzent, melde) {
+    if (seite.text && seite.text.length >= MIN_ZEICHEN) return seite;
+    const gelesen = await bildLesen(aufbereiten(seite.canvas, kopfProzent), melde);
+    seite.text = gelesen.text;
+    seite.konfidenz = gelesen.konfidenz;
+    return seite;
+  }
+
   /* --------------------------------------------------------------- Ablauf */
 
   async function lesen(datei, kopfProzent, melde) {
@@ -198,5 +279,6 @@
       .catch(() => { /* ohne Zwischenspeicher weiter */ });
   }
 
-  window.karoBlattLesen = { lesen: lesen, MIN_ZEICHEN: MIN_ZEICHEN };
+  window.karoBlattLesen = { lesen: lesen, paketSeiten: paketSeiten,
+                            paketOcr: paketOcr, MIN_ZEICHEN: MIN_ZEICHEN };
 })();

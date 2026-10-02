@@ -1,0 +1,157 @@
+{% extends "learning_base.html" %}
+{% block title %}Material prüfen{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="/static/material-paket.css?v={{ asset_version|default('0') }}">{% endblock %}
+{% block content %}
+{% if paket.zweck == "klassenarbeit" %}
+<a class="back-link" href="/klassenarbeit/neu">← Zurück zur Klassenarbeit</a>
+{% else %}
+<a class="back-link" href="/lernen/{{ paket.subject or 'mathematik' }}">← Zurück zum Lernen</a>
+{% endif %}
+
+{% if paket.state == "analyse" %}
+<section class="card paket-liest">
+  <h1>{{ companion_name }} liest deine {{ paket.seiten|length }} Seite{{ "n" if paket.seiten|length != 1 }} ein …</h1>
+  <p class="hint">Das kann einen Moment dauern — die Seite lädt sich von selbst neu, sobald alles da ist.</p>
+  <div class="paket-liest-balken" aria-hidden="true"><span></span></div>
+</section>
+<script>karoAutoRefresh("/lernen/material/{{ paket.id }}/stand", "{{ signatur }}");</script>
+
+{% elif paket.state == "fehler" %}
+<section class="card">
+  <h1>Das hat nicht geklappt</h1>
+  <p class="msg err">{{ paket.fehler or "Das Material konnte nicht gelesen werden." }}</p>
+  {% if paket.seiten %}
+  <p class="hint">Deine {{ paket.seiten|length }} Seite{{ "n" if paket.seiten|length != 1 }} sind noch da — du kannst es einfach noch einmal versuchen.</p>
+  <form method="post" action="/lernen/material/{{ paket.id }}/erneut" class="paket-form-reihe">
+    {{ csrf_input() }}
+    <button type="submit">Erneut einlesen</button>
+  </form>
+  {% else %}
+  <p><a href="{{ paket_upload_url }}">← Neue Seiten auswählen</a></p>
+  {% endif %}
+</section>
+{% if paket.seiten %}
+<details class="card disclosure">
+  <summary>Deine {{ paket.seiten|length }} Seiten ansehen</summary>
+  <div class="paket-seiten">
+    {% for s in paket.seiten %}
+    <div class="paket-seite">
+      <img src="/lernen/material/{{ paket.id }}/seite/{{ s.id }}.jpg" alt="Seite {{ s.position }}" loading="lazy">
+      <span class="paket-seite-nr">Seite {{ s.position }}{% if s.state == "fehler" %} · unlesbar{% endif %}</span>
+      <form method="post" action="/lernen/material/{{ paket.id }}/seite/{{ s.id }}/entfernen">
+        {{ csrf_input() }}
+        <button type="submit" class="quiet">Entfernen</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  <form method="post" action="/lernen/material/{{ paket.id }}/seiten" enctype="multipart/form-data">
+    {{ csrf_input() }}
+    <div class="field">
+      <label for="paket-mehr">Seite neu hinzufügen</label>
+      <input type="file" id="paket-mehr" name="seite" multiple accept=".pdf,.jpg,.jpeg,.png,.heic,.heif">
+    </div>
+    <button type="submit" class="quiet">Hinzufügen und neu einlesen</button>
+  </form>
+</details>
+{% endif %}
+
+{% elif paket.state == "bereit" %}
+<section class="card">
+  <h1>{{ companion_name }} hat das gefunden:</h1>
+
+  {% if paket.ergebnis.hinweise %}
+  <div class="msg warn">
+    {% for h in paket.ergebnis.hinweise %}<p>{{ h }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% set fehler_seiten = paket.seiten | selectattr("state", "equalto", "fehler") | list %}
+  {% if fehler_seiten %}
+  <div class="msg warn">
+    {% for s in fehler_seiten %}<p>Seite {{ s.position }} war schwer lesbar{% if paket.ergebnis.themen %} — {{ paket.ergebnis.themen|length }} Themen wurden trotzdem erkannt{% endif %}.</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="post" action="/lernen/material/{{ paket.id }}/uebernehmen" class="paket-review">
+    {{ csrf_input() }}
+    <div class="field">
+      <label for="paket-fach">Fach</label>
+      <select id="paket-fach" name="fach">
+        {% for key, label in faecher_liste %}
+        <option value="{{ key }}" {{ "selected" if paket.ergebnis.fach == key }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      {% if paket.ergebnis.fach_unsicher %}
+      <p class="hint">{{ companion_name }} war sich beim Fach nicht sicher — bitte prüfe es.</p>
+      {% endif %}
+    </div>
+
+    {% if paket.ergebnis.themen %}
+    <fieldset class="field paket-themen">
+      <legend>Erkannte Themen — nimm mit, was stimmt:</legend>
+      {% for t in paket.ergebnis.themen %}
+      <label class="paket-thema">
+        <input type="checkbox" name="thema" value="{{ t.titel }}" checked>
+        <span>{{ t.titel }}{% if t.seiten %}<small> · Seite {{ t.seiten | join(", ") }}</small>{% endif %}</span>
+      </label>
+      {% endfor %}
+    </fieldset>
+    {% else %}
+    <p class="hint">Kein Thema wurde automatisch erkannt — trag es selbst ein:</p>
+    {% endif %}
+
+    <div class="field">
+      <label for="paket-extra">{{ "Weitere Themen" if paket.ergebnis.themen else "Themen" }} (ein Thema pro Zeile)</label>
+      <textarea id="paket-extra" name="extra" rows="3"
+                placeholder="Brüche addieren&#10;Brüche kürzen"></textarea>
+    </div>
+
+    <input type="hidden" name="klasse" value="{{ klasse or '' }}">
+    <button type="submit">{{ "Themen in die Klassenarbeit übernehmen →" if paket.zweck == "klassenarbeit" else "Themen übernehmen →" }}</button>
+  </form>
+</section>
+
+<details class="card disclosure">
+  <summary>Seiten ansehen oder ergänzen</summary>
+  <div class="paket-seiten">
+    {% for s in paket.seiten %}
+    <div class="paket-seite">
+      <img src="/lernen/material/{{ paket.id }}/seite/{{ s.id }}.jpg" alt="Seite {{ s.position }}" loading="lazy">
+      <span class="paket-seite-nr">Seite {{ s.position }}{% if s.state == "fehler" %} · unlesbar{% endif %}</span>
+      <form method="post" action="/lernen/material/{{ paket.id }}/seite/{{ s.id }}/entfernen">
+        {{ csrf_input() }}
+        <button type="submit" class="quiet">Entfernen</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  <form method="post" action="/lernen/material/{{ paket.id }}/seiten" enctype="multipart/form-data">
+    {{ csrf_input() }}
+    <div class="field">
+      <label for="paket-mehr">Weitere Seiten</label>
+      <input type="file" id="paket-mehr" name="seite" multiple accept=".pdf,.jpg,.jpeg,.png,.heic,.heif">
+    </div>
+    <button type="submit" class="quiet">Seiten hinzufügen und neu einlesen</button>
+  </form>
+</details>
+
+{% else %}
+<section class="card">
+  <h1>Material übernommen ✓</h1>
+  {% set themen = paket.ergebnis.gewaehlt or [] %}
+  {% if themen %}
+  <p>{{ themen|length }} Thema{{ "n" if themen|length != 1 }} gefunden:</p>
+  <ul class="paket-fertig">
+    {% for t in themen %}<li>{{ t }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if paket.zweck == "klassenarbeit" %}
+  <p><a href="/klassenarbeit/neu?material={{ paket.id }}">→ Zur Klassenarbeit — die Themen stehen schon im Feld</a></p>
+  {% else %}
+  <p><a href="/lernen/{{ paket.subject or 'mathematik' }}">→ Zum Lernplatz — dort warten deine Themen</a></p>
+  {% endif %}
+  <p class="hint"><a href="{{ paket_upload_url }}">Noch ein Blatt einlesen</a></p>
+</section>
+{% endif %}
+{% endblock %}

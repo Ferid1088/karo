@@ -130,3 +130,4 @@ body.learning-ui:has(.heute-seite) { background: #f2f5fa; }
   .heute-igel { display: none }
   .heute-seite .schritt-karte { padding: 1.3rem 1.2rem }
 }
+.learn-three-col{grid-template-columns:repeat(3,minmax(0,1fr))}.material-einstieg .actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.6rem}.material-einstieg .hint{margin-top:.7rem}@media(max-width:1100px){.learn-three-col{grid-template-columns:1fr}}

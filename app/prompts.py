@@ -1213,3 +1213,70 @@ Alles, was du rechnest, wird nachgerechnet. Eine Gleichung, die nicht
 aufgeht, führt dazu, dass die ganze Lektion verworfen wird — prüfe jede
 Zahl, bevor du sie hinschreibst. Ausgenommen sind die Felder, die einen
 Denkfehler BESCHREIBEN: dort gehört die falsche Rechnung hin."""
+
+# ==========================================================================
+# 12. Materialpaket: Themen aus gelesenem Blatt-Text erkennen
+# ==========================================================================
+#
+# Hier geht nur TEXT an das Modell — die Seiten werden auf dem Geraet gelesen
+# (WASM-OCR) oder vom lokalen Tesseract, und `material_paket` schwaerzt den
+# Text, bevor er hier ankommt. Ein Bildparameter gibt es nicht (siehe
+# tests/test_keine_bilder_an_modelle.py).
+
+MATERIAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "fach": {"type": ["string", "null"]},
+        "themen": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "titel": {"type": "string"},
+                    "seiten": {"type": "array",
+                               "items": {"type": "integer"}},
+                    "konfidenz": {"type": "number"},
+                },
+                "required": ["titel", "seiten"],
+            },
+        },
+    },
+    "required": ["fach", "themen"],
+}
+
+
+def material_prompt(grade: int, fach_hint: str | None, seiten_text: str) -> str:
+    """Aus dem Text eines Materialpakets die Lern-Themen ablesen.
+
+    `fach_hint` ist das Fach, in dem das Kind gerade arbeitet — ein Hinweis,
+    keine Vorgabe: ein Englisch-Blatt im Mathe-Reiter soll „englisch"
+    melden, damit die Prüfansicht korrigieren kann.
+    """
+    hinweis = (f"Das Kind war gerade im Fach „{fach_hint}“ unterwegs — "
+               "wahrscheinlich gehört das Blatt dazu, aber nicht sicher."
+               if fach_hint else "Es ist nicht bekannt, in welchem Fach das "
+               "Kind gerade arbeitet.")
+    return f"""Ein Schulkind (Klassenstufe {grade}) hat ein Arbeitsblatt oder
+ein Themenblatt eingescannt. Unten steht der Text, den eine Erkennung auf dem
+Gerät daraus gelesen hat — mit „=== Seite n ===“ markiert. Er kann Fehler
+enthalten und an den Rändern abgehackt sein. {hinweis}
+
+Lies daraus:
+
+- `fach`: das Schulfach — „deutsch", „mathematik", „englisch" oder
+  „andere". Nur null, wenn der Text gar nichts hergibt.
+- `themen`: die Unterrichtsthemen des Blatts als kurze Stichworte, so wie
+  sie im Unterricht heissen (z. B. „Brüche addieren", nicht ganze Sätze).
+  Zu jedem Thema `seiten` — die Seitennummern, auf denen es behandelt wird
+  — und `konfidenz` zwischen 0 und 1: wie sicher das Blatt dieses Thema
+  wirklich behandelt. Nur Themen, die auf dem Blatt tatsächlich vorkommen;
+  erfinde kein Lehrplan-Thema dazu. Leere Liste, wenn kein Unterrichtsthema
+  erkennbar ist — eine Aufgabennummer oder Übung ist kein Thema.
+
+Kein Name, keine Schule, keine Lehrkraft, kein Datum — falls so etwas im
+Text steht, einfach ignorieren.
+
+--- Text des Pakets ---
+
+{seiten_text}"""

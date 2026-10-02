@@ -151,6 +151,7 @@ SCHEMA_KEYS = {
     frozenset({"lesbarkeit", "antworten"}): "sheet",
     frozenset({"einschaetzung", "tagesplan"}): "plan",
     frozenset({"themen", "exam_date"}): "exam_scan",
+    frozenset({"fach", "themen"}): "material",
     frozenset({"ok"}): "verify_ping",
     frozenset({"erreichbar", "inhalt"}): "research_fetch",
     frozenset({"ideen"}): "welten_ideas",

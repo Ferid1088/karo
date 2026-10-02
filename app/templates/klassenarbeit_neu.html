@@ -18,14 +18,15 @@
     <textarea id="exam_topics" name="themen" rows="4" required placeholder="Brüche addieren
 Brüche kürzen
 Textaufgaben">{{ draft.get('themen', '') }}</textarea>
+    {# Oder das Themenblatt einlesen lassen: im Browser gelesen, nur Text
+       geht weiter — die erkannten Themen landen oben im Feld und bleiben
+       änderbar. Termin, Fach und das Anlegen entscheidet das Formular. #}
+    <p class="hint">oder</p>
+    <p class="actions">
+      <a class="learn-zweit-action" href="/lernen/material?zweck=klassenarbeit">📄 Themenblatt hochladen</a>
+      <a class="learn-zweit-action" href="/lernen/material?zweck=klassenarbeit&amp;kamera=1">Foto machen</a>
+    </p>
     <button type="submit">Klassenarbeit anlegen →</button>
   </form>
 </section>
-
-{# Hier stand „Oder: Themenblatt hochladen": ein Foto des Ankündigungsblatts
-   ging an ein Modell, das Themen und Termin ablas. Ein Foto vom Küchentisch
-   trägt mehr als die Ankündigung — den Namen des Kindes, die Klasse, was
-   sonst noch danebenlag. Bestätigen musste ein Mensch die Themen ohnehin
-   immer; jetzt tippt er sie gleich oben ein. Das Lesen kommt zurück, sobald
-   es auf dem Gerät läuft (Schritt 2). #}
 {% endblock %}
