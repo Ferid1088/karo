@@ -29,7 +29,7 @@ def _stueck(db, tag, topic_id, sekunden, gemessen_um='10:00:00'):
                   " VALUES(?,?,?,?,?)", (topic_id, tag, beginn, beginn, sekunden))
 
 
-def test_schlag_beginnt_und_verlaengert_ein_stueck(client, fake_llm, fake_cli, app_env):
+def test_schlag_beginnt_und_verlaengert_ein_stueck(client, fake_llm, app_env):
     from app.services import learning_time
     einrichten(client, fake_llm)
     topic_id = _thema(app_env.db)
@@ -54,7 +54,7 @@ def test_schlag_beginnt_und_verlaengert_ein_stueck(client, fake_llm, fake_cli, a
     assert len(app_env.db.q("SELECT id FROM learning_time WHERE topic_id=?", topic_id)) == 2
 
 
-def test_gemessener_tag_schlaegt_die_schaetzung(client, fake_llm, fake_cli, app_env):
+def test_gemessener_tag_schlaegt_die_schaetzung(client, fake_llm, app_env):
     from app.services import learning_time
     einrichten(client, fake_llm)
     topic_id = _thema(app_env.db)
@@ -90,7 +90,7 @@ def test_dauer_liest_sich_wie_eine_uhrzeit():
     assert learning_time.dauer(7200) == '2 Std. 00 Min.'
 
 
-def test_herzschlag_ordnet_das_thema_dem_pfad_zu(client, fake_llm, fake_cli, app_env):
+def test_herzschlag_ordnet_das_thema_dem_pfad_zu(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     topic_id = _thema(app_env.db)
     # Lernzeit misst nur das Kind: eine zusehende Eltern-Sitzung darf sie
@@ -111,7 +111,7 @@ def test_herzschlag_ordnet_das_thema_dem_pfad_zu(client, fake_llm, fake_cli, app
         assert zeile['topic_id'] is None
 
 
-def test_herzschlag_ohne_csrf_wird_abgewiesen(client, fake_llm, fake_cli, app_env):
+def test_herzschlag_ohne_csrf_wird_abgewiesen(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     with als_kind(client, app_env):
         antwort = client.post('/lernen/zeit', data={'pfad': '/lernen'},
@@ -119,7 +119,7 @@ def test_herzschlag_ohne_csrf_wird_abgewiesen(client, fake_llm, fake_cli, app_en
         assert antwort.status_code == 403
 
 
-def test_lernzeit_steht_im_elternbericht_mit_herkunft(client, fake_llm, fake_cli, app_env):
+def test_lernzeit_steht_im_elternbericht_mit_herkunft(client, fake_llm, app_env):
     from app.services import parent_report
     einrichten(client, fake_llm)
     topic_id = _thema(app_env.db, code='M-ZEIT-2', label='Gemessenes Thema')
@@ -139,7 +139,7 @@ def test_lernzeit_steht_im_elternbericht_mit_herkunft(client, fake_llm, fake_cli
     assert 'Lernzeit' in seite.text and '30 Min.' in seite.text
 
 
-def test_nur_lernen_und_quiz_zaehlen_als_arbeitszeit(client, fake_llm, fake_cli):
+def test_nur_lernen_und_quiz_zaehlen_als_arbeitszeit(client, fake_llm ):
     """Der Herzschlag laeuft nicht auf "Heute", nicht im Elternbereich und
     nicht in "Meine Welt" — dort wird nichts gemessen."""
     einrichten(client, fake_llm)

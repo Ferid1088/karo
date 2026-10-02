@@ -43,7 +43,9 @@ services:
       - KARO_LOG_LEVEL=INFO
       - KARO_DRIVE_PATH=${KARO_DRIVE_PATH:-}
       - TZ=Europe/Berlin
-      - CLAUDE_CODE_MAX_OUTPUT_TOKENS=32000
+      # Der einzige externe KI-Anbieter. Der Schlüssel kommt aus der .env
+      # neben dieser Datei — er wird nie in /data/config.json gespeichert.
+      - DEVIN_API_KEY=${DEVIN_API_KEY:-}
 
     # Die App schreibt eine JSON-Zeile pro Logeintrag nach stdout, der
     # Docker-Treiber sammelt sie. Ohne Grenze wuerde ein Dauerfehler

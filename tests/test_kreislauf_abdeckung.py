@@ -163,7 +163,7 @@ def test_jedes_formular_findet_eine_passende_route(app_env):
 # --------------------------------------------------------------------------
 
 def test_veraltete_aufgaben_antwort_kostet_keine_runde(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Doppelklick, zweiter Tab oder Browser-Zurueck: die alte Antwort gehoert
     zur alten Aufgabe und darf die neue nicht als falsch markieren."""
     from app.adaptiv import sitzung as zustand, inhalt_store, store, unterricht
@@ -202,7 +202,7 @@ def test_veraltete_aufgaben_antwort_kostet_keine_runde(
 
 
 def test_veraltete_diagnose_antwort_trifft_kein_neues_ziel(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Die erste Diagnose-Frage ist beantwortet — ihr altes Formular darf
     die Kontrollfrage nicht als falsch werten (kein unbekanntes Hochzaehlen)."""
     from app.adaptiv import sitzung as zustand, store, unterricht
@@ -237,7 +237,7 @@ def test_veraltete_diagnose_antwort_trifft_kein_neues_ziel(
 
 
 def test_doppeltes_weiter_ueberspringt_keine_phase(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Zwei Weiter-POSTs vom selben Bildschirm duerfen nicht zwei Phasen
     weitergehen — sonst verschluckt ein Doppelklick das Beispiel."""
     from app.adaptiv import sitzung as zustand, store, unterricht
@@ -263,7 +263,7 @@ def test_doppeltes_weiter_ueberspringt_keine_phase(
 
 
 def test_fehlende_aufgabe_wird_kein_leeres_formular(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     """Gibt der Katalog die Aufgabe nicht her, ist ein Formular ohne
     Antwortmoeglichkeit ein Dead End — die ehrliche Seite tritt an."""
     from app.adaptiv import sitzung as zustand, inhalt_store, store, unterricht
@@ -289,7 +289,7 @@ def test_fehlende_aufgabe_wird_kein_leeres_formular(
 
 
 def test_termin_formular_ignoriert_eine_geschaffte_wiederholung(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """/wiederholung/{wid}/termin gehoert zur Auffrischung — ein alter Tab
     plant einer bestandenen Wiederholung sonst eine neue nach."""
     from app.adaptiv import store, wiederholung
@@ -341,7 +341,7 @@ def _bis_zur_selbstaendigen_aufgabe(client, fake_llm, app_env,
 
 
 def test_richtiger_transfer_ohne_beleg_startet_neue_runde(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Treffer=5: ein richtiger Transfer mit zu wenig Belegen gibt keine
     Pause auf COMPLETE, sondern eine neue Runde mit einer neuen Aufgabe —
     jede Runde eine andere, und „verstanden" erst bei MASTERED."""
@@ -376,7 +376,7 @@ def test_richtiger_transfer_ohne_beleg_startet_neue_runde(
 
 
 def test_rundengrenze_gilt_auch_in_extra_runden(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Die Extra-Runde ist keine Endlosschleife: jede falsche Antwort zaehlt
     eine Runde — bei adaptiv_max_lehrrunden eskaliert Karo wie immer."""
     from app.adaptiv import sitzung as zustand, inhalt_store, unterricht
@@ -399,7 +399,7 @@ def test_rundengrenze_gilt_auch_in_extra_runden(
 
 
 def test_geparkte_alt_sitzung_bekommt_ihre_runde(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Eine Sitzung auf COMPLETE aus der Parkplatz-Zeit: offen, unfertig und
     auf „verstanden" geparkt. Der naechste Bildschirm repariert sie — das
     Konzept bleibt neu startbar und spielbar bis MASTERED."""
@@ -432,7 +432,7 @@ def test_geparkte_alt_sitzung_bekommt_ihre_runde(
 
 
 def test_kein_offener_zustand_zeigt_geschafft(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """„verstanden" gibt es erst bei MASTERED: ueber alle offenen
     Zustand/Phase-Kombinationen hinweg erzeugt `bildschirm` nie den
     Abschluss-Bildschirm — die COMPLETE-Reparatur eingeschlossen."""

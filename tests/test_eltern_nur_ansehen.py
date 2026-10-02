@@ -8,7 +8,7 @@ from .conftest import csrf_from
 from .test_app import einrichten, kind_modus_aktivieren
 
 
-def test_eltern_duerfen_den_kinderbereich_ansehen(client, fake_llm, fake_cli):
+def test_eltern_duerfen_den_kinderbereich_ansehen(client, fake_llm ):
     einrichten(client, fake_llm)
     for pfad in ('/', '/lernen', '/lernstand', '/woche/woche', '/post'):
         seite = client.get(pfad)
@@ -17,7 +17,7 @@ def test_eltern_duerfen_den_kinderbereich_ansehen(client, fake_llm, fake_cli):
         assert 'class="nur-ansehen"' in seite.text or 'nur-ansehen"' in seite.text, pfad
 
 
-def test_eltern_koennen_im_kinderbereich_nichts_aendern(client, fake_llm, fake_cli, app_env):
+def test_eltern_koennen_im_kinderbereich_nichts_aendern(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     token = csrf_from(client.get('/').text)
     with app_env.db.tx() as c:
@@ -43,7 +43,7 @@ def test_eltern_koennen_im_kinderbereich_nichts_aendern(client, fake_llm, fake_c
     assert not app_env.db.q("SELECT id FROM learning_time")
 
 
-def test_elternarbeit_bleibt_moeglich(client, fake_llm, fake_cli):
+def test_elternarbeit_bleibt_moeglich(client, fake_llm ):
     """Antworten bestaetigen und die eigenen Seiten bedienen Eltern weiter —
     beides hat nur im Lernbereich bzw. unter /eltern einen Knopf."""
     from app.main import _eltern_darf_aendern
@@ -73,7 +73,7 @@ def test_elternarbeit_bleibt_moeglich(client, fake_llm, fake_cli):
     assert _eltern_darf_aendern('/woche/ziele/neu')
 
 
-def test_im_kind_modus_geht_wieder_alles(client, fake_llm, fake_cli, app_env):
+def test_im_kind_modus_geht_wieder_alles(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     kind_modus_aktivieren(client)
     seite = client.get('/')
@@ -85,7 +85,7 @@ def test_im_kind_modus_geht_wieder_alles(client, fake_llm, fake_cli, app_env):
     assert app_env.db.q("SELECT id FROM learning_time")
 
 
-def test_eine_zusehende_eltern_sitzung_misst_keine_lernzeit(client, fake_llm, fake_cli):
+def test_eine_zusehende_eltern_sitzung_misst_keine_lernzeit(client, fake_llm ):
     einrichten(client, fake_llm)
     assert 'lernzeit.js' not in client.get('/lernen').text
     kind_modus_aktivieren(client)

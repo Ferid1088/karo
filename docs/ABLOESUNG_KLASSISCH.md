@@ -18,8 +18,8 @@ Eingefroren sind:
 
 | Datei | SHA-256 |
 |---|---|
-| `app/teaching.py` | `801e5c47f881981cb8f269f8fbe9e5b0ae865eaf60a3e97a77c5dade361bbebb` |
-| `app/quizzes.py` | `00394403e4c45255510c077d084fd181ce778054bd7b5f5d861274985d84987f` |
+| `app/teaching.py` | `3287fd52a70ab28a959ec71dfdeebbd014af0a5e6a9f1a882b760d5a6d932235` |
+| `app/quizzes.py` | `6ecacac91c33c6c664e78c9387b295f548117adf03509b0097336c88c2badb43` |
 
 `tests/test_lernregeln.py::test_z6_der_klassische_weg_ist_eingefroren`
 vergleicht diese Zahlen mit dem Stand im Baum. Eine Änderung an einer der
@@ -33,6 +33,11 @@ und kein Nebenbei.
 - `teaching.py` (2026): `MAX_WUNSCH_LAENGE` zeigt auf
   `config.ops().formular_wunsch_zeichen` statt des Literals 500 — reine
   Konfigurations-Zentralisierung, gleicher Wert, kein Verhalten geändert.
+- `teaching.py`, `quizzes.py` (2026): Anbieterwechsel — `ClaudeClient`
+  (`app.llm`) wurde durch die providerneutrale Fassade `AIClient`
+  (`app.ai`) ersetzt; einziger externer Anbieter ist jetzt Devin
+  (asynchron per Session). Aufrufstruktur, Schemata und Prüflogik
+  unverändert.
 
 Mit den beiden Dateien hängen zusammen, ohne selbst eingefroren zu sein:
 `app/routers/lernzyklus.py` (Einstieg), `app/services/learning_content.py`

@@ -17,7 +17,7 @@ def prepare(client, fake_llm, app_env):
     return first, second
 
 
-def test_child_topic_lifecycle_and_independent_success(client, fake_llm, fake_cli, app_env):
+def test_child_topic_lifecycle_and_independent_success(client, fake_llm, app_env):
     first, second = prepare(client, fake_llm, app_env)
     token = csrf_from(client.get('/lernen').text)
     card = f'data-topic-id="{first}"'
@@ -55,7 +55,7 @@ def test_child_topic_lifecycle_and_independent_success(client, fake_llm, fake_cl
     assert client.post('/export', data={'_csrf': token}).status_code == 403
 
 
-def test_gelernt_on_new_topic_returns_to_neu_after_uncheck(client, fake_llm, fake_cli, app_env):
+def test_gelernt_on_new_topic_returns_to_neu_after_uncheck(client, fake_llm, app_env):
     # Ein Häkchen direkt auf einer "Neue Themen"-Karte (ohne "Thema anfangen")
     # darf das Thema nicht dauerhaft nach "In Bearbeitung" verschieben.
     first, _ = prepare(client, fake_llm, app_env)
@@ -71,7 +71,7 @@ def test_gelernt_on_new_topic_returns_to_neu_after_uncheck(client, fake_llm, fak
 
 
 def test_gelernt_checkbox_refreshes_current_page_instead_of_opening_erfolge(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     first, _ = prepare(client, fake_llm, app_env)
     token = csrf_from(client.get('/lernen').text)
     card = f'data-topic-id="{first}"'
@@ -92,7 +92,7 @@ def test_gelernt_checkbox_refreshes_current_page_instead_of_opening_erfolge(
     assert response.request.url.path == '/lernstand'
 
 
-def test_progress_requires_csrf_and_active_topic(client, fake_llm, fake_cli, app_env):
+def test_progress_requires_csrf_and_active_topic(client, fake_llm, app_env):
     first, _ = prepare(client, fake_llm, app_env)
     token = csrf_from(client.get('/lernen').text)
     for action in ('beginnen', 'gelernt'):
@@ -104,7 +104,7 @@ def test_progress_requires_csrf_and_active_topic(client, fake_llm, fake_cli, app
     assert client.post(f'/lernzyklus/{first}/gelernt', data={'_csrf': token, 'gelernt': 'ja'}).status_code == 404
 
 
-def test_exam_topics_keep_separate_progress(client, fake_llm, fake_cli, app_env):
+def test_exam_topics_keep_separate_progress(client, fake_llm, app_env):
     from app.services import learning_hub, exam
     first, second = prepare(client, fake_llm, app_env)
     app_env.config.update(klassenarbeit_kind=True)
@@ -143,7 +143,7 @@ def test_existing_topic_schema_gets_nullable_progress_columns(app_env):
 
 
 def test_prepared_material_is_new_and_auto_completion_is_not_manual_success(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     from app import teaching, topics
     from app.services import learning_progress
     first, _ = prepare(client, fake_llm, app_env)

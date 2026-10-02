@@ -18,7 +18,7 @@ def _bereit(client, fake_llm):
     return lektionen
 
 
-def test_fremdes_thema_bekommt_keinen_vorschlag(client, fake_llm, fake_cli,
+def test_fremdes_thema_bekommt_keinen_vorschlag(client, fake_llm,
                                                 app_env):
     lektionen = _bereit(client, fake_llm)
 
@@ -27,7 +27,7 @@ def test_fremdes_thema_bekommt_keinen_vorschlag(client, fake_llm, fake_cli,
 
 
 def test_verwandtes_thema_bekommt_die_passende_lernreihe(client, fake_llm,
-                                                         fake_cli, app_env):
+                                                         app_env):
     """„Brüche kürzen" ist ein anderes Konzept, aber dasselbe Gebiet — hier
     ist der Verweis auf die Bruchlektion sinnvoll."""
     lektionen = _bereit(client, fake_llm)
@@ -37,7 +37,7 @@ def test_verwandtes_thema_bekommt_die_passende_lernreihe(client, fake_llm,
     assert [l["konzept_key"] for l in vorschlaege] == ["ungleichnamig-addieren"]
 
 
-def test_fuellwoerter_stiften_keine_verwandtschaft(client, fake_llm, fake_cli,
+def test_fuellwoerter_stiften_keine_verwandtschaft(client, fake_llm,
                                                    app_env):
     """„Volumen bei verschiedenen Maßeinheiten" und „Brüche mit
     verschiedenen Nennern addieren" teilen nur „verschiedenen". Das ist
@@ -47,7 +47,7 @@ def test_fuellwoerter_stiften_keine_verwandtschaft(client, fake_llm, fake_cli,
     assert lektionen.empfehlungen("Volumen bei verschiedenen Maßeinheiten", "mathematik") == []
 
 
-def test_die_seite_bietet_nichts_unpassendes_an(client, fake_llm, fake_cli,
+def test_die_seite_bietet_nichts_unpassendes_an(client, fake_llm,
                                                 app_env):
     from .conftest import csrf_from
     from .test_app import kind_modus_aktivieren

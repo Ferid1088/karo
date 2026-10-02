@@ -26,7 +26,7 @@ def _spalten(app_env, tabelle):
 
 
 @pytest.mark.parametrize("tabelle,spalte", SPAETER_DAZU)
-def test_fehlende_spalte_wird_nachgezogen(client, fake_llm, fake_cli, app_env,
+def test_fehlende_spalte_wird_nachgezogen(client, fake_llm, app_env,
                                           tabelle, spalte):
     from app.adaptiv import store
     with app_env.db.tx() as c:
@@ -39,7 +39,7 @@ def test_fehlende_spalte_wird_nachgezogen(client, fake_llm, fake_cli, app_env,
 
 
 def test_die_lektion_laesst_sich_danach_wieder_saeen(client, fake_llm,
-                                                     fake_cli, app_env):
+                                                     app_env):
     """Der eigentliche Schaden: ohne die Spalte bricht `saeen()` ab."""
     from app.adaptiv import lektionen, store
     with app_env.db.tx() as c:
@@ -53,7 +53,7 @@ def test_die_lektion_laesst_sich_danach_wieder_saeen(client, fake_llm,
 
 
 def test_topic_id_wird_in_bestehender_datenbank_nachgezogen(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """`lern_eingabe.topic_id` kam nach dem ersten Schema dazu."""
     from app.adaptiv import store
     with app_env.db.tx() as c:

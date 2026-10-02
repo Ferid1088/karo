@@ -5,7 +5,7 @@ from .conftest import csrf_from, make_jpeg, run_jobs
 from .test_app import einrichten, kind_modus_aktivieren, _bis_rot
 
 
-def test_exam_plan_stays_available_to_parents_and_child_access_is_configurable(client, fake_llm, fake_cli, app_env):
+def test_exam_plan_stays_available_to_parents_and_child_access_is_configurable(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     for enabled in (False, True, False):
         app_env.config.update(klassenarbeit_kind=enabled)
@@ -36,7 +36,7 @@ def test_exam_plan_stays_available_to_parents_and_child_access_is_configurable(c
 
 
 def test_child_can_create_use_and_update_exam_with_setting(
-        client, fake_llm, fake_cli, app_env, tmp_path):
+        client, fake_llm, app_env, tmp_path):
     from app.services import learning_hub, exam_calendar
     topic_id = _bis_rot(client, fake_llm, app_env)
     topic = app_env.db.q1('SELECT * FROM topic WHERE id=?', topic_id)

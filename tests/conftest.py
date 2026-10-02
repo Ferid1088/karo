@@ -1,125 +1,95 @@
 """Testaufbau.
 
-Die App läuft gegen ein gefälschtes Modell und ein temporäres
+Die App läuft gegen einen gefälschten KI-Anbieter und ein temporäres
 Datenverzeichnis. Damit ist der komplette Weg prüfbar — Einrichtung,
 Wissensbasis, Themenvorschlag, Prüfung, Lernzyklus mit Gegenprüfung — ohne
 Netz und ohne Kosten.
 
-Beide Backends werden gefälscht:
-  * `api`  über ein Ersatzmodul `anthropic`
-  * `abo`  über ein Ersatz-`subprocess.run`, das die Claude-CLI nachbildet
+Der einzige externe Anbieter ist Devin (asynchron per Session). `FakeDevin`
+bildet `DevinBackend._api` nach: `POST /sessions` legt eine Session an, die
+beim ersten `GET` schon `finished` ist und ihr `structured_output` liefert.
+Damit übt die Suite den echten Session/Lebenszyklus — anlegen, parken,
+abholen — statt nur einer synchronen Attrappe.
 """
 
 from __future__ import annotations
 
 import importlib
-import json
 import sys
 import types
 from pathlib import Path
 
 import pytest
 
-# --------------------------------------------------------------------------
-# Gefälschte anthropic-Bibliothek (Backend „api")
-# --------------------------------------------------------------------------
 
-def _install_fake_anthropic() -> types.ModuleType:
-    mod = types.ModuleType("anthropic")
+class FakeDevin:
+    """Bildet die Devin-Sessions-API nach (`DevinBackend._api`-Ebene)."""
 
-    class APIError(Exception):
-        pass
+    def __init__(self, fake):
+        self.fake = fake
+        self.sessions: dict[str, dict] = {}
+        self.created: list[dict] = []      # alle POST /sessions-Nutzdaten
+        self.counter = 0
+        self.probes = 0                    # Zugangsprüfungen (GET /sessions?)
+        self.working_once = False          # erster GET liefert "working"
 
-    class APIStatusError(APIError):
-        def __init__(self, message="", status_code=500):
-            super().__init__(message)
-            self.message = message
-            self.status_code = status_code
+    def api(self, method: str, path: str, payload: dict | None = None):
+        from app.ai import AIAuthError, AIError
 
-    class AuthenticationError(APIStatusError):
-        pass
+        if self.fake.fail_auth:
+            raise AIAuthError(
+                f"Devin API {method} {path}: 401 — der DEVIN_API_KEY "
+                "wird abgelehnt.")
+        # Zugangsprobe (verify) — keine Session, nur die Liste.
+        if method == "GET" and path.startswith("/sessions?"):
+            self.probes += 1
+            return {"sessions": []}
+        if method == "POST" and path == "/sessions":
+            self.counter += 1
+            sid = f"dev-test-{self.counter}"
+            self.created.append(dict(payload or {}))
+            schema = (payload or {}).get("structured_output_schema") or {}
+            self.sessions[sid] = {
+                "status_enum": "working" if self.working_once else "finished",
+                "structured_output": self.fake.antwort(schema),
+            }
+            self.fake.calls.append({"backend": "devin", "session_id": sid,
+                                    "purpose": (payload or {}).get("title")})
+            return {"session_id": sid}
+        if method == "GET" and path.startswith("/sessions/"):
+            sid = path.rsplit("/", 1)[-1]
+            if sid not in self.sessions:
+                raise AIError(f"Devin API GET {path}: unbekannte Session",
+                              retryable=False)
+            eintrag = self.sessions[sid]
+            if eintrag["status_enum"] == "working":
+                # Einmal warten, dann fertig — deckt das Parken ab.
+                eintrag["status_enum"] = "finished"
+                return {"status_enum": "working"}
+            antwort = dict(eintrag)
+            if self.fake.stop_reason == "max_tokens":
+                antwort["truncated"] = True
+            return antwort
+        if method == "POST" and path.endswith("/message"):
+            sid = path.split("/")[2]
+            if sid in self.sessions:
+                self.sessions[sid]["status_enum"] = "finished"
+            return {}
+        raise AIError(f"FakeDevin: unbekannter Aufruf {method} {path}",
+                      retryable=False)
 
-    class PermissionDeniedError(APIStatusError):
-        pass
 
-    class RateLimitError(APIStatusError):
-        pass
+class _FakeKI:
+    """Antwortvorrat plus Merkzettel — was die Tests steuern und prüfen."""
 
-    class NotFoundError(APIStatusError):
-        pass
+    def __init__(self):
+        self.fail_auth = False
+        self.calls: list[dict] = []
+        self.responses: dict = {}
+        self.stop_reason = "end_turn"
+        self.devin = FakeDevin(self)
 
-    class BadRequestError(APIStatusError):
-        pass
-
-    class APIConnectionError(APIError):
-        pass
-
-    class APITimeoutError(APIConnectionError):
-        pass
-
-    class _Model:
-        def __init__(self, mid, name):
-            self.id, self.display_name = mid, name
-
-    class _Page:
-        def __init__(self, data):
-            self.data = data
-
-    class _Models:
-        def list(self, limit=50):
-            if mod.fail_auth:
-                raise AuthenticationError("bad key", 401)
-            return _Page([_Model("claude-sonnet-test", "Sonnet (Test)"),
-                          _Model("claude-haiku-test", "Haiku (Test)")])
-
-    class _Block:
-        def __init__(self, payload):
-            self.type = "tool_use"
-            self.input = payload
-
-    class _Usage:
-        input_tokens, output_tokens = 1200, 300
-
-    class _Message:
-        def __init__(self, payload, stop="end_turn"):
-            self.content = [_Block(payload)] if payload is not None else []
-            self.usage = _Usage()
-            self.stop_reason = stop
-
-    class _Messages:
-        def create(self, model=None, max_tokens=None, system=None, tools=None,
-                   tool_choice=None, messages=None):
-            if mod.fail_auth:
-                raise AuthenticationError("bad key", 401)
-            mod.calls.append({"model": model, "messages": messages,
-                              "system": system, "backend": "api"})
-            schema = (tools or [{}])[0].get("input_schema") or {}
-            return _Message(mod.antwort(schema), mod.stop_reason)
-
-    class Anthropic:
-        def __init__(self, api_key=None, timeout=None, max_retries=None):
-            self.api_key = api_key
-            self.models = _Models()
-            self.messages = _Messages()
-
-    mod.Anthropic = Anthropic
-    for name, cls in [
-        ("APIError", APIError), ("APIStatusError", APIStatusError),
-        ("AuthenticationError", AuthenticationError),
-        ("PermissionDeniedError", PermissionDeniedError),
-        ("RateLimitError", RateLimitError), ("NotFoundError", NotFoundError),
-        ("BadRequestError", BadRequestError),
-        ("APIConnectionError", APIConnectionError),
-        ("APITimeoutError", APITimeoutError),
-    ]:
-        setattr(mod, name, cls)
-
-    mod.fail_auth = False
-    mod.calls = []
-    mod.stop_reason = "end_turn"
-    mod.responses = {}
-
-    def antwort(schema: dict):
+    def antwort(self, schema: dict):
         """Waehlt die Antwort anhand der Pflichtfelder des Schemas.
 
         Robuster als ein von Hand gesetzter Zweck: ein Job wie lesson_build
@@ -128,12 +98,8 @@ def _install_fake_anthropic() -> types.ModuleType:
         """
         schluessel = schema_key(schema)
         if schluessel is None:
-            return mod.responses.get("_unbekannt")
-        return mod.responses.get(schluessel)
-
-    mod.antwort = antwort
-    sys.modules["anthropic"] = mod
-    return mod
+            return self.responses.get("_unbekannt")
+        return self.responses.get(schluessel)
 
 
 #: Pflichtfelder -> Name der Antwort in `fake_llm.responses`
@@ -166,79 +132,23 @@ def schema_key(schema: dict) -> str | None:
     return SCHEMA_KEYS.get(pflicht)
 
 
-FAKE = _install_fake_anthropic()
+FAKE = _FakeKI()
 
 
 @pytest.fixture
 def fake_llm():
+    """Setzt den Antwortvorrat zurück. Der Name ist historisch gewachsen —
+    dahinter steht heute ausschließlich der gefälschte Devin-Anbieter."""
     FAKE.fail_auth = False
     FAKE.calls.clear()
     FAKE.responses = {}
     FAKE.stop_reason = "end_turn"
+    FAKE.devin.sessions.clear()
+    FAKE.devin.created.clear()
+    FAKE.devin.counter = 0
+    FAKE.devin.probes = 0
+    FAKE.devin.working_once = False
     return FAKE
-
-
-# --------------------------------------------------------------------------
-# Gefälschte Claude-CLI (Backend „abo")
-# --------------------------------------------------------------------------
-
-class FakeCli:
-    """Bildet `claude -p --output-format json --json-schema ...` nach."""
-
-    def __init__(self, fake):
-        self.fake = fake
-        self.aufrufe: list[list[str]] = []
-        self.rueckgabe = 0
-        self.stderr = ""
-
-    def which(self, name):
-        return "/usr/local/bin/claude" if name == "claude" else None
-
-    def run(self, argv, **kwargs):
-        self.aufrufe.append(list(argv))
-        env = kwargs.get("env") or {}
-        # Der Abo-Weg darf nie über einen API-Schlüssel laufen.
-        assert not env.get("ANTHROPIC_API_KEY"), \
-            "Der Abo-Weg darf keinen API-Schlüssel benutzen"
-        assert env.get("CLAUDE_CODE_OAUTH_TOKEN"), "Token fehlt in der Umgebung"
-        assert "--bare" not in argv, "--bare ignoriert die Abo-Anmeldung"
-
-        if self.fake.fail_auth:
-            return types.SimpleNamespace(
-                returncode=1, stdout="", stderr="OAuth token invalid (401)")
-        if self.rueckgabe != 0:
-            return types.SimpleNamespace(
-                returncode=self.rueckgabe, stdout="", stderr=self.stderr)
-
-        self.fake.calls.append({"argv": argv, "backend": "abo"})
-        schema = {}
-        if "--json-schema" in argv:
-            try:
-                schema = json.loads(argv[argv.index("--json-schema") + 1])
-            except (ValueError, IndexError, json.JSONDecodeError):
-                schema = {}
-        nutzdaten = self.fake.antwort(schema)
-        huelle = {
-            "type": "result", "subtype": "success", "is_error": False,
-            "model": "claude-sonnet-test",
-            "structured_output": nutzdaten,
-            "usage": {"input_tokens": 900, "output_tokens": 250},
-            "total_cost_usd": 0.004,
-            "stop_reason": self.fake.stop_reason,
-        }
-        return types.SimpleNamespace(
-            returncode=0, stdout=json.dumps(huelle, ensure_ascii=False),
-            stderr="")
-
-
-@pytest.fixture
-def fake_cli(fake_llm, monkeypatch):
-    from app.llm import cli_backend
-
-    cli = FakeCli(fake_llm)
-    monkeypatch.setattr(cli_backend.shutil, "which", cli.which)
-    monkeypatch.setattr(cli_backend.subprocess, "run", cli.run)
-    return cli
 
 
 # --------------------------------------------------------------------------
@@ -253,6 +163,9 @@ def app_env(tmp_path, monkeypatch):
     drive.mkdir()
     monkeypatch.setenv("KARO_DATA_DIR", str(daten))
     monkeypatch.setenv("KARO_DRIVE_DIR", str(drive))
+    # Der einzige Provider-Schlüssel — kommt aus der Umgebung, nie aus der
+    # Konfigurationsdatei.
+    monkeypatch.setenv("DEVIN_API_KEY", "test-devin-key")
 
     for name in [m for m in list(sys.modules) if m.startswith("app")]:
         del sys.modules[name]
@@ -262,6 +175,11 @@ def app_env(tmp_path, monkeypatch):
     importlib.reload(config)
     importlib.reload(db)
     db._local.__dict__.clear()
+
+    # Die Devin-HTTP-Ebene durch die Session-Attrappe ersetzen — erst nach
+    # dem Neuladen der Module, sonst zeigt der Patch auf eine tote Klasse.
+    from app.ai import devin as devin_mod
+    monkeypatch.setattr(devin_mod.DevinBackend, "_api", FAKE.devin.api)
 
     from app import main
 
@@ -318,15 +236,19 @@ def run_jobs(app_env, fake, limit: int = 30) -> None:
 
     Welche Antwort ein Aufruf bekommt, entscheidet das Schema — siehe
     SCHEMA_KEYS. Der Test muss die Aufrufreihenfolge nicht kennen.
+
+    Zurückgestellte Aufträge (`not_before` in der Zukunft — der Anbieter
+    arbeitet asynchron) werden sofort wieder vorgezogen: das Parken selbst
+    hat eigene Tests, hier zählt das Ergebnis.
     """
     from app import jobs
 
     for _ in range(limit):
         zeile = app_env.db.q1(
-            """SELECT id FROM job WHERE state='wartend'
-                 AND (not_before IS NULL OR not_before <= ?)
-                ORDER BY id LIMIT 1""", app_env.db.now())
+            "SELECT id FROM job WHERE state='wartend' ORDER BY id LIMIT 1")
         if zeile is None:
             return
+        with app_env.db.tx() as c:
+            c.execute("UPDATE job SET not_before=NULL WHERE state='wartend'")
         if not jobs.run_once():
             return

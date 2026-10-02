@@ -19,15 +19,15 @@ import json
 import logging
 
 from . import config, db, ingest, jobs, pii, prompts, topics, faecher
-from .llm import ClaudeClient, ClaudeError
+from .ai import AIClient, AIError
 
 log = logging.getLogger("karo.exam_plan")
 
 ROLLE = "klassenarbeit_themenblatt"
 
 
-def client() -> ClaudeClient:
-    return ClaudeClient.from_config(config.load())
+def client() -> AIClient:
+    return AIClient.from_config(config.load())
 
 
 # --------------------------------------------------------------------------
@@ -159,7 +159,7 @@ def job_exam_plan_build(payload: dict) -> None:
             schema=prompts.PLAN_SCHEMA,
             system=prompts.SYSTEM,
         )
-    except ClaudeError as exc:
+    except AIError as exc:
         with db.tx() as c:
             c.execute("UPDATE exam_plan SET state='fehler', fehler=? WHERE id=?",
                       (str(exc), plan["id"]))

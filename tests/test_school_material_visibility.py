@@ -5,7 +5,7 @@ from .conftest import csrf_from, make_jpeg, run_jobs
 from .test_app import einrichten, kind_modus_aktivieren
 
 
-def test_school_material_stays_available_to_parents_and_child_access_is_configurable(client, fake_llm, fake_cli, app_env):
+def test_school_material_stays_available_to_parents_and_child_access_is_configurable(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     for enabled in (False, True, False):
         app_env.config.update(schulblaetter_kind=enabled)
@@ -30,7 +30,7 @@ def test_school_material_stays_available_to_parents_and_child_access_is_configur
      '/vorbereitung/schulmaterial/einlesen', '/vorbereitung/schulmaterial/{id}'),
 ])
 def test_child_can_use_school_material_only_when_enabled(
-        client, fake_llm, fake_cli, app_env, tmp_path, index, upload, scan, detail):
+        client, fake_llm, app_env, tmp_path, index, upload, scan, detail):
     einrichten(client, fake_llm)
     kind_modus_aktivieren(client)
     token = csrf_from(client.get('/').text)

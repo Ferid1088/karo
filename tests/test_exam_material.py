@@ -33,7 +33,7 @@ def historisches_material(exam_id, tag, ausgabe='html'):
     return exam_learning.status(exam_learning.starten(exam_id, tag['row_key'], ausgabe))
 
 
-def test_material_in_zeile_archiviert_und_in_eigenem_tab(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_material_in_zeile_archiviert_und_in_eigenem_tab(client, fake_llm, app_env, alter_generator):
     from app import materials, exam_plan
     topic_id = _bis_rot(client, fake_llm, app_env)
     exam_id, tage = plan_anlegen(app_env, topic_id)
@@ -65,7 +65,7 @@ def test_material_in_zeile_archiviert_und_in_eigenem_tab(client, fake_llm, fake_
     assert restored.content == archive["inhalt"]
 
 
-def test_zeilen_und_neues_material_bleiben_getrennt(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_zeilen_und_neues_material_bleiben_getrennt(client, fake_llm, app_env, alter_generator):
     from app import teaching
     topic_id = _bis_rot(client, fake_llm, app_env)
     existing = teaching.starten(topic_id, "html", "Eine andere Lernrunde")
@@ -81,7 +81,7 @@ def test_zeilen_und_neues_material_bleiben_getrennt(client, fake_llm, fake_cli, 
     assert len({r[0] for r in paths}) == 2
 
 
-def test_alte_lerntag_route_erzeugt_auch_mit_legacy_schalter_keine_einheit(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_alte_lerntag_route_erzeugt_auch_mit_legacy_schalter_keine_einheit(client, fake_llm, app_env, alter_generator):
     topic_id = _bis_rot(client, fake_llm, app_env)
     exam_id, tage = plan_anlegen(app_env, topic_id)
     before = len(app_env.db.q('SELECT id FROM job'))
@@ -96,7 +96,7 @@ def test_alte_lerntag_route_erzeugt_auch_mit_legacy_schalter_keine_einheit(clien
     assert not app_env.db.q("SELECT * FROM exam_material")
 
 
-def test_fehlende_quellen_zeigen_einen_handlungsweg(client, fake_llm, fake_cli, app_env, monkeypatch, alter_generator):
+def test_fehlende_quellen_zeigen_einen_handlungsweg(client, fake_llm, app_env, monkeypatch, alter_generator):
     from app import kb, research
     topic_id = _bis_rot(client, fake_llm, app_env)
     exam_id, tage = plan_anlegen(app_env, topic_id)
@@ -110,7 +110,7 @@ def test_fehlende_quellen_zeigen_einen_handlungsweg(client, fake_llm, fake_cli, 
     assert historisches_material(exam_id, tage[0])["id"] == m["id"]
 
 
-def test_video_aus_archiv_unterstuetzt_spulen(client, fake_llm, fake_cli, app_env, tmp_path, monkeypatch, alter_generator):
+def test_video_aus_archiv_unterstuetzt_spulen(client, fake_llm, app_env, tmp_path, monkeypatch, alter_generator):
     from app import materials, teaching
     topic_id = _bis_rot(client, fake_llm, app_env)
     exam_id, tage = plan_anlegen(app_env, topic_id)
@@ -130,7 +130,7 @@ def test_video_aus_archiv_unterstuetzt_spulen(client, fake_llm, fake_cli, app_en
     assert 'Material' in materials.holen('runde', m['round_id'])['titel']
 
 
-def test_materialdatenbank_umziehen_und_vorhandenes_ziel_schuetzen(client, fake_llm, fake_cli, app_env, tmp_path, alter_generator):
+def test_materialdatenbank_umziehen_und_vorhandenes_ziel_schuetzen(client, fake_llm, app_env, tmp_path, alter_generator):
     from app import materials
     topic_id = _bis_rot(client, fake_llm, app_env)
     exam_id, tage = plan_anlegen(app_env, topic_id)
@@ -158,7 +158,7 @@ def test_materialdatenbank_umziehen_und_vorhandenes_ziel_schuetzen(client, fake_
     assert materials.pfad() == ziel
 
 
-def test_historische_lernkontrolle_bleibt_lesbar_ohne_neues_persoenliches_quiz(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_historische_lernkontrolle_bleibt_lesbar_ohne_neues_persoenliches_quiz(client, fake_llm, app_env, alter_generator):
     from app import exam_learning
     topic_id = _bis_rot(client, fake_llm, app_env)
     exam_id, tage = plan_anlegen(app_env, topic_id)

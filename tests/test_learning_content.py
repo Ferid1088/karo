@@ -7,7 +7,7 @@ from .test_ui import Forms
 
 
 def test_content_creation_moves_to_child_topic_after_first_check(
-        client, fake_llm, fake_cli, app_env, alter_generator):
+        client, fake_llm, app_env, alter_generator):
     from app import quizzes, teaching
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env, themenname="Brüche addieren")
@@ -59,7 +59,7 @@ def test_content_creation_moves_to_child_topic_after_first_check(
     assert '<iframe' in client.get(response.headers['location']).text
 
 
-def test_lesson_quiz_does_not_replace_initial_topic_check(client, fake_llm, fake_cli, app_env):
+def test_lesson_quiz_does_not_replace_initial_topic_check(client, fake_llm, app_env):
     from app import quizzes, topics
     from app.services import learning_content
     einrichten(client, fake_llm)

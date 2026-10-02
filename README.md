@@ -77,47 +77,26 @@ an den Hersteller.
 
 ---
 
-## Zugang: das 20-€-Abo oder ein API-Schlüssel
+## Zugang: `DEVIN_API_KEY`
 
-Karo kann **beides**, die Wahl fällt bei der Einrichtung.
-
-### Weg A — Claude-Abo (Pro/Max, ohne API-Schlüssel)
-
-Auf dem Rechner einmalig:
+Einziger KI-Anbieter ist die Devin-API — asynchron, pro Aufruf eine Session.
+Der Schlüssel kommt **ausschließlich aus der Umgebung**, nie aus der
+Konfigurationsdatei:
 
 ```bash
-npm install -g @anthropic-ai/claude-code
-claude setup-token
+# .env neben der docker-compose.yml
+DEVIN_API_KEY=…
 ```
 
-Der Befehl zeigt einen langlebigen Token. Diesen bei der Einrichtung
-einsetzen. Karo ruft danach die Claude-CLI im Hintergrund auf
-(`claude -p --output-format json --json-schema …`) und rechnet über das Abo ab
-— kein API-Schlüssel, keine Rechnung pro Aufruf.
+Karo arbeitet asynchron: ein Auftrag legt eine Devin-Session an, parkt sich
+selbst (`not_before`), fragt später erneut nach und übernimmt dann das
+`structured_output`. Eltern merken davon nichts — die Seite zeigt „in
+Arbeit", bis das Ergebnis da ist. Fehlt der Schlüssel, bleiben alle
+Einstellungen erreichbar und Karo meldet klar, was fehlt — es gibt keinen
+zweiten Anbieter und keinen stillen Fallback.
 
-Zwei Dinge dazu, offen gesagt:
-
-* **Kontingent.** Das Abo hat Nutzungsfenster. Karos Aufrufe zählen mit. Ein
-  Kind pro Tag liegt weit darunter; parallel eigenes Programmieren mit Claude
-  Code kann in einen Deckel laufen. Karo zeigt dann eine klare Meldung und
-  arbeitet den Vorgang später erneut ab.
-* **Weitergabe.** Anthropic erlaubt Dritt-Entwicklern nicht, claude.ai-Login
-  oder -Kontingente für ihre Produkte anzubieten. Für die eigene Familie ist
-  das unproblematisch. Gibt jemand das Image an einen Freund weiter, der sein
-  **eigenes** Abo und seinen **eigenen** Token einsetzt, nutzt jeder sein
-  eigenes Kontingent — technisch saubere Trennung, aber der Bereich bleibt eine
-  Grauzone der Nutzungsbedingungen. Für ein verkauftes Produkt ist es nicht
-  zulässig; dafür ist Weg B da.
-
-### Weg B — Anthropic-API-Schlüssel
-
-Zu holen unter `console.anthropic.com` → *API Keys*. Rund ein Euro im Monat bei
-täglicher Nutzung; die geschätzten Kosten stehen laufend unter *Protokoll*.
-Dieser Weg ist der vorgesehene für alles außer der eigenen Familie.
-
-Der Rest der Anwendung merkt von der Wahl nichts: beide Wege liegen hinter
-demselben `ClaudeClient`. Ein Wechsel auf Bedrock, Vertex oder ein lokales
-Modell ist eine neue Datei in `app/llm/` und ein Eintrag in einem Dictionary.
+Alle Modellaufrufe laufen über die Fassade `AIClient` in `app/ai/` — kein
+Modul spricht direkt mit der API.
 
 ---
 
@@ -211,33 +190,30 @@ make publish
 
 ## Einrichtung beim ersten Start
 
-**Schritt 1 — Zugang.** Erst die Wahl zwischen Abo und API-Schlüssel, dann die
-Zugangsdaten sowie Vorname und Klassenstufe des Kindes; beides bleibt auf
-diesem Rechner. Karo prüft den Zugang sofort mit einem echten Aufruf und
-speichert ihn nur, wenn er funktioniert. Bei falschen Daten erscheint eine
-verständliche Meldung — beim Abo-Weg mit dem konkreten nächsten Schritt
-(„Bitte am Rechner erneut `claude setup-token` ausführen") — und die Eingabe
-bleibt offen.
+**Schritt 1 — Zugang.** Karo zeigt, ob `DEVIN_API_KEY` gesetzt ist, und prüft
+die Verbindung auf Wunsch mit einer echten Anfrage. Der Schlüssel wird nicht
+in der Oberfläche eingetippt und nicht in `config.json` gespeichert — geändert
+wird er in der Umgebung (`.env`), danach Neustart. Dazu Vorname und
+Klassenstufe des Kindes; beides bleibt auf diesem Rechner.
 
-**Schritt 2 — Modelle, Ausgabe, Ablage, Passwort.** Beim API-Weg fragt Karo
-das Konto ab und zeigt nur freigeschaltete Modelle; beim Abo-Weg die drei, die
-die CLI kennt. Dazu die Voreinstellung für die Ausgabe des Lernmaterials, wie
-viel vom oberen Blattrand abgeschnitten wird, und ein Passwort für diese
-Instanz — beim ersten Mal **Pflicht**, mindestens 8 Zeichen. Später unter
-*Einstellungen* änderbar; dort ist das Feld optional, ein leeres Feld behält
-das bestehende Passwort.
+**Schritt 2 — Ausgabe, Ablage, Passwort.** Die Voreinstellung für die Ausgabe
+des Lernmaterials, wie viel vom oberen Blattrand abgeschnitten wird, und ein
+Passwort für diese Instanz — beim ersten Mal **Pflicht**, mindestens 8 Zeichen.
+Später unter *Einstellungen* änderbar; dort ist das Feld optional, ein leeres
+Feld behält das bestehende Passwort.
 
 ### Wo die Zugangsdaten liegen
 
-Ausschließlich in `/data/config.json` im Docker-Volume auf Ihrem Rechner, mit
-Dateirechten `0600`. Nicht im Image, nicht im Quellcode, nicht in Git, nicht in
-den Protokollen — ein Formatter schwärzt Schlüssel- und Tokenmuster
-einschließlich der in Fehlermeldungen und Tracebacks, bevor eine Zeile
-geschrieben wird. Beim Start prüft Karo diese Schwärzung selbst und verweigert
-sonst den Dienst.
+`DEVIN_API_KEY` lebt nur in der Umgebung (`.env`), niemals in
+`/data/config.json`. Die übrigen Einstellungen liegen in `/data/config.json`
+im Docker-Volume auf Ihrem Rechner, mit Dateirechten `0600`. Nichts davon im
+Image, im Quellcode, in Git oder in den Protokollen — ein Formatter schwärzt
+Schlüssel- und Tokenmuster einschließlich der in Fehlermeldungen und
+Tracebacks, bevor eine Zeile geschrieben wird. Beim Start prüft Karo diese
+Schwärzung selbst und verweigert sonst den Dienst.
 
-Zugang wechseln oder löschen: *Einstellungen* → *Zugangsdaten löschen und neu
-eingeben*.
+Schlüssel wechseln: `DEVIN_API_KEY` in `.env` ändern und den Container neu
+starten.
 
 ---
 
@@ -395,9 +371,8 @@ gehen verloren — die Wahrheit steht in Karo, nicht in der Tabelle.
 
 ## Datenschutz
 
-An Anthropic gehen:
+An Devin gehen — nur Text, niemals Bilder:
 
-* das Bild des Blattes, zugeschnitten und verkleinert
 * Klassenstufe, Fach und Thema
 * der abgelesene Text der Blätter und die Antworten des Kindes im Wortlaut
 * die Themenliste und, für den Lernplan, die Flaggen samt Fehlerzahlen
@@ -449,10 +424,9 @@ ist kein Backup.
 make test
 ```
 
-Die Tests laufen ohne Modellkosten: beide Zugangswege laufen gegen ein
-gefälschtes Modell, der Abo-Weg gegen eine nachgebildete Claude-CLI, die prüft,
-dass kein API-Schlüssel in der Umgebung steht und `--bare` nicht benutzt wird
-(es würde die Abo-Anmeldung übergehen).
+Die Tests laufen ohne Modellkosten: ein nachgebildeter Devin-Session-Dienst
+(`FakeDevin` in `tests/conftest.py`) bildet den echten Lebenszyklus nach —
+Session anlegen, parken, pollen, `structured_output` abholen.
 
 Die wichtigsten:
 
@@ -473,11 +447,10 @@ Die wichtigsten:
 ```
 app/
   main.py         FastAPI, Routen, Einrichtungsweiche, Zugangskontrolle, CSRF
-  llm/
-    base.py       DER Vertrag: Protokoll, Ausnahmen, RawResult
-    cli_backend.py   Abo-Weg über die Claude-CLI als Unterprozess
-    api_backend.py   API-Weg über die anthropic-Bibliothek
-    client.py     ClaudeClient — die einzige Naht zum Modell
+  ai/
+    base.py       DER Vertrag: Protokoll, Ausnahmen, AIPending
+    devin.py      Devin-Session-Provider (einziger externer Anbieter)
+    client.py     AIClient — die einzige Naht zum Modell, mit Audit
   config.py       Zugangsdaten und Einstellungen, atomar in /data/config.json
   prompts.py      Prompts und Antwortschemata
   pii.py          Entfernt personenbezogene Angaben vor jedem Aufruf
@@ -496,7 +469,7 @@ app/
   schema.sql      Schema, inklusive Trigger gegen Änderungen an Antworten
 ```
 
-Zwei Nähte tragen das Ganze: `app/llm/base.py` legt fest, was ein Backend
+Zwei Nähte tragen das Ganze: `app/ai/base.py` legt fest, was ein Anbieter
 können muss, und `app/domain.py` entscheidet über Flaggen — ohne Modell.
 
 ---

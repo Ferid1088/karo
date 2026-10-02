@@ -54,7 +54,7 @@ def _katalog(geprueft: bool = True, schwierigkeit: int = 2):
 # A3 — zwischengespeicherte Inhalte rufen kein Modell
 # --------------------------------------------------------------------------
 
-def test_tier1_treffer_ruft_kein_modell(client, fake_llm, fake_cli, app_env):
+def test_tier1_treffer_ruft_kein_modell(client, fake_llm, app_env):
     """A3: Ein Tier-1-Katalogtreffer löst null Modellaufrufe aus.
 
     Das ist der Test, der das gesamte Kostenmodell schützt.
@@ -75,7 +75,7 @@ def test_tier1_treffer_ruft_kein_modell(client, fake_llm, fake_cli, app_env):
 
 
 def test_unbekannter_fehler_ruft_ohne_schalter_kein_modell(client, fake_llm,
-                                                           fake_cli, app_env):
+                                                           app_env):
     """A3/§6: Ohne Tier-2/3-Schalter wird ehrlich nichts erkannt — statt heimlich
     ein Modell zu rufen."""
     from app.adaptiv import katalog
@@ -94,7 +94,7 @@ def test_unbekannter_fehler_ruft_ohne_schalter_kein_modell(client, fake_llm,
 # --------------------------------------------------------------------------
 
 def test_gleiche_fehlvorstellung_andere_schreibweise_gleicher_fehlertyp(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """A4: Zwei verschieden geschriebene Antworten derselben Fehlvorstellung
     landen beim selben Fehlertyp."""
     from app.adaptiv import katalog
@@ -109,7 +109,7 @@ def test_gleiche_fehlvorstellung_andere_schreibweise_gleicher_fehlertyp(
 
 
 def test_zwei_fehlvorstellungen_ergeben_zwei_erklaerungen(client, fake_llm,
-                                                          fake_cli, app_env):
+                                                          app_env):
     """A4: Dasselbe Thema mit zwei Fehlvorstellungen liefert zwei Erklärungen."""
     from app.adaptiv import katalog, store
 
@@ -130,7 +130,7 @@ def test_zwei_fehlvorstellungen_ergeben_zwei_erklaerungen(client, fake_llm,
 
 
 def test_neue_schreibweise_erzeugt_keinen_neuen_fehlertyp(client, fake_llm,
-                                                          fake_cli, app_env):
+                                                          app_env):
     """A4: Eine andere Formulierung erzeugt keinen zweiten Fehlertyp."""
     from app.adaptiv import katalog, store
 
@@ -185,7 +185,7 @@ def test_ungueltige_parameter_werden_abgelehnt():
 
 
 def test_kaputte_modellausgabe_erreicht_die_datenbank_nicht(client, fake_llm,
-                                                            fake_cli, app_env):
+                                                            app_env):
     """A2: Kaputtes JSON erreicht weder Datenbank noch Template — und erzeugt
     keinen 500er, sondern einen definierten Rückfall."""
     import pytest
@@ -220,7 +220,7 @@ def test_schwache_erklaerung_wird_gemeldet():
 # §6/§11 — versionieren statt ersetzen, Ungeprüftes bleibt drin
 # --------------------------------------------------------------------------
 
-def test_ungeprueftes_wird_keinem_kind_ausgeliefert(client, fake_llm, fake_cli,
+def test_ungeprueftes_wird_keinem_kind_ausgeliefert(client, fake_llm,
                                                     app_env):
     """§11: Ein nicht geprüfter Inhalt wird nicht ausgeliefert."""
     from app.adaptiv import katalog
@@ -235,7 +235,7 @@ def test_ungeprueftes_wird_keinem_kind_ausgeliefert(client, fake_llm, fake_cli,
     assert katalog.erklaerung_fuer(fehlertyp_id, 6) is not None
 
 
-def test_neue_variante_ersetzt_die_alte_nicht(client, fake_llm, fake_cli,
+def test_neue_variante_ersetzt_die_alte_nicht(client, fake_llm,
                                               app_env):
     """§6: Versionieren, nie destruktiv ersetzen; Verlierer werden archiviert."""
     from app.adaptiv import store
@@ -259,7 +259,7 @@ def test_neue_variante_ersetzt_die_alte_nicht(client, fake_llm, fake_cli,
 # A5 — Wiederholungen sind endlich
 # --------------------------------------------------------------------------
 
-def test_drei_erfolglose_runden_eskalieren(client, fake_llm, fake_cli, app_env):
+def test_drei_erfolglose_runden_eskalieren(client, fake_llm, app_env):
     """A5: Drei erfolglose Lehrrunden auf einen Fehlertyp → ESCALATED, danach
     keine weitere Erklärung, und der Fehlertyp ist im Profil markiert."""
     from app.adaptiv import sitzung, store
@@ -285,7 +285,7 @@ def test_drei_erfolglose_runden_eskalieren(client, fake_llm, fake_cli, app_env):
 
 
 def test_eskalierte_sitzung_zaehlt_nicht_endlos_weiter(client, fake_llm,
-                                                       fake_cli, app_env):
+                                                       app_env):
     """A5: Kein Pfad kann Lehrrunden unbegrenzt wiederholen."""
     from app.adaptiv import sitzung
 
@@ -305,7 +305,7 @@ def test_eskalierte_sitzung_zaehlt_nicht_endlos_weiter(client, fake_llm,
     assert stand["runden"] == sitzung.max_runden()
 
 
-def test_verbotener_uebergang_wird_abgewiesen(client, fake_llm, fake_cli,
+def test_verbotener_uebergang_wird_abgewiesen(client, fake_llm,
                                               app_env):
     """§7: Der Automat lässt nur vorgesehene Übergänge zu."""
     import pytest
@@ -321,7 +321,7 @@ def test_verbotener_uebergang_wird_abgewiesen(client, fake_llm, fake_cli,
 # A6 — Zustand übersteht Unterbrechung
 # --------------------------------------------------------------------------
 
-def test_sitzung_wird_an_derselben_phase_fortgesetzt(client, fake_llm, fake_cli,
+def test_sitzung_wird_an_derselben_phase_fortgesetzt(client, fake_llm,
                                                      app_env):
     """A6: Phase, Versuche, Beherrschung und die gegebene Antwort überstehen
     Neuladen und Neuanmeldung — der Zustand liegt in der Datenbank, nicht im
@@ -350,7 +350,7 @@ def test_sitzung_wird_an_derselben_phase_fortgesetzt(client, fake_llm, fake_cli,
     assert wieder["fehlertyp_id"] == fehlertyp_id
 
 
-def test_jeder_uebergang_ist_festgeschrieben(client, fake_llm, fake_cli,
+def test_jeder_uebergang_ist_festgeschrieben(client, fake_llm,
                                              app_env):
     """§7: Jeder Übergang wird geschrieben und ist damit prüfbar."""
     from app.adaptiv import sitzung, store
@@ -378,7 +378,7 @@ def test_jeder_uebergang_ist_festgeschrieben(client, fake_llm, fake_cli,
 # --------------------------------------------------------------------------
 
 def test_eine_richtige_antwort_ist_keine_beherrschung(client, fake_llm,
-                                                      fake_cli, app_env):
+                                                      app_env):
     """A8: Eine richtige Antwort erzeugt keine Beherrschung."""
     from app.adaptiv import sitzung, store
 
@@ -401,7 +401,7 @@ def test_eine_richtige_antwort_ist_keine_beherrschung(client, fake_llm,
 
 
 def test_mastery_schwelle_kommt_aus_der_konfiguration(client, fake_llm,
-                                                      fake_cli, app_env):
+                                                      app_env):
     """A8: Die Schwelle steht in der Konfiguration, nicht als Zahl im Code."""
     from app.adaptiv import sitzung
 
@@ -414,7 +414,7 @@ def test_mastery_schwelle_kommt_aus_der_konfiguration(client, fake_llm,
     assert sitzung.beherrscht(3, cfg)
 
 
-def test_max_lehrrunden_kommt_aus_der_konfiguration(client, fake_llm, fake_cli,
+def test_max_lehrrunden_kommt_aus_der_konfiguration(client, fake_llm,
                                                     app_env):
     """A5: Auch die Rundenzahl ist Konfiguration."""
     from app.adaptiv import sitzung
@@ -439,7 +439,7 @@ def test_max_lehrrunden_kommt_aus_der_konfiguration(client, fake_llm, fake_cli,
 # §13/§16 — normalisierte Eingabe, Schalter aus
 # --------------------------------------------------------------------------
 
-def test_drei_eingabewege_ergeben_eine_struktur(client, fake_llm, fake_cli,
+def test_drei_eingabewege_ergeben_eine_struktur(client, fake_llm,
                                                 app_env):
     """§13: Scan, Themenblatt und getipptes Thema landen in einer Struktur."""
     from app.adaptiv import store
@@ -462,7 +462,7 @@ def test_drei_eingabewege_ergeben_eine_struktur(client, fake_llm, fake_cli,
         assert isinstance(eintrag["aufgaben"], list)
 
 
-def test_neue_schalter_sind_standardmaessig_aus(client, fake_llm, fake_cli,
+def test_neue_schalter_sind_standardmaessig_aus(client, fake_llm,
                                                 app_env):
     """§16: Das neue System ist abschaltbar und stört die laufende App nicht."""
     einrichten(client, fake_llm)

@@ -1,17 +1,6 @@
 /* Settings: disclose relevant controls while retaining ordinary HTML forms. */
 (() => {
   'use strict';
-  document.querySelectorAll('[data-backend-form]').forEach(form => {
-    function updateBackend() {
-      const selected = form.querySelector('input[name="backend"]:checked');
-      form.querySelectorAll('[data-backend-panel]').forEach(panel => {
-        panel.hidden = !!selected && panel.dataset.backendPanel !== selected.value;
-      });
-    }
-    form.addEventListener('change', updateBackend);
-    updateBackend();
-  });
-
   const form = document.querySelector('[data-settings-form]');
   if (form) {
     const format = form.querySelector('[name="default_ausgabe"]');

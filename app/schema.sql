@@ -367,6 +367,25 @@ CREATE TABLE IF NOT EXISTS llm_call (
 CREATE INDEX IF NOT EXISTS idx_llm_created ON llm_call(created_at);
 
 -- ==========================================================================
+-- 9b. Asynchrone Anbieter-Sessions (Devin)
+-- ==========================================================================
+-- Ordnet dem Fingerabdruck eines Aufrufs (Anbieter + System + Prompt) die
+-- angelegte Session zu, damit ein Neustart oder ein zurückgestellter Job
+-- dieselbe Session wiederfindet statt eine zweite anzulegen.
+CREATE TABLE IF NOT EXISTS provider_session (
+    call_key    TEXT PRIMARY KEY,
+    provider    TEXT NOT NULL,
+    session_id  TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'working',
+    nudged      INTEGER NOT NULL DEFAULT 0,
+    restarts    INTEGER NOT NULL DEFAULT 0,
+    detail      TEXT,
+    purpose     TEXT,
+    created_ts  REAL NOT NULL,
+    updated_ts  REAL NOT NULL
+);
+
+-- ==========================================================================
 -- 10. Jobs
 -- ==========================================================================
 CREATE TABLE IF NOT EXISTS job (

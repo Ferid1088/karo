@@ -29,7 +29,7 @@ def _katalog(client, fake_llm):
 # --------------------------------------------------------------------------
 
 def test_eine_nur_in_der_datenbank_stehende_lektion_wird_gefunden(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Der Kern: ohne das kann keine erzeugte Lektion je ausgeliefert werden."""
     from app.adaptiv import lektionen, store
     _katalog(client, fake_llm)
@@ -45,7 +45,7 @@ def test_eine_nur_in_der_datenbank_stehende_lektion_wird_gefunden(
     assert treffer is not None and treffer["konzept_id"] == konzept_id
 
 
-def test_ohne_stichworte_traegt_das_label(client, fake_llm, fake_cli, app_env):
+def test_ohne_stichworte_traegt_das_label(client, fake_llm, app_env):
     from app.adaptiv import lektionen, store
     _katalog(client, fake_llm)
     store.konzept_sichern("mathematik", "geometrie", "quader-volumen",
@@ -58,7 +58,7 @@ def test_ohne_stichworte_traegt_das_label(client, fake_llm, fake_cli, app_env):
 
 
 def test_die_verfasste_bruchlektion_bleibt_unveraendert_auffindbar(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Die Umstellung darf die eine vorhandene Lektion nicht verlieren."""
     lektionen = _katalog(client, fake_llm)
 
@@ -74,7 +74,7 @@ def test_die_verfasste_bruchlektion_bleibt_unveraendert_auffindbar(
 # Prüfzustand: ungeprüft erreicht kein Kind (§11)
 # --------------------------------------------------------------------------
 
-def test_ungeprueftes_konzept_wird_nicht_angeboten(client, fake_llm, fake_cli,
+def test_ungeprueftes_konzept_wird_nicht_angeboten(client, fake_llm,
                                                    app_env):
     from app.adaptiv import lektionen, store
     _katalog(client, fake_llm)
@@ -90,7 +90,7 @@ def test_ungeprueftes_konzept_wird_nicht_angeboten(client, fake_llm, fake_cli,
     assert lektionen.fuer_thema("Prisma", "mathematik")["konzept_id"] == konzept_id
 
 
-def test_ungepruefter_fehlertyp_trifft_nicht(client, fake_llm, fake_cli,
+def test_ungepruefter_fehlertyp_trifft_nicht(client, fake_llm,
                                              app_env):
     """Tier 1 darf keine ungeprüfte Fehlvorstellung zurückgeben."""
     from app.adaptiv import katalog, store
@@ -109,7 +109,7 @@ def test_ungepruefter_fehlertyp_trifft_nicht(client, fake_llm, fake_cli,
 
 
 def test_ungepruefte_aufgabe_wird_nicht_ausgeliefert(client, fake_llm,
-                                                     fake_cli, app_env):
+                                                     app_env):
     from app.adaptiv import inhalt_store, store
     _katalog(client, fake_llm)
     konzept_id = store.konzept_sichern("mathematik", "x", "z", "Z", 5, 6,
@@ -123,7 +123,7 @@ def test_ungepruefte_aufgabe_wird_nicht_ausgeliefert(client, fake_llm,
     assert inhalt_store.aufgaben(fehlertyp_id) == []
 
 
-def test_verfasster_inhalt_gilt_als_geprueft(client, fake_llm, fake_cli,
+def test_verfasster_inhalt_gilt_als_geprueft(client, fake_llm,
                                              app_env):
     """Von Menschen geschrieben heißt geprüft (§11) — sonst verschwände die
     Bruchlektion beim ersten Start nach der Umstellung."""
@@ -140,7 +140,7 @@ def test_verfasster_inhalt_gilt_als_geprueft(client, fake_llm, fake_cli,
 
 
 def test_der_katalog_steht_beim_start_und_nicht_erst_beim_ersten_klick(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Verfasste Lektionen säen beim Hochfahren, nicht beim ersten Aufruf.
 
     Lazy war es nur, solange `verfuegbar()` auf jedem Seitenaufbau lief.

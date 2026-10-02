@@ -14,7 +14,7 @@ Namen, Klasse und Datum stehen dort nicht mehr drin.
 
     Seiten hochgeladen
       → job material_analyse: fehlende Seiten serverseitig lesen,
-        Fach erkennen, Themen vorschlagen (Modell nur auf Text)
+        Fach erkennen, Themen vorschlagen (KI nur auf Text)
       → Mensch bestätigt in der Prüfansicht
       → zweck 'lernen': Themen landen im normalen Lernbereich
         zweck 'klassenarbeit': Themen füllen das Formular der neuen Arbeit
@@ -28,6 +28,7 @@ import time
 
 from . import blatt_text, config, db, faecher, ingest, jobs, pii, prompts
 from .adaptiv.normalisierung import normalisiere_thema
+from .ai import AIPending
 
 log = logging.getLogger("karo.material")
 
@@ -467,10 +468,10 @@ def _analyse_modell(paket_id: int, fach_hint: str | None,
     Hash des tatsächlichen Prompts liegen — an dem Hash erkennt man später,
     ob es derselbe Modellinput war, ohne den Inhalt zu kennen.
 
-    Wirft ClaudeError; der Aufrufer entscheidet über den Umgang."""
+    Wirft AIError; der Aufrufer entscheidet über den Umgang."""
     import hashlib
 
-    from .llm import ClaudeClient
+    from .ai import AIClient
     cfg = config.load_safe()
     nummern = "\n\n".join(
         f"=== Seite {i} ===\n{text}" for i, text in enumerate(seiten_texte, 1))
@@ -483,7 +484,7 @@ def _analyse_modell(paket_id: int, fach_hint: str | None,
         f"input_chars={len(prompt)}\n"
         f"prompt_hash=sha256:"
         f"{hashlib.sha256(prompt.encode('utf-8')).hexdigest()}")
-    ergebnis = ClaudeClient.from_config(cfg).complete(
+    ergebnis = AIClient.from_config(cfg).complete(
         purpose="material_analyse",
         prompt=prompt,
         schema=prompts.MATERIAL_SCHEMA,
@@ -571,12 +572,14 @@ def job_material_analyse(payload: dict) -> None:
     try:
         ergebnis = _analyse_modell(paket_id, fach_hint,
                                    [s["text"] for s in gelesen])
+    except AIPending:
+        raise                           # der Anbieter arbeitet noch — Job parken
     except Exception as exc:                # noqa: BLE001 - Meldung steht in fehler
-        from .llm import ClaudeError
-        if not isinstance(exc, ClaudeError):
+        from .ai import AIError
+        if not isinstance(exc, AIError):
             log.warning("Material-Analyse unerwartet fehlgeschlagen",
                         exc_info=True)
-        fehler(str(exc) if isinstance(exc, ClaudeError)
+        fehler(str(exc) if isinstance(exc, AIError)
                else "Die Analyse ist fehlgeschlagen. Bitte erneut versuchen.")
         return
 

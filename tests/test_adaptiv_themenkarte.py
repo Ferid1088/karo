@@ -18,7 +18,7 @@ def _themen(client, fake_llm, app_env, *labels):
     return [topics.anlegen(label, subject="mathematik") for label in labels]
 
 
-def test_thema_mit_lernreihe_bekommt_einen_knopf(client, fake_llm, fake_cli,
+def test_thema_mit_lernreihe_bekommt_einen_knopf(client, fake_llm,
                                                  app_env):
     _themen(client, fake_llm, app_env, "Brüche addieren und subtrahieren")
 
@@ -29,7 +29,7 @@ def test_thema_mit_lernreihe_bekommt_einen_knopf(client, fake_llm, fake_cli,
     assert 'value="Brüche addieren und subtrahieren"' in seite
 
 
-def test_jede_karte_hat_einen_aktiven_knopf(client, fake_llm, fake_cli,
+def test_jede_karte_hat_einen_aktiven_knopf(client, fake_llm,
                                             app_env):
     """Auch ohne verfasste Lernreihe. Ein abgeblendeter Knopf auf zehn von elf
     Karten sieht aus wie eine kaputte App, nicht wie eine ehrliche."""
@@ -44,7 +44,7 @@ def test_jede_karte_hat_einen_aktiven_knopf(client, fake_llm, fake_cli,
 
 
 def test_ohne_lernreihe_sagt_das_die_naechste_seite(client, fake_llm,
-                                                    fake_cli, app_env):
+                                                    app_env):
     """Die Ehrlichkeit wandert vom Kärtchen auf die Antwortseite — sie
     verschwindet nicht. Untergeschoben wird weiterhin nichts."""
     from .test_app import kind_modus_aktivieren
@@ -72,7 +72,7 @@ def test_ohne_lernreihe_sagt_das_die_naechste_seite(client, fake_llm,
 
 
 def test_der_knopf_startet_wirklich_den_diagnoseweg(client, fake_llm,
-                                                    fake_cli, app_env):
+                                                    app_env):
     """Derselbe Loop wie „Brüche addieren" — nicht nur ein Link."""
     from .test_app import kind_modus_aktivieren
     _themen(client, fake_llm, app_env, "Brüche addieren und subtrahieren")
@@ -89,7 +89,7 @@ def test_der_knopf_startet_wirklich_den_diagnoseweg(client, fake_llm,
 
 
 def test_ohne_den_schalter_bleibt_die_karte_wie_bisher(client, fake_llm,
-                                                       fake_cli, app_env):
+                                                       app_env):
     from app import topics
     einrichten(client, fake_llm)
     topics.anlegen("Brüche addieren und subtrahieren", subject="mathematik")
@@ -101,7 +101,7 @@ def test_ohne_den_schalter_bleibt_die_karte_wie_bisher(client, fake_llm,
 
 
 def test_kein_globaler_verweis_mehr_ueber_dem_raster(client, fake_llm,
-                                                     fake_cli, app_env):
+                                                     app_env):
     """Der alte Sammelverweis hing an der Rolle und an keinem Thema: als
     Elternteil war er unsichtbar, und er verriet nie, welches der Themen
     überhaupt unterrichtet werden kann. Die Karte kann beides."""
@@ -115,7 +115,7 @@ def test_kein_globaler_verweis_mehr_ueber_dem_raster(client, fake_llm,
     assert "Starten" in seite
 
 
-def test_der_knopf_erscheint_auch_fuer_eltern(client, fake_llm, fake_cli,
+def test_der_knopf_erscheint_auch_fuer_eltern(client, fake_llm,
                                               app_env):
     """Die Route prüft den Schalter, nicht die Rolle — die Karte jetzt auch.
     Sonst sucht man als Elternteil wieder vergeblich nach dem Einstieg."""
@@ -127,7 +127,7 @@ def test_der_knopf_erscheint_auch_fuer_eltern(client, fake_llm, fake_cli,
     assert "Starten" in seite.text
 
 
-def test_der_knopf_traegt_die_handlungsfarbe(client, fake_llm, fake_cli,
+def test_der_knopf_traegt_die_handlungsfarbe(client, fake_llm,
                                              app_env):
     _themen(client, fake_llm, app_env, "Brüche addieren und subtrahieren")
 
@@ -140,7 +140,7 @@ def test_der_knopf_traegt_die_handlungsfarbe(client, fake_llm, fake_cli,
 
 
 def test_die_lektionszeile_traegt_keine_eigene_gestaltung(client, fake_llm,
-                                                          fake_cli, app_env):
+                                                          app_env):
     """„Das geht schon" ist ein <button>, sieht aber wie eine Listenzeile aus.
 
     Ohne eigene Regel gewinnt die Knopf-Grundregel mit ihrer vollen

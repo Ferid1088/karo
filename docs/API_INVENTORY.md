@@ -8,8 +8,7 @@ Nur Integrationen, die im Code tatsächlich vorhanden sind. Keine Annahmen.
 
 | Name | Typ | Richtung | Auth | aktiv/optional |
 |---|---|---|---|---|
-| Anthropic API | LLM-Provider | ausgehend HTTPS | `anthropic_api_key` (Bearer-Header durch SDK) | optional — Backend `api` |
-| Claude CLI / Abo | LLM-Provider | ausgehend (CLI) | `claude_oauth_token` → `CLAUDE_CODE_OAUTH_TOKEN` | optional — Backend `abo` |
+| Devin API | LLM-Provider | ausgehend HTTPS | `DEVIN_API_KEY` (Bearer, nur aus Umgebung) | einziger KI-Anbieter |
 | Curriculum-Dienst | HTTP-Service | ausgehend | `curriculum_key` (Header) | optional — nur wenn konfiguriert |
 | NotebookLM-CLI | lokales Werkzeug | ausgehend Google | Google-Session in `NOTEBOOKLM_HOME` | optional — nur wenn eingerichtet |
 | Tesseract | lokales Werkzeug | lokal | — | Teil des Images |
@@ -18,47 +17,31 @@ Nur Integrationen, die im Code tatsächlich vorhanden sind. Keine Annahmen.
 | ffmpeg | lokales Werkzeug | lokal | — | Teil des Images (wenn `KARO_MIT_MP4`) |
 | Xvfb / noVNC | lokale Werkzeuge | lokal | — | für NotebookLM-Login |
 
-**Nicht vorhanden:** OpenAI, OpenRouter, ElevenLabs, Devin-API, Google-OAuth
+**Nicht vorhanden:** OpenAI, OpenRouter, ElevenLabs, Google-OAuth
 (kein OAuth-Client im Code), Google Drive API. „Google" kommt nur über die
 NotebookLM-CLI hinein, die selbst eine Google-Browsersession pflegt.
 
 ---
 
-## 1. Anthropic API (Backend `api`)
+## 1. Devin API
 
 | | |
 |---|---|
-| Typ | LLM-Provider |
+| Typ | LLM-Provider, asynchron per Session |
 | Richtung | ausgehend HTTPS |
-| Verwendung | Lernserien, Fachklassifikation, Materialanalyse, Recherche-Ranking |
-| Base URL | SDK-Standard `https://api.anthropic.com` |
-| Auth | `x-api-key` aus `Config.anthropic_api_key` (config.json) |
-| Provider/Modell | `Config.model_stark`, `Config.model_text`, `Config.model_video` |
-| Timeout | `ops.llm_api_timeout_seconds` (180 s); Lektionen 900 s |
-| Retry | SDK `max_retries = ops.llm_api_max_retries` (3) |
-| Rate-Limit | SDK-Retry; Fehler landen als `ClaudeError` im Job |
-| Rausgehende Daten | Prompts mit Aufgabentexten/Themen; **keine Bilder** (Privacy-Test `test_keine_bilder_an_modelle`) |
+| Verwendung | Lernserien, Fachklassifikation, Materialanalyse, Recherche-Ranking, Gegenprüfungen |
+| Base URL | `ops.devin_base_url` (`https://api.devin.ai/v1`) |
+| Ablauf | `POST /sessions` → Auftrag wird mit `not_before` geparkt (`AIPending` → `jobs.Deferred`) → `GET /sessions/{id}` bis `structured_output` da ist |
+| Auth | `Authorization: Bearer $DEVIN_API_KEY` — nur aus der Umgebung, nie in `config.json` |
+| Fingerprint | SHA-256 aus Provider+Prompts → Tabelle `provider_session`; identische Aufrufe teilen die Session, geparkte Jobs finden sie wieder |
+| Timeout | `ops.devin_http_timeout_seconds` (60 s) pro Anfrage; Session-Höchstalter `devin_max_session_seconds` (7200 s) |
+| Warten | `ops.devin_poll_seconds` (300 s) zwischen Polls — verbraucht keinen Job-Versuch |
+| Fehler | `blocked` → ein Nudge per `POST /sessions/{id}/message`; abgelaufen/gescheitert → max. `devin_max_restarts` (1) Neustart, sonst `AIError` im Job |
+| Rausgehende Daten | Prompts mit Aufgabentexten/Themen; **keine Bilder** (Privacy-Test `test_keine_bilder_an_modelle`) — die Schnittstelle hat gar keinen Bild-Parameter |
 | Personenbezogen | Lernstände, Themen — kein Name, kein Foto |
-| Code | `app/llm/api_backend.py`, `app/llm/client.py` |
+| Code | `app/ai/devin.py` (Provider), `app/ai/client.py` (`AIClient`-Fassade + `llm_call`-Audit), `app/ai/base.py` (Fehler/`AIPending`) |
 
-## 2. Claude CLI / Abo (Backend `abo`)
-
-| | |
-|---|---|
-| Typ | LLM-Provider über die installierte `claude`-CLI |
-| Richtung | ausgehend (CLI ruft Anthropic) |
-| Verwendung | wie oben — gleiche `ClaudeClient`-Schnittstelle |
-| Base URL | intern der CLI |
-| Auth | `CLAUDE_CODE_OAUTH_TOKEN` aus `Config.claude_oauth_token` (config.json); `ANTHROPIC_API_KEY` wird aus der CLI-Umgebung gelöscht |
-| Provider/Modell | `sonnet`/`haiku`/`opus`-Aliase der CLI |
-| Timeout | `ops.llm_cli_timeout_seconds` (300 s) |
-| Retry | keine eigenen — Job-Layer (`jobs_retry_delays`) |
-| Rate-Limit | Abo-Kontingent; Fehler wird als Job-Fehler gezeigt |
-| Rausgehende Daten | wie Anthropic API |
-| Personenbezogen | wie oben |
-| Code | `app/llm/cli_backend.py`, `app/llm/client.py` |
-
-## 3. Curriculum-Dienst
+## 2. Curriculum-Dienst
 
 | | |
 |---|---|
@@ -75,7 +58,7 @@ NotebookLM-CLI hinein, die selbst eine Google-Browsersession pflegt.
 | Personenbezogen | keine |
 | Code | `app/adaptiv/curriculum_dienst.py` |
 
-## 4. NotebookLM-CLI
+## 3. NotebookLM-CLI
 
 | | |
 |---|---|
@@ -89,7 +72,7 @@ NotebookLM-CLI hinein, die selbst eine Google-Browsersession pflegt.
 | Personenbezogen | abhängig vom Familienkonto |
 | Code | `app/media/notebooklm.py` |
 
-## 5. Lokale Werkzeuge
+## 4. Lokale Werkzeuge
 
 | Name | Zweck | Konfiguration | Code |
 |---|---|---|---|
@@ -99,7 +82,7 @@ NotebookLM-CLI hinein, die selbst eine Google-Browsersession pflegt.
 | ffmpeg | Video-Erzeugung | `video_timeout_seconds` | `app/media/video.py` |
 | Xvfb/noVNC | NotebookLM-Login | `notebooklm_vnc_*`, `notebooklm_novnc_*` | `app/media/notebooklm.py` |
 
-## 6. Eingebettete Inhalte (keine API)
+## 5. Eingebettete Inhalte (keine API)
 
 `app/welten/content.py` enthält eine kuratierte Liste öffentlicher Bildungs-URLs
 (NASA, MedlinePlus, USFS usw.) als Lesestoff für „Meine Welt". Das sind Links,
@@ -110,15 +93,15 @@ keine Anbindungen — keine Auth, keine Calls.
 ## Zählung
 
 ```text
-Externe APIs/Integrationen insgesamt:   4   (Anthropic, Claude-CLI, Curriculum, NotebookLM)
-OAuth-Integrationen:                    1   (NotebookLM-Browsersession; Claude-CLI nutzt OAuth-Token)
-LLM-/AI-Provider:                       2   (Anthropic API, Claude CLI — ein Ziel, zwei Wege)
+Externe APIs/Integrationen insgesamt:   3   (Devin API, Curriculum, NotebookLM)
+OAuth-Integrationen:                    1   (NotebookLM-Browsersession)
+LLM-/AI-Provider:                       1   (Devin API — einziger Anbieter)
 lokale externe Werkzeuge:               5   (Tesseract, Tesseract.js, Piper, ffmpeg, Xvfb/noVNC)
-optionale Integrationen:                4   (alles außer Tesseract/ffmpeg im Image)
-aktive Standardintegrationen:           2   (LLM-Backend + Tesseract; Rest erst nach Einrichtung)
+optionale Integrationen:                3   (Curriculum, NotebookLM, Piper)
+aktive Standardintegrationen:           2   (Devin API + Tesseract; Rest erst nach Einrichtung)
 ```
 
 ```text
-AI: 2 · Speech: 1 (Piper) · Storage: 0 · Auth: 0 · Curriculum: 1 ·
+AI: 1 · Speech: 1 (Piper) · Storage: 0 · Auth: 0 · Curriculum: 1 ·
 Media: 3 (NotebookLM, ffmpeg, Xvfb) · Monitoring: 0 · Other: 0
 ```

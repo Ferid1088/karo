@@ -129,7 +129,7 @@ def test_pdf_mit_zu_vielen_seiten_wird_abgelehnt(proben, monkeypatch):
 
 # ------------------------------------------------------ Der Weg nach innen
 
-def test_serverseitig_loescht_die_datei_sofort(client, fake_llm, fake_cli, app_env, proben,
+def test_serverseitig_loescht_die_datei_sofort(client, fake_llm, app_env, proben,
                                                monkeypatch):
     """Sie geht kurz an den eigenen Server und ueberlebt die Anfrage nicht."""
     from app import blatt_text
@@ -156,7 +156,7 @@ def test_serverseitig_loescht_die_datei_sofort(client, fake_llm, fake_cli, app_e
     assert not gesehen["pfad"].parent.exists()
 
 
-def test_ohne_lesehilfe_auf_dem_server_wird_das_gesagt(client, fake_llm, fake_cli, app_env,
+def test_ohne_lesehilfe_auf_dem_server_wird_das_gesagt(client, fake_llm, app_env,
                                                        proben, monkeypatch):
     from app import blatt_text
 
@@ -170,7 +170,7 @@ def test_ohne_lesehilfe_auf_dem_server_wird_das_gesagt(client, fake_llm, fake_cl
     assert "eintippen" in antwort.json()["fehler"]
 
 
-def test_gelesener_text_nimmt_denselben_weg_wie_eingetippter(client, fake_llm, fake_cli,
+def test_gelesener_text_nimmt_denselben_weg_wie_eingetippter(client, fake_llm,
                                                              app_env, proben, monkeypatch):
     """Ein Weg, nicht zwei — sonst laeuft einer erst am Tag der Umstellung."""
     from app import blatt_text

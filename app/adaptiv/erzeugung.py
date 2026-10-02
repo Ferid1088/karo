@@ -32,10 +32,8 @@ QUELLE = "erzeugt"
 #: mittendrin ab, und die Prüfung verwirft sie als unvollständig.
 MAX_TOKENS = config.ops().llm_lektion_max_tokens
 
-#: Entsprechend länger darf der Aufruf dauern. Gemessen auf der
-#: Testinstallation: 240 bis 300 Sekunden — genau an der üblichen Grenze,
-#: weshalb jeder zweite Versuch als Zeitüberschreitung endete.
-TIMEOUT_SEKUNDEN = config.ops().llm_lektion_timeout_seconds
+#: Devin arbeitet asynchron — das Zeitlimit für eine Lektion steht in
+#: ops.devin_max_session_seconds, nicht an einem einzelnen HTTP-Aufruf.
 
 #: Welche Rolle als Auswahl gestellt wird statt als Rechnung.
 _ALS_AUSWAHL = {"vorhersage", "transfer"}
@@ -184,7 +182,7 @@ def _handler_anmelden():
     """Erst beim Import von `jobs` registrieren — sonst zieht diese Datei
     die halbe Anwendung in die adaptive Schicht, nur um geladen zu werden."""
     from .. import config, jobs, pii, prompts
-    from ..llm.client import ClaudeClient
+    from ..ai.client import AIClient
 
     @jobs.handler("lektion_erzeugen")
     def job_lektion_erzeugen(payload: dict) -> dict:
@@ -213,12 +211,11 @@ def _handler_anmelden():
         from . import curriculum_dienst
         if curriculum_dienst.configured(cfg) or "curriculum_service" in payload:
             return curriculum_dienst.prepare(cfg, payload, thema, fach, klasse)
-        # §5: Modell A schreibt Didaktik und ist das starke Modell. Ohne
-        # ausdrückliche Wahl nähme `complete()` das kleine Textmodell —
-        # das schrieb Komponentenparameter, die die Prüfung verwarf.
-        ergebnis = ClaudeClient.from_config(cfg, TIMEOUT_SEKUNDEN).complete(
+        # §5: der Anbieter schreibt die Didaktik — Devin kennt keine
+        # Modellwahl, die Qualitätssicherung liegt in `schemas.pruefe_lektion`
+        # und `klassenpruefung.pruefen` hinterher.
+        ergebnis = AIClient.from_config(cfg).complete(
             purpose="lektion_erzeugen",
-            model=cfg.model_stark or None,
             max_tokens=MAX_TOKENS,
             prompt=prompts.lektion_prompt(
                 None, NAMEN[fach],

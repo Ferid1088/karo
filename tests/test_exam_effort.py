@@ -162,7 +162,7 @@ def test_die_herkunft_der_einschaetzung_steht_dabei(app_env):
 
 
 def test_beim_anlegen_einer_arbeit_entstehen_die_inhaltsauftraege(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     """Wer die Themen gleich beim Anlegen eintraegt, wartete sonst ewig.
 
     `inhalte_anfordern` hing nur am Nachtragen von Themen und am Oeffnen der

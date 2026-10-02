@@ -37,13 +37,13 @@ from .domain import (
     Stufe,
     NEXT_STUFE,
 )
-from .llm import ClaudeClient, ClaudeError
+from .ai import AIClient, AIPending
 
 log = logging.getLogger("karo.teaching")
 
 
-def client() -> ClaudeClient:
-    return ClaudeClient.from_config(config.load())
+def client() -> AIClient:
+    return AIClient.from_config(config.load())
 
 
 class TeachingError(Exception):
@@ -706,6 +706,8 @@ def job_lesson_variant(payload: dict) -> None:
                           notebooklm_quelle_pfad=?
                     WHERE id=?""",
                 (pfad, notiz.strip() or None, notebooklm_quelle_pfad, variant_id))
+    except AIPending:
+        raise                       # der Anbieter arbeitet noch — Job parken
     except TeachingError as exc:
         _fehlschlag(str(exc))
     except Exception:                                        # pragma: no cover

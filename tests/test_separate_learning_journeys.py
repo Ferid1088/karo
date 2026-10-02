@@ -39,7 +39,7 @@ def post(client, token, base, session_id, action, answer=""):
                        data={"_csrf": token, "antwort": answer})
 
 
-def test_same_name_never_shares_local_topics(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_same_name_never_shares_local_topics(client, fake_llm, app_env, monkeypatch):
     from app.services import learning_hub
     personal, exams, tids, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     assert len({personal, *tids}) == 3
@@ -56,7 +56,7 @@ def test_same_name_never_shares_local_topics(client, fake_llm, fake_cli, app_env
     assert not app_env.db.q("SELECT id FROM lern_sitzung")
 
 
-def test_parallel_tabs_and_progress_stay_separate(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_parallel_tabs_and_progress_stay_separate(client, fake_llm, app_env, monkeypatch):
     from app.adaptiv import store
     personal, exams, tids, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     pbase, psid, _ = start(client, token, personal)
@@ -78,7 +78,7 @@ def test_parallel_tabs_and_progress_stay_separate(client, fake_llm, fake_cli, ap
     assert client.get(f"{ebase}?sitzung={esid}").status_code == 200
 
 
-def test_exam_teaches_known_error_through_mastery_without_model(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_exam_teaches_known_error_through_mastery_without_model(client, fake_llm, app_env, monkeypatch):
     from app.adaptiv import store, inhalt_store
     personal, exams, tids, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     fake_llm.calls.clear()
@@ -110,7 +110,7 @@ def test_exam_teaches_known_error_through_mastery_without_model(client, fake_llm
 
 
 @pytest.mark.parametrize("exam_scope", [False, True])
-def test_generation_wait_resume_and_database_reuse(client, fake_llm, fake_cli, app_env, monkeypatch, exam_scope):
+def test_generation_wait_resume_and_database_reuse(client, fake_llm, app_env, monkeypatch, exam_scope):
     from app.services import learning_hub
     from app.adaptiv import store
     _, exams, _, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
@@ -143,7 +143,7 @@ def test_generation_wait_resume_and_database_reuse(client, fake_llm, fake_cli, a
     assert store.sitzung(session["id"])["daten"].get("zweite_diagnose")
 
 
-def test_full_calendar_preserves_omitted_days_and_exam_ownership(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_full_calendar_preserves_omitted_days_and_exam_ownership(client, fake_llm, app_env, monkeypatch):
     from app.services import exam_calendar
     _, exams, _, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     first, second = exams
@@ -159,7 +159,7 @@ def test_full_calendar_preserves_omitted_days_and_exam_ownership(client, fake_ll
     assert exam_calendar.get_days(first)["2026-09-28"] == 0
 
 
-def test_create_exam_guides_to_own_plan_and_retains_invalid_form(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_create_exam_guides_to_own_plan_and_retains_invalid_form(client, fake_llm, app_env, monkeypatch):
     _, _, _, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     response = client.post("/klassenarbeit", data={"_csrf": token, "exam_date": "2026-11-03",
                            "themen": "Brüche kürzen", "fach": "Mathematik"}, follow_redirects=False)
@@ -174,7 +174,7 @@ def test_create_exam_guides_to_own_plan_and_retains_invalid_form(client, fake_ll
     assert "Behaltenes Thema" in page.text and "Bitte wähle das Fach" in page.text
 
 
-def test_rehearsal_is_gated_scoped_and_idempotent(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_rehearsal_is_gated_scoped_and_idempotent(client, fake_llm, app_env, monkeypatch):
     from app.services import exam_calendar, exam_rehearsal
     from app.adaptiv import store
     personal, exams, tids, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
@@ -199,7 +199,7 @@ def test_rehearsal_is_gated_scoped_and_idempotent(client, fake_llm, fake_cli, ap
     assert store.topic_mastery(tids[1]) is None
 
 
-def test_deleted_exam_is_not_scheduled_or_accessible(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_deleted_exam_is_not_scheduled_or_accessible(client, fake_llm, app_env, monkeypatch):
     from app.services import exam_calendar, learning_hub
     _, exams, tids, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     exam_calendar.save_days(exams[0], {"2026-09-27": 20})
@@ -212,7 +212,7 @@ def test_deleted_exam_is_not_scheduled_or_accessible(client, fake_llm, fake_cli,
                        data={"_csrf": token, "topic_id": tids[0]}).status_code == 404
 
 
-def test_archive_and_legacy_paths_cannot_take_exam_topics(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_archive_and_legacy_paths_cannot_take_exam_topics(client, fake_llm, app_env, monkeypatch):
     from app.services import learning_hub
     _, exams, tids, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     tid = tids[0]
@@ -226,7 +226,7 @@ def test_archive_and_legacy_paths_cannot_take_exam_topics(client, fake_llm, fake
     assert response.status_code == 200 and 'sitzung=' in response.text
 
 
-def test_early_rehearsal_is_visible_even_on_unplanned_day(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_early_rehearsal_is_visible_even_on_unplanned_day(client, fake_llm, app_env, monkeypatch):
     from app.services import exam_calendar
     _, exams, _, _ = setup_journeys(client, fake_llm, app_env, monkeypatch)
     exam_calendar.save_days(exams[0], {'2026-10-14': 25})
@@ -238,7 +238,7 @@ def test_early_rehearsal_is_visible_even_on_unplanned_day(client, fake_llm, fake
     assert month['lernminuten'] == 25
 
 
-def test_scan_ownership_cannot_cross_learning_areas(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_scan_ownership_cannot_cross_learning_areas(client, fake_llm, app_env, monkeypatch):
     from app.services.exam import create_exam, ExamError
     _, _, _, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     with app_env.db.tx() as c:
@@ -260,7 +260,7 @@ def test_scan_ownership_cannot_cross_learning_areas(client, fake_llm, fake_cli, 
     assert response.status_code == 200 and 'Brüche kürzen' in response.text
 
 
-def test_migration_preserves_ambiguous_history_and_is_idempotent(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_migration_preserves_ambiguous_history_and_is_idempotent(client, fake_llm, app_env, monkeypatch):
     from app.services import learning_hub
     from app.adaptiv import store
     personal, exams, tids, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
@@ -277,7 +277,7 @@ def test_migration_preserves_ambiguous_history_and_is_idempotent(client, fake_ll
     assert replacements == [learning_hub.exam_topics(e)[0]['id'] for e in exams]
 
 
-def test_unknown_answers_offer_help_instead_of_infinite_retry(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_unknown_answers_offer_help_instead_of_infinite_retry(client, fake_llm, app_env, monkeypatch):
     from app.adaptiv import store
     _, exams, tids, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     app_env.config.update(llm_error_creation_enabled=False)
@@ -289,7 +289,7 @@ def test_unknown_answers_offer_help_instead_of_infinite_retry(client, fake_llm, 
     assert 'zu zweit' in page.text
 
 
-def test_generated_grade_variant_remains_findable_without_overwriting_source(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_generated_grade_variant_remains_findable_without_overwriting_source(client, fake_llm, app_env, monkeypatch):
     from app.adaptiv import erzeugung, lektionen, store
     setup_journeys(client, fake_llm, app_env, monkeypatch)
     original = _lektion()
@@ -304,7 +304,7 @@ def test_generated_grade_variant_remains_findable_without_overwriting_source(cli
     assert erzeugung.speichern(variant, 'Mathematik') == second
 
 
-def test_exam_upload_to_confirmed_exam_stays_separate(client, fake_llm, fake_cli, app_env, monkeypatch, tmp_path):
+def test_exam_upload_to_confirmed_exam_stays_separate(client, fake_llm, app_env, monkeypatch, tmp_path):
     from app.services import learning_hub
     personal, _, _, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     # Themen werden eingetippt; ein Themenblatt wird nicht mehr gelesen.
@@ -320,7 +320,7 @@ def test_exam_upload_to_confirmed_exam_stays_separate(client, fake_llm, fake_cli
 
 
 @pytest.mark.parametrize('video', [False, True])
-def test_historical_exam_media_remain_readable_only_in_exam_area(client, fake_llm, fake_cli, app_env, monkeypatch, tmp_path, video):
+def test_historical_exam_media_remain_readable_only_in_exam_area(client, fake_llm, app_env, monkeypatch, tmp_path, video):
     _, exams, tids, token = setup_journeys(client, fake_llm, app_env, monkeypatch)
     media = tmp_path / ('archiv.mp4' if video else 'archiv.html')
     content = b'0123456789' * 100 if video else b'<p>Gespeicherte Pruefungserklaerung</p>'

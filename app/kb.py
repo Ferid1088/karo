@@ -16,7 +16,7 @@ import logging
 import re
 
 from . import config, db, jobs, pii
-from .llm import ClaudeClient
+from .ai import AIClient
 
 log = logging.getLogger("karo.kb")
 
@@ -26,8 +26,8 @@ ARTEN = ("erklaerung", "regel", "beispiel", "aufgabe", "loesung")
 LEHR_ARTEN = ("erklaerung", "regel", "beispiel")
 
 
-def client() -> ClaudeClient:
-    return ClaudeClient.from_config(config.load())
+def client() -> AIClient:
+    return AIClient.from_config(config.load())
 
 
 # --------------------------------------------------------------------------

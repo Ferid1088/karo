@@ -43,7 +43,7 @@ def test_gleichwertig_erkennt_umlaut_schreibweisen(app_env):
     assert not ist_gleichwertig("Brüche", "Brote")
 
 
-def test_brueche_addieren_findet_die_bruchlektion(client, fake_llm, fake_cli,
+def test_brueche_addieren_findet_die_bruchlektion(client, fake_llm,
                                                   app_env):
     """Der Fall, der den Fehler sichtbar gemacht hat.
 
@@ -62,7 +62,7 @@ def test_brueche_addieren_findet_die_bruchlektion(client, fake_llm, fake_cli,
 
 
 def test_das_kind_landet_in_der_lektion_statt_in_der_absage(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Derselbe Weg, den das Kind wirklich geht."""
     einrichten(client, fake_llm)
     app_env.config.update(adaptive_learning_enabled=True, learner_grade=6)
@@ -79,7 +79,7 @@ def test_das_kind_landet_in_der_lektion_statt_in_der_absage(
     assert sitzung["zustand"] == "DIAGNOSING"
 
 
-def test_ein_fremdes_thema_trifft_weiterhin_nicht(client, fake_llm, fake_cli,
+def test_ein_fremdes_thema_trifft_weiterhin_nicht(client, fake_llm,
                                                   app_env):
     """Die Reparatur darf die Ehrlichkeit aus `lektionen.py` nicht aufweichen:
     was es nicht gibt, wird weiter gesagt.

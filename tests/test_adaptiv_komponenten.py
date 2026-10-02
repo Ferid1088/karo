@@ -142,7 +142,7 @@ def test_jede_komponente_hat_einen_renderer_im_template():
         assert f"cfg.component == '{k.id}'" in vorlage, k.id
 
 
-def test_gezeichnete_komponenten_sind_vorlesbar(client, fake_llm, fake_cli,
+def test_gezeichnete_komponenten_sind_vorlesbar(client, fake_llm,
                                                 app_env):
     """§3: Barrierefreiheit gehört zur Komponente, nicht zum Zufall."""
     import re
@@ -180,7 +180,7 @@ def _kind_lernt(client, fake_llm, app_env):
     return token
 
 
-def test_eltern_sehen_denkfehler_und_stand(client, fake_llm, fake_cli, app_env):
+def test_eltern_sehen_denkfehler_und_stand(client, fake_llm, app_env):
     """§9 „definition of done“: Die Eltern sehen einen sinnvollen Fortschritt."""
     _kind_lernt(client, fake_llm, app_env)
 
@@ -196,7 +196,7 @@ def test_eltern_sehen_denkfehler_und_stand(client, fake_llm, fake_cli, app_env):
     assert "im Aufbau" in seite.text
 
 
-def test_elternsicht_ist_fuer_kinder_gesperrt(client, fake_llm, fake_cli,
+def test_elternsicht_ist_fuer_kinder_gesperrt(client, fake_llm,
                                               app_env):
     """Die Rollentrennung bleibt unverändert (§16)."""
     _kind_lernt(client, fake_llm, app_env)
@@ -205,7 +205,7 @@ def test_elternsicht_ist_fuer_kinder_gesperrt(client, fake_llm, fake_cli,
     assert "Eltern-Bereich" in antwort.text
 
 
-def test_elternsicht_zeigt_keine_modellgedanken(client, fake_llm, fake_cli,
+def test_elternsicht_zeigt_keine_modellgedanken(client, fake_llm,
                                                 app_env):
     """§18: beobachtbare Lernsignale — keine rohen Modellüberlegungen."""
     _kind_lernt(client, fake_llm, app_env)

@@ -63,7 +63,7 @@ def test_ohne_datum_wird_nichts_erfunden(app_env, monkeypatch):
     assert "needed_by" not in gesendet[0]
 
 
-def test_eltern_sehen_jedes_thema_einzeln_mit_schaetzung(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_eltern_sehen_jedes_thema_einzeln_mit_schaetzung(client, fake_llm, app_env, monkeypatch):
     """„Wird vorbereitet" ohne Zahl ist nicht von „haengt" zu unterscheiden."""
     from app import db, jobs
     from app.adaptiv import erzeugung
@@ -118,7 +118,7 @@ def test_ein_gescheitertes_thema_sieht_nicht_aus_wie_ein_laufendes(app_env, monk
     assert "Kontingent" in themen[0]["grund"]
 
 
-def test_eltern_sehen_ab_wann_es_weitergeht(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_eltern_sehen_ab_wann_es_weitergeht(client, fake_llm, app_env, monkeypatch):
     """Erschöpftes Kontingent beim Dienst: nicht „gleich fertig", sondern eine Uhrzeit.
 
     Ohne diese Angabe sieht ein stehender Auftrag aus wie ein laufender, und

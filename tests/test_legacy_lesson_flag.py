@@ -13,7 +13,7 @@ from .conftest import csrf_from
 from .test_app import einrichten, kind_modus_aktivieren
 
 
-def test_schalter_ist_standardmaessig_aus(client, fake_llm, fake_cli, app_env):
+def test_schalter_ist_standardmaessig_aus(client, fake_llm, app_env):
     einrichten(client, fake_llm)
 
     assert app_env.config.load().legacy_lesson_generation_enabled is False
@@ -29,7 +29,7 @@ def _kind_mit_thema(client, fake_llm, app_env, label="Brüche vergleichen"):
 
 
 def test_themenseite_fuehrt_nicht_mehr_in_den_generator(client, fake_llm,
-                                                        fake_cli, app_env):
+                                                        app_env):
     """Der Bildschirm mit der Format-Auswahl ist nicht mehr erreichbar."""
     topic_id = _kind_mit_thema(client, fake_llm, app_env)
 
@@ -39,7 +39,7 @@ def test_themenseite_fuehrt_nicht_mehr_in_den_generator(client, fake_llm,
     assert r.headers["location"] == "/lernen"
 
 
-def test_erzeugen_legt_keine_lerneinheit_an(client, fake_llm, fake_cli, app_env):
+def test_erzeugen_legt_keine_lerneinheit_an(client, fake_llm, app_env):
     """Der Knopf „Lerninhalte erstellen" erzeugt nichts mehr — auch nicht,
     wenn jemand die Adresse von Hand aufruft."""
     topic_id = _kind_mit_thema(client, fake_llm, app_env)
@@ -55,7 +55,7 @@ def test_erzeugen_legt_keine_lerneinheit_an(client, fake_llm, fake_cli, app_env)
     assert not app_env.db.q("SELECT id FROM job")
 
 
-def test_alle_runden_routen_sind_zu(client, fake_llm, fake_cli, app_env):
+def test_alle_runden_routen_sind_zu(client, fake_llm, app_env):
     """Auch die Folgeschritte einer laufenden Runde — sonst bliebe der Weg
     über eine alte Lesezeichen-Adresse offen."""
     topic_id = _kind_mit_thema(client, fake_llm, app_env)
@@ -73,7 +73,7 @@ def test_alle_runden_routen_sind_zu(client, fake_llm, fake_cli, app_env):
     assert r.headers["location"] == "/lernen"
 
 
-def test_die_elterntuer_in_den_generator_ist_zu(client, fake_llm, fake_cli,
+def test_die_elterntuer_in_den_generator_ist_zu(client, fake_llm,
                                                 app_env):
     """`/themen/{id}/lernen` ruft dasselbe `teaching.starten()` auf. Eltern
     kommen dort hin, Kinder nicht — der Schalter gilt für beide."""
@@ -90,7 +90,7 @@ def test_die_elterntuer_in_den_generator_ist_zu(client, fake_llm, fake_cli,
     assert not app_env.db.q("SELECT id FROM lesson")
 
 
-def test_lernseite_und_material_sind_zu(client, fake_llm, fake_cli, app_env):
+def test_lernseite_und_material_sind_zu(client, fake_llm, app_env):
     """Die Seite der alten Lernrunde und ihre erzeugten Dateien — sonst wäre
     der Generator nur versteckt, nicht abgeschaltet."""
     _kind_mit_thema(client, fake_llm, app_env)
@@ -103,7 +103,7 @@ def test_lernseite_und_material_sind_zu(client, fake_llm, fake_cli, app_env):
 
 
 def test_themenkarte_zeigt_keinen_weg_in_den_generator(client, fake_llm,
-                                                       fake_cli, app_env):
+                                                       app_env):
     """Eine tote Schaltfläche ist schlimmer als keine: die Karte darf den
     alten Weg gar nicht erst anbieten."""
     topic_id = _kind_mit_thema(client, fake_llm, app_env)
@@ -119,7 +119,7 @@ def test_themenkarte_zeigt_keinen_weg_in_den_generator(client, fake_llm,
 
 
 def test_keine_toten_verweise_in_erfolgen_und_themenliste(client, fake_llm,
-                                                          fake_cli, app_env):
+                                                          app_env):
     """`/lernstand` und die Elternliste verlinkten denselben Bildschirm."""
     from app import topics
     einrichten(client, fake_llm)
@@ -146,7 +146,7 @@ def test_keine_toten_verweise_in_erfolgen_und_themenliste(client, fake_llm,
 
 
 def test_fragerunden_und_lernstand_bleiben_erreichbar(client, fake_llm,
-                                                      fake_cli, app_env):
+                                                      app_env):
     """Der Schalter trennt den Generator ab, nicht den Lernstand: Prüfungen,
     der „gelernt"-Haken und die Übersichten hängen nicht daran."""
     from app import topics
@@ -175,7 +175,7 @@ def test_fragerunden_und_lernstand_bleiben_erreichbar(client, fake_llm,
 
 
 def test_mit_gesetztem_schalter_ist_der_alte_weg_unveraendert(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Nichts ist gelöscht: wer den Schalter setzt, bekommt den alten Weg
     zurück — Themenseite, Format-Auswahl und Erzeugung."""
     from app import teaching
@@ -206,7 +206,7 @@ def test_mit_gesetztem_schalter_ist_der_alte_weg_unveraendert(
     assert teaching.holen(lesson_id)["topic_id"] == topic_id
 
 
-def test_klassenarbeit_erzeugt_kein_material_mehr(client, fake_llm, fake_cli,
+def test_klassenarbeit_erzeugt_kein_material_mehr(client, fake_llm,
                                                   app_env):
     """Der Lerntag der Klassenarbeit ruft dasselbe `teaching.starten()`.
 
@@ -233,7 +233,7 @@ def test_klassenarbeit_erzeugt_kein_material_mehr(client, fake_llm, fake_cli,
     assert not app_env.db.q("SELECT id FROM exam_material")
 
 
-def test_lernplan_zeigt_keine_format_auswahl_mehr(client, fake_llm, fake_cli,
+def test_lernplan_zeigt_keine_format_auswahl_mehr(client, fake_llm,
                                                   app_env):
     """Dieselbe Format-Auswahl steht ein zweites Mal im Lernplan."""
     from .test_app import _bis_rot

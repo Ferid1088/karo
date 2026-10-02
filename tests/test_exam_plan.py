@@ -21,7 +21,7 @@ def exam_test_date(app_env, monkeypatch):
 
 
 def test_klassenarbeit_ohne_gelesenes_themenblatt_wird_nicht_angelegt(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     seite = client.get("/klassenarbeit")
     r = client.post("/klassenarbeit", data={"fach": "mathematik", 
@@ -35,7 +35,7 @@ def test_klassenarbeit_ohne_gelesenes_themenblatt_wird_nicht_angelegt(
 
 
 def test_themen_und_termin_werden_eingetippt_ohne_modell(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Das Ankündigungsblatt wird nicht mehr gelesen — es wird abgetippt.
 
     Ein Foto vom Küchentisch trägt mehr als die Ankündigung: den Namen des
@@ -68,7 +68,7 @@ def test_themen_und_termin_werden_eingetippt_ohne_modell(
 
 
 def test_klassenarbeit_uebernimmt_scan_und_plant_erst_nach_kalendereingabe(
-        client, fake_llm, fake_cli, app_env, tmp_path):
+        client, fake_llm, app_env, tmp_path):
     topic_id = _bis_rot(client, fake_llm, app_env)
 
     fake_llm.responses["plan"] = PLAN_ANTWORT
@@ -127,7 +127,7 @@ def _farbe_geben(app_env, topic_id, flag="gelb"):
 
 
 def test_exam_uebernimmt_keine_persoenlichen_prognosen(
-        client, fake_llm, fake_cli, app_env, tmp_path):
+        client, fake_llm, app_env, tmp_path):
     """Ein aktives, farbig geflaggtes Thema, das auf dem Themenblatt gar
     nicht steht, darf nicht in die eingefrorene Prognose aufgenommen
     werden — sonst wuerde jede Klassenarbeit sich mit ALLEN Themen im Fach
@@ -157,7 +157,7 @@ def test_exam_uebernimmt_keine_persoenlichen_prognosen(
 
 
 def test_exam_hat_keine_duplikate_bei_doppelt_genanntem_thema(
-        client, fake_llm, fake_cli, app_env, tmp_path):
+        client, fake_llm, app_env, tmp_path):
     from app.services import exam as exam_service
 
     einrichten(client, fake_llm)
@@ -176,7 +176,7 @@ def test_exam_hat_keine_duplikate_bei_doppelt_genanntem_thema(
 
 
 def test_unbekanntes_thema_auf_dem_blatt_laesst_die_erstellung_nicht_abstuerzen(
-        client, fake_llm, fake_cli, app_env, tmp_path):
+        client, fake_llm, app_env, tmp_path):
     """Unbekannte Prüfungsthemen dürfen keine fremden Lernstände übernehmen."""
     from app.services import exam as exam_service
 
@@ -201,7 +201,7 @@ def test_unbekanntes_thema_auf_dem_blatt_laesst_die_erstellung_nicht_abstuerzen(
 
 
 def test_klassenarbeit_kann_mit_manuellen_themen_angelegt_werden(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     page = client.get('/klassenarbeit/neu')
     response = client.post('/klassenarbeit', data={"fach": "mathematik", 

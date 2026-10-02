@@ -1,4 +1,4 @@
-"""Themen — vorgeschlagen von Claude, freigegeben von einem Menschen.
+"""Themen — vorgeschlagen vom KI-Anbieter, freigegeben von einem Menschen.
 
 Ein Thema ist die Einheit, in der Karo bewertet und lehrt. Es kommt nicht aus
 einer festen Liste, sondern aus dem Material, das tatsächlich im Unterricht
@@ -15,7 +15,7 @@ import unicodedata
 
 from . import config, db, jobs, kb, prompts
 from .domain import Flag
-from .llm import ClaudeClient
+from .ai import AIClient
 
 log = logging.getLogger("karo.topics")
 
@@ -24,8 +24,8 @@ AKTIV = "aktiv"
 ABGELEHNT = "abgelehnt"
 
 
-def client() -> ClaudeClient:
-    return ClaudeClient.from_config(config.load())
+def client() -> AIClient:
+    return AIClient.from_config(config.load())
 
 
 # --------------------------------------------------------------------------
@@ -334,7 +334,7 @@ def zuordnen(topic_id: int) -> int:
 
 
 def anlegen(label: str, beschreibung: str = "", *, subject: str) -> int | None:
-    """Thema von Hand anlegen — für alles, was Claude nicht vorgeschlagen hat.
+    """Thema von Hand anlegen — für alles, was die KI nicht vorgeschlagen hat.
 
     Wirft `faecher.FachFehler`/`SubjectMismatch`, wenn das Fach fehlt oder
     das Thema in ein anderes Fach gehört.

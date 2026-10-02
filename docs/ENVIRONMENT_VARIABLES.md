@@ -4,7 +4,7 @@ Drei Gruppen:
 
 1. **Pfade/Deployment** — wo Karo Daten ablegt und wie es deployed ist
 2. **Ops-Overrides** — `KARO_<OPS_FELD>` überschreibt `config.ops()`-Defaults
-3. **Provider-/CLI-Umgebung** — Variablen, die Karo an Unterprozesse weitergibt
+3. **Provider-Schlüssel** — `DEVIN_API_KEY` für den einzigen KI-Anbieter
 
 Alle Ops-Overrides sind in `docs/CONFIG.md` einzeln beschrieben; hier nur die
 Nicht-Ops-Variablen.
@@ -37,16 +37,11 @@ Ports sind Deployment-Größen und stehen in den Deploy-Dateien selbst:
 | `KARO_CURRICULUM_URL` | nein | `config.curriculum_url` | nein | Basis-URL des Curriculum-Dienstes | `app/adaptiv/curriculum_dienst.py`, `docker-compose.curriculum.yml` |
 | `KARO_CURRICULUM_KEY` | nein | `config.curriculum_key` | **ja** | Schlüssel für den Curriculum-Dienst | dto. |
 
-## Umgebung des LLM-CLI-Unterprozesses
+## KI-Anbieter-Schlüssel
 
-Karo **setzt** diese Variablen beim Start des `claude`-Unterprozesses — sie
-werden nicht gelesen:
-
-| Variable | Wert | Beschreibung |
-|---|---|---|
-| `CLAUDE_CODE_OAUTH_TOKEN` | `Config.claude_oauth_token` | Abo-Login der Claude-CLI |
-| `ANTHROPIC_API_KEY` | *(entfernt)* | wird bewusst gelöscht, damit die CLI nicht versehentlich das API-Konto nutzt |
-| `CLAUDE_CODE_MAX_OUTPUT_TOKENS` | `ops.llm_cli_verify_tokens` beim Testaufruf | Antwortdeckel des Einrichtungs-Tests; `docker-compose.yml` setzt zusätzlich `32000` als Container-Default für normale CLI-Läufe |
+| Variable | Pflicht | Secret | Beschreibung | Verwendet in |
+|---|---|---|---|---|
+| `DEVIN_API_KEY` | **ja** (für KI-Funktionen) | **ja** | Zugangsschlüssel der Devin-API — einziger externer KI-Anbieter. Wird ausschließlich aus der Umgebung gelesen und nie in `config.json` gespeichert. | `app/ai/devin.py`, `docker-compose.yml`, `.env.example` |
 
 ## CI (`.github/workflows/pytest-full.yml`)
 
@@ -62,7 +57,7 @@ werden nicht gelesen:
 
 Jedes `Ops`-Feld in `app/config.py` hat einen Override nach dem Muster
 `KARO_<FELDNAME_IN_UPPERCASE>` — z. B. `KARO_UPLOAD_MAX_BYTES`,
-`KARO_LLM_API_TIMEOUT_SECONDS`, `KARO_NOTEBOOKLM_VNC_RFB_PORT`.
+`KARO_DEVIN_POLL_SECONDS`, `KARO_NOTEBOOKLM_VNC_RFB_PORT`.
 Vier historische Namen bleiben aus Kompatibilität kürzer:
 
 | Ops-Feld | Env-Name |
@@ -77,7 +72,7 @@ Fallback.
 
 ## Secrets
 
-Secrets stehen **nicht** in der Umgebung, sondern in `/data/config.json`:
-`anthropic_api_key`, `claude_oauth_token`, `curriculum_key`, `app_password_*`,
-`child_password_*`, und `/data/session.key` für die Session-Signatur.
+`DEVIN_API_KEY` steht **nur** in der Umgebung. Die übrigen Secrets liegen in
+`/data/config.json`: `curriculum_key`, `app_password_*`, `child_password_*`,
+und `/data/session.key` für die Session-Signatur.
 `.env` ist gitignored; siehe `.env.example` für die leeren Schlüssel.

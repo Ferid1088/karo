@@ -201,8 +201,8 @@
 (function () {
   {# NotebookLM nur, solange der alte Erzeugungsweg erreichbar ist —
      sonst stuende hier eine Verbindung, die nichts mehr bedient. #}
-  var LABELS = {claude: "Claude"{% if cfg.legacy_lesson_generation_enabled %}, notebooklm: "NotebookLM"{% endif %}};
-  var LINKS = {claude: "/setup#claude-verbindung"{% if cfg.legacy_lesson_generation_enabled %}, notebooklm: "/setup#notebooklm-verbindung"{% endif %}};
+  var LABELS = {devin: "Devin"{% if cfg.legacy_lesson_generation_enabled %}, notebooklm: "NotebookLM"{% endif %}};
+  var LINKS = {devin: "/setup#devin-verbindung"{% if cfg.legacy_lesson_generation_enabled %}, notebooklm: "/setup#notebooklm-verbindung"{% endif %}};
   var VERBINDUNGEN = Object.keys(LABELS);
 
   function pillEl(name) { return document.getElementById("status-" + name); }

@@ -6,7 +6,7 @@ import re
 from .test_app import einrichten, kind_modus_aktivieren
 
 
-def test_learning_pages_use_their_own_mascot(client, fake_llm, fake_cli, app_env):
+def test_learning_pages_use_their_own_mascot(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     app_env.config.update(klassenarbeit_kind=True)
     kind_modus_aktivieren(client)
@@ -56,7 +56,7 @@ def test_learning_mascot_asset_exists():
         assert image.getchannel('A').getextrema()[0] == 0
 
 
-def test_heute_hat_ein_eigenes_tier(client, fake_llm, fake_cli, app_env):
+def test_heute_hat_ein_eigenes_tier(client, fake_llm, app_env):
     """"Heute" gehoert dem Igel. Fuchs, Eule und Biene sind anderswo zu Hause
     — zwei Bereiche mit demselben Tier waeren nicht auseinanderzuhalten."""
     einrichten(client, fake_llm)

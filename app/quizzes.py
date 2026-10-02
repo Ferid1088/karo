@@ -25,7 +25,7 @@ from .domain import (
     Rule,
     compute_flag,
 )
-from .llm import ClaudeClient
+from .ai import AIClient
 
 log = logging.getLogger("karo.quiz")
 
@@ -70,8 +70,8 @@ _VORZUSTAENDE_FUER_FREIGABE = tuple(
     von for von, ziele in ALLOWED_TRANSITIONS.items() if STATE_FREIGEGEBEN in ziele)
 
 
-def client() -> ClaudeClient:
-    return ClaudeClient.from_config(config.load())
+def client() -> AIClient:
+    return AIClient.from_config(config.load())
 
 
 class QuizError(Exception):

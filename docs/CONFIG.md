@@ -85,27 +85,28 @@ Welt) nutzen diese Funktion.
 | `browser_ocr_max_kante` | int | 2 000 | `KARO_BROWSER_OCR_MAX_KANTE` | Zielkante beim Browser-PDF-Render. | dto. |
 | `browser_ocr_min_konfidenz` | int | 60 | `KARO_BROWSER_OCR_MIN_KONFIDENZ` | Tesseract.js-Konfidenz; darunter gelten Wörter als geraten. | dto. |
 
-## LLM / Modelle
+## KI-Anbieter (Devin)
+
+Der einzige externe KI-Anbieter ist Devin (asynchron per Session:
+`POST /v1/sessions` → später pollen → `structured_output`). Alle Aufrufe
+laufen über die Fassade `AIClient` (`app/ai/`); der Zugangsschlüssel kommt
+ausschließlich aus der Umgebungsvariable `DEVIN_API_KEY`.
 
 | Parameter | Typ | Default | Env-Override | Beschreibung | Verwendet in |
 |---|---|---|---|---|---|
-| `llm_api_timeout_seconds` | float | 180 | `KARO_LLM_API_TIMEOUT_SECONDS` | Anthropic-SDK-Timeout pro Aufruf. | `app/llm/api_backend.py` |
-| `llm_api_max_retries` | int | 3 | `KARO_LLM_API_MAX_RETRIES` | SDK-Interne Wiederholungen. | dto. |
-| `llm_api_models_limit` | int | 50 | `KARO_LLM_API_MODELS_LIMIT` | Seitengröße beim Auflisten der Modelle. | dto. |
-| `llm_default_max_tokens` | int | 8 192 | `KARO_LLM_DEFAULT_MAX_TOKENS` | Standard-Antwortbudget, wenn kein Aufruf ein anderes nennt. | `app/llm/client.py` |
-| `llm_api_verify_tokens` | int | 8 | `KARO_LLM_API_VERIFY_TOKENS` | Token für den Einrichtungs-Testaufruf (API-Backend). | `app/llm/api_backend.py` |
-| `llm_cli_binary` | str | `claude` | `KARO_LLM_CLI_BINARY` | Name/Pfad der Claude-CLI („Abo"-Backend). | `app/llm/cli_backend.py` |
-| `llm_cli_timeout_seconds` | int | 300 | `KARO_LLM_CLI_TIMEOUT_SECONDS` | CLI-Laufzeitdeckel. | dto. |
-| `llm_cli_verify_timeout_seconds` | int | 90 | `KARO_LLM_CLI_VERIFY_TIMEOUT_SECONDS` | Testaufruf-Dauerdeckel. | dto. |
-| `llm_cli_verify_tokens` | int | 256 | `KARO_LLM_CLI_VERIFY_TOKENS` | `CLAUDE_CODE_MAX_OUTPUT_TOKENS` beim Testaufruf. | dto. |
-| `llm_fach_timeout_seconds` | int | 20 | `KARO_LLM_FACH_TIMEOUT_SECONDS` | Fachklassifikation: kurzer Aufruf, kurzer Deckel. | `app/faecher.py` |
-| `llm_fach_max_tokens` | int | 64 | `KARO_LLM_FACH_MAX_TOKENS` | dto. | `app/faecher.py` |
+| `devin_base_url` | str | `https://api.devin.ai/v1` | `KARO_DEVIN_BASE_URL` | Basis-URL der Devin-API. | `app/ai/devin.py` |
+| `devin_poll_seconds` | int | 300 | `KARO_DEVIN_POLL_SECONDS` | Wartezeit, bis ein geparkter Auftrag die Session erneut abfragt. | `app/jobs.py`, `app/ai/devin.py` |
+| `devin_max_session_seconds` | int | 7 200 | `KARO_DEVIN_MAX_SESSION_SECONDS` | Höchstalter einer Session; danach gilt sie als gescheitert. | `app/ai/devin.py` |
+| `devin_http_timeout_seconds` | float | 60 | `KARO_DEVIN_HTTP_TIMEOUT_SECONDS` | HTTP-Deckel pro API-Anfrage (Anlegen, Pollen, Nudge). | dto. |
+| `devin_max_restarts` | int | 1 | `KARO_DEVIN_MAX_RESTARTS` | Neustarts abgelaufener/gescheiterter Sessions je Auftrag. | dto. |
+| `devin_max_acu` | int | 0 | `KARO_DEVIN_MAX_ACU` | ACU-Obergrenze pro Session (0 = ohne Limit anlegen). | dto. |
+| `llm_default_max_tokens` | int | 8 192 | `KARO_LLM_DEFAULT_MAX_TOKENS` | Standard-Antwortbudget, wenn kein Aufruf ein anderes nennt. | `app/ai/client.py` |
+| `llm_fach_max_tokens` | int | 64 | `KARO_LLM_FACH_MAX_TOKENS` | Fachklassifikation: kurzer Aufruf, kurzes Budget. | `app/faecher.py` |
 | `llm_lektion_max_tokens` | int | 32 000 | `KARO_LLM_LEKTION_MAX_TOKENS` | Token-Budget für eine komplette Lernreihe. | `app/adaptiv/erzeugung.py` |
-| `llm_lektion_timeout_seconds` | int | 900 | `KARO_LLM_LEKTION_TIMEOUT_SECONDS` | Eine ganze Lernreihe darf länger dauern. | dto., `app/llm/client.py` |
 
-Modellnamen (`model_stark`, `model_text`, `model_video`, …) und die Backend-Wahl
-(`llm_backend`: `abo`/`api`) stehen in `Config`/`config.json`, weil die Familie sie
-im Setup pflegt.
+`Config.ai_provider` ist fix `"devin"` — es gibt keine Backend-Wahl mehr.
+`Config.has_credentials` liest nur, ob `DEVIN_API_KEY` in der Umgebung
+steht; der Schlüssel wird nie in `config.json` gespeichert.
 
 ## Curriculum-Dienst
 
@@ -237,11 +238,13 @@ Diese Literale sind Domänenlogik, kein Betriebsparameter — sie bleiben im Cod
 
 ## Was **nicht** hier steht — und warum
 
-- **Secrets** (`anthropic_api_key`, `claude_oauth_token`, `curriculum_key`,
-  Passwort-Hashes): liegen in `/data/config.json`, siehe `docs/API_INVENTORY.md`.
+- **Secrets** (`curriculum_key`, Passwort-Hashes): liegen in
+  `/data/config.json`, siehe `docs/API_INVENTORY.md`. `DEVIN_API_KEY`
+  kommt ausschließlich aus der Umgebung.
 - **Pfade** (`KARO_DATA_DIR`, `KARO_DRIVE_DIR`, `KARO_DRIVE_PATH`,
   `NOTEBOOKLM_HOME`, `KARO_GIT_SHA`): Umgebungs-/Deployment-Größen, siehe
   `docs/ENVIRONMENT_VARIABLES.md`.
-- **Modellnamen und Backend-Wahl**: Familieneinstellung in `Config`/`config.json`.
+- **KI-Anbieter**: fix Devin (`Config.ai_provider`); der Schlüssel lebt in
+  `DEVIN_API_KEY`, nicht in `config.json`.
 - **Adaptive Lernparameter** (`adaptiv_*` in `Config`): Produkteinstellungen der
   Familie, nicht Betrieb — bleiben auf der Einstellungsseite.

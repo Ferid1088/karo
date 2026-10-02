@@ -6,7 +6,7 @@ from .test_app import einrichten, kind_modus_aktivieren
 from .test_settings import SettingsValues
 
 
-def test_choose_and_save_storage(client, fake_llm, fake_cli, app_env):
+def test_choose_and_save_storage(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     folder = app_env.drive / 'Schule & Lernen' / 'Mathe'
     folder.mkdir(parents=True)
@@ -30,7 +30,7 @@ def test_choose_and_save_storage(client, fake_llm, fake_cli, app_env):
 
 
 @pytest.mark.parametrize('relative', ['../data', '/etc', 'outside'])
-def test_folder_escape_rejected(client, fake_llm, fake_cli, app_env, relative):
+def test_folder_escape_rejected(client, fake_llm, app_env, relative):
     einrichten(client, fake_llm)
     (app_env.drive / 'outside').symlink_to(app_env.data, target_is_directory=True)
     response = client.get('/setup/speicher/ordner', params={
@@ -42,7 +42,7 @@ def test_folder_escape_rejected(client, fake_llm, fake_cli, app_env, relative):
     assert response.status_code == 400
 
 
-def test_existing_database_and_invalid_filename_rejected(client, fake_llm, fake_cli, app_env):
+def test_existing_database_and_invalid_filename_rejected(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     (app_env.drive / 'existing.db').write_text('keep')
     token = csrf_from(client.get('/setup').text)
@@ -53,7 +53,7 @@ def test_existing_database_and_invalid_filename_rejected(client, fake_llm, fake_
     assert (app_env.drive / 'existing.db').read_text() == 'keep'
 
 
-def test_storage_requires_parent_and_csrf(client, fake_llm, fake_cli):
+def test_storage_requires_parent_and_csrf(client, fake_llm ):
     einrichten(client, fake_llm)
     assert client.post('/setup/speicher/auswaehlen', data={
         'kind': 'material', 'root': 'drive'}).status_code == 403

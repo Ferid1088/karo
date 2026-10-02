@@ -2,7 +2,7 @@
 from .test_app import einrichten, kind_modus_aktivieren
 
 
-def test_parent_can_move_between_distinct_areas(client, fake_llm, fake_cli):
+def test_parent_can_move_between_distinct_areas(client, fake_llm ):
     einrichten(client, fake_llm)
     for path in ('/eltern', '/setup', '/themen', '/wissen', '/klassenarbeit', '/messung/fortschritt'):
         page = client.get(path)
@@ -15,7 +15,7 @@ def test_parent_can_move_between_distinct_areas(client, fake_llm, fake_cli):
         assert 'Für Eltern' in page.text
 
 
-def test_shared_pages_keep_child_skin_when_enabled(client, fake_llm, fake_cli, app_env):
+def test_shared_pages_keep_child_skin_when_enabled(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     app_env.config.update(schulblaetter_kind=True, klassenarbeit_kind=True)
     for path in ('/wissen', '/klassenarbeit'):
@@ -31,7 +31,7 @@ def test_shared_pages_keep_child_skin_when_enabled(client, fake_llm, fake_cli, a
     assert client.get('/eltern').status_code == 403
 
 
-def test_review_uses_parent_skin_until_review_is_enabled_for_child(client, fake_llm, fake_cli, app_env):
+def test_review_uses_parent_skin_until_review_is_enabled_for_child(client, fake_llm, app_env):
     from .conftest import run_jobs
     from .test_app import blatt_einlesen, themen_freigeben
     from app import quizzes
@@ -48,7 +48,7 @@ def test_review_uses_parent_skin_until_review_is_enabled_for_child(client, fake_
     assert 'data-ui-area="child"' in client.get(f'/quiz/{quiz_id}').text
 
 
-def test_erfolge_tabs_stay_in_the_area_they_were_opened_from(client, fake_llm, fake_cli):
+def test_erfolge_tabs_stay_in_the_area_they_were_opened_from(client, fake_llm ):
     """Die Erfolge-Seite liegt unter zwei Adressen. Ein Reiterklick darf den
     Bereich nicht wechseln — in den Kinderbereich kommt man nur ueber
     "Zum Kinderbereich"."""
@@ -70,7 +70,7 @@ def test_erfolge_tabs_stay_in_the_area_they_were_opened_from(client, fake_llm, f
     assert '/messung/fortschritt?tab=arbeiten' not in kind.text
 
 
-def test_erfolge_actions_return_to_their_own_area(client, fake_llm, fake_cli, app_env):
+def test_erfolge_actions_return_to_their_own_area(client, fake_llm, app_env):
     from app import db
     from app.routers.shared import erfolge_ziel
     from .conftest import csrf_from

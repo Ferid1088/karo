@@ -50,7 +50,7 @@ def test_mehrdeutiges_bleibt_offen(app_env):
 # SUBJECT_MISMATCH: nichts wird im falschen Fach gespeichert
 # --------------------------------------------------------------------------
 
-def test_fachfremdes_thema_wird_nicht_gespeichert(client, fake_llm, fake_cli, app_env):
+def test_fachfremdes_thema_wird_nicht_gespeichert(client, fake_llm, app_env):
     from app import faecher
     from app.services import learning_hub
     einrichten(client, fake_llm)
@@ -63,7 +63,7 @@ def test_fachfremdes_thema_wird_nicht_gespeichert(client, fake_llm, fake_cli, ap
     assert learning_hub.create_topic("present perfect", "englisch", 7)
 
 
-def test_das_modell_entscheidet_wenn_stichworte_schweigen(client, fake_llm, fake_cli, app_env):
+def test_das_modell_entscheidet_wenn_stichworte_schweigen(client, fake_llm, app_env):
     from app import faecher
     from app.services import learning_hub
     einrichten(client, fake_llm)
@@ -71,11 +71,13 @@ def test_das_modell_entscheidet_wenn_stichworte_schweigen(client, fake_llm, fake
     with pytest.raises(faecher.SubjectMismatch):
         learning_hub.create_topic("Zeitformen", "deutsch", 7)
     assert app_env.db.q("SELECT id FROM topic WHERE label='Zeitformen'") == []
+    # Dieselbe Frage würde die gespeicherte Session wiederverwenden —
+    # ein anderes Thema ist ein neuer Aufruf mit neuer Antwort.
     fake_llm.responses["fach"] = {"fach": "deutsch"}
-    assert learning_hub.create_topic("Zeitformen", "deutsch", 7)
+    assert learning_hub.create_topic("Satzglieder", "deutsch", 7)
 
 
-def test_das_kind_erfaehrt_wohin_ein_thema_gehoert(client, fake_llm, fake_cli, app_env):
+def test_das_kind_erfaehrt_wohin_ein_thema_gehoert(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     kind_modus_aktivieren(client)
     seite = client.get("/lernen/neu?fach=mathematik")
@@ -87,7 +89,7 @@ def test_das_kind_erfaehrt_wohin_ein_thema_gehoert(client, fake_llm, fake_cli, a
     assert app_env.db.q("SELECT id FROM topic WHERE label='irregular verbs'") == []
 
 
-def test_ohne_fach_wird_nichts_angelegt(client, fake_llm, fake_cli, app_env):
+def test_ohne_fach_wird_nichts_angelegt(client, fake_llm, app_env):
     from app import faecher
     from app.services import learning_hub
     einrichten(client, fake_llm)
@@ -108,7 +110,7 @@ def _drei_themen():
         ("englisch", "present perfect"))}
 
 
-def test_reiter_zeigen_nur_ihr_fach(client, fake_llm, fake_cli, app_env):
+def test_reiter_zeigen_nur_ihr_fach(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     _drei_themen()
     kind_modus_aktivieren(client)
@@ -121,7 +123,7 @@ def test_reiter_zeigen_nur_ihr_fach(client, fake_llm, fake_cli, app_env):
             assert anderes not in seite, (fach, anderes)
 
 
-def test_suche_findet_nichts_aus_anderen_faechern(client, fake_llm, fake_cli, app_env):
+def test_suche_findet_nichts_aus_anderen_faechern(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     _drei_themen()
     assert "Brüche addieren" in client.get("/lernen/mathematik?q=Brüche").text
@@ -130,13 +132,13 @@ def test_suche_findet_nichts_aus_anderen_faechern(client, fake_llm, fake_cli, ap
     assert "0 Themen gefunden" in englisch
 
 
-def test_lernen_oeffnet_das_zuletzt_gewaehlte_fach(client, fake_llm, fake_cli, app_env):
+def test_lernen_oeffnet_das_zuletzt_gewaehlte_fach(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     client.get("/lernen/englisch")
     assert client.get("/lernen", follow_redirects=False).headers["location"] == "/lernen/englisch"
 
 
-def test_wissensbasis_sucht_nur_auf_blaettern_des_fachs(client, fake_llm, fake_cli, app_env):
+def test_wissensbasis_sucht_nur_auf_blaettern_des_fachs(client, fake_llm, app_env):
     from app import kb
     einrichten(client, fake_llm)
     with app_env.db.tx() as c:
@@ -215,7 +217,7 @@ def _blatt(client, tmp_path, fach, name):
     }, files={"datei": (f"{name}.jpg", jpeg.read_bytes() + name.encode(), "image/jpeg")})
 
 
-def test_upload_setzt_das_fach_und_liste_zeigt_nur_dieses(client, fake_llm, fake_cli, app_env, tmp_path):
+def test_upload_setzt_das_fach_und_liste_zeigt_nur_dieses(client, fake_llm, app_env, tmp_path):
     einrichten(client, fake_llm)
     _blatt(client, tmp_path, "englisch", "Vocabulary Unit 3")
     _blatt(client, tmp_path, "deutsch", "Kommasetzung")
@@ -228,7 +230,7 @@ def test_upload_setzt_das_fach_und_liste_zeigt_nur_dieses(client, fake_llm, fake
     assert "Vocabulary" not in client.get("/wissen?fach=mathematik").text
 
 
-def test_blatt_upload_ohne_fach_oder_mit_falschem_namen(client, fake_llm, fake_cli, app_env, tmp_path):
+def test_blatt_upload_ohne_fach_oder_mit_falschem_namen(client, fake_llm, app_env, tmp_path):
     einrichten(client, fake_llm)
     seite = client.get("/wissen?fach=mathematik")
     jpeg = make_jpeg(tmp_path / "x.jpg")
@@ -240,7 +242,7 @@ def test_blatt_upload_ohne_fach_oder_mit_falschem_namen(client, fake_llm, fake_c
     assert app_env.db.q("SELECT id FROM document") == []
 
 
-def test_fachfremdes_blatt_wird_gar_nicht_erst_angenommen(client, fake_llm, fake_cli, app_env, tmp_path):
+def test_fachfremdes_blatt_wird_gar_nicht_erst_angenommen(client, fake_llm, app_env, tmp_path):
     """Die Fachprüfung greift jetzt beim Hochladen, nicht nach dem Lesen.
 
     Vorher las ein Modell das Foto und meldete „gehört zu Englisch". Das Foto
@@ -255,7 +257,7 @@ def test_fachfremdes_blatt_wird_gar_nicht_erst_angenommen(client, fake_llm, fake
     assert app_env.db.q("SELECT id FROM topic") == []
 
 
-def test_das_thema_eines_blatts_bleibt_in_dessen_fach(client, fake_llm, fake_cli, app_env, tmp_path):
+def test_das_thema_eines_blatts_bleibt_in_dessen_fach(client, fake_llm, app_env, tmp_path):
     """Das Fach kommt aus dem Reiter, nicht aus einem Modell."""
     einrichten(client, fake_llm)
     _blatt(client, tmp_path, "mathematik", "Bruchrechnung")
@@ -268,7 +270,7 @@ def test_das_thema_eines_blatts_bleibt_in_dessen_fach(client, fake_llm, fake_cli
 # Klassenarbeiten und Heute: fachübergreifend, Fach sichtbar
 # --------------------------------------------------------------------------
 
-def test_klassenarbeit_mit_fachfremdem_thema_wird_abgelehnt(client, fake_llm, fake_cli, app_env):
+def test_klassenarbeit_mit_fachfremdem_thema_wird_abgelehnt(client, fake_llm, app_env):
     from app.services import exam
     einrichten(client, fake_llm)
     with pytest.raises(exam.ExamError, match="gehören nicht zu Mathematik: present perfect"):
@@ -279,7 +281,7 @@ def test_klassenarbeit_mit_fachfremdem_thema_wird_abgelehnt(client, fake_llm, fa
         exam.create_exam("2099-01-01", manual_topics="Brüche addieren", subject="Biologie")
 
 
-def test_pruefungen_und_heute_zeigen_das_fach(client, fake_llm, fake_cli, app_env):
+def test_pruefungen_und_heute_zeigen_das_fach(client, fake_llm, app_env):
     from app.services import exam
     einrichten(client, fake_llm)
     app_env.config.update(klassenarbeit_kind=True)
@@ -296,7 +298,7 @@ def test_pruefungen_und_heute_zeigen_das_fach(client, fake_llm, fake_cli, app_en
 # Elternordner „Ohne Fach“
 # --------------------------------------------------------------------------
 
-def test_inhalte_ohne_gueltiges_fach_sieht_nur_der_elternordner(client, fake_llm, fake_cli, app_env):
+def test_inhalte_ohne_gueltiges_fach_sieht_nur_der_elternordner(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     with app_env.db.tx() as c:
         tid = c.execute("""INSERT INTO topic(subject,code,label,state,created_at,learning_visible,grade)
@@ -317,7 +319,7 @@ def test_inhalte_ohne_gueltiges_fach_sieht_nur_der_elternordner(client, fake_llm
     assert client.get("/eltern/ohne-fach", follow_redirects=False).status_code == 403
 
 
-def test_eltern_ordnen_ein_fach_zu(client, fake_llm, fake_cli, app_env):
+def test_eltern_ordnen_ein_fach_zu(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     with app_env.db.tx() as c:
         tid = c.execute("""INSERT INTO topic(subject,code,label,state,created_at,learning_visible,grade)
@@ -344,7 +346,7 @@ def test_alte_fachnamen_werden_beim_start_vereinheitlicht(app_env):
     assert faecher == {"Dreisatz": "mathematik", "Zellen": "Biologie"}
 
 
-def test_das_kind_sieht_die_meldung_bei_der_klassenarbeit(client, fake_llm, fake_cli, app_env):
+def test_das_kind_sieht_die_meldung_bei_der_klassenarbeit(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     app_env.config.update(klassenarbeit_kind=True)
     kind_modus_aktivieren(client)

@@ -5,7 +5,7 @@ from .conftest import csrf_from
 from .test_app import einrichten
 
 
-def test_today_start_works_without_adaptive_feature(client, fake_llm, fake_cli, app_env):
+def test_today_start_works_without_adaptive_feature(client, fake_llm, app_env):
     from app import topics
     einrichten(client, fake_llm)
     tid = topics.anlegen('Brüche addieren', subject="mathematik")
@@ -23,7 +23,7 @@ def test_today_start_works_without_adaptive_feature(client, fake_llm, fake_cli, 
 
 
 @pytest.mark.parametrize('state', ['bereit', 'ausgewertet'])
-def test_exam_quizzes_are_not_personal_next_steps(client, fake_llm, fake_cli, app_env, state):
+def test_exam_quizzes_are_not_personal_next_steps(client, fake_llm, app_env, state):
     from app.services import exam, learning_hub, workflow
     einrichten(client, fake_llm)
     app_env.config.update(antworten_pruefen_kind=True)
@@ -40,7 +40,7 @@ def test_exam_quizzes_are_not_personal_next_steps(client, fake_llm, fake_cli, ap
         assert 'Nur in dieser Prüfung' not in page
 
 
-def test_historical_exam_quiz_does_not_hide_personal_quiz(client, fake_llm, fake_cli, app_env):
+def test_historical_exam_quiz_does_not_hide_personal_quiz(client, fake_llm, app_env):
     from app import topics
     from app.services import workflow, topic_workflow
     einrichten(client, fake_llm)

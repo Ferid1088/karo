@@ -34,7 +34,7 @@ def _waehle(client, token, thema=THEMA):
 
 
 def test_ohne_schalter_bleibt_es_bei_der_ehrlichen_antwort(client, fake_llm,
-                                                           fake_cli, app_env):
+                                                           app_env):
     token = _kind(client, fake_llm, app_env, erzeugen=False)
 
     seite = _waehle(client, token)
@@ -45,7 +45,7 @@ def test_ohne_schalter_bleibt_es_bei_der_ehrlichen_antwort(client, fake_llm,
 
 
 def test_ein_unbekanntes_thema_loest_die_erzeugung_aus(client, fake_llm,
-                                                       fake_cli, app_env):
+                                                       app_env):
     token = _kind(client, fake_llm, app_env, erzeugen=True)
 
     seite = _waehle(client, token)
@@ -58,7 +58,7 @@ def test_ein_unbekanntes_thema_loest_die_erzeugung_aus(client, fake_llm,
     assert app_env.db.q("SELECT id FROM lern_sitzung") == []
 
 
-def test_der_auftrag_erzeugt_prueft_und_gibt_frei(client, fake_llm, fake_cli,
+def test_der_auftrag_erzeugt_prueft_und_gibt_frei(client, fake_llm,
                                                   app_env):
     from app.adaptiv import lektionen, store
     token = _kind(client, fake_llm, app_env, erzeugen=True)
@@ -74,7 +74,7 @@ def test_der_auftrag_erzeugt_prueft_und_gibt_frei(client, fake_llm, fake_cli,
     assert len(fake_llm.calls) == 2  # Author plus independent class review.
 
 
-def test_danach_ist_es_ein_treffer_ohne_modell(client, fake_llm, fake_cli,
+def test_danach_ist_es_ein_treffer_ohne_modell(client, fake_llm,
                                                app_env):
     """§6: genau der Punkt der ganzen Übung."""
     token = _kind(client, fake_llm, app_env, erzeugen=True)
@@ -90,7 +90,7 @@ def test_danach_ist_es_ein_treffer_ohne_modell(client, fake_llm, fake_cli,
     assert fake_llm.calls == []
 
 
-def test_zweimal_klicken_erzeugt_nicht_zweimal(client, fake_llm, fake_cli,
+def test_zweimal_klicken_erzeugt_nicht_zweimal(client, fake_llm,
                                                app_env):
     token = _kind(client, fake_llm, app_env, erzeugen=True)
 
@@ -103,7 +103,7 @@ def test_zweimal_klicken_erzeugt_nicht_zweimal(client, fake_llm, fake_cli,
 
 
 def test_eine_unbrauchbare_ausgabe_hinterlaesst_nichts(client, fake_llm,
-                                                       fake_cli, app_env):
+                                                       app_env):
     """Die Prüfung greift auch hier: lieber keine Lektion als eine falsche."""
     from app.adaptiv import lektionen
     token = _kind(client, fake_llm, app_env, erzeugen=True)
@@ -125,7 +125,7 @@ def test_eine_unbrauchbare_ausgabe_hinterlaesst_nichts(client, fake_llm,
     assert "nachgerechnet" in (auftrag["last_error"] or "")
 
 
-def test_das_wartende_kind_bekommt_eine_auskunft(client, fake_llm, fake_cli,
+def test_das_wartende_kind_bekommt_eine_auskunft(client, fake_llm,
                                                  app_env):
     token = _kind(client, fake_llm, app_env, erzeugen=True)
     _waehle(client, token)
@@ -139,36 +139,31 @@ def test_das_wartende_kind_bekommt_eine_auskunft(client, fake_llm, fake_cli,
 
 
 # --------------------------------------------------------------------------
-# §5: Modell A ist das starke Modell
+# §5: die Lektion geht als eigene Session an den Anbieter
 # --------------------------------------------------------------------------
 
-def test_die_lektion_schreibt_das_starke_modell(client, fake_llm, fake_cli,
-                                                app_env):
-    """§5 trennt zwei Modelle: A schreibt Didaktik und ist stark, B waehlt
-    Komponenten und ist klein. Eine ganze Lernreihe ist Arbeit fuer A.
-
-    Ohne ausdrueckliche Wahl nimmt `complete()` das Textmodell — auf der
-    Testinstallation Haiku. Ergebnis: Aufrufe von vier Minuten, 40.000
-    Ausgabe-Token und Komponentenparameter, die die Pruefung verwarf.
-    """
+def test_die_lektion_geht_als_session_an_devin(client, fake_llm,
+                                               app_env):
+    """Der Anbieter schreibt die Didaktik — unter Devin eine eigene Session
+    mit dem Lektions-Schema. Eine Modellwahl gibt es nicht mehr; die
+    Qualitaetssicherung liegt in `schemas.pruefe_lektion` und der
+    Klassenpruefung hinterher."""
     token = _kind(client, fake_llm, app_env, erzeugen=True)
-    app_env.config.update(model_stark="sonnet-stark", model_text="haiku-klein")
     _waehle(client, token)
 
     run_jobs(app_env, fake_llm)
 
-    aufruf = next(a for a in fake_llm.calls
-                  if "lektion" in " ".join(a.get("argv") or []).lower()
-                  or a.get("model"))
-    argv = aufruf.get("argv") or []
-    assert "sonnet-stark" in argv, argv
-    assert "haiku-klein" not in argv
+    auftraege = [p.get("title", "") for p in fake_llm.devin.created]
+    assert any("lektion_erzeugen" in t for t in auftraege), auftraege
 
 
 def test_die_lektion_bekommt_mehr_luft_als_ein_quiz(app_env):
     """Eine ganze Lernreihe ist um ein Vielfaches laenger als eine Fragerunde
-    — mit der Vorgabe von 8192 Token bricht die Antwort mittendrin ab."""
+    — mit der Vorgabe von 8192 Token bricht die Antwort mittendrin ab. Und
+    weil Devin asynchron antwortet, bekommt die Session deutlich mehr Zeit
+    als ein synchroner Aufruf je haette."""
+    from app import config
     from app.adaptiv import erzeugung
 
     assert erzeugung.MAX_TOKENS > 8192
-    assert erzeugung.TIMEOUT_SEKUNDEN > 300
+    assert config.ops().devin_max_session_seconds > 300

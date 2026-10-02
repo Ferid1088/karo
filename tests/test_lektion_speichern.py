@@ -19,7 +19,7 @@ from .test_app import einrichten
 
 
 def test_eine_geprueufte_lektion_landet_vollstaendig_im_katalog(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     from app.adaptiv import erzeugung, inhalt_store, lektionen, store, schemas
     einrichten(client, fake_llm)
 
@@ -35,7 +35,7 @@ def test_eine_geprueufte_lektion_landet_vollstaendig_im_katalog(
 
 
 def test_tier_eins_erkennt_die_erzeugte_fehlvorstellung(client, fake_llm,
-                                                        fake_cli, app_env):
+                                                        app_env):
     """Der Zweck des Ganzen: beim nächsten Kind trifft der Katalog."""
     from app.adaptiv import erzeugung, katalog
     einrichten(client, fake_llm)
@@ -47,7 +47,7 @@ def test_tier_eins_erkennt_die_erzeugte_fehlvorstellung(client, fake_llm,
     assert treffer.fehlertyp["fehler_key"] == "kanten-addiert"
 
 
-def test_das_ausliefern_ruft_kein_modell(client, fake_llm, fake_cli, app_env):
+def test_das_ausliefern_ruft_kein_modell(client, fake_llm, app_env):
     """A3: einmal erzeugt, danach reiner Lookup — das ganze Kostenmodell."""
     from app.adaptiv import erzeugung, katalog
     einrichten(client, fake_llm)
@@ -61,7 +61,7 @@ def test_das_ausliefern_ruft_kein_modell(client, fake_llm, fake_cli, app_env):
     assert fake_llm.calls == []
 
 
-def test_erzeugtes_ist_als_erzeugt_erkennbar(client, fake_llm, fake_cli,
+def test_erzeugtes_ist_als_erzeugt_erkennbar(client, fake_llm,
                                              app_env):
     """§6 speichert die Herkunft — kuratiert und erzeugt sind nicht dasselbe,
     auch wenn beide ausgeliefert werden."""
@@ -76,7 +76,7 @@ def test_erzeugtes_ist_als_erzeugt_erkennbar(client, fake_llm, fake_cli,
 
 
 def test_eine_ungueltige_lektion_hinterlaesst_nichts(client, fake_llm,
-                                                     fake_cli, app_env):
+                                                     app_env):
     """Kein halber Katalogeintrag: geprüft wird vor dem ersten Schreiben."""
     from app.adaptiv import erzeugung, schemas, store
     einrichten(client, fake_llm)
@@ -90,7 +90,7 @@ def test_eine_ungueltige_lektion_hinterlaesst_nichts(client, fake_llm,
                                   "wuerfel-volumen") is None
 
 
-def test_zweimal_speichern_verdoppelt_nichts(client, fake_llm, fake_cli,
+def test_zweimal_speichern_verdoppelt_nichts(client, fake_llm,
                                              app_env):
     from app.adaptiv import erzeugung, inhalt_store, store
     einrichten(client, fake_llm)
@@ -105,7 +105,7 @@ def test_zweimal_speichern_verdoppelt_nichts(client, fake_llm, fake_cli,
 
 
 def test_eine_erzeugte_lektion_verdraengt_keine_verfasste(client, fake_llm,
-                                                          fake_cli, app_env):
+                                                          app_env):
     """Die Bruchlektion bleibt, was sie ist."""
     from app.adaptiv import erzeugung, lektionen, store
     einrichten(client, fake_llm)
@@ -119,7 +119,7 @@ def test_eine_erzeugte_lektion_verdraengt_keine_verfasste(client, fake_llm,
 
 
 def test_ein_abbruch_mitten_im_schreiben_bleibt_unsichtbar(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     """Die eigentliche Zusicherung: die Freigabe zum Schluss trägt die
     Atomarität. Bricht das Schreiben ab, steht zwar eine halbe Lektion in
     der Datenbank — sichtbar wird sie nie, weil nichts freigegeben ist.

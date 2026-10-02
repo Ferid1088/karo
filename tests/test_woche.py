@@ -8,7 +8,7 @@ from .test_app import einrichten, session_cookie_faelschen
 
 
 @pytest.fixture
-def family(client, app_env, fake_llm, fake_cli, monkeypatch):
+def family(client, app_env, fake_llm, monkeypatch):
     password = einrichten(client, fake_llm)
     from app.woche import pilot, pilot_store
     monkeypatch.setattr(pilot, 'today', lambda now=None: date(2026, 9, 15))

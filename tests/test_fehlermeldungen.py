@@ -1,8 +1,8 @@
 """Eine Meldung darf nicht raten, wenn der Grund festgehalten ist.
 
 Beim Themenblatt stand "Lade ein deutlicheres Foto hoch", auch wenn in
-Wahrheit das Claude-Kontingent aufgebraucht oder die Datei verschwunden war.
-Wer dem folgt, lädt dasselbe Blatt noch dreimal hoch.
+Wahrheit eine Ratenbegrenzung des Anbieters oder eine verschwundene Datei
+der Grund war. Wer dem folgt, lädt dasselbe Blatt noch dreimal hoch.
 """
 from .conftest import csrf_from
 from .test_app import einrichten
@@ -10,10 +10,10 @@ from .test_app import einrichten
 
 def test_klartext_nennt_den_grund_statt_der_bildqualitaet():
     from app.routers.shared import klartext
-    kontingent = ("Die Claude-CLI ist fehlgeschlagen (Code 1). "
-                  "You've hit your session limit · resets 5am (Europe/Berlin)")
-    assert "Kontingent" in klartext(kontingent)
-    assert "Foto" not in klartext(kontingent)
+    ratenlimit = "Devin API POST /sessions: 429 Rate-Limit"
+    assert "Anfragen" in klartext(ratenlimit)
+    assert "Foto" not in klartext(ratenlimit)
+    assert "DEVIN_API_KEY" in klartext("DEVIN_API_KEY ist nicht gesetzt.")
     assert "nicht mehr da" in klartext("Die Bilddatei abc.jpg fehlt.")
     assert "zu lange" in klartext("Der Aufruf hat zu lange gedauert und wurde abgebrochen.")
     # Unbekanntes bleibt wörtlich stehen, statt in eine Vermutung zu kippen.
@@ -22,7 +22,7 @@ def test_klartext_nennt_den_grund_statt_der_bildqualitaet():
     assert "nicht festgehalten" in klartext("   ")
 
 
-def test_der_festgehaltene_grund_steht_bei_den_eltern(client, fake_llm, fake_cli,
+def test_der_festgehaltene_grund_steht_bei_den_eltern(client, fake_llm,
                                                      app_env, monkeypatch):
     """Nicht „lade ein deutlicheres Foto hoch", sondern der wirkliche Grund.
 
@@ -43,12 +43,11 @@ def test_der_festgehaltene_grund_steht_bei_den_eltern(client, fake_llm, fake_cli
     exam_effort.inhalte_anfordern(exam_id)
     with db.tx() as c:
         c.execute("UPDATE job SET state='fehler', last_error=? WHERE type='lektion_erzeugen'",
-                  ("Die Claude-CLI ist fehlgeschlagen (Code 1). You've hit your "
-                   "session limit · resets 5am (Europe/Berlin)",))
+                  ("Devin API POST /sessions: 429 Rate-Limit",))
 
     seite = client.get("/eltern/lernfortschritt")
     assert seite.status_code == 200
-    assert "Kontingent" in seite.text
+    assert "Zu viele Anfragen" in seite.text
     assert "deutlicheres Foto" not in seite.text
 
 

@@ -25,7 +25,7 @@ def _bereit(client, fake_llm, app_env, *labels):
     return ids
 
 
-def test_der_knopf_merkt_sich_das_thema(client, fake_llm, fake_cli, app_env):
+def test_der_knopf_merkt_sich_das_thema(client, fake_llm, app_env):
     ids = _bereit(client, fake_llm, app_env, LEKTION)
     token = csrf_from(client.get("/lernen?status=neu").text)
 
@@ -38,7 +38,7 @@ def test_der_knopf_merkt_sich_das_thema(client, fake_llm, fake_cli, app_env):
     assert eingabe["thema_text"] == LEKTION
 
 
-def test_ein_getipptes_thema_bleibt_ohne_themen_id(client, fake_llm, fake_cli,
+def test_ein_getipptes_thema_bleibt_ohne_themen_id(client, fake_llm,
                                                    app_env):
     """Nicht jede Sitzung kommt von einer Karte — das darf nichts brechen."""
     _bereit(client, fake_llm, app_env, LEKTION)
@@ -52,7 +52,7 @@ def test_ein_getipptes_thema_bleibt_ohne_themen_id(client, fake_llm, fake_cli,
 
 
 def test_laufende_sitzung_setzt_das_thema_auf_in_bearbeitung(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Der eigentliche Punkt: der Reiter zeigt echten Sitzungszustand."""
     ids = _bereit(client, fake_llm, app_env, LEKTION, "Brüche kürzen")
     token = csrf_from(client.get("/lernen?status=neu").text)
@@ -70,7 +70,7 @@ def test_laufende_sitzung_setzt_das_thema_auf_in_bearbeitung(
     assert "Brüche kürzen" in client.get("/lernen?status=neu").text
 
 
-def test_fremdes_topic_id_wird_nicht_uebernommen(client, fake_llm, fake_cli,
+def test_fremdes_topic_id_wird_nicht_uebernommen(client, fake_llm,
                                                  app_env):
     """Die ID kommt aus dem Formular — sie muss ein echtes aktives Thema sein."""
     _bereit(client, fake_llm, app_env, LEKTION)

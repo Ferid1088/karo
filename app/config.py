@@ -26,8 +26,7 @@ DRIVE_DIR = Path(os.environ.get("KARO_DRIVE_DIR", "/drive"))
 CONFIG_PATH = DATA_DIR / "config.json"
 _SESSION_SECRET_PATH = DATA_DIR / "session.key"
 
-SECRET_FIELDS = ("anthropic_api_key", "claude_oauth_token",
-                 "curriculum_key",
+SECRET_FIELDS = ("curriculum_key",
                  "app_password_hash", "app_password_salt",
                  "child_password_hash", "child_password_salt")
 
@@ -51,12 +50,12 @@ class ConfigUnreadable(RuntimeError):
 
 @dataclass(frozen=True)
 class Config:
-    # --- Welcher Weg zum Modell -------------------------------------------
-    llm_backend: str = "abo"        # 'abo' (20-€-Abo) oder 'api' (Schlüssel)
+    # --- KI-Anbieter --------------------------------------------------------
+    # Genau ein externer Anbieter, und der heisst Devin. Der Schlüssel steht
+    # niemals in dieser Datei: er kommt ausschließlich aus der Umgebungs-
+    # variablen DEVIN_API_KEY (siehe .env.example).
+    ai_provider: str = "devin"
 
-    # --- Zugangsdaten (geheim) --------------------------------------------
-    claude_oauth_token: str = ""    # aus `claude setup-token`
-    anthropic_api_key: str = ""
     # Optionaler zentraler Inhaltsdienst. Kein stiller KI-Fallback bei Ausfall.
     curriculum_url: str = ""
     curriculum_key: str = ""
@@ -71,15 +70,6 @@ class Config:
     learner_name: str = ""          # bleibt lokal, dient dem Schwärzen
     learner_grade: int = 7
     subject: str = "mathematik"     # Standardfach: deutsch | mathematik | englisch
-
-    # --- Modellwahl --------------------------------------------------------
-    # Zwei Textmodelle: das starke schreibt Lektionen (Didaktik, §5), das
-    # kleine erledigt den Rest. Frueher hiess das starke `model_vision` und
-    # las Handschrift — Bilder gehen nicht mehr an ein Modell, der Name log
-    # also. Ein alter Eintrag `model_vision` in der config.json wird beim
-    # Laden verworfen; beim naechsten Verbinden wird neu gewaehlt.
-    model_stark: str = ""
-    model_text: str = ""
 
     # --- Ausgabe des Lernmaterials ----------------------------------------
     default_ausgabe: str = "html"   # html | mp4 | notebooklm
@@ -164,9 +154,9 @@ class Config:
 
     @property
     def has_credentials(self) -> bool:
-        if self.llm_backend == "abo":
-            return bool(self.claude_oauth_token)
-        return bool(self.anthropic_api_key)
+        # Der Schluessel lebt nur in der Umgebung — absichtlich live gelesen,
+        # damit ein nachtraeglich gesetzter Wert ohne Neuschreiben gilt.
+        return bool(os.environ.get("DEVIN_API_KEY"))
 
     def public_dict(self) -> dict:
         """Alles, was gefahrlos in ein Template oder ins Protokoll darf."""
@@ -425,23 +415,23 @@ class Ops:
     #: Browser-OCR: Konfidenz, unter der ein Wort als geraten gilt (0-100).
     browser_ocr_min_konfidenz: int = 60
 
-    # --- LLM ------------------------------------------------------------------
-    llm_api_timeout_seconds: float = 180.0
-    llm_api_max_retries: int = 3
-    llm_api_models_limit: int = 50
+    # --- KI-Anbieter (Devin) ---------------------------------------------------
+    devin_base_url: str = "https://api.devin.ai/v1"
+    #: Abstand, mit dem ein gestellter Auftrag seine Session erneut abfragt.
+    devin_poll_seconds: int = 300
+    #: Danach wird eine laufende Session aufgegeben und der Job schlägt fehl.
+    devin_max_session_seconds: int = 7_200
+    #: Zeitlimit für einen einzelnen HTTP-Aufruf zur API (nicht für die Session).
+    devin_http_timeout_seconds: float = 60.0
+    #: Wie oft eine abgelaufene/fehlgeschlagene Session neu angelegt wird.
+    devin_max_restarts: int = 1
+    #: ACU-Kostenrahmen pro Session; 0 = kein Limit.
+    devin_max_acu: int = 0
     llm_default_max_tokens: int = 8_192
-    #: Nur „antwortet das Modell?" beim Verbinden — absichtlich winzig.
-    llm_api_verify_tokens: int = 8
-    llm_cli_binary: str = "claude"
-    llm_cli_timeout_seconds: int = 300
-    llm_cli_verify_timeout_seconds: int = 90
-    llm_cli_verify_tokens: int = 256
     #: Ad-hoc-Fachprüfung beim Themeneinlesen.
-    llm_fach_timeout_seconds: int = 20
     llm_fach_max_tokens: int = 64
     #: Lektions-Erzeugung ist der längste und teuerste Aufruf im System.
     llm_lektion_max_tokens: int = 32_000
-    llm_lektion_timeout_seconds: int = 900
 
     # --- Curriculum-Dienst -----------------------------------------------------
     curriculum_request_timeout_seconds: int = 8
@@ -599,7 +589,7 @@ def _ops_parse(field_name: str, raw: str):
 
 
 #: Felder, bei denen 0 eine eigene Bedeutung trägt (hier: „kein Limit").
-_OPS_ZERO_OK = {"family_daily_topics"}
+_OPS_ZERO_OK = {"family_daily_topics", "devin_max_acu"}
 
 
 def _ops_validate(o: "Ops") -> None:
@@ -633,6 +623,12 @@ def _ops_validate(o: "Ops") -> None:
         probleme.append("paket_max_bild_bytes > paket_max_bytes")
     if o.jobs_defer_min_seconds > o.jobs_defer_max_seconds:
         probleme.append("jobs_defer_min_seconds > jobs_defer_max_seconds")
+    if not o.devin_base_url.startswith(("https://", "http://")):
+        probleme.append("devin_base_url muss eine http(s)-URL sein")
+    if o.devin_poll_seconds > o.jobs_defer_max_seconds:
+        probleme.append(
+            "devin_poll_seconds > jobs_defer_max_seconds — gestellte Aufträge "
+            "würden später abgefragt als das Parken erlaubt")
     if o.adaptiv_zeit_spanne_min > o.adaptiv_zeit_spanne_max:
         probleme.append("adaptiv_zeit_spanne_min > adaptiv_zeit_spanne_max")
     if o.woche_schlafgrenze_stunde > 23:

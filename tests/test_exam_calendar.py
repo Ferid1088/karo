@@ -86,7 +86,7 @@ def test_only_due_exam_session_appears_on_today(app_env, monkeypatch):
 
 
 def test_child_can_save_calendar_and_today_starts_adaptive_topic(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     from app.services import exam_calendar
 
     einrichten(client, fake_llm)
@@ -143,7 +143,7 @@ def test_last_planned_day_is_simulation_and_can_move_one_day_earlier(app_env, mo
 
 
 def test_simulation_questions_are_gated_until_simulation_day(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     from app.services import exam_calendar
 
     einrichten(client, fake_llm)
@@ -287,7 +287,7 @@ def test_empty_calendar_days_are_valid_and_mean_no_study(app_env, monkeypatch):
 
 
 def test_child_exam_page_hides_legacy_plan_and_shows_guided_flow(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     from app.services import exam_calendar
 
     einrichten(client, fake_llm)

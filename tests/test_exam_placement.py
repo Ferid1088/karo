@@ -141,7 +141,7 @@ def test_abgegeben_bleibt_abgegeben(app_env):
     assert exam_placement.stand(exam_id)["vollstaendig"]
 
 
-def test_die_einstufung_gehoert_dem_kind(client, fake_llm, fake_cli, app_env):
+def test_die_einstufung_gehoert_dem_kind(client, fake_llm, app_env):
     """Sie ist eine Abfrage: was dabei herauskommt, steht danach als Können
     des Kindes in der Planung. Eltern dürfen zusehen, aber nicht antworten —
     sonst plant Karo die Prüfung nach dem Wissen der Erwachsenen."""

@@ -64,11 +64,11 @@ def test_json_zeile_uebernimmt_fachfelder():
 
 
 def test_json_zeile_schwaerzt_geheimnisse():
-    eintrag_roh = _record("schluessel sk-ant-api03-AAAABBBBCCCCDDDD hier")
+    eintrag_roh = _record("schluessel sk-testkey01-AAAABBBBCCCCDDDD hier")
     from app.observability.logging import JsonFormatter
 
     zeile = JsonFormatter().format(eintrag_roh)
-    assert "sk-ant" not in zeile
+    assert "sk-testkey" not in zeile
     assert "***redigiert***" in zeile
     # …und die Zeile bleibt trotz Schwärzung gültiges JSON.
     assert json.loads(zeile)["msg"].startswith("schluessel")
@@ -357,7 +357,7 @@ def _lektion_anlegen():
 
 
 def test_mastery_gate_schreibt_erfolge_schwelle_und_ausgang(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     from app.adaptiv import sitzung, store
 
     einrichten(client, fake_llm)
@@ -390,7 +390,7 @@ def test_mastery_gate_schreibt_erfolge_schwelle_und_ausgang(
     assert nutz["gemeistert"] is True
 
 
-def test_gescheiterte_runde_schreibt_die_grenze(client, fake_llm, fake_cli,
+def test_gescheiterte_runde_schreibt_die_grenze(client, fake_llm,
                                                 app_env):
     from app.adaptiv import sitzung, store
 

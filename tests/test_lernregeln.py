@@ -326,7 +326,7 @@ def _sitzung_mit_offener_voraussetzung(client, fake_llm, app_env):
 
 
 def test_z3_voraussetzung_hat_ihren_eigenen_bildschirm(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Kein Geschafft-Fallback: Grundlage und ihre Aufgaben sind sichtbar."""
     token, vid, s = _sitzung_mit_offener_voraussetzung(client, fake_llm, app_env)
 
@@ -344,7 +344,7 @@ def test_z3_voraussetzung_hat_ihren_eigenen_bildschirm(
 
 
 def test_z3_sitzt_sie_eskaliert_der_http_weg(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Die Grundlage sitzt — es lag nicht daran: eskalieren wie bisher."""
     from app.adaptiv import sitzung
     token, vid, s = _sitzung_mit_offener_voraussetzung(client, fake_llm, app_env)
@@ -358,7 +358,7 @@ def test_z3_sitzt_sie_eskaliert_der_http_weg(
 
 
 def test_z3_fehlt_sie_startet_der_umweg_und_kehrt_zurueck(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Kein Dead End: falsche Diagnose → Umweg lernen → zurueck an die Stelle."""
     import json
     from app.adaptiv import sitzung as zustand, store
@@ -399,7 +399,7 @@ def test_z3_fehlt_sie_startet_der_umweg_und_kehrt_zurueck(
 
 
 def test_z3_sitzt_sie_inzwischen_geht_es_direkt_weiter(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Ist die Grundlage anderswo sicher geworden, fragt die Bruecke nicht zweimal."""
     import json
     from app.adaptiv import store
@@ -424,7 +424,7 @@ def test_z3_sitzt_sie_inzwischen_geht_es_direkt_weiter(
 
 
 def test_z3_der_umweg_verdoppelt_sich_nicht(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Laeuft der Umweg schon, startet kein zweiter."""
     token, vid, s = _sitzung_mit_offener_voraussetzung(client, fake_llm, app_env)
     client.post("/lernen/adaptiv/voraussetzung",
@@ -441,7 +441,7 @@ def test_z3_der_umweg_verdoppelt_sich_nicht(
 
 
 def test_z3_ein_laufender_umweg_bekommt_seinen_rueckweg(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Liegt schon eine offene Sitzung auf dem Voraussetzungskonzept, wird sie
     weitergefuehrt statt verdoppelt — aber MIT Rueckweg-Marker. Ohne ihn
     landete der Umweg bei MASTERED auf der Terminwahl und die wartende
@@ -475,7 +475,7 @@ def test_z3_ein_laufender_umweg_bekommt_seinen_rueckweg(
 
 
 def test_z3_ende_zu_ende_vom_scheitern_ueber_den_umweg_zurueck(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Lernen → dreimal gescheitert → Grundlage pruefen → lernen → weiter."""
     from app.adaptiv import sitzung as zustand, store
     from .test_adaptiv_lektion import _bis_zur_gefuehrten_aufgabe

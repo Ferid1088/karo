@@ -37,7 +37,7 @@ def seed(app_env, monkeypatch):
         c.execute('INSERT INTO exam_topic(exam_id,topic_id,position) VALUES(1,3,0)')
 
 
-def test_facts_are_read_only_and_keep_learning_separate(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_facts_are_read_only_and_keep_learning_separate(client, fake_llm, app_env, monkeypatch):
     einrichten(client, fake_llm)
     seed(app_env, monkeypatch)
     from app.services.parent_overview import summary
@@ -60,7 +60,7 @@ def test_facts_are_read_only_and_keep_learning_separate(client, fake_llm, fake_c
     assert summary()['next_exam']['id'] == 1
 
 
-def test_empty_overview_access_and_existing_tools(client, fake_llm, fake_cli, app_env):
+def test_empty_overview_access_and_existing_tools(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     response = client.get('/eltern')
     assert response.status_code == 200
@@ -82,7 +82,7 @@ def test_empty_overview_access_and_existing_tools(client, fake_llm, fake_cli, ap
     assert client.get('/eltern').status_code == 403
 
 
-def test_retry_stays_in_parent_area_and_requires_csrf(client, fake_llm, fake_cli, monkeypatch):
+def test_retry_stays_in_parent_area_and_requires_csrf(client, fake_llm, monkeypatch):
     einrichten(client, fake_llm)
     from app.routers import eltern
     retried = []
@@ -98,7 +98,7 @@ def test_retry_stays_in_parent_area_and_requires_csrf(client, fake_llm, fake_cli
     assert retried == [123]
 
 
-def test_mobile_desktop_themes_and_disclosures(client, fake_llm, fake_cli, app_env, monkeypatch, tmp_path):
+def test_mobile_desktop_themes_and_disclosures(client, fake_llm, app_env, monkeypatch, tmp_path):
     pw = pytest.importorskip('playwright.sync_api')
     einrichten(client, fake_llm)
     seed(app_env, monkeypatch)

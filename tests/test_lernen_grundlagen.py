@@ -447,7 +447,7 @@ def test_ein_heute_bestandener_check_steht_abgehakt_da(app_env):
 
 # ------------------------------------------------- der Weg durch die App
 
-def _kind_und_faelliger_termin(client, fake_llm, fake_cli, app_env):
+def _kind_und_faelliger_termin(client, fake_llm, app_env):
     """Kind angemeldet, adaptiver Weg an, eine Wiederholung faellig."""
     from app.adaptiv import wiederholung
     from app.woche import plaene
@@ -463,8 +463,8 @@ def _kind_und_faelliger_termin(client, fake_llm, fake_cli, app_env):
 
 
 def test_faellige_wiederholung_erscheint_auf_der_heute_seite(client, fake_llm,
-                                                            fake_cli, app_env):
-    termin, _ = _kind_und_faelliger_termin(client, fake_llm, fake_cli, app_env)
+                                                            app_env):
+    termin, _ = _kind_und_faelliger_termin(client, fake_llm, app_env)
 
     seite = client.get("/")
 
@@ -472,11 +472,11 @@ def test_faellige_wiederholung_erscheint_auf_der_heute_seite(client, fake_llm,
     assert f"/lernen/adaptiv/wiederholung/{termin['id']}" in seite.text
 
 
-def test_bestandener_check_festigt_das_konzept(client, fake_llm, fake_cli,
+def test_bestandener_check_festigt_das_konzept(client, fake_llm,
                                               app_env):
     from app.adaptiv import wiederholung
     from .conftest import csrf_from
-    termin, konzept_id = _kind_und_faelliger_termin(client, fake_llm, fake_cli,
+    termin, konzept_id = _kind_und_faelliger_termin(client, fake_llm,
                                                     app_env)
 
     seite = client.get(f"/lernen/adaptiv/wiederholung/{termin['id']}")
@@ -494,11 +494,11 @@ def test_bestandener_check_festigt_das_konzept(client, fake_llm, fake_cli,
 
 
 def test_verpatzter_check_endet_in_auffrischung_und_neuer_wahl(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Kein Minus: kurz auffrischen, dann waehlt das Kind wieder selbst."""
     from app.adaptiv import wiederholung
     from .conftest import csrf_from
-    termin, konzept_id = _kind_und_faelliger_termin(client, fake_llm, fake_cli,
+    termin, konzept_id = _kind_und_faelliger_termin(client, fake_llm,
                                                     app_env)
     seite = client.get(f"/lernen/adaptiv/wiederholung/{termin['id']}")
     token = csrf_from(seite.text)

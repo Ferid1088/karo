@@ -16,7 +16,7 @@ def eltern_login(client, passwort='geheim123'):
     client.post('/login', data={'_csrf': csrf_from(seite.text), 'password': passwort})
 
 
-def test_service_guardrails_and_suggestions(client, fake_llm, fake_cli, app_env):
+def test_service_guardrails_and_suggestions(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     from app.services import family_post as post
     for text, emoji in [('', None), ('Hallo', '👎'), ('x' * 201, None), ('', '😞'), ('Hallo', '<script>')]:
@@ -46,7 +46,7 @@ def test_service_guardrails_and_suggestions(client, fake_llm, fake_cli, app_env)
     assert post.suggestions({'mode': 'monat'}, 'Milena')[0]['emoji'] == '❤️'
 
 
-def test_parent_sends_child_reads_and_answers(client, fake_llm, fake_cli, app_env):
+def test_parent_sends_child_reads_and_answers(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     seite = client.get('/eltern?ansicht=woche&datum=2026-09-22')
     assert 'id="pr-d-post"' in seite.text and 'Nachricht an Milena' in seite.text
@@ -93,7 +93,7 @@ def test_parent_sends_child_reads_and_answers(client, fake_llm, fake_cli, app_en
     assert 'Milena: ❤️' in page and 'gelesen ✓' in page and 'Letzte Antwort: ❤️' in page
 
 
-def test_withdraw_before_reading(client, fake_llm, fake_cli, app_env):
+def test_withdraw_before_reading(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     from app.services import family_post as post
     msg = post.send('Oh, falsch geschickt', '🤗')
@@ -103,7 +103,7 @@ def test_withdraw_before_reading(client, fake_llm, fake_cli, app_env):
     assert post.inbox() == [] and post.unread() == []
 
 
-def test_celebration_only_for_childs_own_reached_goal(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_celebration_only_for_childs_own_reached_goal(client, fake_llm, app_env, monkeypatch):
     einrichten(client, fake_llm)
     from app.woche import plaene, plaene_store as store
     from app.services import family_post as post
@@ -139,7 +139,7 @@ def test_celebration_only_for_childs_own_reached_goal(client, fake_llm, fake_cli
     assert 'grün' not in ' '.join(g['celebration'] for g in post.celebrations_due())
 
 
-def test_child_sets_celebration_in_wizard_and_detail(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_child_sets_celebration_in_wizard_and_detail(client, fake_llm, app_env, monkeypatch):
     from app.woche import plaene, plaene_store as store
     einrichten(client, fake_llm)
     monkeypatch.setattr(plaene, 'today', lambda now=None: date(2026, 9, 22))

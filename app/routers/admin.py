@@ -58,7 +58,7 @@ def klassenarbeit_neu(request: Request, exam_date: str = Form(...),
 # Hier standen „/klassenarbeit/themenblatt" und sein Status: ein Foto des
 # Ankündigungsblatts ging an ein Modell, das Themen und Termin ablas.
 # Bestätigen musste ein Mensch sie ohnehin immer — jetzt tippt er sie gleich
-# ein. Siehe app/llm/base.py; das Lesen kommt zurück, sobald es auf dem Gerät
+# ein. Siehe app/ai/base.py; das Lesen kommt zurück, sobald es auf dem Gerät
 # läuft (docs/Karo_Prompts_Schritt_fuer_Schritt.MD, Schritt 2).
 
 
@@ -314,7 +314,7 @@ def protokoll(request: Request):
         "SELECT COUNT(*) AS n, COALESCE(SUM(cost_usd),0) AS c FROM llm_call "
         "WHERE created_at >= ?", dt.date.today().replace(day=1).isoformat()))
     return render(request, "protokoll.html", zeilen=zeilen, gesamt=gesamt,
-                  monat=monat, backend=config.load_safe().llm_backend)
+                  monat=monat, backend=config.load_safe().ai_provider)
 
 
 @router.get("/protokoll/{call_id}", response_class=HTMLResponse)

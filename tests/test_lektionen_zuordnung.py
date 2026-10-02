@@ -23,7 +23,7 @@ ANDERE_BRUCHTHEMEN = [
 
 
 def test_andere_bruchthemen_bekommen_keine_additionslektion(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     from app.adaptiv import lektionen
     einrichten(client, fake_llm)
 
@@ -31,7 +31,7 @@ def test_andere_bruchthemen_bekommen_keine_additionslektion(
         assert lektionen.fuer_thema(thema, "mathematik") is None, thema
 
 
-def test_das_addieren_selbst_trifft_weiterhin(client, fake_llm, fake_cli,
+def test_das_addieren_selbst_trifft_weiterhin(client, fake_llm,
                                               app_env):
     """Die Gegenprobe: die Lektion, die es gibt, bleibt auffindbar."""
     from app.adaptiv import lektionen

@@ -1,5 +1,12 @@
 # Karo – Prompts Schritt für Schritt
 
+> **Historisches Arbeitsprotokoll.** Diese Datei dokumentiert die Prompts, mit
+> denen frühere Umbauten angeleitet wurden — sie beschreibt, was damals
+> gemacht werden sollte, nicht den heutigen Stand. Namen des damaligen
+> Anbieters bleiben hier stehen, weil das Protokoll sonst verfälscht wäre.
+> Aktuell ist Devin der einzige KI-Anbieter (`app/ai/`,
+> `docs/API_INVENTORY.md`).
+
 Reihenfolge einhalten. Einen Prompt erst geben, wenn der vorige **fertig** ist (Bedingung steht jeweils unten).
 Erledigt: Runde 1 (Vertrag), Runde 2 (Container-SHA, Fail-closed, Vertragsversion, CI, Dockerfile, Kontingent),
 Schritt 1 (karo 130285a). Deployment und Brücke übernimmt Schritt 1b.

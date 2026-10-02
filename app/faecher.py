@@ -112,12 +112,11 @@ def _modell(text: str, fach: str) -> str | None:
     """
     from . import config, pii
     cfg = config.load_safe()
-    if not getattr(cfg, "has_credentials", False) or not getattr(cfg, "model_text", ""):
+    if not getattr(cfg, "has_credentials", False):
         return None
     try:
-        from .llm.client import ClaudeClient
-        antwort = ClaudeClient.from_config(
-            cfg, config.ops().llm_fach_timeout_seconds).complete(
+        from .ai.client import AIClient
+        antwort = AIClient.from_config(cfg).complete(
             purpose="fach_pruefen",
             max_tokens=config.ops().llm_fach_max_tokens, schema=FACH_SCHEMA,
             prompt=("Zu welchem Schulfach gehört dieses Lernthema eines Schulkinds? "

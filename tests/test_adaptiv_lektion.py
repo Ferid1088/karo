@@ -49,7 +49,7 @@ def _phase(app_env):
 # --------------------------------------------------------------------------
 
 def test_reihenfolge_regel_beispiel_gefuehrte_aufgabe(client, fake_llm,
-                                                      fake_cli, app_env):
+                                                      app_env):
     """B1: RULE → WORKED_EXAMPLE → GUIDED_TASK ist die tatsächliche Folge."""
     from app.adaptiv import sitzung as zustand
 
@@ -68,7 +68,7 @@ def test_reihenfolge_regel_beispiel_gefuehrte_aufgabe(client, fake_llm,
 
 
 def test_beispiel_hat_andere_zahlen_als_die_gefuehrte_aufgabe(client, fake_llm,
-                                                              fake_cli, app_env):
+                                                              app_env):
     """B1: Sonst schreibt das Kind die Lösung einfach ab."""
     from app.adaptiv import inhalt_store, inhalte_brueche, store
 
@@ -82,7 +82,7 @@ def test_beispiel_hat_andere_zahlen_als_die_gefuehrte_aufgabe(client, fake_llm,
 
 
 def test_gefuehrte_aufgabe_zeigt_ihre_brueche_sofort(client, fake_llm,
-                                                     fake_cli, app_env):
+                                                     app_env):
     """B1: Das Bild ist von Anfang an da, nicht erst nach zwei Fehlversuchen."""
     token = _kind(client, fake_llm, app_env)
     seite = _bis_zur_gefuehrten_aufgabe(client, token)
@@ -92,7 +92,7 @@ def test_gefuehrte_aufgabe_zeigt_ihre_brueche_sofort(client, fake_llm,
     assert 'class="strip"' in haupt
 
 
-def test_selbststaendige_aufgabe_zeigt_kein_bild(client, fake_llm, fake_cli,
+def test_selbststaendige_aufgabe_zeigt_kein_bild(client, fake_llm,
                                                  app_env):
     """B1: Ohne Bild — genau das ist die Prüfung.
 
@@ -119,7 +119,7 @@ def test_selbststaendige_aufgabe_zeigt_kein_bild(client, fake_llm, fake_cli,
         assert 'class="area"' not in haupt
 
 
-def test_adaptation_zeigt_eine_andere_darstellung(client, fake_llm, fake_cli,
+def test_adaptation_zeigt_eine_andere_darstellung(client, fake_llm,
                                                   app_env):
     """B1: Nach einem Fehlversuch nicht dasselbe Bild noch einmal."""
     from app.adaptiv import sitzung as zustand
@@ -140,7 +140,7 @@ def test_adaptation_zeigt_eine_andere_darstellung(client, fake_llm, fake_cli,
 # B2 — Streifen korrekt zeichnen
 # --------------------------------------------------------------------------
 
-def test_streifen_sind_immer_gleich_breit(client, fake_llm, fake_cli, app_env):
+def test_streifen_sind_immer_gleich_breit(client, fake_llm, app_env):
     """B2: Der wichtige Test — ein Drittel darf nicht breiter aussehen als
     eine Hälfte, sonst widerspricht das Bild dem Begriff."""
     token = _kind(client, fake_llm, app_env)
@@ -154,7 +154,7 @@ def test_streifen_sind_immer_gleich_breit(client, fake_llm, fake_cli, app_env):
 
 
 def test_jeder_streifen_hat_eine_vorlesbare_beschriftung(client, fake_llm,
-                                                         fake_cli, app_env):
+                                                         app_env):
     """B2: Jeder gezeichnete Streifen ist beschriftet."""
     token = _kind(client, fake_llm, app_env)
     seite = _bis_zur_gefuehrten_aufgabe(client, token)
@@ -164,7 +164,7 @@ def test_jeder_streifen_hat_eine_vorlesbare_beschriftung(client, fake_llm,
     assert all('role="img"' in s and "aria-label=" in s for s in streifen)
 
 
-def test_jeder_streifen_ist_rechnerisch_moeglich(client, fake_llm, fake_cli,
+def test_jeder_streifen_ist_rechnerisch_moeglich(client, fake_llm,
                                                  app_env):
     """B2: 0 <= gefüllt <= gesamt und gesamt > 0 — für jedes gezeichnete Bild."""
     token = _kind(client, fake_llm, app_env)
@@ -178,7 +178,7 @@ def test_jeder_streifen_ist_rechnerisch_moeglich(client, fake_llm, fake_cli,
         assert 0 <= int(gefuellt) <= int(gesamt)
 
 
-def test_streifen_entstehen_nur_an_einer_stelle(client, fake_llm, fake_cli,
+def test_streifen_entstehen_nur_an_einer_stelle(client, fake_llm,
                                                 app_env):
     """B2: Genau ein Makro zeichnet Streifen — keine Kopie in einem anderen
     Template."""
@@ -197,7 +197,7 @@ def test_streifen_entstehen_nur_an_einer_stelle(client, fake_llm, fake_cli,
 # --------------------------------------------------------------------------
 
 def test_jede_phase_ausser_complete_hat_erklaer_mehr(client, fake_llm,
-                                                     fake_cli, app_env):
+                                                     app_env):
     """B3: Jede Phase hat einen Eintrag, und jeder Eintrag hat ein Bild."""
     from app.adaptiv import inhalt_store, inhalte_brueche, sitzung as zustand
 
@@ -215,7 +215,7 @@ def test_jede_phase_ausser_complete_hat_erklaer_mehr(client, fake_llm,
 
 
 def test_erklaer_mehr_wiederholt_nicht_den_bildschirmtext(client, fake_llm,
-                                                          fake_cli, app_env):
+                                                          app_env):
     """B3: Denselben Satz noch einmal zu lesen hilft niemandem — geprüft für
     JEDE Phase, nicht nur für zwei."""
     from app.adaptiv import inhalt_store, inhalte_brueche, sitzung as zustand
@@ -254,7 +254,7 @@ def test_erklaer_mehr_wiederholt_nicht_den_bildschirmtext(client, fake_llm,
 # --------------------------------------------------------------------------
 
 def test_kein_anbieteraufruf_und_keine_kinderantwort_im_protokoll(
-        client, fake_llm, fake_cli, app_env, caplog):
+        client, fake_llm, app_env, caplog):
     """A7, soweit hier anwendbar.
 
     Es gibt in dieser Lektion keinen Anbieteraufruf, also auch nichts zu
@@ -283,7 +283,7 @@ def test_kein_anbieteraufruf_und_keine_kinderantwort_im_protokoll(
     )["letzte_antwort"]
 
 
-def test_erklaer_mehr_verraet_die_loesung_nicht(client, fake_llm, fake_cli,
+def test_erklaer_mehr_verraet_die_loesung_nicht(client, fake_llm,
                                                 app_env):
     """B3: Auf Übungsschirmen erklärt die Hilfe die Aufgabe, nicht die Antwort —
     dafür gibt es die Tippstufen."""
@@ -298,7 +298,7 @@ def test_erklaer_mehr_verraet_die_loesung_nicht(client, fake_llm, fake_cli,
         assert loesung not in hilfe["text"]
 
 
-def test_hilfe_ist_in_jeder_phase_erreichbar(client, fake_llm, fake_cli,
+def test_hilfe_ist_in_jeder_phase_erreichbar(client, fake_llm,
                                              app_env):
     """B3: In jeder Phase außer COMPLETE — auch mitten in einer Aufgabe."""
     token = _kind(client, fake_llm, app_env)
@@ -318,7 +318,7 @@ def test_hilfe_ist_in_jeder_phase_erreichbar(client, fake_llm, fake_cli,
 # B4 — Hilfe ändert nichts
 # --------------------------------------------------------------------------
 
-def test_hilfe_kann_den_zustand_gar_nicht_aendern(client, fake_llm, fake_cli,
+def test_hilfe_kann_den_zustand_gar_nicht_aendern(client, fake_llm,
                                                   app_env):
     """B4: Die Hilfe ist reines Aufklappen — sie schickt nichts an den Server,
     kann also Phase, Versuche, Beherrschung und Tipps nicht verändern."""
@@ -339,7 +339,7 @@ def test_hilfe_kann_den_zustand_gar_nicht_aendern(client, fake_llm, fake_cli,
 # --------------------------------------------------------------------------
 
 def test_bekannte_falsche_antwort_fuehrt_zur_katalogerklaerung(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Definition of done: Fehlvorstellung benannt, Erklärung aus dem Katalog
     geladen — ohne jede Erzeugung."""
     token = _kind(client, fake_llm, app_env)
@@ -368,7 +368,7 @@ def test_bekannte_falsche_antwort_fuehrt_zur_katalogerklaerung(
     assert fake_llm.calls == []
 
 
-def test_richtige_antworten_fuehren_zu_beherrschung(client, fake_llm, fake_cli,
+def test_richtige_antworten_fuehren_zu_beherrschung(client, fake_llm,
                                                     app_env):
     """Eine richtige Antwort reicht nicht, zwei schon (A8)."""
     from app.adaptiv import sitzung as zustand
@@ -393,7 +393,7 @@ def test_richtige_antworten_fuehren_zu_beherrschung(client, fake_llm, fake_cli,
     assert fortschritt["erfolge"] == 3
 
 
-def test_gekuerzte_antwort_zaehlt_als_richtig(client, fake_llm, fake_cli,
+def test_gekuerzte_antwort_zaehlt_als_richtig(client, fake_llm,
                                               app_env):
     """6/8 ist dieselbe Antwort wie 3/4."""
     from app.adaptiv import sitzung as zustand
@@ -405,7 +405,7 @@ def test_gekuerzte_antwort_zaehlt_als_richtig(client, fake_llm, fake_cli,
     assert _phase(app_env)["phase"] == zustand.INDEPENDENT_TASK
 
 
-def test_drei_fehlversuche_eskalieren_im_browser(client, fake_llm, fake_cli,
+def test_drei_fehlversuche_eskalieren_im_browser(client, fake_llm,
                                                  app_env):
     """A5 auf dem echten Weg: danach wird nichts mehr erklärt."""
     from app.adaptiv import sitzung as zustand
@@ -426,7 +426,7 @@ def test_drei_fehlversuche_eskalieren_im_browser(client, fake_llm, fake_cli,
     assert fortschritt["braucht_mensch"] == 1
 
 
-def test_neuladen_setzt_an_derselben_stelle_fort(client, fake_llm, fake_cli,
+def test_neuladen_setzt_an_derselben_stelle_fort(client, fake_llm,
                                                  app_env):
     """A6 auf dem echten Weg."""
     from app.adaptiv import sitzung as zustand
@@ -441,7 +441,7 @@ def test_neuladen_setzt_an_derselben_stelle_fort(client, fake_llm, fake_cli,
 
 
 def test_unbekannte_antwort_erfindet_keine_fehlvorstellung(client, fake_llm,
-                                                           fake_cli, app_env):
+                                                           app_env):
     """A4: Lieber nachfragen als eine Diagnose erfinden."""
     token = _kind(client, fake_llm, app_env)
     _post(client, token, "anker", antwort="die Hälfte")
@@ -456,7 +456,7 @@ def test_unbekannte_antwort_erfindet_keine_fehlvorstellung(client, fake_llm,
     assert fake_llm.calls == []
 
 
-def test_ohne_schalter_bleibt_alles_beim_alten(client, fake_llm, fake_cli,
+def test_ohne_schalter_bleibt_alles_beim_alten(client, fake_llm,
                                                app_env):
     """§16: Abgeschaltet ist die Route nicht erreichbar, der Rest unberührt."""
     einrichten(client, fake_llm)
@@ -472,7 +472,7 @@ def test_ohne_schalter_bleibt_alles_beim_alten(client, fake_llm, fake_cli,
 # Was es noch nicht gibt, wird gesagt — nicht stillschweigend ersetzt
 # --------------------------------------------------------------------------
 
-def test_einstieg_zeigt_die_vorhandenen_lernreihen(client, fake_llm, fake_cli,
+def test_einstieg_zeigt_die_vorhandenen_lernreihen(client, fake_llm,
                                                    app_env):
     """Ohne Themenwahl startet nichts von selbst."""
     einrichten(client, fake_llm)
@@ -486,7 +486,7 @@ def test_einstieg_zeigt_die_vorhandenen_lernreihen(client, fake_llm, fake_cli,
 
 
 def test_unbekanntes_thema_startet_nicht_heimlich_die_bruchlektion(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Der eigentliche Punkt: Karo tut nicht so, als könnte es alles.
 
     Vorher lieferte die Route immer die Bruchlektion, egal welches Thema
@@ -513,7 +513,7 @@ def test_unbekanntes_thema_startet_nicht_heimlich_die_bruchlektion(
 
 
 def test_passendes_thema_startet_die_richtige_lernreihe(client, fake_llm,
-                                                        fake_cli, app_env):
+                                                        app_env):
     """„Brüche addieren“ findet die Bruchlektion — ohne Modell, per Stichwort.
 
     Frueher stand hier „Bruchrechnung“. Das ist ein Themenwort und traf
@@ -533,7 +533,7 @@ def test_passendes_thema_startet_die_richtige_lernreihe(client, fake_llm,
     assert sitzung["zustand"] == "DIAGNOSING"
 
 
-def test_das_eingetippte_thema_wird_festgehalten(client, fake_llm, fake_cli,
+def test_das_eingetippte_thema_wird_festgehalten(client, fake_llm,
                                                  app_env):
     """§13: Die Eingabe ist der Anfang der Kette, nicht nur ein Klick."""
     einrichten(client, fake_llm)

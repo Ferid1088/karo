@@ -42,7 +42,7 @@ class Forms(HTMLParser):
             self.current = None
 
 
-def test_new_navigation_and_empty_pages(client, fake_llm, fake_cli):
+def test_new_navigation_and_empty_pages(client, fake_llm ):
     einrichten(client, fake_llm)
     for path in ("/", "/lernen", "/lernzyklus", "/eltern", "/wissen", "/themen",
                  "/recherche", "/lernstand", "/klassenarbeit", "/protokoll", "/setup"):
@@ -59,7 +59,7 @@ def test_new_navigation_and_empty_pages(client, fake_llm, fake_cli):
     assert client.get("/eltern", follow_redirects=False).status_code == 303
 
 
-def test_help_keeps_full_documentation_without_tabs(client, fake_llm, fake_cli):
+def test_help_keeps_full_documentation_without_tabs(client, fake_llm ):
     einrichten(client, fake_llm)
     page = client.get('/hilfe')
     assert page.status_code == 200
@@ -70,7 +70,7 @@ def test_help_keeps_full_documentation_without_tabs(client, fake_llm, fake_cli):
     assert 'Karo verwendet zuerst das Material' in page.text
 
 
-def test_upload_proposals_and_manual_topic_use_rendered_fields(client, fake_llm, fake_cli, app_env, tmp_path):
+def test_upload_proposals_and_manual_topic_use_rendered_fields(client, fake_llm, app_env, tmp_path):
     einrichten(client, fake_llm)
     image = make_jpeg(tmp_path / "schule.jpg")
     page = client.get("/wissen")
@@ -93,7 +93,7 @@ def test_upload_proposals_and_manual_topic_use_rendered_fields(client, fake_llm,
     assert app_env.db.q1("SELECT id FROM topic WHERE label='Dezimalzahlen'")
 
 
-def test_topic_and_lesson_ids_are_not_interchangeable(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_topic_and_lesson_ids_are_not_interchangeable(client, fake_llm, app_env, alter_generator):
     from app import teaching, topics
     einrichten(client, fake_llm)
     topics.anlegen("Ein anderes Thema", subject="mathematik")
@@ -110,7 +110,7 @@ def test_topic_and_lesson_ids_are_not_interchangeable(client, fake_llm, fake_cli
     assert teaching.holen(lesson_id)["state"] == "abgebrochen"
 
 
-def test_learning_quiz_keeps_lesson_association_and_review_gate(client, fake_llm, fake_cli, app_env):
+def test_learning_quiz_keeps_lesson_association_and_review_gate(client, fake_llm, app_env):
     from app import quizzes, teaching
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
@@ -161,7 +161,7 @@ def test_learning_quiz_keeps_lesson_association_and_review_gate(client, fake_llm
     assert 'Vorschlag von Karo: falsch' not in page.text
 
 
-def test_source_buttons_and_exam_fields_match_endpoints(client, fake_llm, fake_cli, app_env):
+def test_source_buttons_and_exam_fields_match_endpoints(client, fake_llm, app_env):
     from app import research
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
@@ -186,7 +186,7 @@ def test_source_buttons_and_exam_fields_match_endpoints(client, fake_llm, fake_c
     assert app_env.db.q1('SELECT exam_date FROM exam')['exam_date'] == '2099-01-01'
 
 
-def test_child_navigation_includes_week_and_parent_features_remain(client, fake_llm, fake_cli):
+def test_child_navigation_includes_week_and_parent_features_remain(client, fake_llm ):
     import re
     from .test_app import kind_modus_aktivieren
     einrichten(client, fake_llm)
@@ -213,7 +213,7 @@ def test_child_navigation_includes_week_and_parent_features_remain(client, fake_
     assert re.findall(r'href="([^"]+)"', nav) == ['/', '/lernen', '/lernstand', '/welten', '/woche/woche']
 
 
-def test_topic_start_immediately_builds_existing_material(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_topic_start_immediately_builds_existing_material(client, fake_llm, app_env, alter_generator):
     from app import teaching
     from .test_app import _bis_rot
     topic_id = _bis_rot(client, fake_llm, app_env)
@@ -231,7 +231,7 @@ def test_topic_start_immediately_builds_existing_material(client, fake_llm, fake
     Forms(page.text)
 
 
-def test_home_prefers_child_ready_work_to_parent_review(client, fake_llm, fake_cli, app_env):
+def test_home_prefers_child_ready_work_to_parent_review(client, fake_llm, app_env):
     from app import quizzes
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env, themenname="Brüche addieren")

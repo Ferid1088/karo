@@ -21,15 +21,12 @@ FROM python:3.11-slim AS base
 
 ARG MIT_MP4=1
 ARG MIT_NOTEBOOKLM=1
-ARG NODE_MAJOR=22
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     KARO_DATA_DIR=/data \
     KARO_DRIVE_DIR=/drive \
-    NPM_CONFIG_UPDATE_NOTIFIER=false \
-    NPM_CONFIG_FUND=false \
     PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
 
 WORKDIR /srv
@@ -71,19 +68,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # wuerde sie in der Docker-Ebenen-Struktur sonst komplett verdoppeln.
 RUN addgroup --gid 5000 karo \
     && adduser --disabled-password --uid 5000 --gid 5000 --home /srv --gecos "" karo
-
-# --- Node und die Claude-Code-CLI ------------------------------------------
-# Nötig für den Zugang über das Claude-Abo: Karo ruft `claude -p` als
-# Unterprozess auf. Der API-Weg braucht das nicht, aber die CLI ist klein
-# genug, dass beide Wege im selben Image Platz haben.
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x -o /tmp/node.sh \
-    && bash /tmp/node.sh \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -f /tmp/node.sh \
-    && rm -rf /var/lib/apt/lists/* \
-    && npm install -g @anthropic-ai/claude-code \
-    && npm cache clean --force \
-    && claude --version
 
 # --- Python-Abhängigkeiten -------------------------------------------------
 # notebooklm-py[browser] bringt Playwright mit; playwright install lädt dazu

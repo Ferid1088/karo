@@ -122,7 +122,7 @@ def test_der_standard_ist_fuenf(app_env, monkeypatch):
     assert topic_budget.grenze() == 5          # kaputte Angabe aendert nichts
 
 
-def test_eltern_sehen_morgen_statt_wird_erstellt(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_eltern_sehen_morgen_statt_wird_erstellt(client, fake_llm, app_env, monkeypatch):
     from app import db
     from app.services import exam_effort, exam
     from .test_app import einrichten

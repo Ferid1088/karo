@@ -66,7 +66,7 @@ def test_erfundene_komponente_auch_in_der_hilfe_abgewiesen(app_env):
         schemas.pruefe_lektion(daten)
 
 
-def test_die_hilfe_erreicht_das_kind(client, fake_llm, fake_cli, app_env):
+def test_die_hilfe_erreicht_das_kind(client, fake_llm, app_env):
     from app.adaptiv import erzeugung, inhalt_store, sitzung
     einrichten(client, fake_llm)
 
@@ -80,7 +80,7 @@ def test_die_hilfe_erreicht_das_kind(client, fake_llm, fake_cli, app_env):
     assert len(inhalt_store.faq(konzept_id)) >= 2
 
 
-def test_die_hilfe_ruft_kein_modell(client, fake_llm, fake_cli, app_env):
+def test_die_hilfe_ruft_kein_modell(client, fake_llm, app_env):
     """A3: Hilfe ist ein Lookup, kein Aufruf im Moment der Ratlosigkeit."""
     from app.adaptiv import erzeugung, inhalt_store, sitzung
     einrichten(client, fake_llm)

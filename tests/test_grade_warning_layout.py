@@ -6,7 +6,7 @@ import pytest
 from .test_grade_guidance import setup
 
 
-def test_warning_is_readable_on_phone_and_desktop(client, fake_llm, fake_cli, app_env, tmp_path):
+def test_warning_is_readable_on_phone_and_desktop(client, fake_llm, app_env, tmp_path):
     pw = pytest.importorskip('playwright.sync_api')
     tid, token = setup(client, fake_llm, app_env)
     warning = client.post('/lernen/adaptiv/start', data={'_csrf': token, 'topic_id': tid}).text

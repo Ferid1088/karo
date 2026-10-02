@@ -20,7 +20,7 @@ def test_relative_day_labels():
     assert date_label(today) == "Montag, 28. September"
 
 
-def test_empty_day_offers_a_choice_without_plan(client, fake_llm, fake_cli):
+def test_empty_day_offers_a_choice_without_plan(client, fake_llm ):
     from .test_app import einrichten
     einrichten(client, fake_llm)
     page = client.get("/").text
@@ -29,7 +29,7 @@ def test_empty_day_offers_a_choice_without_plan(client, fake_llm, fake_cli):
     assert "Tage</b> in Folge" not in page
 
 
-def test_streak_and_success_appear_on_today(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_streak_and_success_appear_on_today(client, fake_llm, app_env, monkeypatch):
     from app.services import today
     from app import topics
     from .test_app import einrichten
@@ -45,7 +45,7 @@ def test_streak_and_success_appear_on_today(client, fake_llm, fake_cli, app_env,
     assert "Heute sicher: <b>Dezimalzahlen</b>" in page
 
 
-def test_success_line_moved_to_erfolge(client, fake_llm, fake_cli):
+def test_success_line_moved_to_erfolge(client, fake_llm ):
     from app import topics
     from .test_app import einrichten
     einrichten(client, fake_llm)
@@ -66,7 +66,7 @@ def test_activity_days_use_the_family_timezone(app_env):
     assert today.activity_days() == {"2026-09-28"}
 
 
-def test_old_success_and_missed_units_stay_quiet(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_old_success_and_missed_units_stay_quiet(client, fake_llm, app_env, monkeypatch):
     from app import topics
     from app.woche import plaene, plaene_store as store
     from .test_app import einrichten
@@ -86,7 +86,7 @@ def test_old_success_and_missed_units_stay_quiet(client, fake_llm, fake_cli, app
     assert store.sessions(missed)[0]["status"] == "missed"
 
 
-def test_exam_day_and_goal_share_one_plan(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_exam_day_and_goal_share_one_plan(client, fake_llm, app_env, monkeypatch):
     from app.services import exam_calendar
     from app.woche import plaene, plaene_store as store
     from .test_app import einrichten
@@ -128,7 +128,7 @@ def test_rehearsal_counts_as_done_when_finished(app_env):
     assert exam_calendar.rehearsal_done(exam_id)
 
 
-def test_child_can_pick_which_task_is_now(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_child_can_pick_which_task_is_now(client, fake_llm, app_env, monkeypatch):
     from app.woche import plaene, plaene_store as store
     from .test_app import einrichten
     einrichten(client, fake_llm)
@@ -149,7 +149,7 @@ def test_child_can_pick_which_task_is_now(client, fake_llm, fake_cli, app_env, m
     assert f'action="/woche/ziele/{first}/start"' in client.get("/?jetzt=ziel-999").text
 
 
-def test_time_capsule_opening_today_shows_only_a_bee_link(client, fake_llm, fake_cli, app_env):
+def test_time_capsule_opening_today_shows_only_a_bee_link(client, fake_llm, app_env):
     from app.welten import store as welt, world_db
     from .test_app import einrichten, session_cookie_faelschen
     einrichten(client, fake_llm)

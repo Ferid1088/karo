@@ -114,9 +114,7 @@ REDACTED = "***redigiert***"
 _PATTERNS = [
     # Karo Curriculum client keys (also redact bare values, not only headers).
     re.compile(r"\bkc_[A-Za-z0-9_\-]{16,}"),
-    # Anthropic
-    re.compile(r"sk-ant-[A-Za-z0-9_\-]{8,}"),
-    # OpenAI-artige und generische lange Schluessel
+    # OpenAI-artige und generische lange Schluessel (deckt sk-* aller Anbieter ab)
     re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}"),
     # AWS und Google, fuer den Fall eines spaeteren Anbieterwechsels
     re.compile(r"\b(AKIA|ASIA)[0-9A-Z]{16}\b"),
@@ -191,5 +189,5 @@ def configure_logging(level: str = "INFO",
 
 def selftest_redaction() -> bool:
     """Wird beim Start ausgefuehrt. Schlaegt sie fehl, startet die App nicht."""
-    probe = "x sk-ant-api03-AAAABBBBCCCCDDDD y"
-    return "sk-ant" not in redact(probe)
+    probe = "x sk-testkey01-AAAABBBBCCCCDDDD y"
+    return "sk-testkey" not in redact(probe)

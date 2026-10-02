@@ -18,7 +18,7 @@ def prepare_review(client, fake_llm, app_env):
     return topic_id, quiz_id
 
 
-def test_review_moves_between_parent_and_child_pages(client, fake_llm, fake_cli, app_env):
+def test_review_moves_between_parent_and_child_pages(client, fake_llm, app_env):
     _, quiz_id = prepare_review(client, fake_llm, app_env)
     link = f'href="/quiz/{quiz_id}"'
     for enabled in (False, True, False):
@@ -38,7 +38,7 @@ def test_review_moves_between_parent_and_child_pages(client, fake_llm, fake_cli,
 
 
 @pytest.mark.parametrize('alias', [False, True])
-def test_child_release_requires_setting_and_csrf(client, fake_llm, fake_cli, app_env, alias):
+def test_child_release_requires_setting_and_csrf(client, fake_llm, app_env, alias):
     topic_id, quiz_id = prepare_review(client, fake_llm, app_env)
     kind_modus_aktivieren(client)
     path = (f'/lernzyklus/{topic_id}/quiz/{quiz_id}' if alias else f'/quiz/{quiz_id}')

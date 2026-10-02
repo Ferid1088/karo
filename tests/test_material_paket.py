@@ -87,7 +87,7 @@ def _bereit(client, fake_llm, app_env, dateien, metadaten, zweck="lernen"):
 # Upload
 # --------------------------------------------------------------------------
 
-def test_ein_jpg_wird_ein_paket(client, fake_llm, fake_cli, app_env):
+def test_ein_jpg_wird_ein_paket(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     r = _upload(client, [("blatt.jpg", _bild(), "image/jpeg")],
                 metadaten=_meta())
@@ -102,7 +102,7 @@ def test_ein_jpg_wird_ein_paket(client, fake_llm, fake_cli, app_env):
 
 
 def test_mehrere_jpgs_bleiben_in_der_gewaehlten_reihenfolge(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     r = _upload(client, [
         ("erste.jpg", _bild(farbe=(240, 0, 0)), "image/jpeg"),
@@ -116,7 +116,7 @@ def test_mehrere_jpgs_bleiben_in_der_gewaehlten_reihenfolge(
         "erste.jpg", "zweite.jpg", "dritte.jpg"]
 
 
-def test_png_wird_angenommen(client, fake_llm, fake_cli, app_env):
+def test_png_wird_angenommen(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     r = _upload(client, [("seite.png", _bild(fmt="PNG"), "image/png")],
                 metadaten=_meta())
@@ -128,7 +128,7 @@ def test_png_wird_angenommen(client, fake_llm, fake_cli, app_env):
 
 
 def test_rohes_pdf_wird_serverseitig_in_seiten_zerlegt(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     """Ohne JavaScript geht ein PDF als Ganzes hoch — der Server zerlegt es
     und der lokale Tesseract-Rückfall liest es dann."""
     einrichten(client, fake_llm)
@@ -152,7 +152,7 @@ def test_rohes_pdf_wird_serverseitig_in_seiten_zerlegt(
     assert all(s["state"] == "gelesen" for s in _seiten(app_env, paket_id))
 
 
-def test_ungueltige_datei_wird_abgewiesen(client, fake_llm, fake_cli, app_env):
+def test_ungueltige_datei_wird_abgewiesen(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     r = _upload(client, [("notizen.txt", b"hallo welt", "text/plain")])
     assert r.status_code == 422
@@ -161,7 +161,7 @@ def test_ungueltige_datei_wird_abgewiesen(client, fake_llm, fake_cli, app_env):
 
 
 def test_ausfuehrbare_datei_wird_abgewiesen(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     r = _upload(client, [("skript.sh", b"#!/bin/sh\nrm -rf /\n",
                           "application/x-sh")])
@@ -170,7 +170,7 @@ def test_ausfuehrbare_datei_wird_abgewiesen(
 
 
 def test_zu_grosses_bild_wird_abgewiesen(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     einrichten(client, fake_llm)
     from app import material_paket
     monkeypatch.setattr(material_paket, "MAX_BILD_BYTES", 100)
@@ -181,7 +181,7 @@ def test_zu_grosses_bild_wird_abgewiesen(
 
 
 def test_zu_grosses_pdf_wird_abgewiesen(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     einrichten(client, fake_llm)
     from app import material_paket
     vorher = len(app_env.db.q("SELECT id FROM document"))
@@ -194,7 +194,7 @@ def test_zu_grosses_pdf_wird_abgewiesen(
 
 
 def test_paket_gesamtlimit_gilt(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     """Das Paketlimit zählt alle Dateien zusammen — nicht jede für sich."""
     einrichten(client, fake_llm)
     from app import material_paket
@@ -210,7 +210,7 @@ def test_paket_gesamtlimit_gilt(
 
 
 def test_anhaengen_zaehlt_auf_das_paketlimit(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     """Das Gesamtlimit gilt paketweit — Nachladen kann es überschreiten."""
     einrichten(client, fake_llm)
     from app import material_paket
@@ -233,7 +233,7 @@ def test_anhaengen_zaehlt_auf_das_paketlimit(
 
 
 def test_zu_viele_seiten_werden_abgewiesen(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     from app import material_paket
     dateien = [(f"s{i}.jpg", _bild(size=(50 + i, 50)), "image/jpeg")
@@ -244,7 +244,7 @@ def test_zu_viele_seiten_werden_abgewiesen(
 
 
 def test_pdf_mit_zu_vielen_seiten_wird_vor_dem_einlesen_abgelehnt(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Ein langes PDF scheitert an der Seitenzahl, bevor eine Seite
     gerendert oder gelesen wird — kein halbfertiges Paket, keine Waisen."""
     einrichten(client, fake_llm)
@@ -260,7 +260,7 @@ def test_pdf_mit_zu_vielen_seiten_wird_vor_dem_einlesen_abgelehnt(
 
 
 def test_fehler_mitten_im_paket_raeumt_dokumente_weg(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Scheitert die zweite Datei, darf die erste nicht als verwaistes
     Dokument zurückbleiben."""
     einrichten(client, fake_llm)
@@ -273,7 +273,7 @@ def test_fehler_mitten_im_paket_raeumt_dokumente_weg(
 
 
 def test_pfad_im_dateinamen_kommt_nirgends_an(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Ein Dateiname ist eine Bezeichnung, nie ein Pfad."""
     einrichten(client, fake_llm)
     r = _upload(client, [("../../tmp/boese.jpg", _bild(), "image/jpeg")],
@@ -288,7 +288,7 @@ def test_pfad_im_dateinamen_kommt_nirgends_an(
     assert ".." not in dokument["stored_path"]
 
 
-def test_upload_ohne_csrf_wird_abgelehnt(client, fake_llm, fake_cli, app_env):
+def test_upload_ohne_csrf_wird_abgelehnt(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     r = client.post("/lernen/material/paket",
                     data={"zweck": "lernen", "fach": "mathematik"},
@@ -301,7 +301,7 @@ def test_upload_ohne_csrf_wird_abgelehnt(client, fake_llm, fake_cli, app_env):
 # Paket als Ganzes
 # --------------------------------------------------------------------------
 
-def test_seite_entfernen_nummeriert_neu(client, fake_llm, fake_cli, app_env):
+def test_seite_entfernen_nummeriert_neu(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     r = _upload(client, [
         ("eins.jpg", _bild(farbe=(240, 0, 0)), "image/jpeg"),
@@ -321,7 +321,7 @@ def test_seite_entfernen_nummeriert_neu(client, fake_llm, fake_cli, app_env):
 
 
 def test_letzte_seite_entfernen_raeumt_das_paket_weg(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     r = _upload(client, [("eins.jpg", _bild(), "image/jpeg")], metadaten=_meta())
     paket_id = _paket_id(r)
@@ -335,7 +335,7 @@ def test_letzte_seite_entfernen_raeumt_das_paket_weg(
                          paket_id) is None
 
 
-def test_paket_uebersteht_einen_reload(client, fake_llm, fake_cli, app_env):
+def test_paket_uebersteht_einen_reload(client, fake_llm, app_env):
     """Die Analyse läuft im Hintergrund — die Statusseite bleibt bestehen."""
     einrichten(client, fake_llm)
     fake_llm.responses["material"] = dict(MATERIAL_ANTWORT)
@@ -351,7 +351,7 @@ def test_paket_uebersteht_einen_reload(client, fake_llm, fake_cli, app_env):
     assert "Brüche addieren" in seite.text
 
 
-def test_analyse_laeuft_nur_einmal(client, fake_llm, fake_cli, app_env):
+def test_analyse_laeuft_nur_einmal(client, fake_llm, app_env):
     """Der Job steht mit Dedup-Schlüssel in der Queue — ein zweites
     Anlegen wartet nicht noch einmal."""
     einrichten(client, fake_llm)
@@ -367,7 +367,7 @@ def test_analyse_laeuft_nur_einmal(client, fake_llm, fake_cli, app_env):
 
 
 def test_unleserliche_seite_richtet_kein_paket_zugrunde(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Eine schwer lesbare Seite wird markiert, die anderen lesen weiter."""
     einrichten(client, fake_llm)
     fake_llm.responses["material"] = dict(MATERIAL_ANTWORT)
@@ -390,7 +390,7 @@ def test_unleserliche_seite_richtet_kein_paket_zugrunde(
 # --------------------------------------------------------------------------
 
 def test_bestaetigte_themen_landen_im_lernen(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     paket_id = _bereit(client, fake_llm, app_env,
                        [("s1.jpg", _bild(farbe=(240, 0, 0)), "image/jpeg"),
@@ -418,7 +418,7 @@ def test_bestaetigte_themen_landen_im_lernen(
 
 
 def test_fachfremdes_thema_wird_nicht_angelegt(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Die Fachprüfung bleibt auch beim Upload — „vocabulary" gehört nicht
     in Mathematik."""
     einrichten(client, fake_llm)
@@ -438,7 +438,7 @@ def test_fachfremdes_thema_wird_nicht_angelegt(
 
 
 def test_klassenarbeit_uebernimmt_themen_ins_formular(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     """Zweck klassenarbeit: die bestätigten Themen füllen das Formular,
     Termin und Anlegen bleiben der übliche Weg."""
     einrichten(client, fake_llm)
@@ -471,7 +471,7 @@ def test_klassenarbeit_uebernimmt_themen_ins_formular(
 
 
 def test_ohne_thema_wird_nichts_uebernommen(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     paket_id = _bereit(client, fake_llm, app_env,
                        [("s.jpg", _bild(), "image/jpeg")], _meta())
@@ -485,7 +485,7 @@ def test_ohne_thema_wird_nichts_uebernommen(
 
 
 def test_doppeltes_uebernehmen_geht_nicht(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     paket_id = _bereit(client, fake_llm, app_env,
                        [("s.jpg", _bild(), "image/jpeg")], _meta())
@@ -506,7 +506,7 @@ def test_doppeltes_uebernehmen_geht_nicht(
 # --------------------------------------------------------------------------
 
 def test_seitenbild_nur_ueber_das_eigene_paket(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     r = _upload(client, [("b.jpg", _bild(), "image/jpeg")], metadaten=_meta())
     paket_id = _paket_id(r)
@@ -533,7 +533,7 @@ def _llm_aufruf(app_env, paket_index=-1):
         "ORDER BY id")[paket_index]
 
 
-def test_kein_ocr_inhalt_in_den_logs(client, fake_llm, fake_cli, app_env,
+def test_kein_ocr_inhalt_in_den_logs(client, fake_llm, app_env,
                                      caplog):
     """Das Protokoll zählt Seiten und IDs — nie Blattinhalte."""
     einrichten(client, fake_llm)   # Kind heißt hier „Milena"
@@ -555,7 +555,7 @@ def test_kein_ocr_inhalt_in_den_logs(client, fake_llm, fake_cli, app_env,
 
 
 def test_audit_speichert_keinen_blattinhalt(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Arbeitsblatt-OCR ist selbst geschwärzt zu sensibel für den
     Audit-Speicher: in llm_call bleiben nur Metadaten und der Hash."""
     einrichten(client, fake_llm)
@@ -588,7 +588,7 @@ def test_audit_speichert_keinen_blattinhalt(
 
 
 def test_prompt_hash_stabil_und_empfindlich(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Gleicher Modellinput → gleicher Hash; ein anderes Blatt → anderer."""
     import re
     einrichten(client, fake_llm)
@@ -605,22 +605,31 @@ def test_prompt_hash_stabil_und_empfindlich(
 
     aufrufe = app_env.db.q(
         "SELECT * FROM llm_call WHERE purpose='material_analyse' ORDER BY id")
-    assert len(aufrufe) == 3
-    assert hash_von(aufrufe[0]) == hash_von(aufrufe[1])
-    assert hash_von(aufrufe[0]) != hash_von(aufrufe[2])
+    # Devin ist asynchron: jeder neue Prompt erzeugt eine Park-Runde und damit
+    # eine zweite Audit-Zeile; identischer Text teilt sich außerdem die
+    # Session (Fingerprint-Dedup). Aussagekräftig sind die unterschiedlichen
+    # Prompt-Hashes: zwei gleiche Blätter → ein Hash, das dritte → ein neuer.
+    hashes = {hash_von(a) for a in aufrufe}
+    assert len(hashes) == 2
 
 
 def test_andere_zwecke_behalten_ihr_vollaudit(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Nur der sensible Blatt-Pfad wird anonymisiert — der Rest des Audits
     hält weiter fest, was wirklich zum Modell ging."""
     einrichten(client, fake_llm)
     from app import config
-    from app.llm import ClaudeClient
+    from app.ai import AIClient, AIPending
     schema = {"type": "object", "required": ["ok"],
               "properties": {"ok": {"type": "boolean"}}}
-    ClaudeClient.from_config(config.load_safe()).complete(
-        "verify_ping", f"AUDITVOLLMARKER {MARKER}", schema)
+    klient = AIClient.from_config(config.load_safe())
+    try:
+        # Devin ist asynchron: der erste Aufruf legt die Session an und
+        # meldet „läuft noch" — erst der zweite holt das Ergebnis ab.
+        klient.complete("verify_ping", f"AUDITVOLLMARKER {MARKER}", schema)
+    except AIPending:
+        pass
+    klient.complete("verify_ping", f"AUDITVOLLMARKER {MARKER}", schema)
     aufruf = app_env.db.q1(
         "SELECT * FROM llm_call WHERE purpose='verify_ping' "
         "ORDER BY id DESC LIMIT 1")

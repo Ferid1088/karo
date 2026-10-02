@@ -20,7 +20,7 @@ def prepare(client, fake_llm, app_env):
     return topic_id, quiz_id
 
 
-def test_reopening_and_double_click_resume_same_quiz(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_reopening_and_double_click_resume_same_quiz(client, fake_llm, app_env, alter_generator):
     from app import quizzes
     topic_id, quiz_id = prepare(client, fake_llm, app_env)
     app_env.config.update(antworten_pruefen_kind=True)
@@ -47,7 +47,7 @@ def test_reopening_and_double_click_resume_same_quiz(client, fake_llm, fake_cli,
     assert len(app_env.db.q('SELECT id FROM quiz')) == 2
 
 
-def test_answers_persist_across_login_and_reject_stale_tabs(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_answers_persist_across_login_and_reject_stale_tabs(client, fake_llm, app_env, alter_generator):
     topic_id, quiz_id = prepare(client, fake_llm, app_env)
     kind_modus_aktivieren(client)
     question = app_env.db.q1('SELECT id FROM question WHERE quiz_id=? ORDER BY position', quiz_id)['id']
@@ -74,7 +74,7 @@ def test_answers_persist_across_login_and_reject_stale_tabs(client, fake_llm, fa
     assert app_env.db.q1('SELECT schueler_antwort FROM question WHERE id=?', question)['schueler_antwort'] == '3/4'
 
 
-def test_review_drafts_survive_without_releasing_answers(client, fake_llm, fake_cli, app_env):
+def test_review_drafts_survive_without_releasing_answers(client, fake_llm, app_env):
     _, quiz_id = prepare(client, fake_llm, app_env)
     quiz_beantworten(client, app_env, quiz_id, {1: '3/4'})
     run_jobs(app_env, fake_llm)
@@ -95,7 +95,7 @@ def test_review_drafts_survive_without_releasing_answers(client, fake_llm, fake_
     assert client.post(f'/quiz/{quiz_id}/entwurf', data=data).status_code == 200
 
 
-def test_quiz_requests_are_atomic(client, fake_llm, fake_cli, app_env):
+def test_quiz_requests_are_atomic(client, fake_llm, app_env):
     from app import quizzes, jobs
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
@@ -114,7 +114,7 @@ def test_quiz_requests_are_atomic(client, fake_llm, fake_cli, app_env):
     assert len(app_env.db.q("SELECT id FROM job WHERE type='quiz_build'")) == 1
 
 
-def test_legacy_repair_preserves_results_and_redirects_empty_duplicates(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_legacy_repair_preserves_results_and_redirects_empty_duplicates(client, fake_llm, app_env, alter_generator):
     from app.services.workflow_repair import repair
     from app.services import learning_content, workflow
     topic_id = _bis_rot(client, fake_llm, app_env)
@@ -136,7 +136,7 @@ def test_legacy_repair_preserves_results_and_redirects_empty_duplicates(client, 
     assert all(s['topic_id'] != duplicate for s in workflow.offene_schritte()[1])
 
 
-def test_failed_enqueue_rolls_back_quiz_and_answers(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_failed_enqueue_rolls_back_quiz_and_answers(client, fake_llm, app_env, monkeypatch):
     from app import quizzes, jobs
     topic_id, quiz_id = prepare(client, fake_llm, app_env)
     def unavailable(*args, **kwargs):
@@ -152,7 +152,7 @@ def test_failed_enqueue_rolls_back_quiz_and_answers(client, fake_llm, fake_cli, 
     assert len(app_env.db.q('SELECT id FROM quiz')) == 1
 
 
-def test_material_creation_resumes_after_restart_and_double_click(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_material_creation_resumes_after_restart_and_double_click(client, fake_llm, app_env, alter_generator):
     from app import teaching, jobs
     topic_id, _ = prepare(client, fake_llm, app_env)
     jobs.stop()
@@ -176,7 +176,7 @@ def test_material_creation_resumes_after_restart_and_double_click(client, fake_l
     assert '<iframe' in client.get(f'/lernen/{lesson_id}').text
 
 
-def test_abandoned_round_quizzes_do_not_block_current_material(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_abandoned_round_quizzes_do_not_block_current_material(client, fake_llm, app_env, alter_generator):
     from app import teaching, quizzes
     from app.services import topic_workflow, workflow
     topic_id = _bis_rot(client, fake_llm, app_env)
@@ -196,7 +196,7 @@ def test_abandoned_round_quizzes_do_not_block_current_material(client, fake_llm,
     assert app_env.db.q1('SELECT id FROM quiz WHERE id=?', old_quiz)
 
 
-def test_completed_lesson_round_is_not_tested_twice(client, fake_llm, fake_cli, app_env):
+def test_completed_lesson_round_is_not_tested_twice(client, fake_llm, app_env):
     from app import teaching, quizzes
     topic_id = _bis_rot(client, fake_llm, app_env)
     lesson_id = teaching.starten(topic_id, 'html')
@@ -206,7 +206,7 @@ def test_completed_lesson_round_is_not_tested_twice(client, fake_llm, fake_cli, 
     assert quizzes.anfordern(topic_id, anlass='lernrunde', lesson_id=lesson_id, round_nr=1) == quiz_id
 
 
-def test_schema_upgrade_recognizes_old_finished_quizzes_once(client, fake_llm, fake_cli, app_env):
+def test_schema_upgrade_recognizes_old_finished_quizzes_once(client, fake_llm, app_env):
     topic_id = _bis_rot(client, fake_llm, app_env)
     before = [dict(r) for r in app_env.db.q('SELECT * FROM answer_log')]
     with app_env.db.tx() as c:

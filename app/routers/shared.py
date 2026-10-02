@@ -45,18 +45,16 @@ templates.env.filters["datum"] = plaene.date_label
 #: Technische Abbruchgruende in Saetze uebersetzen, die jemand lesen kann.
 #: Der Originaltext bleibt daneben stehen — wer ihn braucht, findet ihn.
 _KLARTEXT = (
-    ("session limit", "Das Claude-Kontingent ist gerade aufgebraucht. Es wird zur "
-                      "genannten Uhrzeit zurückgesetzt — danach genügt ein neuer Versuch."),
-    ("usage limit", "Das Claude-Kontingent ist gerade aufgebraucht. Versuchen Sie es "
-                    "später noch einmal."),
     ("rate limit", "Zu viele Anfragen kurz hintereinander. Einen Moment warten, dann "
                    "erneut versuchen."),
+    ("429", "Zu viele Anfragen kurz hintereinander. Einen Moment warten, dann "
+            "erneut versuchen."),
     ("zu lange gedauert", "Der Aufruf hat zu lange gedauert. Ein erneuter Versuch hilft meist."),
     ("fehlt", "Die hochgeladene Datei ist nicht mehr da. Bitte laden Sie sie erneut hoch."),
-    ("nicht angemeldet", "Karo ist gerade nicht bei Claude angemeldet. Bitte unter "
-                         "Einstellungen neu verbinden."),
-    ("authentication", "Die Anmeldung bei Claude wurde abgelehnt. Bitte unter "
-                       "Einstellungen neu verbinden."),
+    ("devin_api_key", "DEVIN_API_KEY ist nicht gesetzt oder wird abgelehnt. Bitte "
+                      "unter Einstellungen prüfen."),
+    ("401", "Der DEVIN_API_KEY wird abgelehnt. Bitte unter Einstellungen prüfen."),
+    ("403", "Der DEVIN_API_KEY wird abgelehnt. Bitte unter Einstellungen prüfen."),
 )
 
 

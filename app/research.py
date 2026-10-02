@@ -26,7 +26,7 @@ from urllib.parse import urlparse
 
 from . import config, db, jobs, prompts, topics, faecher
 from .domain import ERROR_LABELS
-from .llm import ClaudeClient, ClaudeError
+from .ai import AIClient, AIError
 
 log = logging.getLogger("karo.research")
 
@@ -116,8 +116,8 @@ ERLAUBTE_KANAELE = (
 MAX_TREFFER = config.ops().recherche_max_treffer
 
 
-def client() -> ClaudeClient:
-    return ClaudeClient.from_config(config.load())
+def client() -> AIClient:
+    return AIClient.from_config(config.load())
 
 
 # --------------------------------------------------------------------------
@@ -290,7 +290,7 @@ auf diesen Seiten, gib eine leere Liste zurück."""
         daten = client().complete(purpose="research_search", prompt=prompt,
                                   schema=schema, system=prompts.SYSTEM,
                                   web_search=True).data
-    except ClaudeError as exc:
+    except AIError as exc:
         log.info("Websuche nicht möglich: %s", exc)
         return []
 
@@ -413,7 +413,7 @@ erreichbar auf false und inhalt auf einen leeren Text. Erfinde nichts."""
         ergebnis = client().complete(
             purpose="research_fetch", prompt=prompt, schema=FETCH_SCHEMA,
             system=prompts.SYSTEM, web_fetch=True).data
-    except ClaudeError as exc:
+    except AIError as exc:
         log.info("Abrufen von %s nicht möglich: %s", hit["url"], exc)
         return
 

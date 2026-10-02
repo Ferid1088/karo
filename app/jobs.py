@@ -4,8 +4,12 @@ Kein Redis, kein Celery: eine Tabelle und ein Hintergrund-Thread. Jobs stehen
 in der Datenbank und ueberleben deshalb einen Neustart des Containers.
 
 Wiederholungen laufen mit wachsendem Abstand. Ohne das verbraucht eine
-Ratenbegrenzung von Anthropic — deren Meldung lautet "in ein paar Minuten
+Ratenbegrenzung des Anbieters — deren Meldung lautet "in ein paar Minuten
 erneut versuchen" — alle drei Versuche innerhalb von Millisekunden.
+
+Devin ist asynchron: `AIPending` aus `app.ai` parkt den Auftrag (gleiches
+Payload, `not_before` = jetzt + Poll-Abstand), ohne einen Versuch zu
+verbrauchen. Die Session selbst liegt in `provider_session`.
 """
 
 from __future__ import annotations
@@ -17,6 +21,7 @@ import threading
 from typing import Callable
 
 from . import config, db
+from .ai.base import AIPending
 
 log = logging.getLogger("karo.jobs")
 
@@ -157,6 +162,9 @@ def run_once() -> bool:
         _laufe(job["id"], fn, payload)
     except Deferred as deferred:
         _defer(job["id"], deferred)
+    except AIPending as pending:
+        _defer(job["id"], Deferred(payload,
+                                   pending.wait_seconds or _OPS.devin_poll_seconds))
     except PermanentFailure as exc:
         _fail_permanently(job["id"], str(exc))
     except Exception as exc:
@@ -283,6 +291,10 @@ def run_now(job_id: int) -> tuple[str, object]:
         ergebnis = _laufe(job_id, fn, payload)
     except Deferred as deferred:
         _defer(job_id, deferred)
+        return ("pending", None)
+    except AIPending as pending:
+        _defer(job_id, Deferred(payload,
+                                pending.wait_seconds or _OPS.devin_poll_seconds))
         return ("pending", None)
     except PermanentFailure as exc:
         _fail_permanently(job_id, str(exc))

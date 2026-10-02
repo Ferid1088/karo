@@ -6,7 +6,7 @@ import pytest
 from .test_app import einrichten, kind_modus_aktivieren
 
 
-def test_switch_only_in_parent_area(client, fake_llm, fake_cli, app_env):
+def test_switch_only_in_parent_area(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     html = client.get('/eltern').text
     for mode in ('hell', 'auto', 'dunkel'):
@@ -17,7 +17,7 @@ def test_switch_only_in_parent_area(client, fake_llm, fake_cli, app_env):
     assert 'data-modus=' not in client.get('/').text
 
 
-def test_browser_mode_switch_follows_device_and_persists(client, fake_llm, fake_cli, app_env, tmp_path):
+def test_browser_mode_switch_follows_device_and_persists(client, fake_llm, app_env, tmp_path):
     pw = pytest.importorskip('playwright.sync_api')
     einrichten(client, fake_llm)
     with pw.sync_playwright() as p:

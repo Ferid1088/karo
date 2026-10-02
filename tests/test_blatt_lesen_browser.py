@@ -61,7 +61,7 @@ def _seite(client, pw, p, engine: str, geraet: str | None):
 
 @pytest.mark.parametrize("engine,geraet,name", GERAETE,
                          ids=[g[2].replace(" ", "-") for g in GERAETE])
-def test_die_blattaufnahme_steht_auf_jedem_geraet(client, fake_llm, fake_cli, app_env,
+def test_die_blattaufnahme_steht_auf_jedem_geraet(client, fake_llm, app_env,
                                                   engine, geraet, name):
     pw = pytest.importorskip("playwright.sync_api")
     einrichten(client, fake_llm)
@@ -91,7 +91,7 @@ def test_die_blattaufnahme_steht_auf_jedem_geraet(client, fake_llm, fake_cli, ap
 
 @pytest.mark.parametrize("engine,geraet", [("webkit", "iPhone 13"), ("chromium", None)],
                          ids=["iPhone", "Desktop"])
-def test_der_hinweis_kommt_vor_der_kamera(client, fake_llm, fake_cli, app_env, engine, geraet):
+def test_der_hinweis_kommt_vor_der_kamera(client, fake_llm, app_env, engine, geraet):
     """Erst sagen, was passiert — dann die Kamera. Nicht andersherum."""
     pw = pytest.importorskip("playwright.sync_api")
     einrichten(client, fake_llm)
@@ -115,7 +115,7 @@ def test_der_hinweis_kommt_vor_der_kamera(client, fake_llm, fake_cli, app_env, e
             browser.close()
 
 
-def test_ohne_javascript_bleibt_es_ein_formular(client, fake_llm, fake_cli, app_env):
+def test_ohne_javascript_bleibt_es_ein_formular(client, fake_llm, app_env):
     """Die Lesehilfe ist Zugabe, keine Bedingung."""
     einrichten(client, fake_llm)
     html = client.get("/wissen").text

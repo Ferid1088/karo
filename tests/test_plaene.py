@@ -156,7 +156,7 @@ def test_completion_validation(app_env, actual, focus):
         store.complete(store.sessions(goal_id)[0]["id"], actual, focus)
 
 
-def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fake_cli, monkeypatch):
+def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, monkeypatch):
     from app.woche import plaene as current_rules, plaene_store as store
     from .conftest import csrf_from
     from .test_app import einrichten, session_cookie_faelschen
@@ -273,7 +273,7 @@ def test_plan_pages_render_and_completion_persists(client, app_env, fake_llm, fa
     assert 'href="/welten"' in done_today
 
 
-def test_parent_completion_stays_on_karo_page_with_role_notice(client, app_env, fake_llm, fake_cli, monkeypatch):
+def test_parent_completion_stays_on_karo_page_with_role_notice(client, app_env, fake_llm, monkeypatch):
     from app.woche import plaene as current_rules, plaene_store as store
     from .conftest import csrf_from
     from .test_app import einrichten, session_cookie_faelschen
@@ -301,7 +301,7 @@ def test_parent_completion_stays_on_karo_page_with_role_notice(client, app_env, 
     assert "Diese Rückmeldung gehört dem Kind" not in notice.text
 
 
-def test_goal_wizard_creates_time_only_plan(client, app_env, fake_llm, fake_cli, monkeypatch):
+def test_goal_wizard_creates_time_only_plan(client, app_env, fake_llm, monkeypatch):
     from app.woche import plaene as current_rules, plaene_store as store
     from .conftest import csrf_from
     from .test_app import einrichten, session_cookie_faelschen
@@ -327,7 +327,7 @@ def test_goal_wizard_creates_time_only_plan(client, app_env, fake_llm, fake_cli,
     assert len(store.sessions(created[0]["id"])) == 12
 
 
-def test_goal_wizard_rejects_start_date_before_today(client, app_env, fake_llm, fake_cli, monkeypatch):
+def test_goal_wizard_rejects_start_date_before_today(client, app_env, fake_llm, monkeypatch):
     from app.woche import plaene as current_rules
     from .conftest import csrf_from
     from .test_app import einrichten, session_cookie_faelschen
@@ -344,7 +344,7 @@ def test_goal_wizard_rejects_start_date_before_today(client, app_env, fake_llm, 
     assert "darf nicht vor heute liegen" in response.text
 
 
-def test_goal_detail_actions_work_end_to_end(client, app_env, fake_llm, fake_cli, monkeypatch):
+def test_goal_detail_actions_work_end_to_end(client, app_env, fake_llm, monkeypatch):
     from app.woche import plaene as current_rules, plaene_store as store
     from .conftest import csrf_from
     from .test_app import einrichten, session_cookie_faelschen
@@ -444,7 +444,7 @@ def test_date_and_period_labels_use_german_notation():
     assert plaene.period_label("2026-09-22", "") == "22.09.2026"
 
 
-def test_completed_goal_offers_treasure_chest_and_reactivation(client, app_env, fake_llm, fake_cli, monkeypatch):
+def test_completed_goal_offers_treasure_chest_and_reactivation(client, app_env, fake_llm, monkeypatch):
     from app.woche import plaene as current_rules, plaene_store as store
     from .test_app import einrichten, session_cookie_faelschen
 
@@ -475,7 +475,7 @@ def test_completed_goal_offers_treasure_chest_and_reactivation(client, app_env, 
     assert store.goal(goal_id)["status"] == "active"
 
 
-def test_two_sessions_on_the_same_day_are_both_kept(client, app_env, fake_llm, fake_cli, monkeypatch):
+def test_two_sessions_on_the_same_day_are_both_kept(client, app_env, fake_llm, monkeypatch):
     from app.woche import plaene as current_rules, plaene_store as store
     from .test_app import einrichten
 
@@ -497,7 +497,7 @@ def test_two_sessions_on_the_same_day_are_both_kept(client, app_env, fake_llm, f
     assert day[0]["focus_percent"] == 71
 
 
-def test_all_pages_show_the_same_hand_checked_numbers(client, app_env, fake_llm, fake_cli, monkeypatch):
+def test_all_pages_show_the_same_hand_checked_numbers(client, app_env, fake_llm, monkeypatch):
     """Ein Ziel, von Hand nachgerechnet, auf jeder Seite kontrolliert.
 
     Mo 20 Min bei 80 %, Di 12+9+6 Min bei 70/90/50 %, Mi 0 Min, Do (heute) offen,
@@ -553,7 +553,7 @@ def test_all_pages_show_the_same_hand_checked_numbers(client, app_env, fake_llm,
         assert "47" in page and "59 %" in page, path
 
 
-def test_every_page_counts_the_same_goals(client, app_env, fake_llm, fake_cli, monkeypatch):
+def test_every_page_counts_the_same_goals(client, app_env, fake_llm, monkeypatch):
     """Ein laufendes, ein pausiertes und ein abgeschlossenes Ziel: „Bis heute" muss
     auf Heute, Woche, Monat und Ziele dieselbe Zahl sein."""
     import re

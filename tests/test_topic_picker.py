@@ -18,7 +18,7 @@ def prepare(client, fake_llm):
     return client.get('/lernen/neu?fach=mathematik')
 
 
-def test_native_dropdown_uses_scoped_catalog_and_existing_post(client, fake_llm, fake_cli, app_env):
+def test_native_dropdown_uses_scoped_catalog_and_existing_post(client, fake_llm, app_env):
     response = prepare(client, fake_llm)
     assert '<select id="catalog-topic" name="thema" required' in response.text
     assert FRACTIONS in response.text and 'Quader: Volumen berechnen' in response.text
@@ -31,7 +31,7 @@ def test_native_dropdown_uses_scoped_catalog_and_existing_post(client, fake_llm,
     assert app_env.db.q1('SELECT label FROM topic WHERE label=?', FRACTIONS)
 
 
-def test_empty_catalog_keeps_custom_topic_form(client, fake_llm, fake_cli, app_env):
+def test_empty_catalog_keeps_custom_topic_form(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     response = client.get('/lernen/neu?fach=deutsch')
     assert 'Noch kein vorbereitetes Thema' in response.text
@@ -39,7 +39,7 @@ def test_empty_catalog_keeps_custom_topic_form(client, fake_llm, fake_cli, app_e
     assert 'id="catalog-topic"' not in response.text
 
 
-def test_search_keyboard_mobile_and_submit(client, fake_llm, fake_cli, app_env, tmp_path):
+def test_search_keyboard_mobile_and_submit(client, fake_llm, app_env, tmp_path):
     pw = pytest.importorskip('playwright.sync_api')
     prepare(client, fake_llm)
     with pw.sync_playwright() as p:

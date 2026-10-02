@@ -65,7 +65,7 @@ def seed(app_env, monkeypatch):
     return parent_report
 
 
-def test_evidence_timezones_separation_corrections_and_no_writes(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_evidence_timezones_separation_corrections_and_no_writes(client, fake_llm, app_env, monkeypatch):
     einrichten(client,fake_llm)
     report=seed(app_env,monkeypatch)
     changes=app_env.db.conn().total_changes
@@ -104,7 +104,7 @@ def test_evidence_timezones_separation_corrections_and_no_writes(client, fake_ll
     assert 'Gelöscht' not in str(day) and 'Mehrdeutig' not in str(day)
 
 
-def test_empty_future_boundaries_and_routes(client,fake_llm,fake_cli,app_env,monkeypatch):
+def test_empty_future_boundaries_and_routes(client,fake_llm,app_env,monkeypatch):
     einrichten(client,fake_llm)
     from app.services import parent_report as report
     # Reading an unused goal area does not initialize it.
@@ -134,7 +134,7 @@ def test_empty_future_boundaries_and_routes(client,fake_llm,fake_cli,app_env,mon
     assert client.get('/eltern/bericht',follow_redirects=False).status_code==303
 
 
-def test_support_hint_is_evidence_based_not_a_grade(client,fake_llm,fake_cli,app_env,monkeypatch):
+def test_support_hint_is_evidence_based_not_a_grade(client,fake_llm,app_env,monkeypatch):
     einrichten(client,fake_llm)
     report=seed(app_env,monkeypatch)
     with app_env.db.tx() as c:
@@ -151,7 +151,7 @@ def test_support_hint_is_evidence_based_not_a_grade(client,fake_llm,fake_cli,app
         assert all(0<=v['retry_height']<=100 for v in group['values'])
 
 
-def test_overview_lamps_strip_exams_and_goal_units(client,fake_llm,fake_cli,app_env,monkeypatch):
+def test_overview_lamps_strip_exams_and_goal_units(client,fake_llm,app_env,monkeypatch):
     """The at-a-glance layer only re-reads stored evidence and never judges missing data as failure."""
     einrichten(client,fake_llm)
     report=seed(app_env,monkeypatch)
@@ -198,7 +198,7 @@ def test_overview_lamps_strip_exams_and_goal_units(client,fake_llm,fake_cli,app_
     assert html.count('class="pr-chart-group')==7 and 'focus' not in html.lower().replace('focus-visible','')
 
 
-def test_browser_drilldown_history_responsive_and_failure(client,fake_llm,fake_cli,app_env,monkeypatch,tmp_path):
+def test_browser_drilldown_history_responsive_and_failure(client,fake_llm,app_env,monkeypatch,tmp_path):
     pw=pytest.importorskip('playwright.sync_api')
     einrichten(client,fake_llm)
     seed(app_env,monkeypatch)

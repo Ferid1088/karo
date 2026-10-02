@@ -1,10 +1,12 @@
-"""ClaudeClient — die einzige Stelle, an der Karo mit einem Sprachmodell spricht.
+"""AIClient — die einzige Stelle, an der Karo mit dem KI-Anbieter spricht.
 
-Waehlt das Backend, protokolliert jeden Aufruf und prueft die Antwort, bevor
-sie weitergegeben wird. Der Rest der Anwendung kennt nur `complete(...)`.
+Waehlt das Backend (ausschliesslich Devin), protokolliert jeden Aufruf und
+prueft die Antwort, bevor sie weitergegeben wird. Der Rest der Anwendung
+kennt nur `complete(...)`.
 
-Ein Anbieterwechsel — Bedrock, Vertex, ein lokales Modell — ist eine neue Datei
-neben `api_backend.py` und ein Eintrag in `_backend()`. Sonst nichts.
+Devin ist asynchron: `complete()` kann `AIPending` werfen — dann hat das
+Backend eine Session angelegt oder sie laeuft noch. Der Job-Worker stellt
+den Auftrag zurueck; der naechste identische Aufruf holt das Ergebnis ab.
 """
 
 from __future__ import annotations
@@ -19,25 +21,19 @@ from typing import Any
 from .. import config, db
 from ..security import redact
 from .base import (
+    AIError,
+    AIPending,
+    AISchemaError,
+    AISetupError,
     Backend,
-    ClaudeAuthError,
-    ClaudeConnectionError,
-    ClaudeError,
-    ClaudeSchemaError,
-    ClaudeSetupError,
+    RawResult,
 )
 
-log = logging.getLogger("karo.llm")
-
-#: Welches Backend welche Bezeichnung im Setup traegt.
-BACKENDS = {
-    "abo": "Claude-Abo (20 €/Monat, über claude setup-token)",
-    "api": "Anthropic-API-Schlüssel (Abrechnung pro Aufruf)",
-}
+log = logging.getLogger("karo.ai")
 
 
 @dataclass(frozen=True)
-class LlmResult:
+class AIResult:
     data: dict[str, Any]
     model: str
     tokens_in: int
@@ -47,46 +43,45 @@ class LlmResult:
     call_id: int
 
 
-class ClaudeClient:
-    """Fassade. Kennt beide Backends und entscheidet nach der Konfiguration."""
+class AIClient:
+    """Fassade. Kennt das Backend und entscheidet nach der Konfiguration."""
 
-    def __init__(self, backend: Backend, model_text: str = "") -> None:
+    def __init__(self, backend: Backend, modell: str = "") -> None:
         self._backend = backend
-        self.model_text = model_text
+        self.modell = modell
 
     # -- Aufbau -------------------------------------------------------------
 
     @classmethod
-    def from_config(cls, cfg, timeout: int | None = None) -> "ClaudeClient":
-        return cls(build_backend(cfg.llm_backend, cfg, timeout), cfg.model_text)
+    def from_config(cls, cfg, timeout: float | None = None) -> "AIClient":
+        return cls(build_backend(cfg, timeout), getattr(cfg, "ai_provider", "devin"))
 
     @property
     def backend_name(self) -> str:
         return self._backend.name
 
-    # -- Setup-Hilfen -------------------------------------------------------
+    # -- Setup-Hilfe --------------------------------------------------------
 
     def verify(self) -> str:
+        """Billige Zugangsprobe — keine Session, kein Auftrag."""
         return self._backend.verify()
-
-    def list_models(self) -> list[dict]:
-        return self._backend.list_models()
 
     # -- Der eigentliche Aufruf --------------------------------------------
 
     def complete(self, purpose: str, prompt: str, schema: dict, *,
-                 system: str = "", max_tokens: int = config.ops().llm_default_max_tokens, model: str | None = None,
+                 system: str = "", max_tokens: int = config.ops().llm_default_max_tokens,
+                 model: str | None = None,
                  web_search: bool = False, web_fetch: bool = False,
-                 audit_prompt: str | None = None) -> LlmResult:
-        """Ein Modellaufruf mit erzwungener Antwortstruktur.
+                 audit_prompt: str | None = None) -> AIResult:
+        """Ein Aufruf mit erzwungener Antwortstruktur.
 
         Gibt entweder ein Objekt zurueck, das die Pflichtfelder des Schemas
-        enthaelt, oder wirft eine ClaudeError. Niemals Freitext, den jemand
-        weiter unten hoffnungsvoll parst.
+        enthaelt, wirft `AIPending` (Anbieter arbeitet noch — Aufruf spaeter
+        wiederholen, die Session liegt gespeichert) oder eine AIError.
+        Niemals Freitext, den jemand weiter unten hoffnungsvoll parst.
 
         `web_search`/`web_fetch`: siehe `Backend.call()` — nur für echte
-        Websuche bzw. das Abrufen einer freigegebenen Quelle (`research.py`),
-        nicht einfach auf jeden Aufruf setzen.
+        Websuche bzw. das Abrufen einer freigegebenen Quelle (`research.py`).
 
         `audit_prompt`: fuer Eingaben, deren Inhalt auch geschwärzt zu
         sensibel für den Audit-Speicher ist (z. B. Arbeitsblatt-OCR). Dann
@@ -94,20 +89,24 @@ class ClaudeClient:
         Hash des Prompts samt Metadaten — und von der Antwort nur ihr
         Hash, nicht ihr Inhalt.
         """
-        # Nur noch ein Modell: hier geht ausschliesslich Text hin.
-        gewaehlt = model or self.model_text
-        if not gewaehlt:
-            raise ClaudeSetupError(
-                "Es ist kein Modell konfiguriert. Bitte Einstellungen öffnen.")
-
+        gewaehlt = model or self.modell
         begonnen = time.monotonic()
         call_id = _log_start(purpose, gewaehlt, audit_prompt or prompt,
                              self._backend.name)
         try:
             roh = self._backend.call(prompt, schema, model=gewaehlt,
                                      system=system, max_tokens=max_tokens,
-                                     web_search=web_search, web_fetch=web_fetch)
-        except ClaudeError as fehler:
+                                     web_search=web_search, web_fetch=web_fetch,
+                                     purpose=purpose)
+        except AIPending as ausstehend:
+            # Kein Fehler: die Session laeuft beim Anbieter weiter. Der Job
+            # wird zurueckgestellt und kommt spaeter mit derselben
+            # Fingerabdruck-Kennung wieder.
+            _log_finish(call_id, None, False,
+                        f"ausstehend (Session {ausstehend.session_id or '?'})",
+                        0, 0, None, _ms(begonnen))
+            raise
+        except AIError as fehler:
             _log_finish(call_id, None, False, str(fehler), 0, 0, None,
                         _ms(begonnen))
             raise
@@ -115,7 +114,7 @@ class ClaudeClient:
             log.exception("Unerwarteter Fehler im Backend %s", self._backend.name)
             meldung = redact(str(fehler))[:300] or "Unbekannter Fehler."
             _log_finish(call_id, None, False, meldung, 0, 0, None, _ms(begonnen))
-            raise ClaudeError(meldung) from None
+            raise AIError(meldung) from None
 
         rohtext = json.dumps(roh.data, ensure_ascii=False)
         roh_archiv = (f"sha256:{hashlib.sha256(rohtext.encode('utf-8')).hexdigest()}"
@@ -124,51 +123,35 @@ class ClaudeClient:
         if roh.truncated:
             _log_finish(call_id, roh_archiv, False, "Antwort abgeschnitten",
                         roh.tokens_in, roh.tokens_out, roh.cost_usd, _ms(begonnen))
-            raise ClaudeSchemaError(
-                "Die Antwort des Modells wurde abgeschnitten und war deshalb "
+            raise AISchemaError(
+                "Die Antwort des Anbieters wurde abgeschnitten und war deshalb "
                 "unvollständig. Nichts wurde gespeichert.")
 
         fehlend = _missing_required(roh.data, schema)
         if fehlend:
             _log_finish(call_id, roh_archiv, False, f"Felder fehlen: {fehlend}",
                         roh.tokens_in, roh.tokens_out, roh.cost_usd, _ms(begonnen))
-            raise ClaudeSchemaError(
+            raise AISchemaError(
                 "Die Antwort passte nicht zur erwarteten Struktur "
                 f"(fehlend: {', '.join(fehlend)}). Nichts wurde gespeichert.")
 
         _log_finish(call_id, roh_archiv, True, None, roh.tokens_in,
                     roh.tokens_out, roh.cost_usd, _ms(begonnen))
-        return LlmResult(roh.data, roh.model, roh.tokens_in, roh.tokens_out,
-                         roh.cost_usd, _ms(begonnen), call_id)
+        return AIResult(roh.data, roh.model, roh.tokens_in, roh.tokens_out,
+                        roh.cost_usd, _ms(begonnen), call_id)
 
 
 # --------------------------------------------------------------------------
 # Backend-Auswahl
 # --------------------------------------------------------------------------
 
-def build_backend(art: str, cfg, timeout: int | None = None) -> Backend:
-    """`timeout` nur fuer Aufrufe, die laenger brauchen duerfen als der Rest —
-    eine ganze Lernreihe zu schreiben ist so einer."""
-    if art == "abo":
-        from .cli_backend import CliBackend
-
-        if timeout:
-            return CliBackend(cfg.claude_oauth_token, timeout=timeout)
-        return CliBackend(cfg.claude_oauth_token)
-    if art == "api":
-        from .api_backend import ApiBackend
-
-        return ApiBackend(cfg.anthropic_api_key)
-    raise ClaudeSetupError(f"Unbekanntes Backend: {art}")
-
-
-def models_for(art: str) -> list[dict]:
-    """Modellliste ohne Zugangsdaten — fuer die Anzeige im Setup."""
-    if art == "abo":
-        from .cli_backend import CLI_MODELS
-
-        return list(CLI_MODELS)
-    return []
+def build_backend(cfg, timeout: float | None = None) -> Backend:
+    """`timeout` begrenzt die HTTP-Aufrufe zur API, nicht die Sessiondauer."""
+    if getattr(cfg, "ai_provider", "devin") != "devin":
+        raise AISetupError(
+            f"Unbekannter KI-Anbieter: {cfg.ai_provider!r}. Karo kennt nur 'devin'.")
+    from .devin import DevinBackend
+    return DevinBackend(timeout=timeout)
 
 
 # --------------------------------------------------------------------------
@@ -214,7 +197,7 @@ def _log_finish(call_id, rohtext, ok, fehler, tin, tout, kosten, ms) -> None:
 
 
 __all__ = [
-    "ClaudeClient", "LlmResult", "BACKENDS", "build_backend", "models_for",
-    "ClaudeError", "ClaudeAuthError", "ClaudeConnectionError",
-    "ClaudeSchemaError", "ClaudeSetupError",
+    "AIClient", "AIResult", "build_backend",
+    "AIError", "AIAuthError", "AIConnectionError",
+    "AISchemaError", "AISetupError", "AIPending",
 ]

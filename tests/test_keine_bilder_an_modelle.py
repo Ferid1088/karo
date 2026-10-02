@@ -33,21 +33,19 @@ def _python_dateien():
 
 def test_der_llm_client_hat_keinen_bildparameter():
     """Die Regel steht in der Signatur, nicht in einer Verabredung."""
-    from app.llm.client import ClaudeClient
+    from app.ai.client import AIClient
 
-    parameter = set(inspect.signature(ClaudeClient.complete).parameters)
+    parameter = set(inspect.signature(AIClient.complete).parameters)
     assert not (parameter & set(VERDAECHTIG)), parameter
     assert "prompt" in parameter and "schema" in parameter
 
 
 def test_auch_die_backends_nehmen_kein_bild():
     """Sonst könnte jemand am Client vorbei direkt ein Backend rufen."""
-    from app.llm.api_backend import ApiBackend
-    from app.llm.cli_backend import CliBackend
+    from app.ai.devin import DevinBackend
 
-    for klasse in (ApiBackend, CliBackend):
-        parameter = set(inspect.signature(klasse.call).parameters)
-        assert not (parameter & set(VERDAECHTIG)), (klasse.__name__, parameter)
+    parameter = set(inspect.signature(DevinBackend.call).parameters)
+    assert not (parameter & set(VERDAECHTIG)), parameter
 
 
 def test_kein_codepfad_reicht_ein_bild_an_ein_modell():
@@ -121,7 +119,7 @@ def test_es_gibt_keine_route_mehr_die_ein_blatt_entgegennimmt(app_env):
         assert not any(p == pfad and m == "POST" for p, m in wege), pfad
 
 
-def test_die_upload_wege_fuer_blaetter_sind_zu(client, fake_llm, fake_cli):
+def test_die_upload_wege_fuer_blaetter_sind_zu(client, fake_llm ):
     """Und ein vergessener Link laeuft ins Leere statt etwas hochzuladen."""
     from .test_app import einrichten
     einrichten(client, fake_llm)

@@ -73,7 +73,7 @@ def test_abschnitte_bekommen_eine_art_ohne_modell(app_env):
 
 # ---------------------------------------------------------------- Der Weg
 
-def test_text_beim_hochladen_fuellt_die_wissensbasis(client, fake_llm, fake_cli, app_env):
+def test_text_beim_hochladen_fuellt_die_wissensbasis(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     vorher = len(fake_llm.calls)
     antwort = _hochladen(client, text=BLATT)
@@ -92,7 +92,7 @@ def test_text_beim_hochladen_fuellt_die_wissensbasis(client, fake_llm, fake_cli,
     assert "Abschnitte" in (doc["note"] or "")
 
 
-def test_ohne_text_bleibt_es_beim_eingetippten_thema(client, fake_llm, fake_cli, app_env):
+def test_ohne_text_bleibt_es_beim_eingetippten_thema(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     _hochladen(client, text="")
     run_jobs(app_env, fake_llm)
@@ -103,7 +103,7 @@ def test_ohne_text_bleibt_es_beim_eingetippten_thema(client, fake_llm, fake_cli,
     assert vorschlag["label"] == "Brüche addieren"
 
 
-def test_blatt_text_endpunkt_liefert_top_drei(client, fake_llm, fake_cli, app_env):
+def test_blatt_text_endpunkt_liefert_top_drei(client, fake_llm, app_env):
     """Derselbe Endpunkt, den ab Schritt 2 das Browser-OCR benutzt."""
     einrichten(client, fake_llm)
     _hochladen(client, text="", themenname="Brüche addieren")
@@ -127,7 +127,7 @@ def test_blatt_text_endpunkt_liefert_top_drei(client, fake_llm, fake_cli, app_en
     assert "87" in doc["note"]
 
 
-def test_der_endpunkt_nimmt_kein_bild_und_kein_leeres(client, fake_llm, fake_cli, app_env):
+def test_der_endpunkt_nimmt_kein_bild_und_kein_leeres(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     seite = client.get("/wissen")
     token = csrf_from(seite.text)
@@ -139,7 +139,7 @@ def test_der_endpunkt_nimmt_kein_bild_und_kein_leeres(client, fake_llm, fake_cli
 
 # ---------------------------------------------------------------- Bestätigen
 
-def test_ein_mensch_bestaetigt_das_thema(client, fake_llm, fake_cli, app_env):
+def test_ein_mensch_bestaetigt_das_thema(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     _hochladen(client, text=BLATT)
     doc = app_env.db.q1("SELECT * FROM document ORDER BY id DESC LIMIT 1")
@@ -159,7 +159,7 @@ def test_ein_mensch_bestaetigt_das_thema(client, fake_llm, fake_cli, app_env):
 
 
 def test_ein_thema_aus_einem_anderen_fach_bekommt_das_blatt_nicht(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     from app import topics
     einrichten(client, fake_llm)
     _hochladen(client, text=BLATT)
@@ -175,7 +175,7 @@ def test_ein_thema_aus_einem_anderen_fach_bekommt_das_blatt_nicht(
 
 # ---------------------------------------------------------------- Der Zweck
 
-def test_mit_text_kann_karo_wieder_erklaeren(client, fake_llm, fake_cli, app_env):
+def test_mit_text_kann_karo_wieder_erklaeren(client, fake_llm, app_env):
     """Der eigentliche Punkt: ohne Text keine Lerneinheit, mit Text schon."""
     from app import teaching
     einrichten(client, fake_llm)

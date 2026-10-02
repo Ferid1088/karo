@@ -1,14 +1,16 @@
-<form method="post" action="/setup/credentials" data-backend-form>
+<form method="post" action="/setup/credentials">
   {{ csrf_input() }}
 
   <div class="card">
-    <h3>Claude API-Schlüssel</h3>
-    <div class="field">
-      <label for="api_key">Anthropic-API-Schlüssel</label>
-      <input type="password" id="api_key" name="api_key" autocomplete="off"
-             placeholder="sk-..." required>
-      <p class="hint">Kostenlos ab 5 $ Guthaben. Zu finden auf <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys.</p>
-    </div>
+    <h3>KI-Anbieter: Devin</h3>
+    <p class="hint">Karo nutzt ausschließlich die Devin-API. Der Schlüssel
+    kommt aus der Umgebungsvariablen <code>DEVIN_API_KEY</code> — er wird
+    nicht in der Konfiguration gespeichert.</p>
+    {% if not cfg.has_credentials %}
+    <div class="msg err"><b>DEVIN_API_KEY fehlt.</b> Bitte als
+    Umgebungsvariable setzen (z. B. in der <code>.env</code>-Datei) und
+    Karo neu starten.</div>
+    {% endif %}
   </div>
 
   <div class="card">
@@ -18,7 +20,7 @@
         <label for="learner_name">Vorname</label>
         <input type="text" id="learner_name" name="learner_name" maxlength="60"
                value="{{ cfg.learner_name }}" required>
-        <p class="hint">Karo entfernt diesen Namen aus allen Daten, die an Claude gesendet werden.</p>
+        <p class="hint">Karo entfernt diesen Namen aus allen Daten, die an den KI-Anbieter gesendet werden.</p>
       </div>
       <div class="field" style="flex:0 0 130px">
         <label for="grade">Klasse</label>
@@ -32,5 +34,5 @@
     </div>
   </div>
 
-  <button type="submit">Verbindung prüfen</button>
+  <button type="submit" {{ 'disabled' if not cfg.has_credentials }}>Verbindung prüfen</button>
 </form>

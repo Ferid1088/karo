@@ -1,6 +1,6 @@
 """End-to-End-Tests.
 
-Diese Tests fahren den kompletten Weg: Einrichtung über beide Backends,
+Diese Tests fahren den kompletten Weg: Einrichtung über den Devin-Anbieter,
 Wissensbasis, Themenvorschlag mit Freigabe, Prüfung am Bildschirm und auf
 Papier, Lernzyklus mit Gegenprüfung und Wiederholung.
 
@@ -11,6 +11,7 @@ und — der wichtigste — eine Erklärung, die vom Rechenweg der Schule abweich
 
 from __future__ import annotations
 
+import copy
 import json
 from base64 import b64encode
 from pathlib import Path
@@ -21,9 +22,6 @@ from contextlib import contextmanager
 import pytest
 
 from .conftest import csrf_from, make_jpeg, run_jobs
-
-TOKEN = "sk-ant-oat01-TESTTESTTESTTESTTESTTEST"
-KEY = "sk-ant-api03-TESTTESTTESTTESTTEST"
 
 # --------------------------------------------------------------------------
 # Gefälschte Modellantworten
@@ -172,19 +170,14 @@ ALLE = {"kb": KB, "topics": TOPICS, "quiz": QUIZ, "check": CHECK_GEMISCHT,
 # Helfer
 # --------------------------------------------------------------------------
 
-def einrichten(client, fake, backend="abo", passwort="geheim123"):
+def einrichten(client, fake, passwort="geheim123"):
     seite = client.get("/setup")
     assert seite.status_code == 200
     fake.responses = dict(ALLE)
 
-    daten = {"_csrf": csrf_from(seite.text), "backend": backend,
-             "learner_name": "Milena", "grade": "7", "subject": "Mathematik"}
-    if backend == "abo":
-        daten["token"] = TOKEN
-    else:
-        daten["api_key"] = KEY
-
-    r = client.post("/setup/credentials", data=daten)
+    r = client.post("/setup/credentials", data={
+        "_csrf": csrf_from(seite.text),
+        "learner_name": "Milena", "grade": "7", "subject": "Mathematik"})
     assert r.status_code == 200, r.text[:600]
 
     r = client.post("/setup/finish", data={
@@ -371,98 +364,75 @@ def test_ohne_einrichtung_fuehrt_alles_zum_setup(client):
     assert r.headers["location"] == "/setup"
 
 
-def test_einrichtung_ueber_das_abo(client, fake_llm, fake_cli, app_env):
-    """Der Weg, den der Nutzer haben wollte: 20-€-Abo statt API-Guthaben."""
-    einrichten(client, fake_llm, backend="abo")
+def test_einrichtung_ueber_devin(client, fake_llm, app_env):
+    """Ein einziger Weg: DEVIN_API_KEY aus der Umgebung, nichts in config.json."""
+    einrichten(client, fake_llm)
 
     roh = json.loads((app_env.data / "config.json").read_text())
-    assert roh["llm_backend"] == "abo"
-    assert roh["claude_oauth_token"] == TOKEN
-    assert roh["anthropic_api_key"] == ""       # kein Schlüssel nötig
+    assert roh["ai_provider"] == "devin"
     assert roh["setup_complete"] is True
+    # Kein Schlüssel darf in der Konfigurationsdatei landen.
+    assert "test-devin-key" not in (app_env.data / "config.json").read_text()
 
-    # Es wurde wirklich die CLI aufgerufen, nicht die API.
-    assert fake_cli.aufrufe, "die Claude-CLI wurde nicht aufgerufen"
-    argv = fake_cli.aufrufe[0]
-    assert "-p" in argv and "--output-format" in argv
-    assert "--json-schema" in argv
-
-
-def test_einrichtung_ueber_api_schluessel(client, fake_llm, app_env):
-    einrichten(client, fake_llm, backend="api")
-    roh = json.loads((app_env.data / "config.json").read_text())
-    assert roh["llm_backend"] == "api"
-    assert roh["anthropic_api_key"] == KEY
-    assert roh["claude_oauth_token"] == ""
+    # Beim Einrichten wurde die Devin-API wirklich befragt (Zugangsprobe).
+    assert fake_llm.devin.probes >= 1
+    # Sessions werden erst bei echten Aufträgen angelegt — die Einrichtung
+    # legt keine an.
+    assert not fake_llm.devin.sessions
 
 
-def test_umschalten_zwischen_den_wegen(client, fake_llm, fake_cli, app_env):
-    """Die Entscheidung darf nicht festgenagelt sein."""
-    einrichten(client, fake_llm, backend="abo")
+def test_einrichtung_ohne_schluessel_meldet_den_fehlenden_weg(
+        client, fake_llm, app_env, monkeypatch):
+    """Kein stiller Fallback: ohne DEVIN_API_KEY kommt eine klare Meldung."""
+    monkeypatch.delenv("DEVIN_API_KEY")
     seite = client.get("/setup")
+    assert seite.status_code == 200
+    assert "DEVIN_API_KEY" in seite.text
     r = client.post("/setup/credentials", data={
-        "_csrf": csrf_from(seite.text), "backend": "api", "api_key": KEY,
+        "_csrf": csrf_from(seite.text),
         "learner_name": "Milena", "grade": "7", "subject": "Mathematik"})
-    assert r.status_code == 200
-    cfg = app_env.config.load()
-    assert cfg.llm_backend == "api"
-    assert cfg.claude_oauth_token == ""        # der alte Token wird gelöscht
+    assert r.status_code == 400
+    assert "DEVIN_API_KEY" in r.text
+    assert app_env.config.load().setup_complete is False
 
 
-def test_falscher_abo_token_zeigt_den_weg_zur_loesung(client, fake_llm, fake_cli):
+def test_abgelehnter_schluessel_wird_gemeldet(client, fake_llm):
+    """Der Schlüssel wird mit einem echten Aufruf geprüft — nicht blind
+    gespeichert."""
     fake_llm.fail_auth = True
     token = csrf_from(client.get("/setup").text)
     r = client.post("/setup/credentials", data={
-        "_csrf": token, "backend": "abo", "token": TOKEN})
+        "_csrf": token, "learner_name": "Milena", "grade": "7",
+        "subject": "Mathematik"})
     assert r.status_code == 400
-    assert "setup-token" in r.text          # sagt, was zu tun ist
-    assert 'name="token"' in r.text          # Eingabe bleibt möglich
+    assert "DEVIN_API_KEY" in r.text or "abgelehnt" in r.text
 
 
-def test_fehlende_cli_wird_klar_gemeldet(client, fake_llm, monkeypatch):
-    from app.llm import cli_backend
-
-    monkeypatch.setattr(cli_backend.shutil, "which", lambda name: None)
-    token = csrf_from(client.get("/setup").text)
-    r = client.post("/setup/credentials", data={
-        "_csrf": token, "backend": "abo", "token": TOKEN})
-    assert r.status_code == 400
-    assert "CLI" in r.text and "make up" in r.text
-
-
-def test_token_mit_zeilenumbruch_wird_abgelehnt(client, fake_llm, fake_cli):
-    token = csrf_from(client.get("/setup").text)
-    r = client.post("/setup/credentials", data={
-        "_csrf": token, "backend": "abo", "token": "sk-ant-oat\nbroken-123456"})
-    assert r.status_code == 400
-    assert "Zeilenumbrüche" in r.text or "Leerzeichen" in r.text
-
-
-def test_einrichtung_verlangt_ein_passwort(client, fake_llm, fake_cli):
+def test_einrichtung_verlangt_ein_passwort(client, fake_llm ):
     fake_llm.responses = dict(ALLE)
     seite = client.get("/setup")
     r = client.post("/setup/credentials", data={
-        "_csrf": csrf_from(seite.text), "backend": "abo", "token": TOKEN})
+        "_csrf": csrf_from(seite.text),
+        "learner_name": "Milena", "grade": "7", "subject": "Mathematik"})
     r = client.post("/setup/finish", data={"_csrf": csrf_from(r.text)})
     assert r.status_code == 400
     assert "Passwort" in r.text
 
 
-def test_zugangsdaten_erscheinen_auf_keiner_seite(client, fake_llm, fake_cli):
+def test_zugangsdaten_erscheinen_auf_keiner_seite(client, fake_llm ):
     einrichten(client, fake_llm)
     for pfad in ("/", "/themen", "/wissen", "/setup", "/protokoll",
                  "/recherche", "/klassenarbeit"):
         r = client.get(pfad)
         assert r.status_code == 200, pfad
-        assert TOKEN not in r.text, pfad
-        assert "sk-ant" not in r.text, pfad
+        assert "test-devin-key" not in r.text, pfad
 
 
 # ==========================================================================
 # Anmeldung und CSRF
 # ==========================================================================
 
-def test_geschuetzte_seiten_funktionieren_mit_passwort(client, fake_llm, fake_cli):
+def test_geschuetzte_seiten_funktionieren_mit_passwort(client, fake_llm ):
     einrichten(client, fake_llm)
     client.cookies.clear()
     r = client.get("/", follow_redirects=False)
@@ -476,7 +446,7 @@ def test_geschuetzte_seiten_funktionieren_mit_passwort(client, fake_llm, fake_cl
     assert "Heute" in client.get("/").text
 
 
-def test_setup_ist_nach_einrichtung_nicht_mehr_offen(client, fake_llm, fake_cli):
+def test_setup_ist_nach_einrichtung_nicht_mehr_offen(client, fake_llm ):
     einrichten(client, fake_llm)
     client.cookies.clear()
     for pfad in ("/setup", "/setup/finish", "/setup/reset", "/setup/credentials"):
@@ -487,7 +457,7 @@ def test_setup_ist_nach_einrichtung_nicht_mehr_offen(client, fake_llm, fake_cli)
             assert r.headers["location"] == "/login", pfad
 
 
-def test_host_header_umgeht_die_zugangskontrolle_nicht(client, fake_llm, fake_cli):
+def test_host_header_umgeht_die_zugangskontrolle_nicht(client, fake_llm ):
     einrichten(client, fake_llm)
     client.cookies.clear()
     for host in ("x/health?", "x/login?", "x/static/", "x/setup"):
@@ -497,13 +467,13 @@ def test_host_header_umgeht_die_zugangskontrolle_nicht(client, fake_llm, fake_cl
         assert r.headers["location"] == "/login", host
 
 
-def test_post_ohne_csrf_wird_abgelehnt(client, fake_llm, fake_cli):
+def test_post_ohne_csrf_wird_abgelehnt(client, fake_llm ):
     einrichten(client, fake_llm)
     assert client.post("/wissen/einlesen", data={}).status_code == 403
 
 
 def test_upload_groesser_als_das_limit_wird_abgelehnt(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     """change.txt Abschnitt 12: Upload-Groessenbegrenzung bleibt in Kraft.
     Das Limit selbst auf ein paar Bytes verkleinert statt wirklich 25 MB zu
     senden — dieselbe security.MAX_UPLOAD_BYTES-Konstante steuert alle drei
@@ -522,7 +492,7 @@ def test_upload_groesser_als_das_limit_wird_abgelehnt(
     assert app_env.db.q("SELECT id FROM document") == []
 
 
-def test_post_von_fremder_seite_wird_abgelehnt(client, fake_llm, fake_cli):
+def test_post_von_fremder_seite_wird_abgelehnt(client, fake_llm ):
     einrichten(client, fake_llm)
     token = csrf_from(client.get("/wissen").text)
     r = client.post("/wissen/einlesen", data={"_csrf": token},
@@ -534,7 +504,7 @@ def test_post_von_fremder_seite_wird_abgelehnt(client, fake_llm, fake_cli):
 # Rollen: Eltern vs. Kind
 # ==========================================================================
 
-def test_kind_modus_beschraenkt_auf_kindbereiche(client, fake_llm, fake_cli, alter_generator):
+def test_kind_modus_beschraenkt_auf_kindbereiche(client, fake_llm, alter_generator):
     einrichten(client, fake_llm)
     kind_modus_aktivieren(client)
 
@@ -564,7 +534,7 @@ def test_kind_modus_beschraenkt_auf_kindbereiche(client, fake_llm, fake_cli, alt
 
 
 def test_kind_kann_ein_quiz_nicht_selbst_freigeben(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """change.txt Abschnitt 12: die Freigabe bleibt Elternsache, auch
     innerhalb des sonst fuer Kinder erlaubten /quiz-Praefixes — sonst
     koennte ein Kind seine eigene (ggf. falsche) Antwort selbst als
@@ -594,7 +564,7 @@ def test_kind_kann_ein_quiz_nicht_selbst_freigeben(
 
 
 def test_eltern_koennen_alle_kind_routen_erreichen(
-        client, fake_llm, fake_cli, app_env, alter_generator):
+        client, fake_llm, app_env, alter_generator):
     """change.txt Abschnitt 12: "parent can access child routes" — die
     Rollensperre in _kind_erlaubt() greift nur fuer role=='child', eine
     Eltern-Session ist von ihr unberuehrt."""
@@ -605,7 +575,7 @@ def test_eltern_koennen_alle_kind_routen_erreichen(
         assert client.get(pfad, follow_redirects=False).status_code == 200, pfad
 
 
-def test_eigenes_kind_passwort_setzt_rolle_kind(client, fake_llm, fake_cli):
+def test_eigenes_kind_passwort_setzt_rolle_kind(client, fake_llm ):
     einrichten(client, fake_llm, passwort="elternpw123")
     kind_passwort_setzen(client, "kindpw123")
 
@@ -619,7 +589,7 @@ def test_eigenes_kind_passwort_setzt_rolle_kind(client, fake_llm, fake_cli):
     assert client.get("/wissen", follow_redirects=False).status_code == 403
 
 
-def test_erneutes_eltern_login_stellt_rolle_eltern_wieder_her(client, fake_llm, fake_cli):
+def test_erneutes_eltern_login_stellt_rolle_eltern_wieder_her(client, fake_llm ):
     einrichten(client, fake_llm, passwort="elternpw123")
     kind_modus_aktivieren(client)
     assert client.get("/wissen", follow_redirects=False).status_code == 403
@@ -638,7 +608,7 @@ def test_erneutes_eltern_login_stellt_rolle_eltern_wieder_her(client, fake_llm, 
     {"auth": True, "role": ""},           # role ist leer
 ])
 def test_authentifizierte_session_ohne_gueltige_rolle_wird_nie_eltern(
-        client, fake_llm, fake_cli, app_env, kaputte_session):
+        client, fake_llm, app_env, kaputte_session):
     """Fail closed: auth=True allein darf niemals Eltern-Rechte geben —
     weder auf einer Kind-Route noch auf einer Eltern-Route."""
     einrichten(client, fake_llm)
@@ -658,7 +628,7 @@ def test_authentifizierte_session_ohne_gueltige_rolle_wird_nie_eltern(
 # ==========================================================================
 
 def test_vorbereitung_zeigt_dieselben_inhalte_wie_die_alten_seiten(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
 
@@ -688,7 +658,7 @@ def _hauptinhalt(html: str) -> str:
 
 
 def test_messung_zeigt_dieselben_inhalte_wie_die_alten_seiten(
-        client, fake_llm, fake_cli):
+        client, fake_llm ):
     einrichten(client, fake_llm)
     client.get("/")  # verbraucht die Flash-Meldung aus der Einrichtung
     assert "Ausführlicher Lernstand" in client.get("/messung/fortschritt").text
@@ -701,7 +671,7 @@ def test_messung_zeigt_dieselben_inhalte_wie_die_alten_seiten(
 # „Heute“ — naechster Schritt (Phase 5: ein zentraler Orchestrator)
 # ==========================================================================
 
-def test_heute_zeigt_keinen_naechsten_schritt_ohne_themen(client, fake_llm, fake_cli):
+def test_heute_zeigt_keinen_naechsten_schritt_ohne_themen(client, fake_llm ):
     einrichten(client, fake_llm)
     page = client.get('/').text
     assert 'Worauf bist du neugierig?' in page
@@ -710,7 +680,7 @@ def test_heute_zeigt_keinen_naechsten_schritt_ohne_themen(client, fake_llm, fake
 
 
 def test_heute_schlaegt_ein_bestaetigtes_thema_zum_start_vor(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
     topic_id = themen_freigeben(client, app_env)[0]
@@ -721,7 +691,7 @@ def test_heute_schlaegt_ein_bestaetigtes_thema_zum_start_vor(
 
 
 def test_heute_bevorzugt_ein_offenes_quiz_vor_einem_neuen_thema(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
     topic_id = themen_freigeben(client, app_env)[0]
@@ -801,7 +771,7 @@ def test_next_action_freigabe_erscheint_nie_fuer_kind():
 # ==========================================================================
 
 def test_blatt_kommt_in_die_sammlung_ohne_dass_es_jemand_liest(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Das Blatt wird abgelegt, das eingetippte Thema wird zum Vorschlag.
 
     Hier ging das Foto an ein Modell, das es in Abschnitte zerlegte und daraus
@@ -829,7 +799,7 @@ def test_blatt_kommt_in_die_sammlung_ohne_dass_es_jemand_liest(
     assert "Erklärungen" in seite.text
 
 
-def test_wissen_upload_verlangt_themennamen(client, fake_llm, fake_cli, app_env):
+def test_wissen_upload_verlangt_themennamen(client, fake_llm, app_env):
     """Ohne Themennamen lehnt der direkte Upload ab — Karo braucht den Rahmen,
     um Unterthemen vorzuschlagen statt frei zu raten."""
     import io
@@ -849,7 +819,7 @@ def test_wissen_upload_verlangt_themennamen(client, fake_llm, fake_cli, app_env)
 
 
 def test_der_eingetippte_themenname_wird_das_thema(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Kein Modell dazwischen: was eingetippt wird, steht danach als Thema da.
 
     Der Name ging frueher zusammen mit dem Foto des Blatts an ein Modell, das
@@ -884,7 +854,7 @@ def test_der_eingetippte_themenname_wird_das_thema(
     assert len(fake_llm.calls) == vorher
 
 
-def test_themen_werden_vorgeschlagen_und_freigegeben(client, fake_llm, fake_cli,
+def test_themen_werden_vorgeschlagen_und_freigegeben(client, fake_llm,
                                                      app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
@@ -899,7 +869,7 @@ def test_themen_werden_vorgeschlagen_und_freigegeben(client, fake_llm, fake_cli,
     assert len(aktive) == 1
 
 
-def test_thema_umbenennen_behaelt_den_code(client, fake_llm, fake_cli, app_env):
+def test_thema_umbenennen_behaelt_den_code(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
     t = app_env.db.q1("SELECT * FROM topic WHERE state='vorschlag' LIMIT 1")
@@ -912,7 +882,7 @@ def test_thema_umbenennen_behaelt_den_code(client, fake_llm, fake_cli, app_env):
     assert neu["code"] == t["code"]          # daran hängen die Antworten
 
 
-def test_abgelehnte_themen_kommen_nicht_wieder(client, fake_llm, fake_cli,
+def test_abgelehnte_themen_kommen_nicht_wieder(client, fake_llm,
                                                app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
@@ -937,7 +907,7 @@ def test_abgelehnte_themen_kommen_nicht_wieder(client, fake_llm, fake_cli,
 # Prüfung am Bildschirm
 # ==========================================================================
 
-def test_pruefung_am_bildschirm_setzt_die_flagge(client, fake_llm, fake_cli,
+def test_pruefung_am_bildschirm_setzt_die_flagge(client, fake_llm,
                                                  app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
@@ -973,7 +943,7 @@ def test_pruefung_am_bildschirm_setzt_die_flagge(client, fake_llm, fake_cli,
     assert flagge["haupt_fehler"] == "konzeptfehler"
 
 
-def test_leere_freigabe_schliesst_nicht_ab(client, fake_llm, fake_cli, app_env):
+def test_leere_freigabe_schliesst_nicht_ab(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
     topic_id = themen_freigeben(client, app_env)[0]
@@ -994,7 +964,7 @@ def test_leere_freigabe_schliesst_nicht_ab(client, fake_llm, fake_cli, app_env):
 
 
 def test_fremde_frage_kann_nicht_untergeschoben_werden(client, fake_llm,
-                                                       fake_cli, app_env):
+                                                       app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
     topic_id = themen_freigeben(client, app_env)[0]
@@ -1018,7 +988,7 @@ def test_fremde_frage_kann_nicht_untergeschoben_werden(client, fake_llm,
 
 
 def test_zweite_freigabe_hat_keine_zusaetzlichen_seiteneffekte(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Zustandsmaschine bis FREIGEGEBEN + Atomaritaet (change.txt, Aufgabe 3/4):
     zwei Freigaben fuer dieselbe Fragerunde duerfen `answer_log` nicht
     doppelt schreiben und die zweite muss als `bereits` erkannt werden,
@@ -1056,7 +1026,7 @@ def test_zweite_freigabe_hat_keine_zusaetzlichen_seiteneffekte(
 
 
 def test_zweite_freigabe_ueber_http_loest_keine_neue_auswertung_aus(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
     topic_id = themen_freigeben(client, app_env)[0]
@@ -1083,7 +1053,7 @@ def _alle_entscheidungen(app_env, quiz_id):
 
 
 def test_freigegeben_ist_ein_endzustand_fuer_antworten_speichern(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """P0: FREIGEGEBEN ist terminal — antworten_speichern() darf eine schon
     freigegebene Fragerunde nicht zurueck auf 'beantwortet' drehen."""
     from app import quizzes as qz
@@ -1110,7 +1080,7 @@ def test_freigegeben_ist_ein_endzustand_fuer_antworten_speichern(
 
 
 def test_freigegeben_bleibt_stabil_bei_erneutem_antwort_post_ueber_http(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
     topic_id = themen_freigeben(client, app_env)[0]
@@ -1156,7 +1126,7 @@ def _quiz_bereit_zum_freigeben(client, fake_llm, app_env, topic_id):
 
 
 def test_freigabe_persistiert_einen_job_fuer_die_nacharbeit(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     from app import quizzes as qz
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
@@ -1172,7 +1142,7 @@ def test_freigabe_persistiert_einen_job_fuer_die_nacharbeit(
 
 
 def test_abgesturzte_nacharbeit_wird_ueber_den_job_nachgeholt(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     """P2: die Freigabe selbst gelingt; die Nacharbeit (hier: Flagge neu
     berechnen) stuerzt ab. Die Freigabe bleibt trotzdem bestehen, der Job
     bleibt offen (nicht 'fertig') und holt die Nacharbeit nach, sobald er
@@ -1210,7 +1180,7 @@ def test_abgesturzte_nacharbeit_wird_ueber_den_job_nachgeholt(
 
 
 def test_erfolgreiche_nacharbeit_markiert_den_job_sofort_fertig(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Auf dem Erfolgsweg laeuft die Nacharbeit synchron im selben Request —
     der Hintergrund-Worker findet danach nichts mehr zu tun (kein doppeltes
     Verarbeiten)."""
@@ -1235,7 +1205,7 @@ def test_erfolgreiche_nacharbeit_markiert_den_job_sofort_fertig(
 # ==========================================================================
 
 def test_antworten_speichern_race_schuetzt_question_daten(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     """Die Vor-Pruefung in antworten_speichern() sieht den Zustand vor der
     Transaktion — kommt eine Freigabe genau in diesem Fenster dazwischen,
     darf die Transaktion die Antwort trotzdem nicht mehr schreiben. Der
@@ -1274,7 +1244,7 @@ def test_antworten_speichern_race_schuetzt_question_daten(
 
 
 def test_quiz_check_race_schuetzt_question_daten(
-        client, fake_llm, fake_cli, app_env, monkeypatch):
+        client, fake_llm, app_env, monkeypatch):
     """Derselbe Wettlauf fuer job_quiz_check(): der LLM-Aufruf ist wieder
     der Moment, in dem eine dazwischenkommende Freigabe simuliert wird."""
     from types import SimpleNamespace
@@ -1308,7 +1278,7 @@ def test_quiz_check_race_schuetzt_question_daten(
 
 
 def test_freigegeben_ist_terminal_gegen_alle_mutationspfade(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     """Zusammenfassender Test (change.txt Abschnitt 1/15): nach der Freigabe
     bleiben quiz.state, quiz.finished_at, die Antworten in `question` und
     die bereits geschriebenen `answer_log`-Zeilen unter jedem der bekannten
@@ -1347,7 +1317,7 @@ def test_freigegeben_ist_terminal_gegen_alle_mutationspfade(
 # Prüfung auf Papier
 # ==========================================================================
 
-def test_papierweg_von_druck_bis_flagge(client, fake_llm, fake_cli, app_env):
+def test_papierweg_von_druck_bis_flagge(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     blatt_einlesen(client, fake_llm, app_env)
     topic_id = themen_freigeben(client, app_env)[0]
@@ -1391,7 +1361,7 @@ def test_papierweg_von_druck_bis_flagge(client, fake_llm, fake_cli, app_env):
                          topic_id)["flag"] == "rot"
 
 
-def test_antwortblatt_wird_nicht_beschnitten(client, fake_llm, fake_cli, app_env):
+def test_antwortblatt_wird_nicht_beschnitten(client, fake_llm, app_env):
     """Ein Zuschnitt koennte die erste Antwort abschneiden.
 
     Der Weg „bearbeitetes Blatt hochladen" ist weg (Schritt 1). Die Regel
@@ -1463,7 +1433,7 @@ def _bis_rot(client, fake_llm, app_env):
 
 
 def test_lernzyklus_erzeugt_material_mit_gegenpruefung(client, fake_llm,
-                                                       fake_cli, app_env, alter_generator):
+                                                       app_env, alter_generator):
     topic_id = _bis_rot(client, fake_llm, app_env)
 
     lernen_starten(client, app_env, topic_id, "html")
@@ -1488,7 +1458,7 @@ def test_lernzyklus_erzeugt_material_mit_gegenpruefung(client, fake_llm,
 
 
 def test_variante_mit_wunsch_durchlaeuft_dieselbe_gegenpruefung(
-        client, fake_llm, fake_cli, app_env, alter_generator):
+        client, fake_llm, app_env, alter_generator):
     """Eine angeforderte Variante zählt nicht als Runde, prüft aber genauso."""
     topic_id = _bis_rot(client, fake_llm, app_env)
     lernen_starten(client, app_env, topic_id, "html")
@@ -1520,7 +1490,7 @@ def test_variante_mit_wunsch_durchlaeuft_dieselbe_gegenpruefung(
 
 
 def test_variante_meldet_notebooklm_fehler_statt_stillem_ruckfall(
-        client, fake_llm, fake_cli, app_env, alter_generator):
+        client, fake_llm, app_env, alter_generator):
     """Eine Variante darf in einer anderen Ausgabeart erzeugt werden als die
     Runde selbst — z. B. einmalig ein Video statt Folien mit Stimme.
     NotebookLM ist im Test nicht installiert: die Variante muss das klar als
@@ -1554,7 +1524,7 @@ def test_variante_meldet_notebooklm_fehler_statt_stillem_ruckfall(
 
 
 def test_variante_mit_injektionsversuch_wird_bei_widerspruch_verworfen(
-        client, fake_llm, fake_cli, app_env, alter_generator):
+        client, fake_llm, app_env, alter_generator):
     """Ein Wunsch, der die Erklärung vom Schulmaterial abweichen ließe, landet
     nie beim Kind — die Gegenprüfung fängt das genauso ab wie bei einer
     normalen Runde."""
@@ -1565,6 +1535,12 @@ def test_variante_mit_injektionsversuch_wird_bei_widerspruch_verworfen(
     runde = app_env.db.q1(
         "SELECT * FROM lesson_round WHERE lesson_id=? ORDER BY nr", lesson["id"])
 
+    # Die Variante schreibt anderen Inhalt — sonst wäre der Prüfprompt
+    # Byte-identisch zum ersten und die Session-Dedup würde das alte
+    # Urteil wiederverwenden (gleicher Prompt, gleiche Session).
+    variante_lesson = copy.deepcopy(LESSON)
+    variante_lesson["folien"][1]["titel"] = "Umweg über das Kreuzprodukt"
+    fake_llm.responses["lesson"] = variante_lesson
     fake_llm.responses["verify"] = VERIFY_WIDERSPRUCH
     seite = client.get(f"/lernen/{lesson['id']}")
     client.post(f"/lernen/{lesson['id']}/runde/{runde['id']}/variante",
@@ -1582,7 +1558,7 @@ def test_variante_mit_injektionsversuch_wird_bei_widerspruch_verworfen(
 
 
 def test_widerspruch_zur_schule_wird_verworfen_nicht_gezeigt(
-        client, fake_llm, fake_cli, app_env, alter_generator):
+        client, fake_llm, app_env, alter_generator):
     """Der wichtigste Test des Lernzyklus.
 
     Ein Kind, das zwei Rechenwege gleichzeitig lernt, lernt keinen. Weicht die
@@ -1609,7 +1585,7 @@ def test_widerspruch_zur_schule_wird_verworfen_nicht_gezeigt(
 
 
 def test_ein_guter_tag_beendet_den_zyklus_noch_nicht(client, fake_llm,
-                                                     fake_cli, app_env, alter_generator):
+                                                     app_env, alter_generator):
     """Eine fehlerfreie Runde an einem Tag reicht nicht für Grün.
 
     Das ist Absicht und der wichtigste Punkt der Flaggenregel: ein Kind, das
@@ -1662,7 +1638,7 @@ def test_ein_guter_tag_beendet_den_zyklus_noch_nicht(client, fake_llm,
 
 
 def test_gruene_flagge_schliesst_die_lerneinheit_ab(client, fake_llm,
-                                                    fake_cli, app_env, alter_generator):
+                                                    app_env, alter_generator):
     """Sitzt das Thema, hört Karo auf — keine Erklärung auf Vorrat."""
     from app import teaching
 
@@ -1688,7 +1664,7 @@ def test_gruene_flagge_schliesst_die_lerneinheit_ab(client, fake_llm,
     assert danach["finished_at"]
 
 
-def test_obergrenze_beendet_den_zyklus(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_obergrenze_beendet_den_zyklus(client, fake_llm, app_env, alter_generator):
     """Nach drei Runden hoert Karo auf — hier hilft ein Mensch mehr."""
     from app import teaching
 
@@ -1713,7 +1689,7 @@ def test_obergrenze_beendet_den_zyklus(client, fake_llm, fake_cli, app_env, alte
 
 
 def test_ohne_erklaermaterial_gibt_es_eine_klare_meldung(client, fake_llm,
-                                                         fake_cli, app_env):
+                                                         app_env):
     """Karo erklaert nur, was im Unterricht behandelt wurde — oder was aus
     einer freigegebenen Internetquelle stammt.
 
@@ -1750,7 +1726,7 @@ def test_ohne_erklaermaterial_gibt_es_eine_klare_meldung(client, fake_llm,
 # ==========================================================================
 
 def test_mp4_faellt_auf_html_zurueck_wenn_werkzeuge_fehlen(
-        client, fake_llm, fake_cli, app_env, alter_generator):
+        client, fake_llm, app_env, alter_generator):
     """Ein fehlendes ffmpeg darf das Lernen nicht verhindern."""
     topic_id = _bis_rot(client, fake_llm, app_env)
     lernen_starten(client, app_env, topic_id, "mp4")
@@ -1766,7 +1742,7 @@ def test_mp4_faellt_auf_html_zurueck_wenn_werkzeuge_fehlen(
     assert client.get(f"/material/{runde['id']}").status_code == 200
 
 
-def test_mehr_zum_thema_behaelt_bisheriges_material_sichtbar(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_mehr_zum_thema_behaelt_bisheriges_material_sichtbar(client, fake_llm, app_env, alter_generator):
     """„Mehr zum Thema“ legt intern eine neue Lerneinheit an (siehe
     kind.lernen_abbrechen) — ohne eine themenweite Materialliste würden die
     Folien/Videos der vorigen Lerneinheit aus der Oberfläche verschwinden,
@@ -1807,7 +1783,7 @@ def test_mehr_zum_thema_behaelt_bisheriges_material_sichtbar(client, fake_llm, f
     assert f"/material/{runde2['id']}" in seite.text
 
 
-def test_lernen_seite_aktualisiert_sich_ohne_manuellen_reload(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_lernen_seite_aktualisiert_sich_ohne_manuellen_reload(client, fake_llm, app_env, alter_generator):
     """Solange eine Runde noch erzeugt wird, bettet die Seite karoAutoRefresh()
     ein und /lernen/{id}/status liefert eine Signatur, die sich ändert,
     sobald die Runde fertig ist — die Familie muss nicht mehr von Hand
@@ -1835,7 +1811,7 @@ def test_lernen_seite_aktualisiert_sich_ohne_manuellen_reload(client, fake_llm, 
     assert aufruf not in seite.text
 
 
-def test_notebooklm_fehler_zeigt_popup_statt_stillem_ruckfall(client, fake_llm, fake_cli, app_env, alter_generator):
+def test_notebooklm_fehler_zeigt_popup_statt_stillem_ruckfall(client, fake_llm, app_env, alter_generator):
     """Ein NotebookLM-Fehler darf nie unbemerkt zu einem anderen Format
     wechseln — die Familie hat NotebookLM ausgewählt und muss es erfahren,
     mit der Wahl, es erneut zu versuchen oder bewusst umzuschalten (siehe
@@ -1879,7 +1855,7 @@ def test_notebooklm_fehler_zeigt_popup_statt_stillem_ruckfall(client, fake_llm, 
     assert runde["material_pfad"].endswith(".html")
 
 
-def test_notebooklm_quelle_vor_dem_versand_sichtbar(client, fake_llm, fake_cli,
+def test_notebooklm_quelle_vor_dem_versand_sichtbar(client, fake_llm,
                                                      app_env, monkeypatch):
     """Der Text muss abrufbar sein, BEVOR die (bis zu 45 Minuten dauernde)
     Erzeugung läuft — nicht erst danach, wenn er längst verschickt wurde."""
@@ -1916,7 +1892,7 @@ def test_notebooklm_quelle_vor_dem_versand_sichtbar(client, fake_llm, fake_cli,
 # Recherche
 # ==========================================================================
 
-def test_recherche_haelt_sich_an_die_erlaubnisliste(client, fake_llm, fake_cli,
+def test_recherche_haelt_sich_an_die_erlaubnisliste(client, fake_llm,
                                                     app_env):
     """Auch ein Fund, den das Modell fuer passend haelt, muss zugelassen sein."""
     topic_id = _bis_rot(client, fake_llm, app_env)
@@ -1932,7 +1908,7 @@ def test_recherche_haelt_sich_an_die_erlaubnisliste(client, fake_llm, fake_cli,
     assert all(f["state"] == "vorschlag" for f in funde)
 
 
-def test_fundstellen_brauchen_freigabe(client, fake_llm, fake_cli, app_env):
+def test_fundstellen_brauchen_freigabe(client, fake_llm, app_env):
     topic_id = _bis_rot(client, fake_llm, app_env)
     from app import research
 
@@ -1948,7 +1924,7 @@ def test_fundstellen_brauchen_freigabe(client, fake_llm, fake_cli, app_env):
 
 
 def test_ohne_eigenes_material_wird_freigegebene_quelle_zur_faktengrundlage(
-        client, fake_llm, fake_cli, app_env, alter_generator):
+        client, fake_llm, app_env, alter_generator):
     """Gibt es für ein Thema kein eigenes Material, darf eine freigegebene,
     inhaltlich geholte Internetquelle selbst zur Faktengrundlage werden —
     und erst dann lässt sich die Runde starten."""
@@ -2009,7 +1985,7 @@ def test_ohne_eigenes_material_wird_freigegebene_quelle_zur_faktengrundlage(
 
 
 def test_erklaeren_fragt_erst_nach_quellen_bevor_material_entsteht(
-        client, fake_llm, fake_cli, app_env, alter_generator):
+        client, fake_llm, app_env, alter_generator):
     """Karo fragt vor Runde 1, ob im Netz gesucht werden soll, zeigt nur die
     Referenz zur Freigabe, und benutzt einen freigegebenen Fund erst danach."""
     topic_id = _bis_rot(client, fake_llm, app_env)
@@ -2063,7 +2039,7 @@ def test_erklaeren_fragt_erst_nach_quellen_bevor_material_entsteht(
 
 
 def test_thema_mit_nur_aufgaben_weist_auf_fehlendes_material_hin(
-        client, fake_llm, fake_cli, app_env, alter_generator):
+        client, fake_llm, app_env, alter_generator):
     """Ein Thema, zu dem nur Aufgaben (keine Erklärung) eingelesen wurden,
     zeigt den „erklären“-Knopf trotzdem — der Weg über eine freigegebene
     Internetquelle ist jetzt eine echte Alternative — aber weist deutlich
@@ -2149,7 +2125,7 @@ def test_eine_aehnlich_aussehende_domain_kommt_nicht_durch():
 # Datenschutz
 # ==========================================================================
 
-def test_kein_name_in_einem_prompt(client, fake_llm, fake_cli, app_env):
+def test_kein_name_in_einem_prompt(client, fake_llm, app_env):
     """Der eingetragene Vorname darf in keinem gesendeten Text stehen."""
     einrichten(client, fake_llm)
     fake_llm.responses["kb"] = {
@@ -2167,7 +2143,7 @@ def test_kein_name_in_einem_prompt(client, fake_llm, fake_cli, app_env):
         assert "7b" not in zeile["prompt"]
 
 
-def test_antworten_lassen_sich_nicht_aendern(client, fake_llm, fake_cli, app_env):
+def test_antworten_lassen_sich_nicht_aendern(client, fake_llm, app_env):
     import sqlite3
 
     topic_id = _bis_rot(client, fake_llm, app_env)
@@ -2193,7 +2169,7 @@ def test_antworten_lassen_sich_nicht_aendern(client, fake_llm, fake_cli, app_env
 # Export und Betrieb
 # ==========================================================================
 
-def test_lernstand_wird_als_tabelle_geschrieben(client, fake_llm, fake_cli,
+def test_lernstand_wird_als_tabelle_geschrieben(client, fake_llm,
                                                 app_env):
     _bis_rot(client, fake_llm, app_env)
     ziel = app_env.drive / "Lernstand.xlsx"
@@ -2221,7 +2197,7 @@ def test_health_funktioniert_ohne_anmeldung(client, monkeypatch):
     assert client.get("/health").json()["git_sha"] == "abc123def456"
 
 
-def test_beschaedigte_konfiguration_wird_gemeldet(client, fake_llm, fake_cli,
+def test_beschaedigte_konfiguration_wird_gemeldet(client, fake_llm,
                                                   app_env):
     einrichten(client, fake_llm)
     (app_env.data / "config.json").write_text("{kaputt", encoding="utf-8")
@@ -2233,7 +2209,7 @@ def test_beschaedigte_konfiguration_wird_gemeldet(client, fake_llm, fake_cli,
 
 
 def test_fehlgeschlagener_vorgang_wird_spaeter_erneut_versucht(
-        client, fake_llm, fake_cli, app_env):
+        client, fake_llm, app_env):
     from app import jobs
 
     einrichten(client, fake_llm)
@@ -2250,7 +2226,7 @@ def test_fehlgeschlagener_vorgang_wird_spaeter_erneut_versucht(
 
 
 def test_abgeschnittene_antwort_wird_nicht_gespeichert(client, fake_llm,
-                                                       fake_cli, app_env):
+                                                       app_env):
     from app import jobs
 
     einrichten(client, fake_llm)

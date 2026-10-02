@@ -42,7 +42,7 @@ class SettingsValues(HTMLParser):
             self.active = False
 
 
-def test_settings_has_one_place_for_each_connection(client, fake_llm, fake_cli,
+def test_settings_has_one_place_for_each_connection(client, fake_llm,
                                                     alter_generator):
     """Jede Verbindung genau einmal — geprüft auf der vollständigen Seite.
 
@@ -54,14 +54,14 @@ def test_settings_has_one_place_for_each_connection(client, fake_llm, fake_cli,
     page = client.get('/setup')
     forms = Forms(page.text).forms
     assert sum(f['action'] == '/setup/notebooklm/anmelden' for f in forms) == 1
-    assert sum(f['action'] == '/setup/claude/verbinden' for f in forms) == 1
+    assert sum(f['action'] == '/setup/devin/pruefen' for f in forms) == 1
     assert sum(f['action'] == '/setup/finish' for f in forms) == 1
     assert page.text.count('name="default_ausgabe"') == 1
     assert 'data-settings-form' in page.text
     assert 'Knopf weiter unten' not in page.text
 
 
-def test_saving_one_setting_preserves_collapsed_controls(client, fake_llm, fake_cli, app_env):
+def test_saving_one_setting_preserves_collapsed_controls(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     app_env.config.update(header_crop_percent=17, max_lernrunden=6, recherche_erlaubt=False,
                           antworten_pruefen_kind=True, schulblaetter_kind=True,
@@ -76,13 +76,13 @@ def test_saving_one_setting_preserves_collapsed_controls(client, fake_llm, fake_
     assert response.headers['location'] == '/setup'
     cfg = app_env.config.load()
     assert cfg.max_lernrunden == 5
-    for key in ('header_crop_percent', 'recherche_erlaubt', 'model_text', 'model_stark',
+    for key in ('header_crop_percent', 'recherche_erlaubt', 'ai_provider',
                 'default_ausgabe', 'tts_stimme', 'app_password_hash',
                 'antworten_pruefen_kind', 'schulblaetter_kind', 'klassenarbeit_kind'):
         assert getattr(cfg, key) == getattr(before, key), key
 
 
-def test_failed_password_change_keeps_unsaved_preferences(client, fake_llm, fake_cli, app_env):
+def test_failed_password_change_keeps_unsaved_preferences(client, fake_llm, app_env):
     einrichten(client, fake_llm)
     page = client.get('/setup')
     data = SettingsValues(page.text).fields
@@ -106,7 +106,7 @@ def test_failed_password_change_keeps_unsaved_preferences(client, fake_llm, fake
     assert 'data-invalid="true"' in response.text
 
 
-def test_settings_save_does_not_reopen_google_login(client, fake_llm, fake_cli, app_env, monkeypatch):
+def test_settings_save_does_not_reopen_google_login(client, fake_llm, app_env, monkeypatch):
     from app.media import notebooklm
     einrichten(client, fake_llm)
     app_env.config.update(default_ausgabe='notebooklm')
@@ -121,16 +121,19 @@ def test_settings_save_does_not_reopen_google_login(client, fake_llm, fake_cli, 
     assert response.headers['location'] == '/setup'
 
 
-def test_disconnected_claude_keeps_settings_available(client, fake_llm, fake_cli, app_env):
+def test_disconnected_devin_keeps_settings_available(client, fake_llm, app_env,
+                                                     monkeypatch):
+    """Ist DEVIN_API_KEY nicht gesetzt, bleiben die Einstellungen erreichbar —
+    sonst käme man nie mehr an die anderen Bereiche."""
     einrichten(client, fake_llm)
-    app_env.config.update(claude_oauth_token='', anthropic_api_key='')
+    monkeypatch.delenv("DEVIN_API_KEY")
     page = client.get('/setup')
     assert 'data-settings-form' in page.text
     assert 'action="/setup/credentials"' not in page.text
-    assert 'action="/setup/claude/verbinden"' in page.text
+    assert 'action="/setup/devin/pruefen"' in page.text
 
 
-def test_child_profile_name_and_photo_are_saved_and_used(client, fake_llm, fake_cli,
+def test_child_profile_name_and_photo_are_saved_and_used(client, fake_llm,
                                                          app_env, tmp_path):
     from PIL import Image
 
@@ -166,7 +169,7 @@ def test_child_profile_name_and_photo_are_saved_and_used(client, fake_llm, fake_
 
 
 def test_invalid_profile_photo_is_rejected_without_changing_name(client, fake_llm,
-                                                                 fake_cli, app_env):
+                                                                 app_env):
     einrichten(client, fake_llm)
     page = client.get('/setup')
     data = SettingsValues(page.text).fields
@@ -182,7 +185,7 @@ def test_invalid_profile_photo_is_rejected_without_changing_name(client, fake_ll
     assert not (app_env.data / 'profil' / 'kind.jpg').exists()
 
 
-def test_profile_photo_can_be_removed(client, fake_llm, fake_cli, app_env, tmp_path):
+def test_profile_photo_can_be_removed(client, fake_llm, app_env, tmp_path):
     einrichten(client, fake_llm)
     from app import profile
     profile.save_photo(profile.prepare_photo(make_jpeg(tmp_path / 'profil.jpg').read_bytes()))
@@ -201,7 +204,7 @@ CHILD_SETTINGS = ['antworten_pruefen_kind', 'schulblaetter_kind', 'klassenarbeit
 
 
 @pytest.mark.parametrize('field', CHILD_SETTINGS)
-def test_child_checkbox_can_be_enabled_and_disabled(client, fake_llm, fake_cli, app_env, field):
+def test_child_checkbox_can_be_enabled_and_disabled(client, fake_llm, app_env, field):
     einrichten(client, fake_llm)
     others = [key for key in CHILD_SETTINGS if key != field]
     app_env.config.update(**{key: True for key in others})

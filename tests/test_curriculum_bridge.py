@@ -240,7 +240,7 @@ def test_transport_failure_retries_without_an_import(app_env, bridge, monkeypatc
 
 
 def test_personal_and_exam_resume_separately_after_remote_generation(
-        client, fake_llm, fake_cli, app_env, bridge, monkeypatch):
+        client, fake_llm, app_env, bridge, monkeypatch):
     from app import jobs
     from app.adaptiv import store
     from app.services import learning_hub, exam

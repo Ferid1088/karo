@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from .. import config, connections, export, ingest, jobs, quizzes, security, materials, profile, teaching, faecher
 from ..config import ConfigUnreadable
 from ..domain import Ausgabe
-from ..llm import BACKENDS, ClaudeClient, ClaudeError, models_for
+from ..ai import AIClient, AIError
 from .shared import render, flash, zurueck
 
 router = APIRouter()
@@ -64,7 +64,7 @@ def health() -> JSONResponse:
     # beantworten konnte.
     return JSONResponse({"ok": ok, "note": notiz,
                          "setup_complete": cfg.setup_complete,
-                         "backend": cfg.llm_backend,
+                         "backend": cfg.ai_provider,
                          "git_sha": os.environ.get("KARO_GIT_SHA", "unbekannt"),
                          "contract_version": karo_contract.CONTRACT_VERSION,
                          "drive": ingest.drive_available(),
@@ -119,20 +119,14 @@ def kind_modus(request: Request):
     return zurueck("/")
 
 
-def _setup_context(cfg, modelle=None) -> dict:
-    from ..llm.cli_backend import CliBackend
+def _setup_context(cfg) -> dict:
     from ..media import notebooklm, tts, video
-    cli = CliBackend.cli_available()
     mp4_ok, mp4_grund = video.verfuegbar()
     nlm_ok, nlm_grund = notebooklm.verfuegbar()
-    claude_status = connections.status(cfg).get("claude", {})
+    devin_status = connections.status(cfg).get("devin", {})
     return {
-        "backends": BACKENDS,
-        "modelle": modelle if modelle is not None else [],
-        "cli_vorhanden": cli is not None,
-        "cli_pfad": cli,
-        "claude_ok": claude_status.get("ok", False),
-        "claude_note": claude_status.get("note", ""),
+        "devin_ok": devin_status.get("ok", False),
+        "devin_note": devin_status.get("note", ""),
         "drive_ok": ingest.drive_available(),
         "drive_writable": ingest.drive_writable(),
         "drive_path": os.environ.get("KARO_DRIVE_PATH") or str(config.DRIVE_DIR),
@@ -147,40 +141,22 @@ def _setup_context(cfg, modelle=None) -> dict:
     }
 
 
-def _modelle(cfg) -> list[dict]:
-    fest = models_for(cfg.llm_backend)
-    if fest:
-        return fest
-    try:
-        return ClaudeClient.from_config(cfg).list_models()
-    except ClaudeError:
-        return []
-
-
-def _waehle(modelle: list[dict], teil: str) -> str:
-    for m in modelle:
-        if teil in m["id"].lower():
-            return m["id"]
-    return ""
-
-
 @router.get("/setup", response_class=HTMLResponse)
 def setup_form(request: Request):
     cfg = config.load_safe()
-    modelle = _modelle(cfg) if cfg.has_credentials else []
     # Nach abgeschlossener Einrichtung IMMER die Einstellungsseite zeigen,
-    # auch wenn die Zugangsdaten gerade fehlen (z. B. nach „Trennen“) — sonst
-    # faellt die Seite zurueck auf den Einrichtungsassistenten und der Zugriff
-    # auf alle anderen Einstellungen geht verloren. Die Claude-Karte dort
-    # zeigt den fehlenden Zugang ohnehin schon mit einem Verbinden-Formular.
-    schritt = "modell" if cfg.setup_complete or cfg.has_credentials else "start"
+    # auch wenn der Schlüssel gerade fehlt (z. B. DEVIN_API_KEY nicht
+    # gesetzt) — sonst faellt die Seite zurueck auf den Einrichtungs-
+    # assistenten und der Zugriff auf alle anderen Einstellungen geht
+    # verloren. Die Devin-Karte dort zeigt den fehlenden Zugang ohnehin.
+    schritt = "einstellungen" if cfg.setup_complete or cfg.has_credentials \
+        else "start"
     return render(request, "setup.html", schritt=schritt,
-                  **_setup_context(cfg, modelle))
+                  **_setup_context(cfg))
 
 
 @router.post("/setup/credentials", response_class=HTMLResponse)
-def setup_credentials(request: Request, backend: str = Form("abo"),
-                      token: str = Form(""), api_key: str = Form(""),
+def setup_credentials(request: Request,
                       learner_name: str = Form(""), grade: str = Form("7"),
                       subject: str = Form("mathematik")):
     cfg = config.load_safe()
@@ -189,27 +165,16 @@ def setup_credentials(request: Request, backend: str = Form("abo"),
         return render(request, "setup.html", schritt="start", error=meldung,
                       status_code=400, **_setup_context(cfg))
 
-    if backend not in BACKENDS:
-        return zurueck_setup("Bitte einen Weg zum Modell auswählen.")
-
-    entwurf = config.Config(
-        llm_backend=backend,
-        claude_oauth_token=token.strip(),
-        anthropic_api_key=api_key.strip(),
-    )
-    if not entwurf.has_credentials:
-        return zurueck_setup("Bitte die Zugangsdaten eintragen."
-                       if backend == "api" else
-                       'Bitte den Token aus "claude setup-token" eintragen.')
+    if not cfg.has_credentials:
+        return zurueck_setup(
+            "DEVIN_API_KEY ist nicht gesetzt. Den Schlüssel als "
+            "Umgebungsvariable hinterlegen (siehe .env.example) und Karo "
+            "neu starten — er wird aus Sicherheitsgründen nicht in "
+            "config.json gespeichert.")
 
     try:
-        pruefer = ClaudeClient.from_config(entwurf)
-        modelle = _modelle(entwurf) or pruefer.list_models()
-        if not modelle:
-            return zurueck_setup("Es sind keine nutzbaren Modelle verfügbar.")
-        pruefer.model_text = _waehle(modelle, "haiku") or modelle[0]["id"]
-        pruefer.verify()
-    except ClaudeError as exc:
+        AIClient.from_config(cfg).verify()
+    except AIError as exc:
         return zurueck_setup(str(exc))
     except Exception:
         return zurueck_setup("Beim Prüfen ist ein unerwarteter Fehler aufgetreten.")
@@ -220,23 +185,17 @@ def setup_credentials(request: Request, backend: str = Form("abo"),
         klasse = 7
 
     config.update(
-        llm_backend=backend,
-        claude_oauth_token=token.strip() if backend == "abo" else "",
-        anthropic_api_key=api_key.strip() if backend == "api" else "",
         learner_name=learner_name.strip()[:60],
         learner_grade=klasse,
         # Nur eines der drei Fächer; es ist der Reiter, mit dem Lernen öffnet.
         subject=faecher.schluessel(subject) or "mathematik",
-        model_text=_waehle(modelle, "haiku") or modelle[0]["id"],
-        model_stark=_waehle(modelle, "sonnet") or modelle[0]["id"],
     )
-    return render(request, "setup.html", schritt="modell",
-                  **_setup_context(config.load(), modelle))
+    return render(request, "setup.html", schritt="einstellungen",
+                  **_setup_context(config.load()))
 
 
 @router.post("/setup/finish")
-async def setup_finish(request: Request, model_text: str = Form(""),
-                 model_stark: str = Form(""), header_crop: str = Form("8"),
+async def setup_finish(request: Request, header_crop: str = Form("8"),
                  default_ausgabe: str = Form("html"),
                  tts_stimme: str = Form(""),
                  max_lernrunden: str = Form("4"),
@@ -259,7 +218,6 @@ async def setup_finish(request: Request, model_text: str = Form(""),
     # gerade eingetippt war — nicht den alten, gespeicherten Stand. Sonst
     # wirkt es, als wäre die Eingabe bei jedem Fehler verworfen worden, auch
     # wenn tatsächlich nur das Passwortfeld das Problem war.
-    gueltige = {m["id"] for m in _modelle(cfg)}
     try:
         crop = max(0, min(config.ops().kopfzeile_max_prozent, int(header_crop)))
     except ValueError:
@@ -277,8 +235,6 @@ async def setup_finish(request: Request, model_text: str = Form(""),
     entwurf = dataclasses.replace(
         cfg,
         learner_name=profilname,
-        model_text=model_text if model_text in gueltige else cfg.model_text,
-        model_stark=model_stark if model_stark in gueltige else cfg.model_stark,
         header_crop_percent=crop,
         default_ausgabe=(default_ausgabe
                         if default_ausgabe in {a.value for a in Ausgabe}
@@ -295,9 +251,10 @@ async def setup_finish(request: Request, model_text: str = Form(""),
     )
 
     def zurueck_setup(meldung: str):
-        return render(request, "setup.html", schritt="modell", error=meldung,
-                      invalid=True, status_code=400, cfg=entwurf.public_dict(),
-                      **_setup_context(entwurf, _modelle(cfg)))
+        return render(request, "setup.html", schritt="einstellungen",
+                      error=meldung, invalid=True, status_code=400,
+                      cfg=entwurf.public_dict(),
+                      **_setup_context(entwurf))
 
     if not cfg.has_credentials:
         return zurueck("/setup")
@@ -334,8 +291,6 @@ async def setup_finish(request: Request, model_text: str = Form(""),
 
     aenderungen = {
         "learner_name": entwurf.learner_name,
-        "model_text": entwurf.model_text,
-        "model_stark": entwurf.model_stark,
         "header_crop_percent": entwurf.header_crop_percent,
         "default_ausgabe": entwurf.default_ausgabe,
         "tts_stimme": entwurf.tts_stimme,
@@ -392,64 +347,27 @@ async def setup_finish(request: Request, model_text: str = Form(""),
     return zurueck("/setup" if not erstmalig else "/")
 
 
-@router.post("/setup/claude/verbinden")
-def setup_claude_verbinden(request: Request, backend: str = Form("abo"),
-                           token: str = Form(""), api_key: str = Form("")):
-    cfg = config.load()
-
-    if backend not in BACKENDS:
-        flash(request, "Bitte einen Weg zum Modell auswählen.", "err")
+@router.post("/setup/devin/pruefen")
+def setup_devin_pruefen(request: Request):
+    """Verbindung erneut prüfen — der Schlüssel liegt in DEVIN_API_KEY,
+    nicht in der Konfiguration. „Trennen" heisst hier: Variable entfernen
+    und Karo neu starten."""
+    cfg = config.load_safe()
+    if not cfg.has_credentials:
+        flash(request, "DEVIN_API_KEY ist nicht gesetzt — als Umgebungs-"
+                       "variable hinterlegen und Karo neu starten.", "err")
         return zurueck("/setup")
-
-    entwurf = config.Config(
-        llm_backend=backend,
-        claude_oauth_token=token.strip(),
-        anthropic_api_key=api_key.strip(),
-    )
-    if not entwurf.has_credentials:
-        flash(request, "Bitte die Zugangsdaten eintragen."
-                       if backend == "api" else
-                       'Bitte den Token aus "claude setup-token" eintragen.',
-                       "err")
-        return zurueck("/setup")
-
     try:
-        pruefer = ClaudeClient.from_config(entwurf)
-        modelle = models_for(backend) or pruefer.list_models()
-        if not modelle:
-            flash(request, "Es sind keine nutzbaren Modelle verfügbar.", "err")
-            return zurueck("/setup")
-        pruefer.model_text = _waehle(modelle, "haiku") or modelle[0]["id"]
-        pruefer.verify()
-    except ClaudeError as exc:
+        AIClient.from_config(cfg).verify()
+    except AIError as exc:
         flash(request, str(exc), "err")
         return zurueck("/setup")
     except Exception:
-        flash(request, "Beim Prüfen ist ein unerwarteter Fehler aufgetreten.", "err")
+        flash(request, "Beim Prüfen ist ein unerwarteter Fehler aufgetreten.",
+              "err")
         return zurueck("/setup")
-
-    gueltige = {m["id"] for m in modelle}
-    aenderungen = {
-        "llm_backend": backend,
-        "claude_oauth_token": token.strip() if backend == "abo" else "",
-        "anthropic_api_key": api_key.strip() if backend == "api" else "",
-    }
-    if backend != cfg.llm_backend or cfg.model_text not in gueltige:
-        aenderungen["model_text"] = _waehle(modelle, "haiku") or modelle[0]["id"]
-    if backend != cfg.llm_backend or cfg.model_stark not in gueltige:
-        aenderungen["model_stark"] = _waehle(modelle, "sonnet") or modelle[0]["id"]
-
-    config.update(**aenderungen)
     connections.status(config.load(), force=True)
-    flash(request, "Claude ist verbunden.")
-    return zurueck("/setup")
-
-
-@router.post("/setup/claude/trennen")
-def setup_claude_trennen(request: Request):
-    config.update(claude_oauth_token="", anthropic_api_key="")
-    connections.status(config.load(), force=True)
-    flash(request, "Claude-Verbindung getrennt.")
+    flash(request, "Devin ist verbunden.")
     return zurueck("/setup")
 
 
@@ -485,7 +403,6 @@ def setup_notebooklm_trennen(request: Request):
 
 @router.post("/setup/reset")
 def setup_reset(request: Request):
-    config.update(claude_oauth_token="", anthropic_api_key="",
-                  model_text="", model_stark="", setup_complete=False)
+    config.update(setup_complete=False)
     request.session.clear()
     return zurueck("/setup")

@@ -2,7 +2,7 @@
 import json
 
 from .. import prompts
-from ..llm.client import ClaudeClient
+from ..ai.client import AIClient
 from . import schemas
 
 SCHEMA = {'type': 'object', 'additionalProperties': False,
@@ -17,7 +17,7 @@ def pruefen(lesson: dict, fach: str, cfg) -> dict:
     concept = lesson['konzept']
     data = {'fach': fach, 'konzept': concept['label'],
             'aufgaben': [f['aufgaben'] for f in lesson['fehlertypen']]}
-    result = ClaudeClient.from_config(cfg).complete(
+    result = AIClient.from_config(cfg).complete(
         purpose='klassenpruefung', schema=SCHEMA, system=prompts.SYSTEM,
         prompt='Prüfe unabhängig die curriculare Einordnung dieser Lernreihe. '
         'Es gibt keine angefragte Klasse. Ermittle den üblichen Klassenbereich in Deutschland '
