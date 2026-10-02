@@ -16,14 +16,15 @@ import logging
 import threading
 from typing import Callable
 
-from . import db
+from . import config, db
 
 log = logging.getLogger("karo.jobs")
 
 HANDLERS: dict[str, Callable[[dict], None]] = {}
-MAX_ATTEMPTS = 3
-POLL_SECONDS = 3.0
-RETRY_DELAYS = (60, 300)        # Sekunden vor dem 2. und 3. Versuch
+_OPS = config.ops()
+MAX_ATTEMPTS = _OPS.jobs_max_attempts
+POLL_SECONDS = _OPS.jobs_poll_seconds
+RETRY_DELAYS = _OPS.jobs_retry_delays  # Sekunden vor dem 2. und 3. Versuch
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
@@ -34,7 +35,8 @@ class Deferred(Exception):
 
     def __init__(self, payload: dict, seconds: int = 15):
         self.payload = payload
-        self.seconds = max(5, min(int(seconds), 300))
+        self.seconds = max(_OPS.jobs_defer_min_seconds,
+                           min(int(seconds), _OPS.jobs_defer_max_seconds))
 
 
 class PermanentFailure(Exception):
@@ -211,7 +213,7 @@ def start() -> None:
     _thread.start()
 
 
-def stop(timeout: float = 10.0) -> None:
+def stop(timeout: float = _OPS.jobs_stop_timeout_seconds) -> None:
     _stop.set()
     if _thread and _thread.is_alive():
         _thread.join(timeout=timeout)

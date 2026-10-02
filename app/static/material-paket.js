@@ -13,14 +13,15 @@
   if (!zone || !window.karoBlattLesen) return;
 
   const form = zone.closest("form");
-  const MAX = parseInt(zone.dataset.maxSeiten || "10", 10);
-  const KOPF = parseFloat(zone.dataset.kopfProzent || "0");
-  // Die Grenzen stehen im Server (material_paket.py); hier nur dieselben
-  // Zahlen für eine frühe, freundliche Meldung vor dem Verarbeiten.
+  // Die Grenzen stehen im Server (config.ops() → material_paket.py) und werden
+  // vom Template als data-Attribute geliefert — hier keine eigenen Zahlen,
+  // sonst liefen zwei Quellen auseinander.
   const MB = 1048576;
-  const MAX_BILD = parseInt(zone.dataset.maxBildMb || "15", 10) * MB;
-  const MAX_PDF = parseInt(zone.dataset.maxPdfMb || "50", 10) * MB;
-  const MAX_PAKET = parseInt(zone.dataset.maxPaketMb || "100", 10) * MB;
+  const MAX = parseInt(zone.dataset.maxSeiten, 10);
+  const KOPF = parseFloat(zone.dataset.kopfProzent || "0");
+  const MAX_BILD = parseInt(zone.dataset.maxBildMb, 10) * MB;
+  const MAX_PDF = parseInt(zone.dataset.maxPdfMb, 10) * MB;
+  const MAX_PAKET = parseInt(zone.dataset.maxPaketMb, 10) * MB;
   const liste = zone.querySelector("[data-paket-liste]");
   const zaehler = zone.querySelector("[data-paket-zaehler]");
   const fehlerEl = zone.querySelector("[data-paket-fehler]");

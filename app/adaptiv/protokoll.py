@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from .. import db
+from .. import config, db
 from .store import CHILD_KEY, _zeile
 
 #: Rollen, unter denen eine Antwort protokolliert wird.
@@ -34,11 +34,14 @@ WIEDERHOLUNG = "wiederholung"
 #: Grundzeit je Antwortart in Sekunden, geeicht auf Klasse 6. Eine Auswahl
 #: ist schneller entschieden als eine Rechnung, und ein geschriebener Satz
 #: dauert laenger als beides.
-_GRUNDZEIT = {"auswahl": 25, "bruch": 60, "text": 90}
+_OPS = config.ops()
+_GRUNDZEIT = {"auswahl": _OPS.adaptiv_grundzeit_auswahl_seconds,
+              "bruch": _OPS.adaptiv_grundzeit_bruch_seconds,
+              "text": _OPS.adaptiv_grundzeit_text_seconds}
 
 #: Je Klassenstufe unter 6 etwas mehr Zeit, darueber etwas weniger. Gedeckelt,
 #: damit aus einer Klassenangabe keine absurde Zahl wird.
-_SPANNE = (0.6, 1.8)
+_SPANNE = (_OPS.adaptiv_zeit_spanne_min, _OPS.adaptiv_zeit_spanne_max)
 
 
 def _jetzt() -> dt.datetime:

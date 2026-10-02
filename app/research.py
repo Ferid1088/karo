@@ -113,7 +113,7 @@ ERLAUBTE_KANAELE = (
     "musstewissen", "mathenachhilfe", "gerd anders",
 )
 
-MAX_TREFFER = 8
+MAX_TREFFER = config.ops().recherche_max_treffer
 
 
 def client() -> ClaudeClient:
@@ -378,7 +378,7 @@ FETCH_SCHEMA = {
     "required": ["erreichbar", "inhalt"],
 }
 
-MAX_INHALT_LAENGE = 6000
+MAX_INHALT_LAENGE = config.ops().recherche_max_inhalt_zeichen
 
 
 @jobs.handler("research_fetch")

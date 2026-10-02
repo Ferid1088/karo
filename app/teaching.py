@@ -77,7 +77,7 @@ def starten(topic_id: int, ausgabe: str | None = None,
     if ausgabe not in {a.value for a in Ausgabe}:
         raise TeachingError("Unbekannte Ausgabeart.")
 
-    prompt_wunsch = (prompt_wunsch or "").strip()[:500] or None
+    prompt_wunsch = (prompt_wunsch or "").strip()[:MAX_WUNSCH_LAENGE] or None
     with db.tx() as c:
         offen = c.execute(
             """SELECT id, ausgabe FROM lesson WHERE topic_id=?
@@ -568,7 +568,7 @@ def forschung_anfordern(lesson_id: int) -> bool:
 # Variante: dieselbe Runde nochmal, mit einem Gestaltungswunsch
 # --------------------------------------------------------------------------
 
-MAX_WUNSCH_LAENGE = 500
+MAX_WUNSCH_LAENGE = config.ops().formular_wunsch_zeichen
 
 
 def variante_anfordern(round_id: int, wunsch: str, ausgabe: str | None = None) -> int:

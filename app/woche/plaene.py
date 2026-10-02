@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 import calendar
-from datetime import date, datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import date, datetime, timedelta, timezone
 
 from .. import config
 
@@ -15,8 +14,8 @@ MONTH_LABELS = (
 
 
 def today(now: datetime | None = None) -> date:
-    zone = ZoneInfo(getattr(config.load_safe(), "timezone", None) or "Europe/Berlin")
-    return (now or datetime.now(ZoneInfo("UTC"))).astimezone(zone).date()
+    zone = config.zeitzone()
+    return (now or datetime.now(timezone.utc)).astimezone(zone).date()
 
 
 def percent(actual: float, planned: float) -> float:

@@ -5,6 +5,7 @@ import datetime as dt
 import secrets
 import sqlite3
 
+from .. import config
 from . import world_db
 
 CHILD_KEY = "installation"
@@ -202,7 +203,7 @@ def create_capsule(title: str, text: str, opens_on: str, has_media: bool) -> int
     today = dt.date.fromisoformat(world_db.today())
     if target <= today:
         raise ValueError("Die Zeitkapsel muss sich in der Zukunft öffnen.")
-    if target > today + dt.timedelta(days=366 * 5):
+    if target > today + dt.timedelta(days=config.ops().welt_kapsel_max_tage):
         raise ValueError("Das Öffnungsdatum darf höchstens fünf Jahre in der Zukunft liegen.")
     with world_db.tx() as conn:
         return int(conn.execute(
@@ -265,9 +266,9 @@ def usage_today() -> dict:
     audio = int((row["audio_seconds"] if row else 0) or 0)
     return {
         "photos": photos,
-        "photos_left": max(0, 2 - photos),
+        "photos_left": max(0, config.ops().welt_fotos_tag - photos),
         "audio_seconds": audio,
-        "audio_seconds_left": max(0, 60 - audio),
+        "audio_seconds_left": max(0, config.ops().welt_audio_sekunden_tag - audio),
     }
 
 

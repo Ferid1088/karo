@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import UploadFile
+
+from .. import config
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 try:
@@ -23,11 +25,12 @@ except ImportError:  # pragma: no cover - dependency is part of the app image
 
 from . import world_db
 
-MAX_PHOTO_SOURCE_BYTES = 12 * 1024 * 1024
-MAX_AUDIO_BYTES = 2_000_000
-MAX_IMAGE_PIXELS = 25_000_000
-MAX_IMAGE_EDGE = 1800
-THUMB_EDGE = 360
+_OPS = config.ops()
+MAX_PHOTO_SOURCE_BYTES = _OPS.welt_foto_source_bytes
+MAX_AUDIO_BYTES = _OPS.welt_audio_bytes
+MAX_IMAGE_PIXELS = _OPS.welt_max_image_pixels
+MAX_IMAGE_EDGE = _OPS.welt_max_image_edge
+THUMB_EDGE = _OPS.welt_thumb_edge
 
 
 @dataclass(frozen=True)

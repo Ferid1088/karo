@@ -30,6 +30,7 @@ import shutil
 import subprocess
 import tempfile
 
+from .. import config
 from .base import (
     Backend,
     ClaudeAuthError,
@@ -43,7 +44,7 @@ from .base import (
 log = logging.getLogger("karo.llm.cli")
 
 TOOL_NAME = "antwort"
-DEFAULT_TIMEOUT = 300           # die CLI startet ein Agenten-Harness, das dauert
+DEFAULT_TIMEOUT = config.ops().llm_cli_timeout_seconds  # die CLI startet ein Agenten-Harness, das dauert
 
 #: Modelle, die die CLI ueber `--model` versteht. Kurznamen, damit ein
 #: Versionswechsel bei Anthropic nichts kaputt macht.
@@ -60,7 +61,7 @@ class CliBackend:
     name = "abo"
 
     def __init__(self, oauth_token: str, *, timeout: int = DEFAULT_TIMEOUT,
-                 binary: str = "claude") -> None:
+                 binary: str = config.ops().llm_cli_binary) -> None:
         token = (oauth_token or "").strip()
         if not token:
             raise ClaudeAuthError("Es ist kein Abo-Token hinterlegt.")
@@ -77,7 +78,7 @@ class CliBackend:
     # -- Vorbedingungen -----------------------------------------------------
 
     @staticmethod
-    def cli_available(binary: str = "claude") -> str | None:
+    def cli_available(binary: str = config.ops().llm_cli_binary) -> str | None:
         """Pfad zur CLI oder None."""
         return shutil.which(binary)
 
@@ -100,8 +101,8 @@ class CliBackend:
                     "properties": {"ok": {"type": "boolean"}},
                     "required": ["ok"]},
             model="haiku",
-            max_tokens=256,
-            timeout=90,
+            max_tokens=config.ops().llm_cli_verify_tokens,
+            timeout=config.ops().llm_cli_verify_timeout_seconds,
         )
         return result.model
 
@@ -109,7 +110,7 @@ class CliBackend:
         return list(CLI_MODELS)
 
     def call(self, prompt: str, schema: dict, *, model: str, system: str = "",
-             max_tokens: int = 8192, web_search: bool = False,
+             max_tokens: int = config.ops().llm_default_max_tokens, web_search: bool = False,
              web_fetch: bool = False) -> RawResult:
         self._require_cli()
         return self._run(prompt, schema, model=model, system=system,
@@ -119,7 +120,7 @@ class CliBackend:
     # -- intern -------------------------------------------------------------
 
     def _run(self, prompt: str, schema: dict, *, model: str, system: str = "",
-             max_tokens: int = 8192, timeout: int | None = None,
+             max_tokens: int = config.ops().llm_default_max_tokens, timeout: int | None = None,
              web_search: bool = False, web_fetch: bool = False) -> RawResult:
         # Ohne ausdrückliche Freigabe hat die CLI im Kopfmodus (-p) KEIN
         # Werkzeug — auch keine Websuche, selbst wenn der Prompt danach fragt.

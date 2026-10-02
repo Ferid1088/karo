@@ -29,7 +29,7 @@ def save(quiz_id: int, role: str, phase: str, revision: int, values: dict, posit
                 continue
             if phase == 'answers' and prefix == 'antwort':
                 c.execute('UPDATE question SET schueler_antwort=? WHERE id=? AND quiz_id=?',
-                          (value[:2000] or None, int(question_id), quiz_id))
+                          (value[:config.ops().entwurf_antwort_zeichen] or None, int(question_id), quiz_id))
             elif phase == 'review' and prefix in ('urteil', 'fehler'):
                 clean[key] = value[:100]
         position = max(0, min(position, max(0, len(ids) - 1)))

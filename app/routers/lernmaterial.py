@@ -52,7 +52,7 @@ def _vorab_groesse(request: Request) -> None:
     except ValueError:
         angekuendigt = 0
     # Zwei MB Luft für die Formularrahmen der Seiten.
-    if angekuendigt > material_paket.MAX_PAKET_BYTES + 2_000_000:
+    if angekuendigt > material_paket.MAX_PAKET_BYTES + config.ops().paket_overhead_bytes:
         raise material_paket.PaketFehler(
             f"Der Upload ist zu groß — ein Paket darf höchstens "
             f"{material_paket.MAX_PAKET_BYTES // 1_048_576} MB haben.")
@@ -87,9 +87,14 @@ def material_seite(request: Request):
     return render(request, "learning_upload.html", fach=fach, zweck=zweck,
                   fach_name=faecher.NAMEN.get(fach, "deinem Fach"),
                   max_seiten=material_paket.MAX_SEITEN,
+                  min_zeichen=material_paket.MIN_ZEICHEN,
                   max_bild_mb=material_paket.MAX_BILD_BYTES // 1_048_576,
                   max_pdf_mb=material_paket.MAX_PDF_BYTES // 1_048_576,
                   max_paket_mb=material_paket.MAX_PAKET_BYTES // 1_048_576,
+                  ocr_max_seiten=config.ops().browser_ocr_max_seiten,
+                  ocr_max_kante=config.ops().browser_ocr_max_kante,
+                  ocr_min_konfidenz=config.ops().browser_ocr_min_konfidenz,
+                  ocr_sprachen=config.ops().ocr_sprachen,
                   kopf_prozent=config.load_safe().header_crop_percent,
                   quelle=request.query_params.get("quelle", ""))
 

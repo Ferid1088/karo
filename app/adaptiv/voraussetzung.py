@@ -19,11 +19,12 @@ nicht unterrichten kann.
 """
 from __future__ import annotations
 
+from .. import config
 from . import inhalt_store, store
 
 #: So viele geprüfte Aufgaben entscheiden, ob eine Voraussetzung sitzt.
 #: Dieselbe Zahl wie bei der Ersteinschätzung: eine Aufgabe belegt nichts.
-AUFGABEN = 2
+AUFGABEN = config.ops().voraussetzung_aufgaben
 
 
 def offene(konzept_id: int, child_key: str = store.CHILD_KEY) -> list[dict]:

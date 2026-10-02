@@ -2,7 +2,7 @@
 import json
 import random
 
-from .. import db
+from .. import config, db
 from ..adaptiv import inhalt_store, lektionen, store
 from ..adaptiv.unterricht import ist_richtig
 from . import exam_calendar, learning_hub
@@ -73,7 +73,7 @@ def submit(exam_id, topic_id, answers):
         raise ValueError("Öffne zuerst die Generalprobe.")
     if attempt["finished_at"]:
         return attempt
-    cleaned = {str(i): str(answers.get(str(i), "")).strip()[:1000]
+    cleaned = {str(i): str(answers.get(str(i), "")).strip()[:config.ops().probe_antwort_zeichen]
                for i in range(len(attempt["questions"]))}
     if not all(cleaned.values()):
         with db.tx() as c:

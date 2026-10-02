@@ -166,7 +166,7 @@ def normalize_code(text: str) -> str:
     return text[:60]
 
 
-DUPLIKAT_SCHWELLE = 0.88
+DUPLIKAT_SCHWELLE = config.ops().themen_duplikat_schwelle
 
 
 def _vergleichstext(label: str) -> str:
@@ -322,7 +322,7 @@ def zuordnen(topic_id: int) -> int:
     if thema is None:
         return 0
     treffer = kb.suche(f"{thema['label']} {thema.get('beschreibung') or ''}",
-                       thema["subject"], limit=30)
+                       thema["subject"], limit=config.ops().themen_zuordnung_treffer)
     n = 0
     with db.tx() as c:
         for t in treffer:

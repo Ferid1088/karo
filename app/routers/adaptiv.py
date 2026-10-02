@@ -99,7 +99,7 @@ def klasse_bestaetigen(request: Request, confirmation: str = Form('')):
     if _aus():
         return _auswahl(request)
     try:
-        proof = _grade_signer().loads(confirmation, max_age=1800)
+        proof = _grade_signer().loads(confirmation, max_age=config.ops().hinweis_max_age_seconds)
     except BadSignature:
         raise HTTPException(400, 'Der Hinweis ist abgelaufen. Bitte öffne dein Thema erneut.')
     if proof.get('area') != ctx['learning_base'] or proof.get('csrf') != request.session.get('csrf'):

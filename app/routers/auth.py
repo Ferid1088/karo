@@ -22,7 +22,8 @@ def profilbild():
     if not path.is_file():
         return HTMLResponse("Profilbild nicht gefunden.", status_code=404)
     return FileResponse(path, media_type="image/jpeg",
-                        headers={"Cache-Control": "private, max-age=86400"})
+                        headers={"Cache-Control":
+                                 f"private, max-age={config.ops().profil_bild_cache_seconds}"})
 
 
 @router.get("/setup/speicher/ordner")
@@ -260,7 +261,7 @@ async def setup_finish(request: Request, model_text: str = Form(""),
     # wenn tatsächlich nur das Passwortfeld das Problem war.
     gueltige = {m["id"] for m in _modelle(cfg)}
     try:
-        crop = max(0, min(25, int(header_crop)))
+        crop = max(0, min(config.ops().kopfzeile_max_prozent, int(header_crop)))
     except ValueError:
         crop = cfg.header_crop_percent
     try:

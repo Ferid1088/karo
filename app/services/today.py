@@ -9,7 +9,6 @@ geplante Minuten ist ein Vorschlag, keine Aufgabe.
 from __future__ import annotations
 
 import datetime as dt
-from zoneinfo import ZoneInfo
 
 from .. import config, db, faecher
 from ..woche import plaene, plaene_store
@@ -19,7 +18,7 @@ MONATE = ("Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
           "August", "September", "Oktober", "November", "Dezember")
 ERLEDIGT = ("completed", "made_up")
 #: Ein Erfolg, der laenger zurueckliegt, ist kein "kleiner Erfolg von heute".
-ERFOLG_TAGE = 14
+ERFOLG_TAGE = config.ops().erfolg_tage
 
 
 def date_label(day: dt.date) -> str:
@@ -41,7 +40,7 @@ def local_day(value: str) -> dt.date:
         return dt.date.fromisoformat(roh[:10])
     if moment.tzinfo is None:
         return moment.date()
-    zone = ZoneInfo(getattr(config.load_safe(), "timezone", None) or "Europe/Berlin")
+    zone = config.zeitzone()
     return moment.astimezone(zone).date()
 
 
@@ -141,7 +140,7 @@ def activity_days() -> set[str]:
     if db.q1("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lern_wiederholung'"):
         # Auch ein kurzer Check ist ein Lerntag.
         sql.append("SELECT substr(erledigt_am,1,13) FROM lern_wiederholung WHERE status IS NOT 'offen'")
-    zone = ZoneInfo(getattr(config.load_safe(), "timezone", None) or "Europe/Berlin")
+    zone = config.zeitzone()
     days = set()
     for row in db.q(" UNION ".join(sql)):
         try:

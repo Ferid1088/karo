@@ -18,8 +18,8 @@ except ImportError:  # pragma: no cover - optionale Komfortunterstuetzung
     pass
 
 
-PROFILE_SIZE = 512
-Image.MAX_IMAGE_PIXELS = 40_000_000
+PROFILE_SIZE = config.ops().profil_bild_pixel
+Image.MAX_IMAGE_PIXELS = config.ops().ingest_max_image_pixels
 
 
 def photo_path() -> Path:

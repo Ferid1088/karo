@@ -34,7 +34,7 @@ log = logging.getLogger("karo.ingest")
 
 # Bildbomben abwehren: eine 60000x60000-PNG wuerde sonst zehn Gigabyte
 # anfordern und den Container abschiessen.
-Image.MAX_IMAGE_PIXELS = 40_000_000
+Image.MAX_IMAGE_PIXELS = config.ops().ingest_max_image_pixels
 warnings.simplefilter("error", Image.DecompressionBombWarning)
 
 try:                                   # iPhones fotografieren standardmaessig HEIC
@@ -57,11 +57,12 @@ if HEIF_OK:
 PDF_SUFFIXES = {".pdf"}
 ALL_SUFFIXES = IMAGE_SUFFIXES | PDF_SUFFIXES
 
-MAX_EDGE = 1800
-TARGET_BYTES = 4_400_000        # Sicherheitsabstand zur 5-MB-Grenze der API
-MIN_QUALITY = 45
-MAX_SOURCE_BYTES = 60 * 1024 * 1024
-MAX_PDF_PAGES = 300              # schuetzt vor Endlos-Scans, nicht vor echten Heften
+_OPS = config.ops()
+MAX_EDGE = _OPS.ingest_max_edge
+TARGET_BYTES = _OPS.ingest_target_bytes  # Sicherheitsabstand zur 5-MB-Grenze der API
+MIN_QUALITY = _OPS.ingest_min_quality
+MAX_SOURCE_BYTES = _OPS.ingest_max_source_bytes
+MAX_PDF_PAGES = _OPS.ingest_max_pdf_pages  # schuetzt vor Endlos-Scans, nicht vor echten Heften
 
 
 class IngestError(Exception):
@@ -215,7 +216,7 @@ def _encode_image(img: Image.Image, dest: Path, header_crop_percent: int = 0) ->
 
     crop_px = 0
     if header_crop_percent > 0:
-        crop_px = int(img.height * min(header_crop_percent, 25) / 100)
+        crop_px = int(img.height * min(header_crop_percent, config.ops().kopfzeile_max_prozent) / 100)
         if 0 < crop_px < img.height:
             img = img.crop((0, crop_px, img.width, img.height))
         else:

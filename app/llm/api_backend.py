@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 
+from .. import config
 from .base import (
     ClaudeAuthError,
     ClaudeConnectionError,
@@ -40,9 +41,15 @@ class ApiBackend:
 
     name = "api"
 
-    def __init__(self, api_key: str, *, timeout: float = 180.0,
-                 max_retries: int = 3) -> None:
+    def __init__(self, api_key: str, *, timeout: float | None = None,
+                 max_retries: int | None = None) -> None:
         import anthropic
+
+        ops = config.ops()
+        if timeout is None:
+            timeout = ops.llm_api_timeout_seconds
+        if max_retries is None:
+            max_retries = ops.llm_api_max_retries
 
         self._anthropic = anthropic
         key = (api_key or "").strip()
@@ -67,7 +74,7 @@ class ApiBackend:
         model = _pick(modelle, "haiku") or modelle[0]["id"]
         try:
             self._client.messages.create(
-                model=model, max_tokens=8,
+                model=model, max_tokens=config.ops().llm_api_verify_tokens,
                 messages=[{"role": "user", "content": "Antworte mit OK."}])
         except Exception as exc:
             raise self._deuten(exc) from None
@@ -75,14 +82,14 @@ class ApiBackend:
 
     def list_models(self) -> list[dict]:
         try:
-            seite = self._client.models.list(limit=50)
+            seite = self._client.models.list(limit=config.ops().llm_api_models_limit)
         except Exception as exc:
             raise self._deuten(exc) from None
         return [{"id": m.id, "name": getattr(m, "display_name", m.id)}
                 for m in seite.data]
 
     def call(self, prompt: str, schema: dict, *, model: str, system: str = "",
-             max_tokens: int = 8192, web_search: bool = False,
+             max_tokens: int = config.ops().llm_default_max_tokens, web_search: bool = False,
              web_fetch: bool = False) -> RawResult:
         if web_search or web_fetch:
             # Echte Websuche/-abruf würde ein zweites, unerzwungenes Werkzeug

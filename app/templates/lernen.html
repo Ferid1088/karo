@@ -223,7 +223,7 @@
     <form method="post" action="/lernen/{{ lesson.id }}/runde/{{ runde.id }}/variante"
           class="actions" style="gap:.4rem; margin-top:.5rem; flex-wrap:wrap">
       {{ csrf_input() }}
-      <input type="text" name="wunsch" aria-label="Wunsch für die neue Erklärung" maxlength="500" style="flex:1; min-width:12rem"
+      <input type="text" name="wunsch" aria-label="Wunsch für die neue Erklärung" maxlength="{{ wunsch_max_zeichen }}" style="flex:1; min-width:12rem"
              placeholder="z. B. länger, mit mehr Beispielen, langsamer gesprochen">
       <select name="ausgabe" class="mini" aria-label="Format für die neue Erklärung">
         <option value="">wie diese Runde ({{ ausgabe_labels.get(lesson.ausgabe, lesson.ausgabe) }})</option>

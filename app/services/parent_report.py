@@ -9,7 +9,6 @@ import calendar
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from urllib.parse import urlencode
-from zoneinfo import ZoneInfo
 
 from .. import config, db, faecher
 from ..adaptiv import store as learning_store
@@ -28,8 +27,8 @@ HEADS = {'monat': ('Guter Monat', 'Gemischter Monat'), 'woche': ('Gute Woche', '
          'tag': ('Guter Lerntag', 'Gemischter Tag')}
 
 
-def _zone() -> ZoneInfo:
-    return ZoneInfo(getattr(config.load_safe(), 'timezone', None) or 'Europe/Berlin')
+def _zone():
+    return config.zeitzone()
 
 
 def local_day(stamp: str | None) -> date | None:

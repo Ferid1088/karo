@@ -13,15 +13,16 @@ from __future__ import annotations
 
 from datetime import date
 
-from .. import db
+from .. import config, db
 from ..woche import plaene
 
 PARENT_EMOJIS = ('💪', '⭐', '👏', '❤️', '🤗', '🙌', '🎉')
 CHILD_REACTIONS = {'😊': '😊', '❤️': '❤️', '👍': '👍', '🤗': '🤗',
                    'danke': 'Danke!', 'reden': 'Lass uns reden'}
 KINDS = {'nachricht': 'Nachricht', 'ueberraschung': 'Überraschung', 'feier': 'Feier'}
-MAX_TEXT = 200
-MAX_CELEBRATION = 60
+_OPS = config.ops()
+MAX_TEXT = _OPS.post_max_text_zeichen
+MAX_CELEBRATION = _OPS.post_max_feier_zeichen
 
 
 class PostError(ValueError):

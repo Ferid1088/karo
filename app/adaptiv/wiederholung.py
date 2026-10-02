@@ -19,11 +19,11 @@ from __future__ import annotations
 import datetime as dt
 import json
 
-from .. import db
+from .. import config, db
 from .store import CHILD_KEY, _json, _zeile
 
 #: Zur Auswahl stehende Abstaende in Tagen.
-ABSTAENDE = (2, 3, 4, 5)
+ABSTAENDE = config.ops().wiederholung_abstaende
 
 OFFEN = "offen"
 BESTANDEN = "bestanden"

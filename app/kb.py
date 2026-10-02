@@ -118,7 +118,7 @@ def _fts_query(text: str) -> str:
     return " OR ".join(f'"{w}"' for w in worte[:8])
 
 
-def suche(text: str, fach: str, limit: int = 12, arten: tuple[str, ...] | None = None,
+def suche(text: str, fach: str, limit: int = config.ops().kb_suche_treffer, arten: tuple[str, ...] | None = None,
           topic_id: int | None = None) -> list[dict]:
     """Findet Abschnitte in der Wissensbasis — nur auf Blättern des Fachs.
 
@@ -178,7 +178,7 @@ def _fach_von(topic_id: int) -> str | None:
     return row["subject"] if row else None
 
 
-def lehrmaterial(topic_id: int, label: str, limit: int = 10) -> list[dict]:
+def lehrmaterial(topic_id: int, label: str, limit: int = config.ops().kb_lehrmaterial_treffer) -> list[dict]:
     """Nur das, was tatsächlich etwas erklärt — aus dem Fach des Themas."""
     alles = suche(label, _fach_von(topic_id), limit=limit * 2, arten=LEHR_ARTEN, topic_id=topic_id)
     lehr = [a for a in alles if a["art"] in LEHR_ARTEN]

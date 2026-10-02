@@ -27,12 +27,12 @@ from __future__ import annotations
 
 import re
 
-from . import db, faecher, pii, topics
+from . import config, db, faecher, pii, topics
 from .adaptiv.normalisierung import normalisiere_thema
 
 #: Abschnitte länger als das schneidet niemand mehr sinnvoll klein.
-MAX_ABSCHNITTE = 60
-MAX_ZEICHEN = 6000
+MAX_ABSCHNITTE = config.ops().blatt_max_abschnitte
+MAX_ZEICHEN = config.ops().blatt_max_zeichen
 
 #: Wie viele Vorschläge zurückgehen. Drei, weil eine Liste mit zehn Einträgen
 #: keine Bestätigung mehr ist, sondern eine Suche.
@@ -212,18 +212,19 @@ def server_lesen_moeglich() -> bool:
     return shutil.which(TESSERACT) is not None
 
 
-def _bild_lesen(pfad, sprachen: str = "deu+eng") -> str:
+def _bild_lesen(pfad, sprachen: str | None = None) -> str:
     import subprocess
     try:
+        o = config.ops()
         fertig = subprocess.run(
-            [TESSERACT, str(pfad), "stdout", "-l", sprachen],
-            capture_output=True, timeout=120, check=False)
+            [TESSERACT, str(pfad), "stdout", "-l", sprachen or o.ocr_sprachen],
+            capture_output=True, timeout=o.ocr_timeout_seconds, check=False)
     except (OSError, subprocess.TimeoutExpired):
         return ""
     return fertig.stdout.decode("utf-8", "replace") if fertig.returncode == 0 else ""
 
 
-def server_lesen(pfad, *, seiten_grenze: int = 20) -> str:
+def server_lesen(pfad, *, seiten_grenze: int | None = None) -> str:
     """Liest eine Datei auf dem Server. Der Aufrufer löscht sie danach.
 
     Bild: Tesseract. PDF: erst die Textebene (schneller und fehlerfrei), für
@@ -241,9 +242,10 @@ def server_lesen(pfad, *, seiten_grenze: int = 20) -> str:
     doc = ingest._open_pdf(pfad)
     try:
         teile = []
-        for i in range(min(doc.page_count, seiten_grenze)):
+        grenze = seiten_grenze or config.ops().ocr_max_pdf_seiten
+        for i in range(min(doc.page_count, grenze)):
             text = doc.text(i)
-            if len(text) >= 40:
+            if len(text) >= config.ops().seite_min_zeichen:
                 teile.append(text)
                 continue
             import tempfile

@@ -22,26 +22,26 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from .. import config, db
 
 #: Takt der Lernseiten in Sekunden (siehe static/lernzeit.js).
-TAKT = 30
+_OPS = config.ops()
+TAKT = _OPS.lernzeit_takt_seconds
 #: Bis hierher gehoert ein Schlag noch zum laufenden Stueck. Grosszuegiger als
 #: der Takt, damit ein verlorener Schlag keine Lernrunde zerschneidet.
-ANSCHLUSS = 90
+ANSCHLUSS = _OPS.lernzeit_anschluss_seconds
 #: Laenger als das ist eine Pause und zaehlt in der Schaetzung nicht mit.
-PAUSE = 300
+PAUSE = _OPS.lernzeit_pause_seconds
 #: Was eine einzelne Aktivitaet ohne Nachbarn wert ist.
-GUTSCHRIFT = 60
+GUTSCHRIFT = _OPS.lernzeit_gutschrift_seconds
 #: Obergrenze je Tag. Schuetzt die Anzeige vor einem Browserfenster, das ueber
 #: Nacht offen blieb, und vor kaputten Zeitstempeln.
-TAGESDECKEL = 8 * 3600
+TAGESDECKEL = _OPS.lernzeit_tagesdeckel_seconds
 
 
-def _zone() -> ZoneInfo:
-    return ZoneInfo(getattr(config.load_safe(), "timezone", None) or "Europe/Berlin")
+def _zone():
+    return config.zeitzone()
 
 
 def _jetzt() -> datetime:

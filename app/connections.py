@@ -21,7 +21,7 @@ log = logging.getLogger("karo.connections")
 
 #: Etwas kuerzer als das Abfrageintervall im Browser (siehe base.html), damit
 #: eine Anfrage kurz nach Ablauf nie auf einen veralteten Stand trifft.
-CACHE_TTL = 100.0
+CACHE_TTL = config.ops().connections_cache_ttl_seconds
 
 _lock = threading.Lock()
 _cache: dict[str, tuple[float, dict]] = {}

@@ -19,6 +19,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from .. import config
 from .tts import TtsUnavailable, dauer_sekunden, sprechen
 
 log = logging.getLogger("karo.video")
@@ -189,7 +190,7 @@ def _ffmpeg(args: list[str], cwd: Path | None = None) -> None:
     befehl = ["ffmpeg", "-y", "-loglevel", "error", *args]
     try:
         proc = subprocess.run(befehl, capture_output=True, text=True,
-                              timeout=600, cwd=str(cwd) if cwd else None,
+                              timeout=config.ops().video_timeout_seconds, cwd=str(cwd) if cwd else None,
                               check=False)
     except subprocess.TimeoutExpired:
         raise VideoUnavailable("ffmpeg hat zu lange gebraucht.") from None

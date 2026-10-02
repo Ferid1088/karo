@@ -75,7 +75,7 @@ def sprechen(text: str, ziel: Path, stimme: str | None = None) -> Path:
     try:
         proc = subprocess.run(
             [binary, "--model", str(modell), "--output_file", str(ziel)],
-            input=text, text=True, capture_output=True, timeout=180, check=False)
+            input=text, text=True, capture_output=True, timeout=config.ops().tts_timeout_seconds, check=False)
     except subprocess.TimeoutExpired:
         raise TtsUnavailable("Die Sprachausgabe hat zu lange gedauert.") from None
     except OSError as exc:

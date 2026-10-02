@@ -14,25 +14,26 @@ from __future__ import annotations
 import datetime as dt
 import sqlite3
 
-from .. import db
+from .. import config, db
 from . import bruecke, store, vorschlaege
 
 # --------------------------------------------------------------------------
 # Die Schwellen. Alle an einer Stelle.
 # --------------------------------------------------------------------------
 
-FENSTER_TAGE = 28           # Beobachtungsfenster der Zaehler
-SCHLECHTER_TAG_AB = 3       # 3x nichts an diesem Wochentag
-GUTER_TAG_AB = 3            # 3x abgeschlossen an diesem Wochentag
-GEMIEDEN_TAGE = 28          # 4 Wochen kein einziges Mal gewaehlt
-GEMIEDEN_MIN_STUNDEN = 3    # Kunst zu meiden ist kein Problem fuer eine App
-ZU_SCHWER_AB = 2            # 2x „zu schwer" -> kleinere Stufe wird Standard
-ABBRUCH_AB = 3              # 3x abgebrochen -> kuerzerer Block
-VERKLEINERN_MAX = 2         # Untergrenze: danach Strategiewechsel
-SCHWIERIG_TAGE_AB = 3       # 3 schwierige Tage -> die Woche auf eine Sache
-NULLZYKLEN_AB = 2           # 2 Zyklen ohne Ereignis -> fragen statt zusammenfassen
-KARTEN_SCHWELLE = 2         # 2x „gut" auf dasselbe Fach -> Karte anbieten
-SCHLAFGRENZE = 21           # ab 21 Uhr schlaegt die App nichts mehr vor
+_OPS = config.ops()
+FENSTER_TAGE = _OPS.woche_fenster_tage                # Beobachtungsfenster der Zaehler
+SCHLECHTER_TAG_AB = _OPS.woche_schlechter_tag_ab      # x nichts an diesem Wochentag
+GUTER_TAG_AB = _OPS.woche_guter_tag_ab                # x abgeschlossen an diesem Wochentag
+GEMIEDEN_TAGE = _OPS.woche_gemieden_tage              # so lange kein einziges Mal gewaehlt
+GEMIEDEN_MIN_STUNDEN = _OPS.woche_gemieden_min_stunden  # Kunst zu meiden ist kein Problem fuer eine App
+ZU_SCHWER_AB = _OPS.woche_zu_schwer_ab                # x „zu schwer" -> kleinere Stufe wird Standard
+ABBRUCH_AB = _OPS.woche_abbruch_ab                    # x abgebrochen -> kuerzerer Block
+VERKLEINERN_MAX = _OPS.woche_verkleinern_max          # Untergrenze: danach Strategiewechsel
+SCHWIERIG_TAGE_AB = _OPS.woche_schwierig_tage_ab      # so viele schwierige Tage -> die Woche auf eine Sache
+NULLZYKLEN_AB = _OPS.woche_nullzyklen_ab              # so viele Zyklen ohne Ereignis -> fragen statt zusammenfassen
+KARTEN_SCHWELLE = _OPS.woche_karten_schwelle          # x „gut" auf dasselbe Fach -> Karte anbieten
+SCHLAFGRENZE = _OPS.woche_schlafgrenze_stunde         # ab dieser Stunde schlaegt die App nichts mehr vor
 
 GRUND_LABELS = {
     "zu_schwer": "zu schwer",

@@ -33,7 +33,7 @@ from .welten import router as welten
 from .observability import logging as obs_logging
 from .observability.middleware import RequestObservability
 
-obs_logging.configure(os.environ.get("KARO_LOG_LEVEL", "INFO"))
+obs_logging.configure(config.ops().log_level)
 log = logging.getLogger("karo")
 
 BASE = Path(__file__).parent
@@ -145,15 +145,15 @@ def _eltern_darf_aendern(path: str) -> bool:
 
 
 #: Obergrenze für einen Request-Rumpf: groß genug für ein volles
-#: Material-Paket (material_paket.MAX_PAKET_BYTES = 100 MB) samt
-#: Formularrahmen, klein genug, dass ein Upload den Speicher nicht
-#: aushebelt — der Rumpf wird für die CSRF-Prüfung einmal gelesen.
-MAX_BODY_BYTES = 105 * 1024 * 1024
+#: Material-Paket (ops.paket_max_bytes) samt Formularrahmen, klein genug,
+#: dass ein Upload den Speicher nicht aushebelt — der Rumpf wird für die
+#: CSRF-Prüfung einmal gelesen.
+MAX_BODY_BYTES = config.ops().max_body_bytes
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    obs_logging.configure(os.environ.get("KARO_LOG_LEVEL", "INFO"))
+    obs_logging.configure(config.ops().log_level)
     if not security.selftest_redaction():
         raise RuntimeError("Schwärzung der Protokolle funktioniert nicht — Abbruch.")
     db.init()
@@ -339,9 +339,9 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=config.session_secret().hex(),
     session_cookie="karo_session",
-    max_age=60 * 60 * 24 * 14,
+    max_age=config.ops().session_max_age_seconds,
     same_site="strict",
-    https_only=os.environ.get("KARO_HTTPS_ONLY", "0") == "1",
+    https_only=config.ops().https_only,
 )
 class SecurityHeaders:
     """Baseline browser hardening.
@@ -368,10 +368,11 @@ class SecurityHeaders:
                 for key, value in defaults:
                     if key not in existing:
                         headers.append((key, value))
-                if (os.environ.get("KARO_HTTPS_ONLY", "0") == "1"
+                if (config.ops().https_only
                         and b"strict-transport-security" not in existing):
                     headers.append((b"strict-transport-security",
-                                    b"max-age=31536000; includeSubDomains"))
+                                    f"max-age={config.ops().hsts_seconds}; "
+                                    "includeSubDomains".encode()))
                 message["headers"] = headers
             await send(message)
         await self.app(scope, receive, secured)

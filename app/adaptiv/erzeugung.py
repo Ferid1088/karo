@@ -19,6 +19,7 @@ muss zwischen Frage und Antwort treten.
 
 from __future__ import annotations
 
+from .. import config
 from . import inhalt_store, schemas, store
 from .normalisierung import normalisiere
 
@@ -29,12 +30,12 @@ QUELLE = "erzeugt"
 #: zwei bis vier Fehlvorstellungen mit je fünf Aufgaben, dazu Hilfe für
 #: sechs Phasen und die FAQ. Mit der üblichen Vorgabe bricht die Antwort
 #: mittendrin ab, und die Prüfung verwirft sie als unvollständig.
-MAX_TOKENS = 32000
+MAX_TOKENS = config.ops().llm_lektion_max_tokens
 
 #: Entsprechend länger darf der Aufruf dauern. Gemessen auf der
 #: Testinstallation: 240 bis 300 Sekunden — genau an der üblichen Grenze,
 #: weshalb jeder zweite Versuch als Zeitüberschreitung endete.
-TIMEOUT_SEKUNDEN = 900
+TIMEOUT_SEKUNDEN = config.ops().llm_lektion_timeout_seconds
 
 #: Welche Rolle als Auswahl gestellt wird statt als Rechnung.
 _ALS_AUSWAHL = {"vorhersage", "transfer"}

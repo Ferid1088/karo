@@ -16,7 +16,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from .. import db
+from .. import config, db
 from ..security import redact
 from .base import (
     Backend,
@@ -75,7 +75,7 @@ class ClaudeClient:
     # -- Der eigentliche Aufruf --------------------------------------------
 
     def complete(self, purpose: str, prompt: str, schema: dict, *,
-                 system: str = "", max_tokens: int = 8192, model: str | None = None,
+                 system: str = "", max_tokens: int = config.ops().llm_default_max_tokens, model: str | None = None,
                  web_search: bool = False, web_fetch: bool = False,
                  audit_prompt: str | None = None) -> LlmResult:
         """Ein Modellaufruf mit erzwungener Antwortstruktur.

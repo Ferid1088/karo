@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 
+from . import config
 from .domain import ErrorType, Flag, Stufe
 
 ERROR_ENUM = [e.value for e in ErrorType]
@@ -393,7 +394,7 @@ LESSON_SCHEMA = {
 
 #: Harte Obergrenze fuer einen Gestaltungswunsch der Familie. Bequemlichkeit,
 #: nicht Verteidigung — siehe _wunsch_block().
-MAX_WUNSCH_LAENGE = 300
+MAX_WUNSCH_LAENGE = config.ops().prompt_wunsch_zeichen
 
 
 def _wunsch_block(wunsch: str | None) -> str:

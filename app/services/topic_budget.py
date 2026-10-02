@@ -20,15 +20,19 @@ from __future__ import annotations
 
 import os
 
-from .. import db
+from .. import config, db
 
 #: Neue Themen pro Tag. Fuenf, weil eine Klassenarbeit selten mehr als fuenf
-#: wirklich neue Themen bringt — der Rest ist meist schon da.
-STANDARD = 5
+#: wirklich neue Themen bringt — der Rest ist meist schon da. Quelle: Ops.
+STANDARD = config.Ops().family_daily_topics
 
 
 def grenze() -> int:
-    """0 heisst: keine Grenze."""
+    """0 heisst: keine Grenze. Override: KARO_FAMILY_DAILY_TOPICS.
+
+    Wird je Aufruf gelesen — das Budget ist eine Laufzeitbremse, kein
+    Startparameter. Kaputte Angaben aendern nichts am Standard.
+    """
     wert = os.environ.get("KARO_FAMILY_DAILY_TOPICS", "").strip()
     try:
         return max(0, int(wert)) if wert else STANDARD

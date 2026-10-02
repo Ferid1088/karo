@@ -17,18 +17,20 @@ import secrets
 import sys
 from urllib.parse import urlsplit
 
+from . import config
+
 # --- Uploads ---------------------------------------------------------------
 
 #: Einzige Quelle der Wahrheit fuer die Obergrenze eines Datei-Uploads —
 #: vorher als Literal `25 * 1024 * 1024` in admin.py, services/workflow.py
 #: und services/preparation.py dupliziert, und in main.py als eigene,
 #: nie referenzierte Konstante (change.txt Abschnitt 9/13).
-MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_UPLOAD_BYTES = config.ops().upload_max_bytes
 
 # --- Passwort ------------------------------------------------------------
 
 _ITERATIONS = 240_000
-MIN_PASSWORD_LENGTH = 8
+MIN_PASSWORD_LENGTH = config.ops().passwort_min_laenge
 
 
 def hash_password(password: str, salt: str | None = None) -> tuple[str, str]:

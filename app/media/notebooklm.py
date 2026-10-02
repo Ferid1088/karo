@@ -59,26 +59,27 @@ from .. import config
 log = logging.getLogger("karo.notebooklm")
 
 CLI = "notebooklm"
-LOGIN_BROWSER_TIMEOUT = 300     # Sekunden, die die CLI selbst auf die Anmeldung wartet
+_OPS = config.ops()
+LOGIN_BROWSER_TIMEOUT = _OPS.notebooklm_login_browser_timeout_seconds
 
-AUTH_CHECK_TIMEOUT = 30    # reine Lesepruefung der lokalen Sitzung
-SHORT_TIMEOUT = 90         # Notebook anlegen/loeschen, Quelle hochladen
-GENERATE_TIMEOUT = 2700    # 45 min — der CLI-Standard von 1800s reichte im
+AUTH_CHECK_TIMEOUT = _OPS.notebooklm_auth_check_timeout_seconds    # reine Lesepruefung der lokalen Sitzung
+SHORT_TIMEOUT = _OPS.notebooklm_short_timeout_seconds         # Notebook anlegen/loeschen, Quelle hochladen
+GENERATE_TIMEOUT = _OPS.notebooklm_generate_timeout_seconds    # 45 min — der CLI-Standard von 1800s reichte im
                            # Test nicht immer aus, bis NotebookLM fertig war
-DOWNLOAD_TIMEOUT = 300
-CANCEL_POLL_SECONDS = 5    # wie oft waehrend "generate" auf Abbruch geprueft wird
+DOWNLOAD_TIMEOUT = _OPS.notebooklm_download_timeout_seconds
+CANCEL_POLL_SECONDS = _OPS.notebooklm_cancel_poll_seconds    # wie oft waehrend "generate" auf Abbruch geprueft wird
 
-VERSUCHE = 3               # fuer kurze Schritte: anlegen, hochladen, holen, loeschen
-GENERATE_VERSUCHE = 2      # fuer "generate": jeder Versuch dauert bis zu 45 Minuten
-RETRY_BASIS_SEKUNDEN = 15  # Rueckzug zwischen Versuchen: 15s, 30s, 60s, ...
+VERSUCHE = _OPS.notebooklm_attempts               # fuer kurze Schritte: anlegen, hochladen, holen, loeschen
+GENERATE_VERSUCHE = _OPS.notebooklm_generate_attempts      # fuer "generate": jeder Versuch dauert bis zu 45 Minuten
+RETRY_BASIS_SEKUNDEN = _OPS.notebooklm_retry_base_seconds  # Rueckzug zwischen Versuchen: 15s, 30s, 60s, ...
 
 # --- Anmeldung im Browser, angezeigt auf der Einstellungsseite -------------
-VNC_DISPLAY_NR = 99
-VNC_DISPLAY = f":{VNC_DISPLAY_NR}"
-VNC_RFB_PORT = 5901
-NOVNC_PORT = 6080
-NOVNC_WEB_DIR = "/usr/share/novnc"
-VNC_BEREIT_TIMEOUT = 15    # Sekunden, die auf Xvfb/x11vnc/websockify gewartet wird
+VNC_DISPLAY = _OPS.notebooklm_vnc_display
+VNC_DISPLAY_NR = int(VNC_DISPLAY.lstrip(":"))
+VNC_RFB_PORT = _OPS.notebooklm_vnc_rfb_port
+NOVNC_PORT = _OPS.notebooklm_novnc_port
+NOVNC_WEB_DIR = _OPS.notebooklm_novnc_dir
+VNC_BEREIT_TIMEOUT = _OPS.notebooklm_vnc_ready_timeout_seconds    # Sekunden, die auf Xvfb/x11vnc/websockify gewartet wird
 
 
 class NotebookLmUnavailable(RuntimeError):
@@ -394,7 +395,7 @@ def _vnc_starten() -> bool:
 
     try:
         xvfb = subprocess.Popen(
-            ["Xvfb", VNC_DISPLAY, "-screen", "0", "1280x800x24", "-nolisten", "tcp"],
+            ["Xvfb", VNC_DISPLAY, "-screen", "0", _OPS.notebooklm_vnc_screen, "-nolisten", "tcp"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         _vnc_prozesse.append(xvfb)
 

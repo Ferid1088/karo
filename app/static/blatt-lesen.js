@@ -14,11 +14,13 @@
 
   const OCR = "/static/ocr/";
   const PDFJS = "/static/pdfjs/";
-  const SPRACHEN = "deu+eng";
-  const MAX_SEITEN = 20;
-  const MAX_KANTE = 2000;          // größer bringt nichts und dauert lang
-  const MIN_KONFIDENZ = 60;        // Wörter darunter sind geraten
-  const MIN_ZEICHEN = 40;          // weniger ist kein Blatt, sondern ein Versuch
+  // Grenzen kommen vom Server (config.ops()), Fallbacks nur für Seiten ohne Zone
+  const ZONE = document.querySelector("[data-paket-zone]");
+  const SPRACHEN = (ZONE && ZONE.getAttribute("data-ocr-sprachen")) || "deu+eng";
+  const MAX_SEITEN = parseInt(ZONE && ZONE.getAttribute("data-ocr-max-seiten"), 10) || 20;
+  const MAX_KANTE = parseInt(ZONE && ZONE.getAttribute("data-ocr-max-kante"), 10) || 2000;
+  const MIN_KONFIDENZ = parseInt(ZONE && ZONE.getAttribute("data-ocr-min-konfidenz"), 10) || 60;
+  const MIN_ZEICHEN = parseInt(ZONE && ZONE.getAttribute("data-min-zeichen"), 10) || 40;
 
   function el(name, klasse, text) {
     const k = document.createElement(name);

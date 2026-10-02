@@ -27,7 +27,8 @@ def verbindung():
     with _lock:
         ziel = pfad()
         ziel.parent.mkdir(parents=True, exist_ok=True)
-        c = sqlite3.connect(str(ziel), timeout=30)
+        c = sqlite3.connect(str(ziel),
+                            timeout=config.ops().db_connect_timeout_seconds)
         c.row_factory = sqlite3.Row
         try:
             c.execute("""CREATE TABLE IF NOT EXISTS material (

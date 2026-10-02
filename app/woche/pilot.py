@@ -1,10 +1,10 @@
 """Validation and deterministic rules. No learning data or model calls."""
 from datetime import date, datetime, timedelta
-from zoneinfo import ZoneInfo
-import os
 import re
 
-ZONE = ZoneInfo(os.environ.get('KARO_TIMEZONE') or os.environ.get('TZ') or 'Europe/Berlin')
+from .. import config
+
+ZONE = config.zeitzone()
 LIMITS = {'goal': 160, 'step': 240, 'routine': 160, 'promise': 240, 'message': 240, 'reply': 240}
 DAYS = {'1': 'Montag', '2': 'Dienstag', '3': 'Mittwoch', '4': 'Donnerstag', '5': 'Freitag', '6': 'Samstag', '7': 'Sonntag'}
 HELP = {'erklaeren': 'Erklären', 'zusammen': 'Zusammen anfangen', 'sprechen': 'Kurz sprechen'}

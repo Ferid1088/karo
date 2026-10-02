@@ -11,11 +11,9 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from zoneinfo import ZoneInfo
-
 from .. import config
 
-BERLIN = ZoneInfo("Europe/Berlin")
+BERLIN = config.zeitzone()
 _local = threading.local()
 
 
@@ -45,7 +43,7 @@ def _connect() -> sqlite3.Connection:
     path = db_path()
     conn_ = sqlite3.connect(
         str(path),
-        timeout=30.0,
+        timeout=config.ops().db_connect_timeout_seconds,
         isolation_level=None,
         check_same_thread=False,
     )
@@ -53,7 +51,7 @@ def _connect() -> sqlite3.Connection:
     conn_.execute("PRAGMA journal_mode=WAL")
     conn_.execute("PRAGMA foreign_keys=ON")
     conn_.execute("PRAGMA recursive_triggers=ON")
-    conn_.execute("PRAGMA busy_timeout=30000")
+    conn_.execute(f"PRAGMA busy_timeout={config.ops().db_busy_timeout_ms}")
     conn_.execute("PRAGMA synchronous=FULL")
     try:
         os.chmod(path, 0o600)

@@ -133,6 +133,7 @@ def render(request: Request, name: str, status_code: int = 200,
         "lernzeit_messen": (request.session.get("role") == "child"
                             and request.url.path.startswith(("/lernen", "/lernzyklus", "/quiz"))),
         "lernzeit_takt": learning_time.TAKT,
+        "wunsch_max_zeichen": config.ops().formular_wunsch_zeichen,
         "faecher": [(key, _faecher.NAMEN[key]) for key in _faecher.FAECHER],
         "aktives_fach": aktives_fach(request),
     }

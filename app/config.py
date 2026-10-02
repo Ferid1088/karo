@@ -16,8 +16,10 @@ import json
 import os
 import secrets
 import tempfile
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, field, fields, replace
+from functools import cache
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 DATA_DIR = Path(os.environ.get("KARO_DATA_DIR", "/data"))
 DRIVE_DIR = Path(os.environ.get("KARO_DRIVE_DIR", "/drive"))
@@ -97,6 +99,9 @@ class Config:
     drive_subdir: str = ""
     material_db_path: str = ""  # leer: DATA_DIR / lernmaterialien.sqlite3
     header_crop_percent: int = 8
+    #: IANA-Zeitzone für alle Tagesgrenzen („Heute", Streaks, Fristen).
+    #: KARO_TIMEZONE bzw. TZ schlagen diesen Wert (siehe zeitzone()).
+    timezone: str = "Europe/Berlin"
 
     # --- Regel für die Flaggen --------------------------------------------
     rule_gruen_richtige: int = 3
@@ -329,3 +334,344 @@ def profile_dir() -> Path:
 def drive_root() -> Path:
     sub = load_safe().drive_subdir
     return DRIVE_DIR / sub if sub else DRIVE_DIR
+
+
+# --------------------------------------------------------------------------
+# Ops — Betriebsparameter
+# --------------------------------------------------------------------------
+#
+# Alles, was Betreiber, Deployment, Providerwahl, Kosten, Limits oder bewusstes
+# Produktverhalten ändern können sollen, ohne /data/config.json der Familie
+# anzufassen. Ein einziger Ort: jeder Wert hat hier genau einen Default und
+# einen Environment-Override `KARO_<FELDNAME>` (Großschreibung). Zeiten sind
+# Sekunden, Grössen Bytes. Ungültige Werte sind ein Startfehler, kein stiller
+# Fallback — siehe ops().
+
+
+class OpsInvalid(RuntimeError):
+    """Ein KARO_*-Override ist ungültig — die App soll nicht halb starten."""
+
+
+@dataclass(frozen=True)
+class Ops:
+    # --- HTTP / Sitzung -----------------------------------------------------
+    #: Grösster Request-Body. Muss über paket_max_bytes + Overhead liegen,
+    #: sonst erreicht ein legales Paket den Server nie (Validierung in ops()).
+    max_body_bytes: int = 105 * 1024 * 1024
+    #: Lebensdauer der Sitzungs-Cookies.
+    session_max_age_seconds: int = 14 * 24 * 60 * 60
+    #: Strict-Transport-Security, nur wenn https_only gesetzt ist.
+    hsts_seconds: int = 31_536_000
+    https_only: bool = False                  # KARO_HTTPS_ONLY=1
+    log_level: str = "INFO"                   # KARO_LOG_LEVEL
+    environment: str = "prod"                 # KARO_ENV
+
+    # --- Datenbank ----------------------------------------------------------
+    db_connect_timeout_seconds: float = 30.0
+    db_busy_timeout_ms: int = 30_000
+
+    # --- Hintergrund-Jobs ----------------------------------------------------
+    jobs_max_attempts: int = 3
+    jobs_poll_seconds: float = 3.0
+    #: Wartezeiten vor dem 2. und 3. Versuch (Env: kommagetrennt, "60,300").
+    jobs_retry_delays: tuple = (60, 300)
+    #: Deferred-Jobs klemmen ihre Wartezeit in diesen Rahmen.
+    jobs_defer_min_seconds: int = 5
+    jobs_defer_max_seconds: int = 300
+    jobs_stop_timeout_seconds: float = 10.0
+
+    # --- Uploads -------------------------------------------------------------
+    #: Einzel-Upload-Limit ausserhalb des Paketwegs (Lernmaterial, Profilbild).
+    upload_max_bytes: int = 25 * 1024 * 1024
+    passwort_min_laenge: int = 8
+
+    # --- Material-Paket (Multi-Page-Upload) ----------------------------------
+    paket_max_seiten: int = 10
+    #: Weniger Zeichen OCR-/Textebenen-Ergebnis gilt nicht als gelesene Seite
+    #: (Paket-Vorschau, Server-OCR, Browser-JS).
+    seite_min_zeichen: int = 40
+    paket_max_bild_bytes: int = 15 * 1024 * 1024
+    paket_max_pdf_bytes: int = 50 * 1024 * 1024
+    paket_max_bytes: int = 100 * 1024 * 1024
+    #: Formular-/Multipart-Overhead, den der Router auf das Paketlimit legt.
+    paket_overhead_bytes: int = 2 * 1024 * 1024
+    paket_max_text_zeichen: int = 20_000
+    paket_max_themen: int = 20
+
+    # --- Dokument-Eingang (Drive-Inbox) --------------------------------------
+    ingest_max_source_bytes: int = 60 * 1024 * 1024
+    ingest_max_pdf_pages: int = 300
+    ingest_max_edge: int = 1_800
+    ingest_target_bytes: int = 4_400_000
+    ingest_min_quality: int = 45
+    ingest_max_image_pixels: int = 40_000_000
+
+    #: Obergrenze für Config.header_crop_percent — mehr würde Inhalt abschneiden.
+    kopfzeile_max_prozent: int = 25
+    #: Abschnitte pro eingelesenem Blatt — länger schneidet niemand sinnvoll klein.
+    blatt_max_abschnitte: int = 60
+    #: Zeichendeckel pro Abschnitt.
+    blatt_max_zeichen: int = 6_000
+
+    # --- OCR (Tesseract, Server-Fallback) ------------------------------------
+    ocr_timeout_seconds: int = 120
+    ocr_sprachen: str = "deu+eng"
+    #: Server-OCR zerlegt höchstens so viele PDF-Seiten.
+    ocr_max_pdf_seiten: int = 20
+    #: Browser-PDF-Render: höchstens so viele Seiten pro Dokument.
+    browser_ocr_max_seiten: int = 20
+    #: Browser-PDF-Render: Zielkante in Pixel — grösser bringt nichts.
+    browser_ocr_max_kante: int = 2_000
+    #: Browser-OCR: Konfidenz, unter der ein Wort als geraten gilt (0-100).
+    browser_ocr_min_konfidenz: int = 60
+
+    # --- LLM ------------------------------------------------------------------
+    llm_api_timeout_seconds: float = 180.0
+    llm_api_max_retries: int = 3
+    llm_api_models_limit: int = 50
+    llm_default_max_tokens: int = 8_192
+    #: Nur „antwortet das Modell?" beim Verbinden — absichtlich winzig.
+    llm_api_verify_tokens: int = 8
+    llm_cli_binary: str = "claude"
+    llm_cli_timeout_seconds: int = 300
+    llm_cli_verify_timeout_seconds: int = 90
+    llm_cli_verify_tokens: int = 256
+    #: Ad-hoc-Fachprüfung beim Themeneinlesen.
+    llm_fach_timeout_seconds: int = 20
+    llm_fach_max_tokens: int = 64
+    #: Lektions-Erzeugung ist der längste und teuerste Aufruf im System.
+    llm_lektion_max_tokens: int = 32_000
+    llm_lektion_timeout_seconds: int = 900
+
+    # --- Curriculum-Dienst -----------------------------------------------------
+    curriculum_request_timeout_seconds: int = 8
+    curriculum_max_wait_seconds: int = 24 * 60 * 60
+    curriculum_max_response_bytes: int = 2_000_000
+    #: Warten auf einen Export (Polling-Abstand) bzw. generischer Fehlerrückzug.
+    curriculum_poll_seconds: int = 300
+    curriculum_error_retry_seconds: int = 15
+
+    # --- NotebookLM -----------------------------------------------------------
+    notebooklm_login_browser_timeout_seconds: int = 300
+    notebooklm_auth_check_timeout_seconds: int = 30
+    notebooklm_short_timeout_seconds: int = 90
+    notebooklm_generate_timeout_seconds: int = 2_700
+    notebooklm_download_timeout_seconds: int = 300
+    notebooklm_cancel_poll_seconds: int = 5
+    notebooklm_attempts: int = 3
+    notebooklm_generate_attempts: int = 2
+    notebooklm_retry_base_seconds: int = 15
+    notebooklm_vnc_rfb_port: int = 5_901
+    notebooklm_novnc_port: int = 6_080
+    notebooklm_vnc_display: str = ":99"
+    notebooklm_vnc_ready_timeout_seconds: int = 15
+    notebooklm_vnc_screen: str = "1280x800x24"
+    notebooklm_novnc_dir: str = "/usr/share/novnc"
+
+    # --- Medien-Erzeugung -------------------------------------------------------
+    tts_timeout_seconds: int = 180
+    video_timeout_seconds: int = 600
+    profil_bild_pixel: int = 512
+    #: Cache-Dauer des Profilbilds im Browser (Cache-Control max-age).
+    profil_bild_cache_seconds: int = 86_400
+
+    # --- Verbindungsstatus ------------------------------------------------------
+    #: Die Modellliste darf so alt sein, bevor sie neu geholt wird.
+    connections_cache_ttl_seconds: float = 100.0
+
+    # --- Lernzeit-Messung ---------------------------------------------------------
+    lernzeit_takt_seconds: int = 30
+    lernzeit_anschluss_seconds: int = 90
+    lernzeit_pause_seconds: int = 300
+    lernzeit_gutschrift_seconds: int = 60
+    lernzeit_tagesdeckel_seconds: int = 8 * 3_600
+
+    # --- Adaptives Lernen (Produktverhalten, nicht Familien-Setup) -----------------
+    #: Geschätzte Basisdauer einer Antwort je Interaktionsart.
+    adaptiv_grundzeit_auswahl_seconds: int = 25
+    adaptiv_grundzeit_bruch_seconds: int = 60
+    adaptiv_grundzeit_text_seconds: int = 90
+    #: Die Schätzung darf um diesen Faktor über/unter der Basis liegen.
+    adaptiv_zeit_spanne_min: float = 0.6
+    adaptiv_zeit_spanne_max: float = 1.8
+    #: Wählbare Abstände (Tage) für eine Wiederholung.
+    wiederholung_abstaende: tuple = (2, 3, 4, 5)
+    voraussetzung_aufgaben: int = 2
+    #: Gültigkeit des signierten Prüfhinweises im Voraussetzung-Umweg.
+    hinweis_max_age_seconds: int = 1_800
+    #: „Heute" gilt als gut gelaufen, wenn die Serie so viele Tage reicht.
+    erfolg_tage: int = 14
+    #: Neue Themen pro Tag im Familienkonto (KARO_FAMILY_DAILY_TOPICS).
+    family_daily_topics: int = 5
+
+    # --- Meine Woche (Verhaltensregeln) -------------------------------------------
+    woche_fenster_tage: int = 28
+    woche_gemieden_tage: int = 28
+    woche_gemieden_min_stunden: int = 3
+    #: Ab dieser Stunde schlägt die App nichts mehr vor.
+    woche_schlafgrenze_stunde: int = 21
+    #: Zähler-Schwellen der Wochenregeln (woche/regeln.py).
+    woche_schlechter_tag_ab: int = 3
+    woche_guter_tag_ab: int = 3
+    woche_zu_schwer_ab: int = 2
+    woche_abbruch_ab: int = 3
+    woche_verkleinern_max: int = 2
+    woche_schwierig_tage_ab: int = 3
+    woche_nullzyklen_ab: int = 2
+    woche_karten_schwelle: int = 2
+
+    # --- Meine Welt ----------------------------------------------------------------
+    welt_foto_source_bytes: int = 12 * 1024 * 1024
+    welt_audio_bytes: int = 2_000_000
+    welt_max_image_pixels: int = 25_000_000
+    welt_max_image_edge: int = 1_800
+    welt_thumb_edge: int = 360
+    #: Tägliches Foto-Kontingent in „Meine Welt".
+    welt_fotos_tag: int = 2
+    #: Tägliches Hör-Kontingent für private Sprachclips.
+    welt_audio_sekunden_tag: int = 60
+    #: Zeitkapseln dürfen höchstens so weit in der Zukunft liegen.
+    welt_kapsel_max_tage: int = 366 * 5
+
+    # --- Suche und Eingabekappen -------------------------------------------------------
+    #: Treffer der Themen-Volltextsuche.
+    kb_suche_treffer: int = 12
+    #: Lehrmaterial-Treffer pro Thema.
+    kb_lehrmaterial_treffer: int = 10
+    #: Treffer, aus denen die automatische Themen-Zuordnung wählt.
+    themen_zuordnung_treffer: int = 30
+    #: Ähnlichkeitsschwelle, ab der ein Thema als Dublette gilt.
+    themen_duplikat_schwelle: float = 0.88
+    #: Maximale Zeichen pro Antwort in einem Quiz-Entwurf.
+    entwurf_antwort_zeichen: int = 2_000
+    #: Maximale Zeichen pro Antwort in einer Klassenarbeit-Probe.
+    probe_antwort_zeichen: int = 1_000
+
+    # --- Recherche -------------------------------------------------------------------
+    recherche_max_treffer: int = 8
+    recherche_max_inhalt_zeichen: int = 6_000
+
+    # --- Familien-Post / Formular-Deckel ----------------------------------------------
+    post_max_text_zeichen: int = 200
+    post_max_feier_zeichen: int = 60
+    #: Eingabefeld „Lernwunsch" (gespeicherter Wert) vs. Anteil im Prompt.
+    formular_wunsch_zeichen: int = 500
+    prompt_wunsch_zeichen: int = 300
+
+
+#: Historische Env-Namen, die nicht dem KARO_<FELD>-Schema folgen.
+_OPS_ENV_ALIASES = {
+    "log_level": "KARO_LOG_LEVEL",
+    "environment": "KARO_ENV",
+    "https_only": "KARO_HTTPS_ONLY",
+    "family_daily_topics": "KARO_FAMILY_DAILY_TOPICS",
+}
+
+
+def _ops_env_name(field_name: str) -> str:
+    return _OPS_ENV_ALIASES.get(field_name, f"KARO_{field_name.upper()}")
+
+
+def _ops_parse(field_name: str, raw: str):
+    """String aus der Umgebung in den Feldtyp wandeln. Wirft OpsInvalid."""
+    default = Ops.__dataclass_fields__[field_name].default
+    try:
+        if isinstance(default, bool):
+            if raw.strip() in ("1", "true", "ja"):
+                return True
+            if raw.strip() in ("0", "false", "nein"):
+                return False
+            raise ValueError("erwarte 0/1")
+        if isinstance(default, int):
+            return int(raw)
+        if isinstance(default, float):
+            return float(raw)
+        if isinstance(default, tuple):
+            teile = [t.strip() for t in raw.split(",") if t.strip()]
+            if not teile or not all(t.lstrip("-").isdigit() for t in teile):
+                raise ValueError("erwarte kommagetrennte Ganzzahlen")
+            return tuple(int(t) for t in teile)
+        return raw
+    except ValueError as exc:
+        raise OpsInvalid(
+            f"{_ops_env_name(field_name)}={raw!r} ist ungültig: {exc}"
+        ) from None
+
+
+#: Felder, bei denen 0 eine eigene Bedeutung trägt (hier: „kein Limit").
+_OPS_ZERO_OK = {"family_daily_topics"}
+
+
+def _ops_validate(o: "Ops") -> None:
+    """Wertebereiche prüfen — Fehlkonfiguration heisst klare Fehlermeldung."""
+    probleme = []
+    for f in fields(Ops):
+        wert = getattr(o, f.name)
+        if isinstance(wert, bool):
+            continue
+        if isinstance(wert, (int, float)) and wert <= 0 \
+                and f.name not in _OPS_ZERO_OK:
+            probleme.append(f"{f.name} = {wert} — erwartet wird ein positiver Wert")
+        if isinstance(wert, str) and not wert.strip():
+            probleme.append(f"{f.name} darf nicht leer sein")
+        if isinstance(wert, tuple) and not wert:
+            probleme.append(f"{f.name} darf nicht leer sein")
+    if o.log_level not in ("DEBUG", "INFO", "WARNING", "ERROR"):
+        probleme.append(f"log_level {o.log_level!r} — DEBUG|INFO|WARNING|ERROR")
+    if not (1 <= o.notebooklm_vnc_rfb_port <= 65535):
+        probleme.append("notebooklm_vnc_rfb_port ausserhalb 1-65535")
+    if not (1 <= o.notebooklm_novnc_port <= 65535):
+        probleme.append("notebooklm_novnc_port ausserhalb 1-65535")
+    paket_plus_overhead = o.paket_max_bytes + o.paket_overhead_bytes
+    if o.max_body_bytes < paket_plus_overhead:
+        probleme.append(
+            f"max_body_bytes ({o.max_body_bytes}) < paket_max_bytes + Overhead "
+            f"({paket_plus_overhead}) — grösste Pakete kämen nie an")
+    if o.paket_max_pdf_bytes > o.paket_max_bytes:
+        probleme.append("paket_max_pdf_bytes > paket_max_bytes")
+    if o.paket_max_bild_bytes > o.paket_max_bytes:
+        probleme.append("paket_max_bild_bytes > paket_max_bytes")
+    if o.jobs_defer_min_seconds > o.jobs_defer_max_seconds:
+        probleme.append("jobs_defer_min_seconds > jobs_defer_max_seconds")
+    if o.adaptiv_zeit_spanne_min > o.adaptiv_zeit_spanne_max:
+        probleme.append("adaptiv_zeit_spanne_min > adaptiv_zeit_spanne_max")
+    if o.woche_schlafgrenze_stunde > 23:
+        probleme.append("woche_schlafgrenze_stunde > 23")
+    if probleme:
+        raise OpsInvalid(
+            "Betriebskonfiguration ungültig:\n  - " + "\n  - ".join(probleme))
+
+
+@cache
+def ops() -> Ops:
+    """Die Betriebsparameter — Defaults mit KARO_*-Overrides, einmal geprüft.
+
+    Wird beim App-Start aufgerufen (main) und von den Modulen, die ihre
+    Konstanten hierher legen. Env-Overrides greifen beim ersten Aufruf.
+    """
+    overrides = {}
+    for f in fields(Ops):
+        roh = os.environ.get(_ops_env_name(f.name))
+        if roh is not None and roh.strip() != "":
+            overrides[f.name] = _ops_parse(f.name, roh)
+    o = Ops(**overrides)
+    _ops_validate(o)
+    return o
+
+
+# --------------------------------------------------------------------------
+# Zeitzone — eine Quelle für alle Tagesgrenzen
+# --------------------------------------------------------------------------
+
+def zeitzone(cfg: "Config | None" = None) -> ZoneInfo:
+    """KARO_TIMEZONE > TZ > config.timezone > Europe/Berlin.
+
+    Früher las jede Stelle selbst: pilot.py nur die Umgebung, die Dienste
+    ein Config-Feld, das es gar nicht gab, world_db.py eine Konstante.
+    """
+    name = (os.environ.get("KARO_TIMEZONE") or os.environ.get("TZ")
+            or (cfg or load_safe()).timezone or "Europe/Berlin")
+    try:
+        return ZoneInfo(name)
+    except Exception:  # noqa: BLE001 - unbekannter Zonenname, nie crashen
+        return ZoneInfo("Europe/Berlin")

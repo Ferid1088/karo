@@ -116,8 +116,10 @@ def _modell(text: str, fach: str) -> str | None:
         return None
     try:
         from .llm.client import ClaudeClient
-        antwort = ClaudeClient.from_config(cfg, 20).complete(
-            purpose="fach_pruefen", max_tokens=64, schema=FACH_SCHEMA,
+        antwort = ClaudeClient.from_config(
+            cfg, config.ops().llm_fach_timeout_seconds).complete(
+            purpose="fach_pruefen",
+            max_tokens=config.ops().llm_fach_max_tokens, schema=FACH_SCHEMA,
             prompt=("Zu welchem Schulfach gehört dieses Lernthema eines Schulkinds? "
                     "Antworte mit deutsch, mathematik, englisch oder andere.\n"
                     f"Aktives Fach: {NAMEN[fach]}\n"

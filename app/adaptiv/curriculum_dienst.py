@@ -19,13 +19,14 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 import karo_contract
 from karo_contract import VertragVerletzt
 
-from .. import jobs, pii, prompts
+from .. import config, jobs, pii, prompts
 from ..observability import context
 from . import komponenten, schemas, store
 
 FORMAT_ID = karo_contract.FORMAT_ID
-MAX_WAIT_SECONDS = 24 * 60 * 60
-MAX_RESPONSE_BYTES = 2_000_000
+_OPS = config.ops()
+MAX_WAIT_SECONDS = _OPS.curriculum_max_wait_seconds
+MAX_RESPONSE_BYTES = _OPS.curriculum_max_response_bytes
 
 log = logging.getLogger("karo.curriculum")
 
@@ -167,7 +168,7 @@ def request(cfg, method: str, path: str, body: dict | None = None) -> dict:
     gestartet = time.monotonic()
     status_code: int | None = None
     try:
-        with build_opener(_NoRedirect()).open(req, timeout=8) as response:
+        with build_opener(_NoRedirect()).open(req, timeout=_OPS.curriculum_request_timeout_seconds) as response:
             status_code = getattr(response, "status", None)
             raw = response.read(MAX_RESPONSE_BYTES + 1)
         if len(raw) > MAX_RESPONSE_BYTES:
@@ -285,7 +286,7 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
     passt, grund = vertrag_passt(cfg)
     if not passt:
         betrieb_melden(grund)
-        raise jobs.Deferred(payload, 300)
+        raise jobs.Deferred(payload, _OPS.curriculum_poll_seconds)
     safe_topic = pii.scrub(thema, cfg.learner_name)
     if payload.get("curriculum_export"):
         result = request(cfg, "GET", f"/v1/lessons/{int(payload['curriculum_export'])}")
@@ -297,7 +298,7 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
         schluessel = f"{fach}:{grade}:{safe_topic}"
         if not topic_budget.buchen(schluessel):
             payload["budget_wartet"] = True
-            raise jobs.Deferred(payload, 300)
+            raise jobs.Deferred(payload, _OPS.curriculum_poll_seconds)
         payload["budget_schluessel"] = schluessel
         payload.pop("budget_wartet", None)
         anfrage = {
@@ -331,7 +332,8 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
                 "Karos Prüfung hat das gelieferte Material abgelehnt.")
         payload.pop("curriculum_export", None)
         raise jobs.Deferred(payload, result.get("retry_after")
-                            if type(result.get("retry_after")) is int else 60)
+                            if type(result.get("retry_after")) is int
+                            else _OPS.curriculum_error_retry_seconds)
     eid = _export_id(result)
     payload["curriculum_export"] = eid
     if status == "pending":
@@ -346,8 +348,8 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
         # eine Familie: alle 15 Sekunden nachsehen, bis morgen frueh.
         if isinstance(result.get("paused_until"), str):
             payload["curriculum_pausiert_bis"] = result["paused_until"][:19]
-        delay = result.get("retry_after", 15)
-        raise jobs.Deferred(payload, delay if type(delay) is int else 15)
+        delay = result.get("retry_after", _OPS.curriculum_error_retry_seconds)
+        raise jobs.Deferred(payload, delay if type(delay) is int else _OPS.curriculum_error_retry_seconds)
     if status != "ready":
         raise jobs.PermanentFailure("Unbekannter Curriculum-Auftragsstatus.")
     try:
@@ -361,7 +363,7 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
         betrieb_melden(f"Der Lehrplan-Dienst liefert eine Antwort, die nicht zum Vertrag passt: {verstoss}")
         request(cfg, "POST", f"/v1/lessons/{eid}/reject",
                 {"reason": f"Vertrag {CONTRACT_VERSION}: {verstoss}", "reason_code": "contract"})
-        raise jobs.Deferred(payload, 300) from None
+        raise jobs.Deferred(payload, _OPS.curriculum_poll_seconds) from None
     except (schemas.InhaltUngueltig, ValueError, TypeError, KeyError):
         # Stable, non-sensitive reason; no child text or model payload in logs.
         if payload.get("curriculum_rejections", 0) >= 2:

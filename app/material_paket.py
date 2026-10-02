@@ -33,18 +33,19 @@ log = logging.getLogger("karo.material")
 
 #: Ein Paket ist ein Blatt-Stapel, kein Ordner — mehr als zehn Seiten tippt
 #: niemand mehr nach, und länger macht das Einlesen nur träge.
-MAX_SEITEN = 10
+_OPS = config.ops()
+MAX_SEITEN = _OPS.paket_max_seiten
 #: Darunter ist ein Ergebnis kein Blatt, sondern Rauschen — dieselbe Grenze
 #: wie in `static/blatt-lesen.js` und `blatt_text.server_lesen`.
-MIN_ZEICHEN = 40
+MIN_ZEICHEN = _OPS.seite_min_zeichen
 #: Getrennte Größengrenzen: ein Handyfoto ist selten über 15 MB, ein
 #: gescanntes Skript kann größer sein, und das Paket insgesamt bleibt
 #: unterhalb des Speicherfensters, das ein Upload belegen darf.
-MAX_BILD_BYTES = 15 * 1024 * 1024
-MAX_PDF_BYTES = 50 * 1024 * 1024
-MAX_PAKET_BYTES = 100 * 1024 * 1024
-MAX_TEXT_ZEICHEN = 20000
-MAX_THEMEN = 20
+MAX_BILD_BYTES = _OPS.paket_max_bild_bytes
+MAX_PDF_BYTES = _OPS.paket_max_pdf_bytes
+MAX_PAKET_BYTES = _OPS.paket_max_bytes
+MAX_TEXT_ZEICHEN = _OPS.paket_max_text_zeichen
+MAX_THEMEN = _OPS.paket_max_themen
 
 #: Bilder — auch die Kamera des Handys (HEIC). Kein PDF: die Seiten eines
 #: PDFs zerlegt der Browser vor dem Hochladen, hier kommt keine PDF-Datei an.
