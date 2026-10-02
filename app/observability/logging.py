@@ -48,6 +48,9 @@ class JsonFormatter(security.RedactingFormatter):
         rid = context.aktuell()
         if rid:
             eintrag["request_id"] = rid
+        jid = context.job_id.get()
+        if jid:
+            eintrag["job_id"] = jid
         fach = record.__dict__.get("fach")
         if isinstance(fach, dict):
             eintrag.update(fach)

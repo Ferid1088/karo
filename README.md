@@ -241,6 +241,38 @@ eingeben*.
 
 ---
 
+## Protokolle und Fehlersuche
+
+Karo schreibt eine JSON-Zeile pro Eintrag nach stdout, Docker sammelt sie
+(`docker logs karo`). Jede Zeile trägt Zeitstempel, Level, `git_sha` und —
+während einer Anfrage — eine `request_id`; Hintergrundarbeit trägt eine
+`job_id`. Ein Aufruf des Lehrplan-Dienstes geht mit derselben Kennung raus
+(`X-Request-Id`, bei Jobs `job-<id>`), sodass sich ein Vorgang über beide
+Dienste verfolgen lässt: `docker logs curriculum-api | grep request_id=…`.
+
+Die technischen Zeilen sind bewusst vergänglich — Docker rotiert bei
+3 × 20 MB. Was dauerhaft bleiben muss, liegt nicht im Log, sondern in der
+Datenbank:
+
+- **Lernablauf** — `lern_ereignis` (jeder Übergang mit Anlass und
+  Begründungsdaten, z. B. `erfolge`/`schwelle` am Mastery-Gate) und
+  `lern_antwort` (Antwort, Phase, aktive Sekunden). Für eine Sitzung:
+  `SELECT * FROM lern_ereignis WHERE sitzung_id = ?`.
+- **Betriebsstörungen** — `betriebsmeldung` (dedupliziert nach Bereich und
+  Text, mit erstem/letztem Auftreten und Zähler): Lehrplan-Dienst-Fehler,
+  ungefangene Serverfehler (`bereich='http-500'`, nur Weg und Fehlertyp —
+  die Meldung selbst könnte Inhalte enthalten und bleibt im rotierenden
+  Log).
+- **Hintergrundjobs** — `job`-Tabelle: Typ, Payload, Versuche,
+  `last_error`, Zeitstempel. Ein späterer Fehler ist über die `job_id` in
+  den Logzeilen und über die Zeile selbst rekonstruierbar.
+
+Fehlersuche damit: `request_id` aus den Logs (`grep '"request_id": "…"'`)
+→ dazugehörige `lern_sitzung_id` in `lern_ereignis`, Job-Ausfall in
+`job`/`betriebsmeldung`.
+
+---
+
 ## Drei Ausgabeformen für das Lernmaterial
 
 Im Bereich **Klassenarbeit → Lernplan** lässt sich neues Material

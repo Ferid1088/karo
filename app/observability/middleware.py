@@ -60,6 +60,7 @@ class RequestObservability:
         except Exception as exc:
             self._logge(log.error, "request_failed", pfad, methode,
                         status[0], start, exc=exc)
+            self._festhalten(methode, pfad, exc)
             if begonnen[0]:
                 raise      # Antwort laeuft schon — nur noch melden
             try:
@@ -76,6 +77,18 @@ class RequestObservability:
                             status[0], start)
         finally:
             context.ende(token)
+
+    @staticmethod
+    def _festhalten(methode: str, pfad: str, exc: Exception) -> None:
+        """Ungefangene 500er ueberleben die Logrotation: betriebsmeldung
+        dedupliziert nach Weg und Fehlertyp. Bewusst nur der Typ — die
+        Fehlermeldung koennte Inhalte des Kindes enthalten."""
+        try:
+            from ..adaptiv.curriculum_dienst import betrieb_melden
+            betrieb_melden(f"{methode} {pfad}: {type(exc).__name__}",
+                           bereich="http-500")
+        except Exception:
+            pass
 
     @staticmethod
     def _logge(schreiber, event, pfad, methode, status, start, exc=None):

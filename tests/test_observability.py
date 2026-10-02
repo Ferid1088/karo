@@ -197,6 +197,15 @@ def test_ausnahme_wird_einmal_mit_kontext_geloggt(client, app_env):
     assert e.exc_info and e.exc_info[0] is RuntimeError
     # Die 500-Antwort traegt die request_id der fehlgeschlagenen Anfrage.
     assert r.headers.get("x-request-id")
+    # …und der Ausfall ueberlebt die Logrotation als Betriebsmeldung.
+    row = app_env.db.q1(
+        "SELECT bereich, text FROM betriebsmeldung WHERE bereich='http-500'")
+    assert row["text"] == "GET /setup/kaputt: RuntimeError"
+    # Zweiter identischer Fehler: gleiche Zeile, Zaehler hoch — kein Spam.
+    client.get("/setup/kaputt")
+    assert app_env.db.q1(
+        "SELECT anzahl FROM betriebsmeldung WHERE bereich='http-500'"
+    )["anzahl"] == 2
 
 
 def test_contextvariable_ist_nach_der_anfrage_wieder_leer(client):
@@ -204,6 +213,128 @@ def test_contextvariable_ist_nach_der_anfrage_wieder_leer(client):
 
     client.get("/health")
     assert context.aktuell() == ""
+
+
+# --------------------------------------------------------------------------
+# Korrelation über die Dienst-Grenze: X-Request-Id Richtung curriculum-api
+# --------------------------------------------------------------------------
+
+def _dienstaufruf(app_env, monkeypatch):
+    """Ruft `request` mit einem gefaelschten Opener; gibt den gesendeten
+    Request zurueck, damit der Test seine Header lesen kann."""
+    import io
+    from app.adaptiv import curriculum_dienst as bridge
+
+    app_env.config.update(curriculum_url="http://127.0.0.1:8088",
+                          curriculum_key="kc_" + "x" * 32)
+    gesehen = {}
+
+    class Opener:
+        def open(self, req, **kwargs):
+            gesehen["req"] = req
+            return io.BytesIO(b'{"ok": true}')
+
+    monkeypatch.setattr(bridge, "build_opener", lambda *a: Opener())
+    bridge.request(app_env.config.load(), "GET", "/v1/meta")
+    return gesehen["req"]
+
+
+def test_dienstaufruf_traegt_die_laufende_request_id(client, app_env,
+                                                   monkeypatch):
+    from app.observability import context
+
+    token = context.beginne("karo-req-12345")
+    try:
+        req = _dienstaufruf(app_env, monkeypatch)
+    finally:
+        context.ende(token)
+
+    assert req.get_header("X-request-id") == "karo-req-12345"
+
+
+def test_dienstaufruf_im_job_traegt_job_kennung(client, app_env, monkeypatch):
+    """Hintergrundarbeit hat keine request_id — der Auftrag geht als
+    `job-<id>`, so dass der Dienst ihn unter derselben Kennung loggt."""
+    from app.observability import context
+
+    token = context.job_beginne(7)
+    try:
+        req = _dienstaufruf(app_env, monkeypatch)
+    finally:
+        context.job_ende(token)
+
+    assert req.get_header("X-request-id") == "job-000000007"
+
+
+def test_dienstaufruf_ohne_kontext_schickt_keine_id(client, app_env,
+                                                    monkeypatch):
+    req = _dienstaufruf(app_env, monkeypatch)
+    assert req.get_header("X-request-id") is None
+
+
+def test_job_kontext_endet_mit_dem_lauf(client, app_env):
+    from app.observability import context
+
+    token = context.job_beginne(9)
+    context.job_ende(token)
+    assert context.korrelation() == ""
+
+
+# --------------------------------------------------------------------------
+# Hintergrundjobs: eigene Identitaet in jeder Zeile, Fehler komplett
+# --------------------------------------------------------------------------
+
+def test_job_lauf_traegt_job_id_auf_jeder_zeile(client, app_env):
+    from app import jobs
+    from app.observability import context
+
+    gesehen = {}
+    jobs.HANDLERS["sonde_job"] = lambda payload: gesehen.update(
+        job_id=context.job_id.get(), korrelation=context.korrelation())
+    try:
+        jid = jobs.enqueue("sonde_job", {})
+        assert jid
+        status, _ = jobs.run_now(jid)
+    finally:
+        del jobs.HANDLERS["sonde_job"]
+
+    assert status == "done"
+    assert gesehen["job_id"] == jid
+    assert gesehen["korrelation"] == f"job-{jid:09d}"
+    # …und der Kontext ist nach dem Lauf wieder weg.
+    assert context.job_id.get() == 0
+
+
+def test_job_fehler_einmal_mit_traceback_und_id(client, app_env):
+    from app import jobs
+
+    def kaputt(payload):
+        raise RuntimeError("im Job")
+
+    eintraege = []
+    sammler = type("S", (logging.Handler,),
+                   {"emit": lambda self, r: eintraege.append(r)})()
+    logger = logging.getLogger("karo.jobs")
+    logger.addHandler(sammler)
+    jobs.HANDLERS["kaputt_job"] = kaputt
+    try:
+        jid = jobs.enqueue("kaputt_job", {})
+        status, _ = jobs.run_now(jid)
+    finally:
+        del jobs.HANDLERS["kaputt_job"]
+        logger.removeHandler(sammler)
+
+    assert status == "failed"
+    fehl = [e for e in eintraege
+            if getattr(e, "fach", {}).get("event") == "job_failed"]
+    assert len(fehl) == 1
+    assert fehl[0].fach["job_id"] == jid
+    assert fehl[0].fach["job_type"] == "kaputt_job"
+    assert fehl[0].exc_info and fehl[0].exc_info[0] is RuntimeError
+    # Der Fehler bleibt ausserdem dauerhaft in der job-Tabelle.
+    row = app_env.db.q1("SELECT state, last_error FROM job WHERE id=?", jid)
+    assert row["state"] == "wartend" or row["state"] == "fehler"
+    assert "im Job" in (row["last_error"] or "")
 
 
 # --------------------------------------------------------------------------

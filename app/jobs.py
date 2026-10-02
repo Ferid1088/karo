@@ -14,7 +14,6 @@ import datetime as dt
 import json
 import logging
 import threading
-import traceback
 from typing import Callable
 
 from . import db
@@ -153,18 +152,41 @@ def run_once() -> bool:
         return True
 
     try:
-        fn(payload)
+        _laufe(job["id"], fn, payload)
     except Deferred as deferred:
         _defer(job["id"], deferred)
     except PermanentFailure as exc:
         _fail_permanently(job["id"], str(exc))
     except Exception as exc:
-        log.warning("Job %s (%s) fehlgeschlagen: %s", job["id"], job["type"], exc)
-        log.debug("%s", traceback.format_exc())
+        _fehlerlog(job["id"], job["type"], job["attempts"] + 1, exc)
         _finish(job["id"], f"{type(exc).__name__}: {exc}"[:500])
     else:
         _finish(job["id"], None)
     return True
+
+
+def _laufe(job_id: int, fn, payload: dict):
+    """Handler unter der Job-Identitaet laufen lassen: jede Logzeile darin
+    traegt `job_id`, abgehende Dienst-Aufrufe `job-<id>` als Korrelation."""
+    from .observability import context
+    token = context.job_beginne(job_id)
+    try:
+        return fn(payload)
+    finally:
+        context.job_ende(token)
+
+
+def _fehlerlog(job_id: int, job_type: str, attempts: int, exc: Exception) -> None:
+    """Ein Eintrag, der in Produktion voll zaehlt: Typ, Versuch und der
+    komplette Traceback stehen in derselben Zeile — nicht auf DEBUG."""
+    try:
+        log.warning("Job %s (%s) fehlgeschlagen: %s", job_id, job_type, exc,
+                    exc_info=exc,
+                    extra={"fach": {"event": "job_failed", "job_id": job_id,
+                                    "job_type": job_type,
+                                    "attempts": attempts}})
+    except Exception:
+        pass
 
 
 def _loop() -> None:
@@ -256,7 +278,7 @@ def run_now(job_id: int) -> tuple[str, object]:
         return ("failed", None)
 
     try:
-        ergebnis = fn(payload)
+        ergebnis = _laufe(job_id, fn, payload)
     except Deferred as deferred:
         _defer(job_id, deferred)
         return ("pending", None)
@@ -264,8 +286,7 @@ def run_now(job_id: int) -> tuple[str, object]:
         _fail_permanently(job_id, str(exc))
         return ("failed", None)
     except Exception as exc:
-        log.warning("Job %s (%s) fehlgeschlagen: %s", job_id, job["type"], exc)
-        log.debug("%s", traceback.format_exc())
+        _fehlerlog(job_id, job["type"], job["attempts"] + 1, exc)
         _finish(job_id, f"{type(exc).__name__}: {exc}"[:500])
         return ("failed", None)
     _finish(job_id, None)

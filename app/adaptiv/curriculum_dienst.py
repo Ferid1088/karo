@@ -20,6 +20,7 @@ import karo_contract
 from karo_contract import VertragVerletzt
 
 from .. import jobs, pii, prompts
+from ..observability import context
 from . import komponenten, schemas, store
 
 FORMAT_ID = karo_contract.FORMAT_ID
@@ -43,11 +44,12 @@ def settings(cfg) -> tuple[str, str]:
 CONTRACT_VERSION = karo_contract.CONTRACT_VERSION
 
 
-def betrieb_melden(text: str) -> None:
+def betrieb_melden(text: str, bereich: str = "lehrplan-dienst") -> None:
     """Haelt eine Betriebsstoerung fest, die ein Mensch sehen muss.
 
     Ein zurueckgestellter Auftrag sieht von aussen aus wie ein langsamer —
     ohne diese Meldung wartet eine Familie auf etwas, das nie kommt.
+    Technische stdout-Logs rotieren weg; diese Tabelle bleibt.
     """
     from .. import db
     with db.tx() as c:
@@ -56,10 +58,10 @@ def betrieb_melden(text: str) -> None:
             zuerst_am TEXT NOT NULL, zuletzt_am TEXT NOT NULL, anzahl INTEGER NOT NULL DEFAULT 1,
             UNIQUE(bereich, text))""")
         c.execute("""INSERT INTO betriebsmeldung(bereich,text,zuerst_am,zuletzt_am)
-                     VALUES('lehrplan-dienst',?,?,?)
+                     VALUES(?,?,?,?)
                      ON CONFLICT(bereich,text) DO UPDATE
                        SET zuletzt_am=excluded.zuletzt_am, anzahl=anzahl+1""",
-                  (text, db.now(), db.now()))
+                  (bereich, text, db.now(), db.now()))
 
 
 def meta(cfg) -> dict:
@@ -154,9 +156,14 @@ def request(cfg, method: str, path: str, body: dict | None = None) -> dict:
             "localhost", "127.0.0.1", "::1", "curriculum-api"):
         raise jobs.PermanentFailure("Der externe Curriculum-Dienst benötigt HTTPS.")
     data = json.dumps(body, ensure_ascii=False).encode() if body is not None else None
-    req = Request(url + path, data=data, method=method, headers={
-        "Authorization": "Bearer " + key, "Content-Type": "application/json",
-        "Accept": "application/json"})
+    koepfe = {"Authorization": "Bearer " + key,
+              "Content-Type": "application/json", "Accept": "application/json"}
+    bezug = context.korrelation()
+    if bezug:
+        # Damit die Logzeilen des Dienstes zur selben Anfrage gehören:
+        # request_id der laufenden Anfrage oder `job-<id>` im Hintergrund.
+        koepfe["X-Request-Id"] = bezug
+    req = Request(url + path, data=data, method=method, headers=koepfe)
     gestartet = time.monotonic()
     status_code: int | None = None
     try:
@@ -200,6 +207,9 @@ def _request_log(method: str, path: str, gestartet: float,
         eintrag = {"event": "curriculum_request", "service": "curriculum-api",
                    "method": method, "path": path,
                    "duration_ms": round((time.monotonic() - gestartet) * 1000, 1)}
+        bezug = context.korrelation()
+        if bezug:
+            eintrag["correlation"] = bezug
         if status is not None:
             eintrag["status_code"] = status
         if fehler:
