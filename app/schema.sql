@@ -467,6 +467,7 @@ CREATE TABLE IF NOT EXISTS material_paket (
     -- analyse | bereit | uebernommen | fehler
     ergebnis    TEXT NOT NULL DEFAULT '{}',  -- JSON: fach, themen, gewaehlt
     fehler      TEXT,
+    original_bytes INTEGER NOT NULL DEFAULT 0,  -- Summe der hochgeladenen Dateien
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );

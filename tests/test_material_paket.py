@@ -169,14 +169,67 @@ def test_ausfuehrbare_datei_wird_abgewiesen(
     assert app_env.db.q("SELECT id FROM material_paket") == []
 
 
-def test_zu_grosse_datei_wird_abgewiesen(
+def test_zu_grosses_bild_wird_abgewiesen(
         client, fake_llm, fake_cli, app_env, monkeypatch):
     einrichten(client, fake_llm)
     from app import material_paket
-    monkeypatch.setattr(material_paket, "MAX_SEITE_BYTES", 100)
+    monkeypatch.setattr(material_paket, "MAX_BILD_BYTES", 100)
     r = _upload(client, [("blatt.jpg", _bild(), "image/jpeg")])
     assert r.status_code == 422
     assert "groß" in r.json()["fehler"]
+    assert app_env.db.q("SELECT id FROM material_paket") == []
+
+
+def test_zu_grosses_pdf_wird_abgewiesen(
+        client, fake_llm, fake_cli, app_env, monkeypatch):
+    einrichten(client, fake_llm)
+    from app import material_paket
+    vorher = len(app_env.db.q("SELECT id FROM document"))
+    monkeypatch.setattr(material_paket, "MAX_PDF_BYTES", 100)
+    r = _upload(client, [("heft.pdf", _pdf(2), "application/pdf")])
+    assert r.status_code == 422
+    assert "groß" in r.json()["fehler"]
+    assert app_env.db.q("SELECT id FROM material_paket") == []
+    assert len(app_env.db.q("SELECT id FROM document")) == vorher
+
+
+def test_paket_gesamtlimit_gilt(
+        client, fake_llm, fake_cli, app_env, monkeypatch):
+    """Das Paketlimit zählt alle Dateien zusammen — nicht jede für sich."""
+    einrichten(client, fake_llm)
+    from app import material_paket
+    vorher = len(app_env.db.q("SELECT id FROM document"))
+    monkeypatch.setattr(material_paket, "MAX_PAKET_BYTES",
+                        len(_bild()) + 10)
+    r = _upload(client, [("a.jpg", _bild(farbe=(240, 0, 0)), "image/jpeg"),
+                         ("b.jpg", _bild(farbe=(0, 240, 0)), "image/jpeg")])
+    assert r.status_code == 422
+    assert "groß" in r.json()["fehler"]
+    assert app_env.db.q("SELECT id FROM material_paket") == []
+    assert len(app_env.db.q("SELECT id FROM document")) == vorher
+
+
+def test_anhaengen_zaehlt_auf_das_paketlimit(
+        client, fake_llm, fake_cli, app_env, monkeypatch):
+    """Das Gesamtlimit gilt paketweit — Nachladen kann es überschreiten."""
+    einrichten(client, fake_llm)
+    from app import material_paket
+    r = _upload(client, [("a.jpg", _bild(), "image/jpeg")], metadaten=_meta())
+    paket_id = _paket_id(r)
+    vorher = len(app_env.db.q("SELECT id FROM document"))
+
+    paket = app_env.db.q1("SELECT original_bytes FROM material_paket "
+                          "WHERE id=?", paket_id)
+    monkeypatch.setattr(material_paket, "MAX_PAKET_BYTES",
+                        paket["original_bytes"] + 10)
+    seite = client.get(f"/lernen/material/{paket_id}")
+    r = client.post(f"/lernen/material/{paket_id}/seiten", data={
+        "_csrf": csrf_from(seite.text), "seiten": "[]"},
+        files=[("seite", ("b.jpg", _bild(farbe=(0, 240, 0)), "image/jpeg"))])
+    assert r.status_code == 422
+    assert "groß" in r.json()["fehler"]
+    assert len(_seiten(app_env, paket_id)) == 1
+    assert len(app_env.db.q("SELECT id FROM document")) == vorher
 
 
 def test_zu_viele_seiten_werden_abgewiesen(
@@ -188,6 +241,35 @@ def test_zu_viele_seiten_werden_abgewiesen(
     r = _upload(client, dateien)
     assert r.status_code == 422
     assert "Seiten" in r.json()["fehler"]
+
+
+def test_pdf_mit_zu_vielen_seiten_wird_vor_dem_einlesen_abgelehnt(
+        client, fake_llm, fake_cli, app_env):
+    """Ein langes PDF scheitert an der Seitenzahl, bevor eine Seite
+    gerendert oder gelesen wird — kein halbfertiges Paket, keine Waisen."""
+    einrichten(client, fake_llm)
+    from app import material_paket
+    vorher = len(app_env.db.q("SELECT id FROM document"))
+    r = _upload(client, [("heft.pdf", _pdf(material_paket.MAX_SEITEN + 1),
+                          "application/pdf")])
+    assert r.status_code == 422
+    assert "Seiten" in r.json()["fehler"]
+    assert app_env.db.q("SELECT id FROM material_paket") == []
+    assert len(app_env.db.q("SELECT id FROM document")) == vorher
+    assert app_env.db.q("SELECT id FROM job WHERE state='wartend'") == []
+
+
+def test_fehler_mitten_im_paket_raeumt_dokumente_weg(
+        client, fake_llm, fake_cli, app_env):
+    """Scheitert die zweite Datei, darf die erste nicht als verwaistes
+    Dokument zurückbleiben."""
+    einrichten(client, fake_llm)
+    vorher = len(app_env.db.q("SELECT id FROM document"))
+    r = _upload(client, [("ok.jpg", _bild(), "image/jpeg"),
+                         ("kaputt.jpg", b"gar kein bild", "image/jpeg")])
+    assert r.status_code == 422
+    assert app_env.db.q("SELECT id FROM material_paket") == []
+    assert len(app_env.db.q("SELECT id FROM document")) == vorher
 
 
 def test_pfad_im_dateinamen_kommt_nirgends_an(
@@ -442,15 +524,22 @@ def test_seitenbild_nur_ueber_das_eigene_paket(
     ).status_code == 404
 
 
+MARKER = "GEHEIMES_BLATT_4711_QSXZ"
+
+
+def _llm_aufruf(app_env, paket_index=-1):
+    return app_env.db.q(
+        "SELECT * FROM llm_call WHERE purpose='material_analyse' "
+        "ORDER BY id")[paket_index]
+
+
 def test_kein_ocr_inhalt_in_den_logs(client, fake_llm, fake_cli, app_env,
                                      caplog):
-    """Das Protokoll zählt Seiten und IDs — nie Blattinhalte. Und der Name
-    des Kindes kommt nicht einmal im geschrubben Modell-Audit an."""
-    geheim = "Einmalmarker4711QSXZ"
+    """Das Protokoll zählt Seiten und IDs — nie Blattinhalte."""
     einrichten(client, fake_llm)   # Kind heißt hier „Milena"
     fake_llm.responses["material"] = dict(MATERIAL_ANTWORT)
     r = _upload(client, [("b.jpg", _bild(), "image/jpeg")],
-                metadaten=[{"text": SEITENTEXT + " Milena " + geheim,
+                metadaten=[{"text": SEITENTEXT + " Milena " + MARKER,
                             "konfidenz": 0.9, "art": "foto"}])
     paket_id = _paket_id(r)
     run_jobs(app_env, fake_llm)
@@ -461,12 +550,81 @@ def test_kein_ocr_inhalt_in_den_logs(client, fake_llm, fake_cli, app_env,
         # Erneut analysieren läuft noch einmal durch alle Logzeilen.
         material_paket.erneut_analysieren(paket_id)
         run_jobs(app_env, fake_llm)
-    assert geheim not in caplog.text
+    assert MARKER not in caplog.text
+    assert "Milena" not in caplog.text
 
-    # llm_call hält fest, was zum Modell ging — geschrubbt: der Name darf
-    # darin nicht mehr stehen.
-    prompt = app_env.db.q1(
-        "SELECT prompt FROM llm_call WHERE purpose='material_analyse' "
+
+def test_audit_speichert_keinen_blattinhalt(
+        client, fake_llm, fake_cli, app_env):
+    """Arbeitsblatt-OCR ist selbst geschwärzt zu sensibel für den
+    Audit-Speicher: in llm_call bleiben nur Metadaten und der Hash."""
+    einrichten(client, fake_llm)
+    fake_llm.responses["material"] = dict(MATERIAL_ANTWORT)
+    r = _upload(client, [("b.jpg", _bild(), "image/jpeg")],
+                metadaten=[{"text": SEITENTEXT + " Milena " + MARKER,
+                            "konfidenz": 0.9, "art": "foto"}])
+    paket_id = _paket_id(r)
+    run_jobs(app_env, fake_llm)
+
+    aufruf = _llm_aufruf(app_env)
+    prompt = aufruf["prompt"]
+    # Weder der Blattinhalt noch der Kindesname noch die Antwort des
+    # Modells liegen dauerhaft im Audit.
+    for verboten in (MARKER, "Milena", "Addiere die Brüche", "=== Seite"):
+        assert verboten not in prompt
+    assert "Brüche" not in (aufruf["response_raw"] or "")
+    assert aufruf["response_raw"].startswith("sha256:")
+
+    # Was bleibt: Zweck, Backend, Modell, Kennzahlen, Hash — auditierbar,
+    # ohne den Inhalt zu kennen.
+    assert "[MATERIAL_ANALYSE_REDACTED]" in prompt
+    assert f"upload_id={paket_id}" in prompt
+    assert "page_count=1" in prompt
+    assert "subject=mathematik" in prompt
+    assert "input_chars=" in prompt
+    assert "prompt_hash=sha256:" in prompt
+    assert aufruf["model"] and aufruf["backend"]
+    assert aufruf["schema_ok"] == 1
+
+
+def test_prompt_hash_stabil_und_empfindlich(
+        client, fake_llm, fake_cli, app_env):
+    """Gleicher Modellinput → gleicher Hash; ein anderes Blatt → anderer."""
+    import re
+    einrichten(client, fake_llm)
+    fake_llm.responses["material"] = dict(MATERIAL_ANTWORT)
+    for text in (SEITENTEXT, SEITENTEXT, SEITENTEXT + " Zusatzaufgabe."):
+        _upload(client, [("b.jpg", _bild(), "image/jpeg")],
+                metadaten=[{"text": text, "konfidenz": 0.9, "art": "foto"}])
+    run_jobs(app_env, fake_llm)
+
+    def hash_von(aufruf):
+        m = re.search(r"prompt_hash=sha256:([0-9a-f]{64})", aufruf["prompt"])
+        assert m, aufruf["prompt"]
+        return m.group(1)
+
+    aufrufe = app_env.db.q(
+        "SELECT * FROM llm_call WHERE purpose='material_analyse' ORDER BY id")
+    assert len(aufrufe) == 3
+    assert hash_von(aufrufe[0]) == hash_von(aufrufe[1])
+    assert hash_von(aufrufe[0]) != hash_von(aufrufe[2])
+
+
+def test_andere_zwecke_behalten_ihr_vollaudit(
+        client, fake_llm, fake_cli, app_env):
+    """Nur der sensible Blatt-Pfad wird anonymisiert — der Rest des Audits
+    hält weiter fest, was wirklich zum Modell ging."""
+    einrichten(client, fake_llm)
+    from app import config
+    from app.llm import ClaudeClient
+    schema = {"type": "object", "required": ["ok"],
+              "properties": {"ok": {"type": "boolean"}}}
+    ClaudeClient.from_config(config.load_safe()).complete(
+        "verify_ping", f"AUDITVOLLMARKER {MARKER}", schema)
+    aufruf = app_env.db.q1(
+        "SELECT * FROM llm_call WHERE purpose='verify_ping' "
         "ORDER BY id DESC LIMIT 1")
-    assert prompt is not None
-    assert "Milena" not in prompt["prompt"]
+    assert MARKER in aufruf["prompt"]
+    assert "REDACTED" not in aufruf["prompt"]
+    assert aufruf["response_raw"] and not \
+        aufruf["response_raw"].startswith("sha256:")

@@ -44,10 +44,26 @@ def _seiten_aus_formular(formular) -> tuple[list, list[dict]]:
     return dateien, metadaten
 
 
+def _vorab_groesse(request: Request) -> None:
+    """Content-Length prüfen, bevor der mehrteilige Rumpf gelesen wird —
+    ein zu großer Upload wird abgelehnt, ohne dass er im Speicher landet."""
+    try:
+        angekuendigt = int(request.headers.get("content-length") or 0)
+    except ValueError:
+        angekuendigt = 0
+    # Zwei MB Luft für die Formularrahmen der Seiten.
+    if angekuendigt > material_paket.MAX_PAKET_BYTES + 2_000_000:
+        raise material_paket.PaketFehler(
+            f"Der Upload ist zu groß — ein Paket darf höchstens "
+            f"{material_paket.MAX_PAKET_BYTES // 1_048_576} MB haben.")
+
+
 async def _dateien_lesen(dateien) -> list[tuple[str, bytes]]:
     gelesen = []
     for i, datei in enumerate(dateien, 1):
-        daten = await datei.read(material_paket.MAX_SEITE_BYTES + 1)
+        # Das größte Einzellimit (PDF) deckelt den Leseaufruf — welches der
+        # getrennten Limits greift, entscheidet material_paket am Dateityp.
+        daten = await datei.read(material_paket.MAX_PDF_BYTES + 1)
         if not daten:
             raise material_paket.PaketFehler(f"Seite {i} kam leer an.")
         gelesen.append((datei.filename or f"seite-{i}.jpg", daten))
@@ -71,6 +87,9 @@ def material_seite(request: Request):
     return render(request, "learning_upload.html", fach=fach, zweck=zweck,
                   fach_name=faecher.NAMEN.get(fach, "deinem Fach"),
                   max_seiten=material_paket.MAX_SEITEN,
+                  max_bild_mb=material_paket.MAX_BILD_BYTES // 1_048_576,
+                  max_pdf_mb=material_paket.MAX_PDF_BYTES // 1_048_576,
+                  max_paket_mb=material_paket.MAX_PAKET_BYTES // 1_048_576,
                   kopf_prozent=config.load_safe().header_crop_percent,
                   quelle=request.query_params.get("quelle", ""))
 
@@ -78,6 +97,10 @@ def material_seite(request: Request):
 @router.post("/lernen/material/paket")
 async def paket_anlegen(request: Request):
     """Neues Paket: die geordneten Seiten-Bilder plus Browser-Texte."""
+    try:
+        _vorab_groesse(request)
+    except material_paket.PaketFehler as exc:
+        return JSONResponse({"fehler": str(exc)}, status_code=413)
     formular = await request.form()
     try:
         dateien, metadaten = _seiten_aus_formular(formular)
@@ -146,6 +169,10 @@ def paket_seite_bild(request: Request, paket_id: int, seite_id: int):
 @router.post("/lernen/material/{paket_id}/seiten")
 async def paket_seiten(request: Request, paket_id: int):
     """Seiten nachträglich ergänzen — z. B. eine neu fotografierte."""
+    try:
+        _vorab_groesse(request)
+    except material_paket.PaketFehler as exc:
+        return JSONResponse({"fehler": str(exc)}, status_code=413)
     formular = await request.form()
     try:
         dateien, metadaten = _seiten_aus_formular(formular)

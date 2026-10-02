@@ -9,6 +9,7 @@ neben `api_backend.py` und ein Eintrag in `_backend()`. Sonst nichts.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import time
@@ -75,7 +76,8 @@ class ClaudeClient:
 
     def complete(self, purpose: str, prompt: str, schema: dict, *,
                  system: str = "", max_tokens: int = 8192, model: str | None = None,
-                 web_search: bool = False, web_fetch: bool = False) -> LlmResult:
+                 web_search: bool = False, web_fetch: bool = False,
+                 audit_prompt: str | None = None) -> LlmResult:
         """Ein Modellaufruf mit erzwungener Antwortstruktur.
 
         Gibt entweder ein Objekt zurueck, das die Pflichtfelder des Schemas
@@ -85,6 +87,12 @@ class ClaudeClient:
         `web_search`/`web_fetch`: siehe `Backend.call()` — nur für echte
         Websuche bzw. das Abrufen einer freigegebenen Quelle (`research.py`),
         nicht einfach auf jeden Aufruf setzen.
+
+        `audit_prompt`: fuer Eingaben, deren Inhalt auch geschwärzt zu
+        sensibel für den Audit-Speicher ist (z. B. Arbeitsblatt-OCR). Dann
+        landet in `llm_call.prompt` nur dieser neutrale Eintrag — etwa ein
+        Hash des Prompts samt Metadaten — und von der Antwort nur ihr
+        Hash, nicht ihr Inhalt.
         """
         # Nur noch ein Modell: hier geht ausschliesslich Text hin.
         gewaehlt = model or self.model_text
@@ -93,7 +101,8 @@ class ClaudeClient:
                 "Es ist kein Modell konfiguriert. Bitte Einstellungen öffnen.")
 
         begonnen = time.monotonic()
-        call_id = _log_start(purpose, gewaehlt, prompt, self._backend.name)
+        call_id = _log_start(purpose, gewaehlt, audit_prompt or prompt,
+                             self._backend.name)
         try:
             roh = self._backend.call(prompt, schema, model=gewaehlt,
                                      system=system, max_tokens=max_tokens,
@@ -109,9 +118,11 @@ class ClaudeClient:
             raise ClaudeError(meldung) from None
 
         rohtext = json.dumps(roh.data, ensure_ascii=False)
+        roh_archiv = (f"sha256:{hashlib.sha256(rohtext.encode('utf-8')).hexdigest()}"
+                      if audit_prompt is not None else rohtext)
 
         if roh.truncated:
-            _log_finish(call_id, rohtext, False, "Antwort abgeschnitten",
+            _log_finish(call_id, roh_archiv, False, "Antwort abgeschnitten",
                         roh.tokens_in, roh.tokens_out, roh.cost_usd, _ms(begonnen))
             raise ClaudeSchemaError(
                 "Die Antwort des Modells wurde abgeschnitten und war deshalb "
@@ -119,14 +130,14 @@ class ClaudeClient:
 
         fehlend = _missing_required(roh.data, schema)
         if fehlend:
-            _log_finish(call_id, rohtext, False, f"Felder fehlen: {fehlend}",
+            _log_finish(call_id, roh_archiv, False, f"Felder fehlen: {fehlend}",
                         roh.tokens_in, roh.tokens_out, roh.cost_usd, _ms(begonnen))
             raise ClaudeSchemaError(
                 "Die Antwort passte nicht zur erwarteten Struktur "
                 f"(fehlend: {', '.join(fehlend)}). Nichts wurde gespeichert.")
 
-        _log_finish(call_id, rohtext, True, None, roh.tokens_in, roh.tokens_out,
-                    roh.cost_usd, _ms(begonnen))
+        _log_finish(call_id, roh_archiv, True, None, roh.tokens_in,
+                    roh.tokens_out, roh.cost_usd, _ms(begonnen))
         return LlmResult(roh.data, roh.model, roh.tokens_in, roh.tokens_out,
                          roh.cost_usd, _ms(begonnen), call_id)
 

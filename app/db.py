@@ -155,6 +155,7 @@ _ADDED_COLUMNS = [
     ("lesson", "max_runden", "INTEGER NOT NULL DEFAULT 4"),
     ("question", "auswert_call_id", "INTEGER"),
     ("lesson_round_variant", "ausgabe", "TEXT"),
+    ("material_paket", "original_bytes", "INTEGER NOT NULL DEFAULT 0"),
     ("lesson", "abbruch_grund", "TEXT"),
     ("lesson", "prompt_wunsch", "TEXT"),
     ("document", "themenname", "TEXT"),

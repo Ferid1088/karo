@@ -15,6 +15,12 @@
   const form = zone.closest("form");
   const MAX = parseInt(zone.dataset.maxSeiten || "10", 10);
   const KOPF = parseFloat(zone.dataset.kopfProzent || "0");
+  // Die Grenzen stehen im Server (material_paket.py); hier nur dieselben
+  // Zahlen für eine frühe, freundliche Meldung vor dem Verarbeiten.
+  const MB = 1048576;
+  const MAX_BILD = parseInt(zone.dataset.maxBildMb || "15", 10) * MB;
+  const MAX_PDF = parseInt(zone.dataset.maxPdfMb || "50", 10) * MB;
+  const MAX_PAKET = parseInt(zone.dataset.maxPaketMb || "100", 10) * MB;
   const liste = zone.querySelector("[data-paket-liste]");
   const zaehler = zone.querySelector("[data-paket-zaehler]");
   const fehlerEl = zone.querySelector("[data-paket-fehler]");
@@ -131,6 +137,12 @@
         break;
       }
       try {
+        const istPdf = /\.pdf$/i.test(datei.name || "") ||
+                       datei.type === "application/pdf";
+        const grenze = istPdf ? MAX_PDF : MAX_BILD;
+        if (datei.size > grenze) {
+          throw new Error("zu gross");
+        }
         const neu = await window.karoBlattLesen.paketSeiten(datei, KOPF, melde);
         for (const s of neu) {
           if (seiten.length >= MAX) {
@@ -145,8 +157,12 @@
           seiten.push(s);
         }
       } catch (e) {
-        fehler("„" + (datei.name || "Das Foto") + "“ konnte nicht gelesen " +
-               "werden. Versuche es mit einer anderen Datei.");
+        fehler(e && e.message === "zu gross"
+          ? "„" + (datei.name || "Das Foto") + "“ ist zu groß — " +
+            "Bilder bis " + Math.round(MAX_BILD / MB) + " MB, PDFs bis " +
+            Math.round(MAX_PDF / MB) + " MB."
+          : "„" + (datei.name || "Das Foto") + "“ konnte nicht gelesen " +
+            "werden. Versuche es mit einer anderen Datei.");
       }
     }
     melde("");
@@ -185,6 +201,15 @@
         seiten[i].text = "";
         seiten[i].konfidenz = 0;
       }
+    }
+
+    // Gesamtgröße der zu sendenden Seiten — dieselbe Grenze wie am Server.
+    const gesamt = seiten.reduce((summe, s) => summe + (s.jpeg ? s.jpeg.size : 0), 0);
+    if (gesamt > MAX_PAKET) {
+      fehler("Zusammen sind die Seiten zu groß — ein Paket darf höchstens " +
+             Math.round(MAX_PAKET / MB) + " MB haben. Entferne eine Seite.");
+      startBtn.disabled = false;
+      return;
     }
 
     melde("Wird gespeichert …");

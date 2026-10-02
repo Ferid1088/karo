@@ -144,7 +144,11 @@ def _eltern_darf_aendern(path: str) -> bool:
     return not CHILD_OWN_WORK_PATTERN.match(path)
 
 
-MAX_BODY_BYTES = 30 * 1024 * 1024
+#: Obergrenze für einen Request-Rumpf: groß genug für ein volles
+#: Material-Paket (material_paket.MAX_PAKET_BYTES = 100 MB) samt
+#: Formularrahmen, klein genug, dass ein Upload den Speicher nicht
+#: aushebelt — der Rumpf wird für die CSRF-Prüfung einmal gelesen.
+MAX_BODY_BYTES = 105 * 1024 * 1024
 
 
 @asynccontextmanager

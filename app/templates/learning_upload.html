@@ -31,6 +31,8 @@
          data-zweck="{{ zweck }}" data-fach="{{ fach }}"
          data-quelle="{{ quelle }}"
          data-max-seiten="{{ max_seiten }}" data-kopf-prozent="{{ kopf_prozent }}"
+         data-max-bild-mb="{{ max_bild_mb }}" data-max-pdf-mb="{{ max_pdf_mb }}"
+         data-max-paket-mb="{{ max_paket_mb }}"
          data-csrf-name="{{ csrf_field }}" data-csrf="{{ csrf }}"
          data-url="/lernen/material/paket">
       <div class="paket-liste" data-paket-liste></div>
@@ -39,7 +41,7 @@
         <button type="button" class="quiet" data-paket-foto>Foto machen</button>
         <button type="button" class="quiet" data-paket-datei>Datei hochladen</button>
       </div>
-      <p class="hint">PDF · JPG · PNG — bis zu {{ max_seiten }} Seiten. Deine Bilder werden hier auf dem Gerät gelesen, nicht weggeschickt.</p>
+      <p class="hint">PDF · JPG · PNG — bis zu {{ max_seiten }} Seiten. JPG/PNG bis {{ max_bild_mb }} MB, PDF bis {{ max_pdf_mb }} MB, insgesamt bis {{ max_paket_mb }} MB. Deine Bilder werden hier auf dem Gerät gelesen, nicht weggeschickt.</p>
       <p class="msg err" data-paket-fehler hidden></p>
       <p class="hint" data-paket-stand role="status" aria-live="polite"></p>
       <button type="submit" data-paket-start disabled>Seiten einlesen →</button>
@@ -50,7 +52,7 @@
         <label for="paket-dateien">Seiten-Dateien</label>
         <input type="file" id="paket-dateien" name="seite" multiple
                accept=".pdf,.jpg,.jpeg,.png,.heic,.heif">
-        <p class="hint">PDF · JPG · PNG — bis zu {{ max_seiten }} Seiten.</p>
+        <p class="hint">PDF · JPG · PNG — bis zu {{ max_seiten }} Seiten. JPG/PNG bis {{ max_bild_mb }} MB, PDF bis {{ max_pdf_mb }} MB, insgesamt bis {{ max_paket_mb }} MB.</p>
       </div>
       <button type="submit">Seiten einlesen →</button>
     </div>

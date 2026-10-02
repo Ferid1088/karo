@@ -37,7 +37,12 @@ MAX_SEITEN = 10
 #: Darunter ist ein Ergebnis kein Blatt, sondern Rauschen — dieselbe Grenze
 #: wie in `static/blatt-lesen.js` und `blatt_text.server_lesen`.
 MIN_ZEICHEN = 40
-MAX_SEITE_BYTES = ingest.MAX_SOURCE_BYTES
+#: Getrennte Größengrenzen: ein Handyfoto ist selten über 15 MB, ein
+#: gescanntes Skript kann größer sein, und das Paket insgesamt bleibt
+#: unterhalb des Speicherfensters, das ein Upload belegen darf.
+MAX_BILD_BYTES = 15 * 1024 * 1024
+MAX_PDF_BYTES = 50 * 1024 * 1024
+MAX_PAKET_BYTES = 100 * 1024 * 1024
 MAX_TEXT_ZEICHEN = 20000
 MAX_THEMEN = 20
 
@@ -69,43 +74,49 @@ def _protokoll(ereignis: str, **felder) -> None:
 # Paket anlegen und pflegen
 # ---------------------------------------------------------------------------
 
-def _seite_speichern(daten: bytes, name: str, subject: str | None) -> int:
-    """Eine Seite als `document` ablegen. Wirft PaketFehler, wenn die Datei
+def _seite_speichern(daten: bytes, name: str,
+                     subject: str | None) -> tuple[int, bool]:
+    """Eine Seite als `document` ablegen. Gibt (id, neu angelegt) zurück —
+    „neu" heißt: Datei und Zeile gehören diesem Paket und dürfen bei einem
+    Abbruch wieder weggeräumt werden. Wirft PaketFehler, wenn die Datei
     sich nicht als Bild lesen lässt."""
     endung = "." + name.rsplit(".", 1)[-1].lower() if "." in name else ""
     if endung not in SEITEN_ENDUNGEN:
         raise PaketFehler(
             f"„{name[:60]}“ ist keine Bildseite. Erlaubt sind PDF, JPG und PNG — "
             "ein PDF zerlegt Karo vorher im Browser in seine Seiten.")
-    if len(daten) > MAX_SEITE_BYTES:
+    if len(daten) > MAX_BILD_BYTES:
         raise PaketFehler(
-            f"„{name[:60]}“ ist mit {len(daten) // 1_048_576} MB zu groß.")
+            f"„{name[:60]}“ ist mit {len(daten) // 1_048_576} MB zu groß — "
+            f"ein Bild darf höchstens {MAX_BILD_BYTES // 1_048_576} MB haben.")
     try:
         aufnahme = ingest.aufnehmen(
             daten, endung, rolle="material",
             themenname="", subject=faecher.schluessel(subject))
     except ingest.IngestError as exc:
         raise PaketFehler(f"„{name[:60]}“: {exc}") from None
-    return aufnahme["document_id"]
+    return aufnahme["document_id"], aufnahme["status"] == "neu"
 
 
-def _pdf_zerlegen(daten: bytes, name: str, subject: str | None) -> list[int]:
+def _pdf_zerlegen(daten: bytes, name: str,
+                  subject: str | None) -> list[tuple[int, bool]]:
     """Ein hochgeladenes PDF in Seiten-Dokumente zerlegen.
 
     Der Normalweg zerlegt das PDF schon im Browser (pdf.js, siehe
     `static/material-paket.js`) — dieser Weg ist der Rückfall für einen
     Browser ohne JavaScript, der die Datei als Ganzes schickt. Jede Seite
     wird wie in `ingest._ingest_pdf` über den Digest ihres gerenderten
-    Bildes dedupliziert.
+    Bildes dedupliziert. Gibt (document_id, neu angelegt)-Paare zurück.
     """
     import hashlib
     import io
     import tempfile
     from pathlib import Path
 
-    if len(daten) > MAX_SEITE_BYTES:
+    if len(daten) > MAX_PDF_BYTES:
         raise PaketFehler(
-            f"„{name[:60]}“ ist mit {len(daten) // 1_048_576} MB zu groß.")
+            f"„{name[:60]}“ ist mit {len(daten) // 1_048_576} MB zu groß — "
+            f"ein PDF darf höchstens {MAX_PDF_BYTES // 1_048_576} MB haben.")
 
     tmp = Path(tempfile.mkdtemp(prefix="karo-paket-")) / "blatt.pdf"
     tmp.write_bytes(daten)
@@ -129,7 +140,7 @@ def _pdf_zerlegen(daten: bytes, name: str, subject: str | None) -> list[int]:
                 bestehend = db.q1("SELECT id FROM document WHERE sha256=?",
                                   digest)
                 if bestehend is not None:
-                    dokumente.append(bestehend["id"])
+                    dokumente.append((bestehend["id"], False))
                     continue
                 ziel = config.scans_dir() / f"{digest}.jpg"
                 try:
@@ -147,7 +158,7 @@ def _pdf_zerlegen(daten: bytes, name: str, subject: str | None) -> list[int]:
                         (digest, f"{ingest.safe_name(name)[:180]} s{i + 1}",
                          str(ziel), db.today(),
                          faecher.schluessel(subject), db.now()))
-                    dokumente.append(cur.lastrowid)
+                    dokumente.append((cur.lastrowid, True))
         finally:
             doc.close()
         return dokumente
@@ -159,15 +170,34 @@ def _pdf_zerlegen(daten: bytes, name: str, subject: str | None) -> list[int]:
             pass
 
 
+def _dokumente_wegraumen(document_ids: list[int]) -> None:
+    """Dokumente entfernen, die ein abgebrochener Upload neu angelegt hat —
+    Zeile und Datei. Deduplizierte Fundstücke bleiben: sie gehörten schon
+    wem anders."""
+    from pathlib import Path
+
+    for did in document_ids:
+        zeile = db.q1("SELECT stored_path FROM document WHERE id=?", did)
+        if zeile is None:
+            continue
+        try:
+            Path(zeile["stored_path"]).unlink(missing_ok=True)
+        except OSError:
+            pass
+        with db.tx() as c:
+            c.execute("DELETE FROM document WHERE id=?", (did,))
+
+
 def _datei_als_seiten(daten: bytes, name: str,
-                      subject: str | None) -> list[tuple[int, str]]:
+                      subject: str | None) -> list[tuple[int, str, bool]]:
     """Eine Datei zu ihren Seiten-Dokumenten: ein Bild ist eine Seite, ein
-    PDF so viele, wie es hat. Gibt (document_id, art)-Paare zurück."""
+    PDF so viele, wie es hat. Gibt (document_id, art, neu)-Tripel zurück."""
     endung = "." + name.rsplit(".", 1)[-1].lower() if "." in name else ""
     if endung == ".pdf":
-        return [(dokument, "pdf") for dokument in
+        return [(dokument, "pdf", neu) for dokument, neu in
                 _pdf_zerlegen(daten, name, subject)]
-    return [(_seite_speichern(daten, name, subject), "foto")]
+    dokument, neu = _seite_speichern(daten, name, subject)
+    return [(dokument, "foto", neu)]
 
 
 def _seitentext(meta: dict) -> tuple[str, str]:
@@ -180,7 +210,8 @@ def _seitentext(meta: dict) -> tuple[str, str]:
     return sauber, "gelesen"
 
 
-def _pruefe_liste(dateien: list, metadaten: list[dict], vorhanden: int) -> None:
+def _pruefe_liste(dateien: list, metadaten: list[dict], vorhanden: int,
+                  bisher_bytes: int = 0) -> None:
     if not dateien:
         raise PaketFehler("Es wurde keine Seite ausgewählt.")
     # Ohne JavaScript kommen nur Dateien — die Metadaten fehlen dann ganz.
@@ -190,31 +221,45 @@ def _pruefe_liste(dateien: list, metadaten: list[dict], vorhanden: int) -> None:
         raise PaketFehler(
             f"Ein Paket darf höchstens {MAX_SEITEN} Seiten haben — "
             f"es sind schon {vorhanden} darin.")
+    gesamt = bisher_bytes + sum(len(daten) for _, daten in dateien)
+    if gesamt > MAX_PAKET_BYTES:
+        raise PaketFehler(
+            f"Zusammen sind die Seiten zu groß — ein Paket darf höchstens "
+            f"{MAX_PAKET_BYTES // 1_048_576} MB haben.")
 
 
 def _seiten_abladen(dateien: list[tuple[str, bytes]], metadaten: list[dict],
-                    subject: str | None) -> list[tuple[int, str, dict]]:
+                    subject: str | None) -> list[tuple[int, str, dict, bool]]:
     """Jede Datei zu ihren Seiten-Dokumenten — eigene Transaktionen darin.
 
-    Gibt (document_id, art, meta) je Seite zurück. Eine Datei kann mehrere
-    Seiten ergeben (PDF ohne Browser-Zerlegung); der Browser-Text aus
-    `metadaten` gilt nur, wenn die Datei genau eine Seite war — sonst würde
-    ein Seitentext auf fremde Seiten fallen.
+    Gibt (document_id, art, meta, neu) je Seite zurück. Eine Datei kann
+    mehrere Seiten ergeben (PDF ohne Browser-Zerlegung); der Browser-Text
+    aus `metadaten` gilt nur, wenn die Datei genau eine Seite war — sonst
+    würde ein Seitentext auf fremde Seiten fallen. Scheitert eine Datei,
+    werden die neu angelegten Dokumente wieder entfernt.
     """
     seiten = []
-    for i, (name, daten) in enumerate(dateien):
-        meta = dict(metadaten[i]) if i < len(metadaten) else {}
-        meta.setdefault("name", name)
-        for dokument, art in _datei_als_seiten(daten, name, subject):
-            seiten.append((dokument, art,
-                           {"name": meta["name"]} if art == "pdf" else meta))
-    return seiten
+    eigene = []
+    try:
+        for i, (name, daten) in enumerate(dateien):
+            meta = dict(metadaten[i]) if i < len(metadaten) else {}
+            meta.setdefault("name", name)
+            for dokument, art, neu in _datei_als_seiten(daten, name, subject):
+                if neu:
+                    eigene.append(dokument)
+                seiten.append(
+                    (dokument, art,
+                     {"name": meta["name"]} if art == "pdf" else meta, neu))
+        return seiten
+    except Exception:
+        _dokumente_wegraumen(eigene)
+        raise
 
 
 def _seiten_eintragen(c, paket_id: int, start: int,
-                      seiten: list[tuple[int, str, dict]]) -> int:
+                      seiten: list[tuple[int, str, dict, bool]]) -> int:
     """Legt die Seiten-Zeilen an — nur DB, die Dateien liegen schon."""
-    for i, (dokument, art, meta) in enumerate(seiten, 1):
+    for i, (dokument, art, meta, _neu) in enumerate(seiten, 1):
         text, stand = _seitentext(meta)
         c.execute(
             """INSERT INTO material_seite
@@ -245,13 +290,20 @@ def anlegen(zweck: str, subject: str | None, dateien: list[tuple[str, bytes]],
     seiten = _seiten_abladen(dateien, metadaten, fach)
 
     jetzt = db.now()
-    with db.tx() as c:
-        cur = c.execute(
-            """INSERT INTO material_paket (zweck, subject, state, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?)""",
-            (zweck, fach, STATE_ANALYSE, jetzt, jetzt))
-        paket_id = cur.lastrowid
-        seiten_anzahl = _seiten_eintragen(c, paket_id, 0, seiten)
+    try:
+        with db.tx() as c:
+            cur = c.execute(
+                """INSERT INTO material_paket
+                       (zweck, subject, state, original_bytes,
+                        created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (zweck, fach, STATE_ANALYSE,
+                 sum(len(d) for _, d in dateien), jetzt, jetzt))
+            paket_id = cur.lastrowid
+            seiten_anzahl = _seiten_eintragen(c, paket_id, 0, seiten)
+    except Exception:
+        _dokumente_wegraumen([d for d, _, _, neu in seiten if neu])
+        raise
 
     jobs.enqueue("material_analyse", {"paket_id": paket_id},
                  dedup_key=f"material_analyse:{paket_id}")
@@ -270,17 +322,25 @@ def anhaengen(paket_id: int, dateien: list[tuple[str, bytes]],
     vorhanden = db.q1(
         "SELECT COUNT(*) AS n FROM material_seite WHERE paket_id=?",
         paket_id)["n"]
-    _pruefe_liste(dateien, metadaten, vorhanden)
+    _pruefe_liste(dateien, metadaten, vorhanden,
+                  int(paket["original_bytes"] or 0))
 
     seiten = _seiten_abladen(dateien, metadaten, paket["subject"])
     jetzt = db.now()
-    with db.tx() as c:
-        start = c.execute(
-            "SELECT COALESCE(MAX(position), 0) AS m FROM material_seite "
-            "WHERE paket_id=?", (paket_id,)).fetchone()["m"]
-        seiten_anzahl = _seiten_eintragen(c, paket_id, start, seiten)
-        c.execute("UPDATE material_paket SET state=?, fehler=NULL, updated_at=? "
-                  "WHERE id=?", (STATE_ANALYSE, jetzt, paket_id))
+    try:
+        with db.tx() as c:
+            start = c.execute(
+                "SELECT COALESCE(MAX(position), 0) AS m FROM material_seite "
+                "WHERE paket_id=?", (paket_id,)).fetchone()["m"]
+            seiten_anzahl = _seiten_eintragen(c, paket_id, start, seiten)
+            c.execute("UPDATE material_paket SET state=?, fehler=NULL, "
+                      "original_bytes=original_bytes+?, updated_at=? "
+                      "WHERE id=?",
+                      (STATE_ANALYSE, sum(len(d) for _, d in dateien),
+                       jetzt, paket_id))
+    except Exception:
+        _dokumente_wegraumen([d for d, _, _, neu in seiten if neu])
+        raise
     jobs.enqueue("material_analyse", {"paket_id": paket_id},
                  dedup_key=f"material_analyse:{paket_id}")
     _protokoll("material_page_added", upload_id=paket_id,
@@ -397,19 +457,37 @@ def _seite_nachlesen(seite: dict) -> None:
                   (stand, fehler, seite["id"]))
 
 
-def _analyse_modell(fach_hint: str | None, seiten_texte: list[str]) -> dict:
+def _analyse_modell(paket_id: int, fach_hint: str | None,
+                    seiten_texte: list[str]) -> dict:
     """Das Modell liest geschwärzten Seitentext — nie ein Bild.
 
+    Der Text darf zum Modell, aber er bleibt nicht dauerhaft im Audit:
+    `audit_prompt` sorgt dafür, dass in `llm_call` nur Metadaten und der
+    Hash des tatsächlichen Prompts liegen — an dem Hash erkennt man später,
+    ob es derselbe Modellinput war, ohne den Inhalt zu kennen.
+
     Wirft ClaudeError; der Aufrufer entscheidet über den Umgang."""
+    import hashlib
+
     from .llm import ClaudeClient
     cfg = config.load_safe()
     nummern = "\n\n".join(
         f"=== Seite {i} ===\n{text}" for i, text in enumerate(seiten_texte, 1))
+    prompt = prompts.material_prompt(cfg.learner_grade, fach_hint, nummern)
+    audit = (
+        "[MATERIAL_ANALYSE_REDACTED]\n"
+        f"upload_id={paket_id}\n"
+        f"page_count={len(seiten_texte)}\n"
+        f"subject={faecher.schluessel(fach_hint) or '-'}\n"
+        f"input_chars={len(prompt)}\n"
+        f"prompt_hash=sha256:"
+        f"{hashlib.sha256(prompt.encode('utf-8')).hexdigest()}")
     ergebnis = ClaudeClient.from_config(cfg).complete(
         purpose="material_analyse",
-        prompt=prompts.material_prompt(cfg.learner_grade, fach_hint, nummern),
+        prompt=prompt,
         schema=prompts.MATERIAL_SCHEMA,
-        system=prompts.SYSTEM)
+        system=prompts.SYSTEM,
+        audit_prompt=audit)
     daten = ergebnis.data if isinstance(ergebnis.data, dict) else {}
     return _ergebnis_pruefen(daten, len(seiten_texte))
 
@@ -490,7 +568,7 @@ def job_material_analyse(payload: dict) -> None:
     fach_hint = (faecher.name(paket["subject"]) if paket["subject"]
                  else None)
     try:
-        ergebnis = _analyse_modell(fach_hint,
+        ergebnis = _analyse_modell(paket_id, fach_hint,
                                    [s["text"] for s in gelesen])
     except Exception as exc:                # noqa: BLE001 - Meldung steht in fehler
         from .llm import ClaudeError
