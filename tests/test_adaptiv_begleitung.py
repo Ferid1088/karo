@@ -281,3 +281,142 @@ def test_begleitung_nach_erfolg_verliert_den_menschen_marker(
     profil = store.fortschritt(s["konzept_id"], s["fehlertyp_id"])
     assert profil["braucht_mensch"] == 0
     assert profil["mastery"] == "sicher"
+
+
+# ---------------------------------------------------------------------------
+# Fall G — Voraussetzungs-Umweg komplett durch den Browser (Iteration 5/6)
+# ---------------------------------------------------------------------------
+
+def _grundlage_saen(key="GR.BASIS"):
+    """Eine gepruefte Grundlage mit Erstkontakt und Diagnoseaufgabe —
+    so sieht ein vom Lehrplan-Dienst importiertes Konzept aus."""
+    import json
+    from app import db
+    from app.adaptiv import inhalt_store, store
+    kid = store.konzept_sichern("mathematik", "grund", key, "Grundlage",
+                                geprueft=True)
+    ft = store.fehlertyp_sichern(kid, f"{key}-ft", "Grundlage falsch",
+                                 geprueft=True)
+    store.erstkontakt_anlegen(
+        kid, "Was weisst du schon?",
+        {"frage": "Einstieg?", "loesung": "2", "antwort_art": "zahl",
+         "bestaetigung": {"frage": "Kontrolle?", "loesung": "3",
+                          "antwort_art": "zahl"}},
+        "Grundlage nennen", geprueft=True)
+    inhalt_store.aufgabe_sichern(ft, inhalt_store.SELBSTSTAENDIG,
+                                 "Basisaufgabe?", "2", antwort_art="zahl")
+    with db.tx() as c:
+        c.execute("""INSERT OR IGNORE INTO lern_curriculum_import
+                       (fingerprint, konzept_id, provenance, created_at)
+                     VALUES (?,?,?,?)""",
+                  (f"fp-{key}", kid, json.dumps({"concept_id": key}),
+                   db.now()))
+    return kid
+
+
+def test_voraussetzung_umweg_durch_den_browser(client, fake_llm, app_env):
+    """Überfordert am Ziel → Grundlage prüfen → fehlt → lernen → meistern
+    → zurück an die Stelle, an der es hakte. Alles über HTTP."""
+    import re
+    from app.adaptiv import sitzung as zustand, store
+    token = _kind(client, fake_llm, app_env)
+    store.init()
+    ziel = store.konzepte_verfuegbar()[0]["id"]
+    basis = _grundlage_saen()
+    store.voraussetzungen_sichern(ziel, [{"concept_id": "GR.BASIS",
+                                        "title": "Grundlage"}])
+
+    # Mehrfach falsch an der geführten Aufgabe: statt Begleitung prüft
+    # Karo erst die offene Voraussetzung.
+    _bis_zur_gefuehrten_aufgabe(client, token)
+    for _ in range(4):
+        client.post(f"{PFAD}/aufgabe",
+                    data={"_csrf": token, "antwort": "2/6"})
+        client.post(f"{PFAD}/weiter", data={"_csrf": token})
+    sid = app_env.db.q1(
+        "SELECT id FROM lern_sitzung WHERE konzept_id=? ORDER BY id DESC",
+        ziel)["id"]
+    daten = dict(store.sitzung(sid)["daten"] or {})
+    assert daten.get("voraussetzung_offen")
+
+    seite = client.get(PFAD)
+    assert "Grundlage" in seite.text            # Voraussetzungs-Schirm
+    assert "Basisaufgabe" in seite.text
+
+    # Falsch geprueft → Karo bietet den Umweg an, nicht die Begleitung.
+    seite = client.post(f"{PFAD}/voraussetzung",
+                        data={"_csrf": token, "antwort": ["42"]})
+    assert "lernen" in seite.text and "Grundlage" in seite.text
+
+    # Umweg starten: eine eigene Sitzung auf der Grundlage, mit Rückweg.
+    client.post(f"{PFAD}/voraussetzung/lernen", data={"_csrf": token})
+    umweg = app_env.db.q1(
+        "SELECT * FROM lern_sitzung WHERE konzept_id=? ORDER BY id DESC",
+        basis)
+    assert umweg is not None
+    import json as _json
+    assert _json.loads(umweg["daten"] or "{}")["voraussetzung_detour"] == sid
+
+    # Durch die Grundlage: Anker, Diagnose, Kontrolle — beide richtig.
+    uid = umweg["id"]
+    client.post(f"{PFAD}/anker?sitzung={uid}",
+                data={"_csrf": token, "antwort": "ok"})
+    client.post(f"{PFAD}/diagnose?sitzung={uid}",
+                data={"_csrf": token, "antwort": "2"})
+    seite = client.post(f"{PFAD}/diagnose?sitzung={uid}",
+                        data={"_csrf": token, "antwort": "3"})
+    assert store.sitzung(uid)["zustand"] == zustand.MASTERED
+    assert "zurück" in seite.text or "Weiter mit" in seite.text
+
+    # Zurueck zum Ziel: die wartende Sitzung setzt an ihrer Stelle fort.
+    seite = client.post(f"{PFAD}/voraussetzung/weiter?sitzung={uid}",
+                        data={"_csrf": token})
+    daten = dict(store.sitzung(sid)["daten"] or {})
+    assert not daten.get("voraussetzung_offen")
+    for verboten in VERBOTEN:
+        assert verboten not in seite.text
+
+
+def test_voraussetzung_umweg_im_exam_modus(client, fake_llm, app_env,
+                                         monkeypatch):
+    """Dasselbe Umweg-Spiel im Klassenarbeitsbereich — die
+    Kind-Freigabeliste darf den Weg nicht mit 403 blockieren."""
+    import json as _json
+    import re
+    from app.adaptiv import sitzung as zustand, store
+    personal, exams, tids, token = setup_journeys(
+        client, fake_llm, app_env, monkeypatch)
+    pfad = f"/klassenarbeit/{exams[0]}/lernen"
+    antwort = client.post(f"{pfad}/start",
+                          data={"_csrf": token, "topic_id": tids[0]})
+    sid = int(re.search(r'sitzung=(\d+)', antwort.text).group(1))
+
+    store.init()
+    ziel = store.sitzung(sid)["konzept_id"]
+    basis = _grundlage_saen("GR.EXAM")
+    store.voraussetzungen_sichern(ziel, [{"concept_id": "GR.EXAM",
+                                        "title": "Grundlage"}])
+
+    senden = lambda aktion, **daten: client.post(
+        f"{pfad}/{aktion}?sitzung={sid}", data={"_csrf": token, **daten})
+    senden("anker", antwort="x")
+    senden("diagnose", antwort="2/5")
+    senden("vorhersage", antwort="groesser")
+    for _ in range(3):
+        senden("weiter")
+    for _ in range(4):
+        senden("aufgabe", antwort="2/6")
+        senden("weiter")
+
+    seite = client.get(f"{pfad}?sitzung={sid}")
+    assert "Grundlage" in seite.text           # Voraussetzung, nicht 403
+
+    r = senden("voraussetzung", antwort=["42"])
+    assert r.status_code == 200
+    r = senden("voraussetzung/lernen")
+    assert r.status_code == 200
+    umweg = app_env.db.q1(
+        "SELECT * FROM lern_sitzung WHERE konzept_id=? ORDER BY id DESC",
+        basis)
+    assert umweg is not None
+    assert _json.loads(umweg["daten"] or "{}")["voraussetzung_detour"] == sid

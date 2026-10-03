@@ -81,7 +81,7 @@ def _kind_erlaubt(path: str, antworten_pruefen_kind: bool = False,
         or re.fullmatch(r"/klassenarbeit/themenblatt/[0-9]+"
                         r"(?:/(?:stand|seiten|erneut|uebernehmen"
                         r"|seite/[0-9]+(?:/entfernen|\.jpg)?))?", path)
-        or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|themen|loeschen|einstufung(?:/[0-9]+)?|lernen(?:/(?:start|status|wartet|neu|anker|diagnose|weiter|aufgabe|vorhersage|transfer|tipp|fortsetzen|pause|hilfe|klasse-bestaetigen))?|simulation(?:/[0-9]+(?:/antworten)?)?))?", path)
+        or re.fullmatch(r"/klassenarbeit/[0-9]+(?:/(?:plan/(?:neu|status)|lerntag|ergebnis|kalender|themen|loeschen|einstufung(?:/[0-9]+)?|lernen(?:/(?:start|status|wartet|neu|anker|diagnose|weiter|aufgabe|vorhersage|transfer|tipp|fortsetzen|pause|hilfe|klasse-bestaetigen|voraussetzung(?:/(?:lernen|weiter))?))?|simulation(?:/[0-9]+(?:/antworten)?)?))?", path)
     ):
         return True
     if schulblaetter_kind and (
