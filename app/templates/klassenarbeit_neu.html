@@ -1,4 +1,4 @@
-{% extends "learning_base.html" %}
+{% extends "exam_base.html" %}
 {% block title %}Neue Klassenarbeit – {{ companion_name }}{% endblock %}
 {% block content %}
 {# Beide Wege zu einer neuen Arbeit an einem Ort: selbst eintragen oder das
@@ -9,8 +9,8 @@
 <section class="card">
   <h1><img class="pruefung-zeichen" src="/static/pruefung-symbol.svg" alt="" aria-hidden="true">Neue Klassenarbeit</h1>
   <p class="hint">1. Termin und Themen → 2. Lerntage wählen → 3. Vorbereiten</p>
-  <form method="post" action="/klassenarbeit" class="learn-form exam-create-form">{{ csrf_input() }}
-    <div class="learn-two-col compact">
+  <form method="post" action="/klassenarbeit" class="form-grid exam-create-form">{{ csrf_input() }}
+    <div class="two-col compact">
       <div class="field"><label for="exam_date">Termin</label><input type="date" id="exam_date" name="exam_date" min="{{ today }}" value="{{ draft.get('exam_date', '') or '' }}" required></div>
       <div class="field"><label for="exam_subject">Fach</label><select id="exam_subject" name="fach" required>{% set gewaehlt = draft.get('fach') or aktives_fach %}{% for key, label in faecher %}<option value="{{ key }}" {{ 'selected' if key == gewaehlt }}>{{ label }}</option>{% endfor %}</select></div>
     </div>
@@ -25,8 +25,8 @@ Textaufgaben">{{ draft.get('themen', '') }}</textarea>
        reicht den bisherigen Formularstand an den Upload weiter. #}
     <p class="hint">oder</p>
     <p class="actions">
-      <a class="learn-zweit-action" href="/klassenarbeit/themenblatt" data-formularstand>📄 Themenblatt hochladen</a>
-      <a class="learn-zweit-action" href="/klassenarbeit/themenblatt?kamera=1" data-formularstand>Foto machen</a>
+      <a class="zweit-aktion" href="/klassenarbeit/themenblatt" data-formularstand>📄 Themenblatt hochladen</a>
+      <a class="zweit-aktion" href="/klassenarbeit/themenblatt?kamera=1" data-formularstand>Foto machen</a>
     </p>
     <button type="submit">Klassenarbeit anlegen →</button>
   </form>

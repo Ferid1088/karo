@@ -2,7 +2,7 @@
 {% block title %}Fragen – {{ companion_name }}{% endblock %}
 {% block mainclass %}{{ 'focus-view' if quiz.state == 'bereit' and quiz.modus == 'bildschirm' else '' }}{% endblock %}
 {% block content %}
-<div class="learning-session quiz-session">
+<div class="session-page quiz-session">
 <a class="session-back" href="/lernen">Lernplatz verlassen</a>
 <div data-quiz-state="{{ quiz.state }}" data-draft-revision="{{ quiz.draft_revision }}" data-draft-position="{{ quiz.draft_position }}" data-draft-key="karo-antworten-{{ quiz.id }}"></div>
 {% set thema = quiz.thema or {} %}

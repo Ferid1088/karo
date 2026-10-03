@@ -1,8 +1,8 @@
-{% extends "learning_base.html" %}
+{% extends basis %}
 {% block title %}{{ thema }} – {{ companion_name }}{% endblock %}
 {% block content %}
 <div style="max-width:36rem;margin:0 auto">
-<a class="back-link" href="{{ learning_back }}">← Zurück</a>
+<a class="back-link" href="{{ sitzung_zurueck }}">← Zurück</a>
 <h1>{{ companion_name }} bereitet das gerade vor</h1>
 
 <section class="card" data-wartet data-thema="{{ thema }}">
@@ -13,9 +13,9 @@
   <p class="hint" data-meldung role="status" aria-live="polite">Wird vorbereitet …</p>
 </section>
 
-<section class="card"><form method="post" action="{{ learning_base }}/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ topic_id or '' }}"><input type="hidden" name="thema" value="{{ thema }}"><button type="submit">Erneut versuchen</button></form>
+<section class="card"><form method="post" action="{{ sitzung_base }}/start">{{ csrf_input() }}<input type="hidden" name="topic_id" value="{{ topic_id or '' }}"><input type="hidden" name="thema" value="{{ thema }}"><button type="submit">Erneut versuchen</button></form>
   <h2>Solange etwas anderes?</h2>
-  <a class="btn ghost" href="{{ learning_back }}">Zurück zu {{ learning_area }}</a>
+  <a class="btn ghost" href="{{ sitzung_zurueck }}">Zurück zu {{ bereich_name }}</a>
 </section>
 </div>
 

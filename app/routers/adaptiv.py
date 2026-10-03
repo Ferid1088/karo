@@ -31,21 +31,24 @@ def _context(request: Request) -> dict:
             " AND subject IN ('deutsch','mathematik','englisch')", eid)):
         raise HTTPException(404, "Diese Klassenarbeit gibt es nicht.")
     return {
-        "learning_exam_id": eid,
-        "learning_base": f"/klassenarbeit/{eid}/lernen" if eid else "/lernen/adaptiv",
-        "learning_back": f"/klassenarbeit/{eid}" if eid else "/lernen",
-        "learning_area": "Prüfungsvorbereitung" if eid else "Meine Themen",
-        "learning_ui": True, "show_nav": False, "adult_page": False,
+        "bereich_exam_id": eid,
+        # Die Sitzungsbildschirme teilen sich die Templates beider Bereiche —
+        # die Basis kommt von hier, nie aus dem Template selbst.
+        "basis": "exam_base.html" if eid else "learning_base.html",
+        "sitzung_base": f"/klassenarbeit/{eid}/lernen" if eid else "/lernen/adaptiv",
+        "sitzung_zurueck": f"/klassenarbeit/{eid}" if eid else "/lernen",
+        "bereich_name": "Prüfungsvorbereitung" if eid else "Meine Themen",
+        "show_nav": False, "adult_page": False,
     }
 
 
 def _topic(request: Request, raw: str) -> dict | None:
     ctx = _context(request)
     if not raw:
-        if ctx["learning_exam_id"]:
+        if ctx["bereich_exam_id"]:
             raise HTTPException(400, "Wähle ein Prüfungsthema aus deinem Lernplan.")
         return None
-    topic = learning_hub.topic_in_scope(int(raw), ctx["learning_exam_id"]) if raw.isdigit() else None
+    topic = learning_hub.topic_in_scope(int(raw), ctx["bereich_exam_id"]) if raw.isdigit() else None
     if topic is None:
         raise HTTPException(404, "Dieses Thema gehört nicht zu diesem Lernbereich.")
     return topic
@@ -53,7 +56,7 @@ def _topic(request: Request, raw: str) -> dict | None:
 
 def _owns(request: Request, session: dict) -> bool:
     entry = store.eingabe(session.get("eingabe_id")) or {}
-    eid = _context(request)["learning_exam_id"]
+    eid = _context(request)["bereich_exam_id"]
     tid = entry.get("topic_id")
     return (bool(learning_hub.topic_in_scope(tid, eid)) if tid else eid is None)
 
@@ -65,7 +68,7 @@ def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
     warning = _grade_gate(request, concept, entry.get('thema_text') or '', entry.get('topic_id'))
     if warning is not None:
         return warning
-    request.session["learning_session:" + ctx["learning_base"]] = sitzung["id"]
+    request.session["learning_session:" + ctx["sitzung_base"]] = sitzung["id"]
     screen = unterricht.bildschirm(sitzung)
     steps = {"anker": 1, "diagnose": 1, "vorhersage": 2, "haken": 2,
              "regel": 2, "beispiel": 3, "anders": 2, "transfer": 6,
@@ -74,8 +77,8 @@ def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
              "wiederholung_waehlen": 6, "geschafft": 6}
     step = steps.get(screen["art"], 5 if sitzung.get("phase") == "INDEPENDENT_TASK" else 4)
     return render(request, "adaptiv.html", sitzung=sitzung, schirm=screen,
-                  learning_title=entry.get("thema_text") or concept.get("label", "Dein Thema"),
-                  learning_step=step, **ctx)
+                  bereich_titel=entry.get("thema_text") or concept.get("label", "Dein Thema"),
+                  bereich_schritt=step, **ctx)
 
 
 def _grade_signer():
@@ -84,11 +87,11 @@ def _grade_signer():
 
 def _grade_gate(request: Request, concept: dict, thema: str, topic_id: int | None):
     ctx = _context(request)
-    info = grade_guidance.guidance(concept, ctx['learning_base'], topic_id, thema)
+    info = grade_guidance.guidance(concept, ctx['sitzung_base'], topic_id, thema)
     if not info['mismatch'] or info['acknowledged']:
         return None
     token = _grade_signer().dumps(dict(key=info['key'], concept_id=concept['id'],
-        topic_id=topic_id, thema=thema, area=ctx['learning_base'], csrf=request.session.get('csrf')))
+        topic_id=topic_id, thema=thema, area=ctx['sitzung_base'], csrf=request.session.get('csrf')))
     return render(request, 'learning_grade_warning.html', guidance=info, confirmation=token, **ctx)
 
 
@@ -102,7 +105,7 @@ def klasse_bestaetigen(request: Request, confirmation: str = Form('')):
         proof = _grade_signer().loads(confirmation, max_age=config.ops().hinweis_max_age_seconds)
     except BadSignature:
         raise HTTPException(400, 'Der Hinweis ist abgelaufen. Bitte öffne dein Thema erneut.')
-    if proof.get('area') != ctx['learning_base'] or proof.get('csrf') != request.session.get('csrf'):
+    if proof.get('area') != ctx['sitzung_base'] or proof.get('csrf') != request.session.get('csrf'):
         raise HTTPException(403, 'Diese Bestätigung gehört nicht zu diesem Lernbereich.')
     topic = _topic(request, str(proof.get('topic_id') or ''))
     concept = store.konzept(proof['concept_id'])
@@ -110,9 +113,9 @@ def klasse_bestaetigen(request: Request, confirmation: str = Form('')):
         raise HTTPException(409, 'Die Lernreihe muss erneut geprüft werden.')
     if topic and (topic['label'] != proof['thema'] or topic['subject'] != concept['fach']):
         raise HTTPException(409, 'Das Thema wurde geändert. Bitte öffne es erneut.')
-    info = grade_guidance.guidance(concept, ctx['learning_base'], (topic or {}).get('id'), proof['thema'])
+    info = grade_guidance.guidance(concept, ctx['sitzung_base'], (topic or {}).get('id'), proof['thema'])
     if proof['key'] != info['key']:
-        return _grade_gate(request, concept, proof['thema'], (topic or {}).get('id')) or zurueck(ctx['learning_back'])
+        return _grade_gate(request, concept, proof['thema'], (topic or {}).get('id')) or zurueck(ctx['sitzung_zurueck'])
     grade_guidance.acknowledge(info)
     previous = store.letzte_fuer_thema((topic or {}).get('id'), concept['id'])
     return _zeige(request, previous or unterricht.starte(concept['id'], proof['thema'], (topic or {}).get('id')))
@@ -120,7 +123,7 @@ def klasse_bestaetigen(request: Request, confirmation: str = Form('')):
 
 def _laufende(request: Request) -> dict | None:
     ctx = _context(request)
-    selected = request.query_params.get("sitzung") or request.session.get("learning_session:" + ctx["learning_base"])
+    selected = request.query_params.get("sitzung") or request.session.get("learning_session:" + ctx["sitzung_base"])
     if selected:
         session = store.sitzung(int(selected)) if str(selected).isdigit() else None
         if session and _owns(request, session):
@@ -128,7 +131,7 @@ def _laufende(request: Request) -> dict | None:
         if request.query_params.get("sitzung"):
             raise HTTPException(404, "Diese Lernrunde gehört nicht zu diesem Lernbereich.")
     # Resume after login, scoped in SQL; never resume the other area's last session.
-    eid = ctx["learning_exam_id"]
+    eid = ctx["bereich_exam_id"]
     if eid:
         row = db.q1("""SELECT s.id FROM lern_sitzung s JOIN lern_eingabe i ON i.id=s.eingabe_id
             JOIN exam_topic x ON x.topic_id=i.topic_id WHERE x.exam_id=?
@@ -150,7 +153,7 @@ def _fach(request: Request, topic: dict | None, wert: str = "") -> str:
 
 def _auswahl(request: Request, thema: str = "", nichts_gefunden: bool = False, fach: str = ""):
     ctx = _context(request)
-    if ctx["learning_exam_id"] or _aus():
+    if ctx["bereich_exam_id"] or _aus():
         return render(request, "learning_unavailable.html", thema=thema,
                       disabled=_aus(), **ctx)
     fach = _fach(request, None, fach)
@@ -165,15 +168,15 @@ def _wartet(request: Request, thema: str, topic_id: int | None = None, fach: str
     ctx = _context(request)
     query = urlencode({"thema": thema, "topic_id": topic_id or "", "fach": fach})
     return render(request, "adaptiv_wartet.html", thema=thema, topic_id=topic_id,
-                  status_url=ctx["learning_base"] + "/status?" + query,
-                  resume_url=ctx["learning_base"] + "/wartet?" + query, **ctx)
+                  status_url=ctx["sitzung_base"] + "/status?" + query,
+                  resume_url=ctx["sitzung_base"] + "/wartet?" + query, **ctx)
 
 
 @router.get("", response_class=HTMLResponse)
 @exam_router.get("", response_class=HTMLResponse)
 def start(request: Request):
     if _aus():
-        return zurueck(_context(request)["learning_back"])
+        return zurueck(_context(request)["sitzung_zurueck"])
     active = _laufende(request)
     return _zeige(request, active) if active else _auswahl(request)
 
@@ -185,7 +188,7 @@ def start_thema(request: Request, thema: str = Form(""),
                 fach: str = Form("")):
     ctx = _context(request)
     # A posted exam_id must never turn a personal URL into an exam journey.
-    if posted_exam_id and str(ctx["learning_exam_id"]) != str(posted_exam_id):
+    if posted_exam_id and str(ctx["bereich_exam_id"]) != str(posted_exam_id):
         raise HTTPException(404, "Bitte öffne den Lernplan deiner Klassenarbeit.")
     topic = _topic(request, str(topic_id))
     if _aus():
@@ -287,7 +290,7 @@ def _answer(request: Request, action: str, answer="", kennung=""):
         return _auswahl(request)
     active = _laufende(request)
     if active is None:
-        return zurueck(_context(request)["learning_base"])
+        return zurueck(_context(request)["sitzung_base"])
     entry = store.eingabe(active['eingabe_id']) or {}
     warning = _grade_gate(request, store.konzept(active['konzept_id']),
                           entry.get('thema_text') or '', entry.get('topic_id'))

@@ -1,4 +1,4 @@
-{% extends "learning_base.html" %}
+{% extends "exam_base.html" %}
 {% block title %}Klassenarbeit – {{ companion_name }}{% endblock %}
 {% block content %}
 {% set upcoming = zeilen|selectattr('days_left', 'ge', 0)|sort(attribute='exam_date')|list %}

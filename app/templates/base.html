@@ -15,8 +15,8 @@
   <link rel="stylesheet" href="/static/karo.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/simple.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/areas.css?v={{ asset_version|default('0') }}-nav-spacing2">
-  <link rel="stylesheet" href="/static/learning-mascot.css?v=2">
-  {% if learning_ui|default(false) %}<link rel="stylesheet" href="/static/learning.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/learning-exam.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/learning-session.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/exam-detail.css?v={{ asset_version|default('0') }}-journeys3"><link rel="stylesheet" href="/static/exam-overview-calendar.css?v={{ asset_version|default('0') }}-2">{% elif exam_ui|default(false) %}<link rel="stylesheet" href="/static/exam-detail.css?v={{ asset_version|default('0') }}-journeys3"><link rel="stylesheet" href="/static/exam-overview-calendar.css?v={{ asset_version|default('0') }}-2">{% endif %}
+  <link rel="stylesheet" href="/static/nav-icons.css?v={{ asset_version|default('0') }}">
+  {% if learning_ui|default(false) %}<link rel="stylesheet" href="/static/learning.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/session.css?v={{ asset_version|default('0') }}">{% elif exam_ui|default(false) %}<link rel="stylesheet" href="/static/session.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/exam.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/exam-detail.css?v={{ asset_version|default('0') }}-journeys3"><link rel="stylesheet" href="/static/exam-overview-calendar.css?v={{ asset_version|default('0') }}-2">{% endif %}
   {% if world_page|default(false) %}<link rel="stylesheet" href="/static/meine-welt.css?v={{ asset_version|default('0') }}">{% endif %}
   {% block page_styles %}{% endblock %}
   <script src="/static/simple.js?v={{ asset_version|default('0') }}" defer></script>
@@ -48,7 +48,7 @@
   }
 </script>
 </head>
-<body class="{{ 'learning-ui ' if learning_ui|default(false) }}{{ 'exam-page ' if exam_ui|default(false) or (learning_ui|default(false) and path.startswith('/klassenarbeit')) }}{{ 'nur-ansehen' if nur_ansehen|default(false) }}">
+<body class="{{ 'learning-ui ' if learning_ui|default(false) }}{{ 'exam-page ' if exam_ui|default(false) }}{{ 'nur-ansehen' if nur_ansehen|default(false) }}">
 {% macro csrf_input() -%}
 <input type="hidden" name="{{ csrf_field }}" value="{{ csrf }}">
 {%- endmacro %}

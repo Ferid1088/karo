@@ -123,7 +123,7 @@ code, dd { overflow-wrap: anywhere; }
   .actions { flex-wrap: wrap; }
   .simple-footer { width: calc(100% - 2rem); flex-wrap: wrap; }
   .simple-footer span { display: none; }
-  .lernmaterial-frame { min-height: 460px; height: 72vh; }
+  .material-frame { min-height: 460px; height: 72vh; }
   .exam-card .tablewrap { overflow: visible; }
   .exam-card table, .exam-card tbody, .exam-card tr, .exam-card td { display: block; width: 100%; }
   .exam-card thead { display: none; }

@@ -1,4 +1,4 @@
-{% extends "learning_base.html" %}
+{% extends basis %}
 {% block title %}Lernen mit {{ companion_name }}{% endblock %}
 {% block content %}
 {% set h = schirm.hilfe %}
@@ -76,10 +76,10 @@
 {% endif %}
 {%- endmacro %}
 
-<div class="adaptiv learning-session">
+<div class="adaptiv session-page">
 <header class="session-header">
-  <div><a class="session-back" href="{{ learning_back }}">← {{ learning_area }}</a><p class="eyebrow">{{ learning_area|upper }}</p><h1>{{ learning_title }}</h1></div>
-  <div class="session-progress" aria-label="Schritt {{ learning_step }} von 6"><span>Schritt {{ learning_step }} von 6</span><div class="session-dots">{% for i in range(1,7) %}<i class="{{ 'current' if i == learning_step else 'done' if i < learning_step else '' }}"></i>{% endfor %}</div></div>
+  <div><a class="session-back" href="{{ sitzung_zurueck }}">← {{ bereich_name }}</a><p class="eyebrow">{{ bereich_name|upper }}</p><h1>{{ bereich_titel }}</h1></div>
+  <div class="session-progress" aria-label="Schritt {{ bereich_schritt }} von 6"><span>Schritt {{ bereich_schritt }} von 6</span><div class="session-dots">{% for i in range(1,7) %}<i class="{{ 'current' if i == bereich_schritt else 'done' if i < bereich_schritt else '' }}"></i>{% endfor %}</div></div>
 </header>
 
 {% if schirm.fehlerhinweis %}<p class="hint">{{ schirm.fehlerhinweis }}</p>{% endif %}
@@ -88,7 +88,7 @@
 {% if schirm.art == 'anker' %}
 <section class="card">
   <p>{{ schirm.text }}</p>
-  <form method="post" action="{{ learning_base }}/anker?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/anker?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <input type="text" name="antwort" aria-label="Deine Idee" placeholder="Deine Idee …" maxlength="1000" autofocus>
     <button type="submit">Weiter</button>
@@ -99,7 +99,7 @@
 <section class="card">
   {% if schirm.hinweis %}<p>{{ schirm.hinweis }}</p>{% endif %}
   <p><strong>{{ schirm.frage }}</strong></p>
-  <form method="post" action="{{ learning_base }}/diagnose?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/diagnose?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <input type="text" name="antwort" aria-label="Deine Antwort" placeholder="Deine Antwort …" maxlength="1000" autofocus>
     <button type="submit">Prüfen</button>
@@ -111,7 +111,7 @@
   <p>{{ schirm.inhalt.get('haken', '') }}</p>
   {{ komponente(schirm.bild) }}
   <p><strong>{{ schirm.aufgabe.frage }}</strong></p>
-  <form method="post" action="{{ learning_base }}/vorhersage?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/vorhersage?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <div class="actions">
       {% for wert, beschriftung in schirm.aufgabe.optionen %}
@@ -129,7 +129,7 @@
   <p>Deine Antwort war {{ schirm.eigene_antwort }}.</p>
   {% endif %}
   {{ komponente(schirm.bild) }}
-  <form method="post" action="{{ learning_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <button type="submit">Weiter</button>
   </form>
@@ -138,7 +138,7 @@
 {% elif schirm.art == 'transfer' %}
 <section class="card">
   <p><strong>{{ schirm.aufgabe.frage }}</strong></p>
-  <form method="post" action="{{ learning_base }}/transfer?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/transfer?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <div class="actions">
       {% for wert, beschriftung in schirm.aufgabe.optionen %}
@@ -153,7 +153,7 @@
   <p>{{ schirm.inhalt.get('regel', '') }}</p>
   {{ komponente(schirm.bild) }}
   <p>{{ schirm.inhalt.get('bild', {}).get('bleibt_gleich', '') }}</p>
-  <form method="post" action="{{ learning_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <button type="submit">Zeig mir ein Beispiel</button>
   </form>
@@ -166,7 +166,7 @@
   <p>{{ schritt.text }}</p>
   {% if schritt.bild %}{{ streifen(schritt.bild[0], schritt.bild[1]) }}{% endif %}
   {% endfor %}
-  <form method="post" action="{{ learning_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <button type="submit">Jetzt versuche ich es selbst</button>
   </form>
@@ -176,13 +176,13 @@
 <section class="card">
   <p><strong>{{ schirm.aufgabe.frage }}</strong></p>
   {{ komponente(schirm.bild) }}
-  <form method="post" action="{{ learning_base }}/aufgabe?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/aufgabe?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <input type="text" name="antwort" aria-label="Deine Antwort" placeholder="Deine Antwort …" maxlength="1000" autofocus>
     <button type="submit">Prüfen</button>
   </form>
   {% if schirm.tipp_offen %}
-  <form method="post" action="{{ learning_base }}/tipp?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/tipp?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <button type="submit" class="ghost">Tipp</button>
   </form>
@@ -195,7 +195,7 @@
   <p>Schauen wir es sonst einmal anders an.</p>
   {{ komponente(schirm.bild) }}
   <p>{{ schirm.inhalt.get('bild', {}).get('bleibt_gleich', '') }}</p>
-  <form method="post" action="{{ learning_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <button type="submit">Nochmal probieren</button>
   </form>
@@ -206,10 +206,10 @@
     das noch einmal anschaut — wer den Termin mitbestimmt, haelt ihn eher
     ein. Der Vorschlag ist markiert, nicht vorausgewaehlt. -#}
 <section class="card">
-  <p>Gut gemacht! Du hast „{{ learning_title }}“ verstanden und sicher gelöst.</p>
+  <p>Gut gemacht! Du hast „{{ bereich_titel }}“ verstanden und sicher gelöst.</p>
   <p><strong>Damit es sitzt:</strong> Wann willst du es noch einmal anschauen?
      Dauert nur ein paar Minuten.</p>
-  <form method="post" action="{{ learning_base }}/wiederholung?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/wiederholung?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <div class="actions">
       {% for m in schirm.auswahl %}
@@ -226,7 +226,7 @@
   <p>Bevor wir weitermachen, schauen wir kurz, ob etwas von vorher schon sitzt:
      <strong>„{{ schirm.voraussetzung }}“</strong>. Das ist kein Fehler und keine
      Strafe — es zeigt nur, woran es gerade klemmt.</p>
-  <form method="post" action="{{ learning_base }}/voraussetzung?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/voraussetzung?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     {% for aufgabe in schirm.aufgaben %}
     <p><strong>{{ aufgabe.frage }}</strong></p>
@@ -240,8 +240,8 @@
 <section class="card">
   <p>Da fehlt noch ein Stück — gut, dass wir es gemerkt haben!</p>
   <p>Erst lernen wir kurz „{{ schirm.voraussetzung }}“, dann geht es weiter
-     mit „{{ learning_title }}“.</p>
-  <form method="post" action="{{ learning_base }}/voraussetzung/lernen?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+     mit „{{ bereich_titel }}“.</p>
+  <form method="post" action="{{ sitzung_base }}/voraussetzung/lernen?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <button type="submit">Jetzt „{{ schirm.voraussetzung }}“ lernen</button>
   </form>
@@ -250,18 +250,18 @@
 {% elif schirm.art == 'voraussetzung_zurueck' %}
 <section class="card">
   <p>„{{ schirm.voraussetzung }}“ sitzt jetzt — da klemmt nichts mehr.</p>
-  <p>Weiter geht es genau da, wo du warst: „{{ learning_title }}“.</p>
-  <form method="post" action="{{ learning_base }}/voraussetzung/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <p>Weiter geht es genau da, wo du warst: „{{ bereich_titel }}“.</p>
+  <form method="post" action="{{ sitzung_base }}/voraussetzung/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
-    <button type="submit">Weiter mit „{{ learning_title }}“</button>
+    <button type="submit">Weiter mit „{{ bereich_titel }}“</button>
   </form>
 </section>
 
 {% elif schirm.art == 'voraussetzung_geschafft' %}
 <section class="card">
-  <p>Geschafft! „{{ learning_title }}“ hast du verstanden — genau das hat vorher gefehlt.</p>
+  <p>Geschafft! „{{ bereich_titel }}“ hast du verstanden — genau das hat vorher gefehlt.</p>
   <p>Jetzt geht es zurück zu „{{ schirm.thema }}“.</p>
-  <form method="post" action="{{ learning_base }}/voraussetzung/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+  <form method="post" action="{{ sitzung_base }}/voraussetzung/weiter?sitzung={{ sitzung.id }}">{{ csrf_input() }}
     <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
     <button type="submit">Weiter mit „{{ schirm.thema }}“</button>
   </form>
@@ -273,17 +273,17 @@
   <p>Diese Aufgabe schaut ihr euch am besten zu zweit an. Karo hat sich
      gemerkt, worum es ging.</p>
   <div class="actions">
-    <a class="btn" href="{{ learning_back }}">Etwas anderes lernen</a>
+    <a class="btn" href="{{ sitzung_zurueck }}">Etwas anderes lernen</a>
   </div>
 </section>
 
 {% elif schirm.art == 'geschafft' %}
 <section class="card">
-  <p>Gut gemacht! Du hast „{{ learning_title }}“ verstanden und sicher gelöst.</p>
+  <p>Gut gemacht! Du hast „{{ bereich_titel }}“ verstanden und sicher gelöst.</p>
   {% if schirm.wiederholung_am %}<p>Am {{ schirm.wiederholung_am }} schaut ihr es noch einmal kurz an — es steht schon in deinem Tag.</p>{% endif %}
   <div class="actions">
-    <form method="post" action="{{ learning_base }}/neu?sitzung={{ sitzung.id }}">{{ csrf_input() }}<button type="submit">Noch einmal</button></form>
-    <a class="btn ghost" href="{{ learning_back }}">Zurück</a>
+    <form method="post" action="{{ sitzung_base }}/neu?sitzung={{ sitzung.id }}">{{ csrf_input() }}<button type="submit">Noch einmal</button></form>
+    <a class="btn ghost" href="{{ sitzung_zurueck }}">Zurück</a>
   </div>
 </section>
 
@@ -294,7 +294,7 @@
   <p>Hier weiß Karo gerade nicht weiter. Das liegt nicht an dir —
      frag am besten einmal einen Menschen.</p>
   <div class="actions">
-    <a class="btn" href="{{ learning_back }}">Zurück</a>
+    <a class="btn" href="{{ sitzung_zurueck }}">Zurück</a>
   </div>
 </section>
 {% endif %}
@@ -333,7 +333,7 @@
 {% if schirm.art in ('anker', 'diagnose', 'vorhersage', 'aufgabe', 'transfer', 'voraussetzung', 'wiederholung_waehlen') %}
 <script>
 (function () {
-  var ziel = {{ (learning_base ~ '/puls')|tojson }};
+  var ziel = {{ (sitzung_base ~ '/puls')|tojson }};
   var feld = {{ csrf_field|tojson }}, wert = {{ csrf|tojson }};
   var zuletzt = 0, ABSTAND = 15000;
   function melden() {

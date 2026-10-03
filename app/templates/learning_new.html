@@ -4,8 +4,8 @@
 {% block content %}
 <a class="back-link" href="/lernen/{{ fach }}">← {{ fach|fachname }}</a>
 <section class="learn-heading"><div><p class="eyebrow">NEUGIER IST EIN GUTER ANFANG</p><h1>Was möchtest du verstehen?</h1><p>Beschreibe dein Thema oder wähle eins aus.</p></div><img src="/static/karo-owl-book.png" alt="" width="110"></section>
-<div class="learn-two-col learn-three-col">
-<section class="card"><h2>Mein eigenes Thema</h2><form method="post" action="/lernen/neu" class="learn-form">{{ csrf_input() }}<label for="new-topic">Das möchte ich lernen</label><input id="new-topic" name="thema" placeholder="Zum Beispiel: Brüche addieren" maxlength="200" required>{% include 'learning_subject_fields.html' %}<button type="submit">Thema hinzufügen →</button></form></section>
+<div class="two-col learn-three-col">
+<section class="card"><h2>Mein eigenes Thema</h2><form method="post" action="/lernen/neu" class="form-grid">{{ csrf_input() }}<label for="new-topic">Das möchte ich lernen</label><input id="new-topic" name="thema" placeholder="Zum Beispiel: Brüche addieren" maxlength="200" required>{% include 'learning_subject_fields.html' %}<button type="submit">Thema hinzufügen →</button></form></section>
 <section class="card topic-catalog" aria-labelledby="catalog-heading">
 <h2 id="catalog-heading">Ein Thema aussuchen</h2>
 {% if katalog %}
@@ -40,8 +40,8 @@
   <h2 id="material-heading">📄 Arbeitsblatt oder Foto</h2>
   <p>Lade eine oder mehrere Seiten hoch. {{ companion_name }} erkennt die Themen für dich.</p>
   <div class="actions">
-    <a class="learn-zweit-action" href="/lernen/material?fach={{ fach }}">Datei hochladen</a>
-    <a class="learn-zweit-action" href="/lernen/material?fach={{ fach }}&amp;kamera=1">Foto machen</a>
+    <a class="zweit-aktion" href="/lernen/material?fach={{ fach }}">Datei hochladen</a>
+    <a class="zweit-aktion" href="/lernen/material?fach={{ fach }}&amp;kamera=1">Foto machen</a>
   </div>
   <p class="hint">PDF · JPG · PNG — bis zu 10 Seiten</p>
 </section>

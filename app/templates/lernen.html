@@ -102,8 +102,8 @@
 {% endif %}</section>{% endif %}
 {% if r and r.material_pfad %}
 <section class="card lesson-content"><h2>Deine Erklärung</h2>
-{% if r.material_pfad.lower().endswith('.mp4') %}<video class="lernmaterial-video" controls preload="metadata" src="/material/{{ r.id }}"></video>
-{% else %}<iframe class="lernmaterial-frame" title="Erklärung: {{ thema.label }}" src="/material/{{ r.id }}" sandbox="allow-scripts"></iframe>{% endif %}
+{% if r.material_pfad.lower().endswith('.mp4') %}<video class="material-video" controls preload="metadata" src="/material/{{ r.id }}"></video>
+{% else %}<iframe class="material-frame" title="Erklärung: {{ thema.label }}" src="/material/{{ r.id }}" sandbox="allow-scripts"></iframe>{% endif %}
 <a class="secondary-link" href="/material/{{ r.id }}" target="_blank" rel="noopener">Lernmaterial öffnen ↗ · in voller Größe</a>
 {% if r.erklaerung.get('kernidee') %}<p class="quiet-note">{{ r.erklaerung.kernidee }}</p>{% endif %}
 {% if r.quiz %}<a class="btn section-space" href="/quiz/{{ r.quiz.id }}">{{ 'Antworten gemeinsam ansehen' if r.quiz.state in ('geprueft','ausgewertet') else 'Mit den Fragen weiter' }}</a>

@@ -69,7 +69,7 @@ def render_einstufung(request, exam_id: int, naechstes, offen):
                   inhalte=exam_effort_stand(exam_id),
                   thema=(naechstes or {}).get("topic"), offen=offen,
                   adult_page=not config.load().klassenarbeit_kind,
-                  learning_ui=True, show_nav=False)
+                  show_nav=False)
 
 
 def exam_effort_stand(exam_id: int) -> dict:

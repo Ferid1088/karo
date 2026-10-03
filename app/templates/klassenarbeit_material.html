@@ -1,4 +1,4 @@
-{% extends "learning_base.html" %}
+{% extends "exam_base.html" %}
 {% block title %}{{ material.titel }} – {{ companion_name }}{% endblock %}
 {% block content %}
 <a class="back-link" href="/klassenarbeit/{{ material.exam_id }}">← Zu deiner Klassenarbeit</a>
@@ -6,9 +6,9 @@
 <p class="hint">Gespeichertes Material aus einer früheren Prüfungsvorbereitung. Neue Lernrunden startest du in deinem Prüfungsplan.</p>
 {% if material.state == 'bereit' %}
   {% if material.mime == 'video/mp4' %}
-  <video class="lernmaterial-video" controls preload="metadata" src="/klassenarbeit/material/{{ material.id }}/inhalt">Dein Browser unterstützt dieses Video nicht.</video>
+  <video class="material-video" controls preload="metadata" src="/klassenarbeit/material/{{ material.id }}/inhalt">Dein Browser unterstützt dieses Video nicht.</video>
   {% else %}
-  <iframe class="lernmaterial-frame" title="{{ material.titel }}" src="/klassenarbeit/material/{{ material.id }}/inhalt" sandbox="allow-scripts"></iframe>
+  <iframe class="material-frame" title="{{ material.titel }}" src="/klassenarbeit/material/{{ material.id }}/inhalt" sandbox="allow-scripts"></iframe>
   {% endif %}
 {% else %}
   <div class="card" role="status">

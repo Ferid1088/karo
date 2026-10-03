@@ -35,7 +35,7 @@
 <section class="card" id="blatt-thema">
   <h2>{% if abschnitte %}Wozu gehört dieses Blatt?{% else %}Text vom Blatt einfügen{% endif %}</h2>
   {% if not abschnitte %}
-  <form method="post" action="/blatt/text" class="learn-form">
+  <form method="post" action="/blatt/text" class="form-grid">
     {{ csrf_input() }}
     <input type="hidden" name="fach" value="{{ doc.subject }}">
     <input type="hidden" name="document_id" value="{{ doc.id }}">
@@ -46,7 +46,7 @@
     <button type="submit">Text übernehmen</button>
   </form>
   {% else %}
-  <form method="post" action="/blatt/{{ doc.id }}/thema" class="learn-form">
+  <form method="post" action="/blatt/{{ doc.id }}/thema" class="form-grid">
     {{ csrf_input() }}
     {% if vorschlaege %}
     <p>Passt eines davon?</p>

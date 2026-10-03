@@ -1,7 +1,7 @@
 {% extends "learning_base.html" %}
 {% block content %}
 <a class="back-link" href="/lernen">← Meine Themen</a>
-<section class="card learning-session">
+<section class="card session-page">
 <p class="eyebrow">DEIN THEMA IST GESPEICHERT</p>
 <h1>{{ topic.label }}</h1><p>{{ topic.subject|fachname }} · {{ topic.content_level or 'Klasseneinordnung wird geprüft' }}</p>
 <p class="hint">Deine Profilklasse: {{ cfg.learner_grade }}. Falls die Lernreihe anders eingeordnet ist, fragt Karo dich vor dem Start.</p>

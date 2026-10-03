@@ -158,7 +158,7 @@ def klassenarbeit_simulation(request: Request, exam_id: int):
         request, "exam_simulation.html",
         exam_id=exam_id,
         themen=exam_rehearsal.overview(exam_id),
-        learning_ui=True, show_nav=False, adult_page=False,
+        show_nav=False, adult_page=False,
     )
 
 
@@ -197,7 +197,7 @@ def klassenarbeit_simulation_aufgaben(request: Request, exam_id: int, topic_id: 
     if not attempt:
         return zurueck(f"/klassenarbeit/{exam_id}/simulation")
     return render(request, "exam_rehearsal.html", exam_id=exam_id, topic=topics.get(topic_id),
-                  attempt=attempt, learning_ui=True, show_nav=False, adult_page=False)
+                  attempt=attempt, show_nav=False, adult_page=False)
 
 
 @router.post("/klassenarbeit/{exam_id}/simulation/{topic_id}/antworten")
@@ -244,7 +244,7 @@ def _exam_material(material_id: int):
 def klassenarbeit_material(request: Request, material_id: int):
     material = _exam_material(material_id)
     return render(request, "klassenarbeit_material.html", material=material,
-                  learning_ui=True, show_nav=False, adult_page=False)
+                  show_nav=False, adult_page=False)
 
 
 @router.get("/klassenarbeit/material/{material_id}/inhalt")
