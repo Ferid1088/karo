@@ -22,8 +22,13 @@ ESCALATED = "ESCALATED"
 ZUSTAENDE = (INPUT_RECEIVED, MATERIAL_ANALYZED, DIAGNOSING, ERROR_IDENTIFIED,
              TEACHING, MASTERED, ESCALATED)
 
-#: Endzustände — hier wird nichts mehr ausgeliefert.
+#: Zustaende, in denen keine Antwort mehr ausgewertet wird.
 ENDZUSTAENDE = (MASTERED, ESCALATED)
+
+#: Zustaende, die eine Sitzung als beendet gelten lassen. ESCALATED gehoert
+#: nicht dazu: es markiert „braucht intensivere Begleitung", nicht „vorbei" —
+#: das Thema bleibt offen und genau dort wieder auffindbar.
+ABGESCHLOSSEN = (MASTERED,)
 
 UEBERGAENGE: dict[str, tuple[str, ...]] = {
     INPUT_RECEIVED: (MATERIAL_ANALYZED,),
@@ -32,7 +37,10 @@ UEBERGAENGE: dict[str, tuple[str, ...]] = {
     ERROR_IDENTIFIED: (TEACHING,),
     TEACHING: (DIAGNOSING, MASTERED, ESCALATED),
     MASTERED: (),
-    ESCALATED: (),
+    # Eskalation ist eine Unterstuetzungsstufe, kein Ausgang: das Kind kann
+    # jederzeit weitermachen — im Unterricht, oder wieder in der Diagnose,
+    # wenn noch gar kein Fehlertyp feststand.
+    ESCALATED: (TEACHING, DIAGNOSING),
 }
 
 # §7 — Lernphasen innerhalb von TEACHING
@@ -105,8 +113,12 @@ def starten(eingabe_id: int | None = None, konzept_id: int | None = None,
 
 
 def laufende(child_key: str = store.CHILD_KEY) -> dict | None:
-    """A6: dieselbe Phase nach Neuladen UND nach erneutem Login."""
-    return store.offene_sitzung(child_key, abgeschlossen=ENDZUSTAENDE)
+    """A6: dieselbe Phase nach Neuladen UND nach erneutem Login.
+
+    Eine eskalierte Sitzung ist offen: das Kind hat sie nicht verlassen,
+    Karo hat sie auch nicht — die naechste Anmeldung findet sie wieder.
+    """
+    return store.offene_sitzung(child_key, abgeschlossen=ABGESCHLOSSEN)
 
 
 def wechsle(sitzung_id: int, nach_zustand: str, anlass: str = "",
@@ -198,10 +210,12 @@ def runde_gescheitert(sitzung_id: int, antwort: str | None = None,
 
 
 def eskalieren(sitzung_id: int, cfg=None) -> dict:
-    """§7: Eskalation ist ein normaler Ausgang, kein Fehlerzustand.
+    """Eskalation erhoeht die Unterstuetzung — sie beendet nichts.
 
-    Danach wird keine weitere Erklärung mehr ausgeliefert, und der Fehlertyp
-    ist im Profil als „braucht einen Menschen“ markiert.
+    Der Fehlertyp wird im Profil als „braucht einen Menschen" markiert, und
+    das Kind bekommt den Begleit-Schirm: weitermachen, pausieren oder
+    zusaetzlich Hilfe holen. Weitermachen setzt die Sitzung mit tieferem
+    Scaffolding fort — das Thema wird nie automatisch verlassen.
 
     Davor steht seit Z3 eine Frage: liegt es am Konzept — oder an einer
     Voraussetzung? Wer Brüche nicht erweitern kann, scheitert beim Addieren
@@ -287,8 +301,11 @@ def antwort_richtig(sitzung_id: int, antwort: str | None = None, cfg=None,
 
     if gemeistert:
         if sitzung["konzept_id"]:
+            # Wer es am Ende ohne Mensch geschafft hat, braucht den Marker
+            # nicht mehr — im Ereignisprotokoll bleibt er trotzdem sichtbar.
             store.fortschritt_buchen(sitzung["konzept_id"],
                                      sitzung["fehlertyp_id"], mastery="sicher",
+                                     braucht_mensch=False,
                                      child_key=store.fortschritt_scope(sitzung))
         return wechsle(sitzung_id, MASTERED, "Beherrschung erreicht")
 
@@ -297,7 +314,3 @@ def antwort_richtig(sitzung_id: int, antwort: str | None = None, cfg=None,
                                  mastery="im_aufbau", child_key=store.fortschritt_scope(sitzung))
     return store.sitzung(sitzung_id)
 
-
-def darf_erklaeren(sitzung: dict) -> bool:
-    """A5: Nach der Eskalation wird keine weitere Erklärung ausgeliefert."""
-    return bool(sitzung) and sitzung.get("zustand") not in ENDZUSTAENDE

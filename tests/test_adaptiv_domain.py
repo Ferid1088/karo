@@ -260,8 +260,8 @@ def test_neue_variante_ersetzt_die_alte_nicht(client, fake_llm,
 # --------------------------------------------------------------------------
 
 def test_drei_erfolglose_runden_eskalieren(client, fake_llm, app_env):
-    """A5: Drei erfolglose Lehrrunden auf einen Fehlertyp → ESCALATED, danach
-    keine weitere Erklärung, und der Fehlertyp ist im Profil markiert."""
+    """A5: Drei erfolglose Lehrrunden auf einen Fehlertyp → Begleit-Schirm
+    (ESCALATED) — fortsetzbar, kein Abbruch; der Fehlertyp ist markiert."""
     from app.adaptiv import sitzung, store
 
     einrichten(client, fake_llm)
@@ -277,7 +277,10 @@ def test_drei_erfolglose_runden_eskalieren(client, fake_llm, app_env):
         stand = sitzung.runde_gescheitert(s["id"])
 
     assert stand["zustand"] == sitzung.ESCALATED
-    assert not sitzung.darf_erklaeren(stand)
+    # Eskalation ist fortsetzbar: der Rueckweg in den Unterricht ist
+    # vorgesehen, und das Thema bleibt als offene Sitzung auffindbar.
+    assert sitzung.TEACHING in sitzung.UEBERGAENGE[sitzung.ESCALATED]
+    assert store.sitzung(s["id"])["zustand"] == sitzung.ESCALATED
 
     profil = store.fortschritt(konzept_id, fehlertyp_id)
     assert profil["braucht_mensch"] == 1

@@ -286,7 +286,13 @@ def test_unknown_answers_offer_help_instead_of_infinite_retry(client, fake_llm, 
     for _ in range(3):
         page = post(client, token, base, sid, 'diagnose', '99999')
     assert store.sitzung(sid)['zustand'] == 'ESCALATED'
-    assert 'zu zweit' in page.text
+    # Begleitung statt Abbruch: das Kind darf im selben Thema weitermachen.
+    assert 'Mit Karo weitermachen' in page.text
+    assert 'zu zweit' not in page.text
+    seite = client.post(f"{base}/fortsetzen?sitzung={sid}",
+                        data={"_csrf": token})
+    assert seite.status_code == 200
+    assert store.sitzung(sid)['zustand'] != 'ESCALATED'
 
 
 def test_generated_grade_variant_remains_findable_without_overwriting_source(client, fake_llm, app_env, monkeypatch):

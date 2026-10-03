@@ -197,8 +197,13 @@ def _bildschirm(sitzung: dict) -> dict:
                 "hilfe": hilfe}
 
     if zustand_name == zustand.ESCALATED:
-        return {"art": "eskaliert", "hilfe": _hilfe(konzept_id, None),
-                "phase": None}
+        # „Braucht intensivere Begleitung“, nicht „vorbei“: das Kind waehlt
+        # selbst — weitermachen, pausieren oder Hilfe holen.
+        return {"art": "begleitung",
+                "eltern_gerufen": bool(daten.get("eltern_gerufen")),
+                "hilfe": _hilfe(konzept_id, None),
+                "phase": None,
+                "konzept": store.konzept(konzept_id) or {}}
     if zustand_name == zustand.MASTERED:
         # Z3: Ein geschaffter Umweg fuehrt erst zurueck an die Stelle, an der
         # es hakte — den Wiederholungstermin waehlt das Kind dort.
@@ -479,6 +484,61 @@ def _unbekannte_diagnose(sitzung: dict, daten: dict, erste: dict,
     if not weiter_moeglich or versuche >= zustand.unbekannte_antworten(cfg):
         return zustand.eskalieren(sitzung["id"])
     return _merke(sitzung["id"], sitzung, **merk)
+
+
+def fortsetzen(sitzung: dict) -> dict:
+    """„Mit Karo weitermachen“ — die Begleitung geht weiter, nie von vorn.
+
+    Stand ein Fehlertyp fest, fuehrt es im Unterricht zu einer anderen
+    Darstellung; hatte die Diagnose die Antwort nicht einordnen koennen,
+    beginnt die Lernleiter erneut — mit einer neuen Aufgabe aus dem
+    Katalog, nicht mit derselben Sackgasse.
+    """
+    daten = dict(sitzung.get("daten") or {})
+    daten.pop("eltern_gerufen", None)
+    if sitzung["zustand"] == zustand.ESCALATED:
+        if sitzung.get("fehlertyp_id"):
+            s = zustand.wechsle(sitzung["id"], zustand.TEACHING,
+                                "Begleitung fortgesetzt",
+                                phase=zustand.ADAPTATION)
+            return store.sitzung_aktualisieren(sitzung["id"], daten=daten) or s
+        # Kein Fehlertyp bekannt: neue Diagnose-Aufgabe, Leiter von vorn.
+        daten["unbekannte_antworten"] = 0
+        daten["unbekannt_stufe"] = 0
+        erste, _ = _diagnose_aufgaben(sitzung["konzept_id"])
+        zusatz = _diagnose_zusatz(sitzung["konzept_id"], daten, erste)
+        if zusatz:
+            gezeigt = list(daten.get("zusatz_gezeigt") or [])
+            gezeigt.append(zusatz["frage"])
+            daten["diagnose_zusatz"] = zusatz
+            daten["zusatz_gezeigt"] = gezeigt
+        daten.pop("zweite_diagnose", None)
+        s = zustand.wechsle(sitzung["id"], zustand.DIAGNOSING,
+                            "Begleitung fortgesetzt")
+        store.sitzung_aktualisieren(sitzung["id"], daten=daten)
+        return s
+    if sitzung["zustand"] == zustand.TEACHING:
+        # Ohne Material in dieser Phase: zurueck zur anderen Darstellung —
+        # die braucht keine Aufgabe aus dem Katalog.
+        if sitzung["phase"] != zustand.ADAPTATION:
+            store.sitzung_aktualisieren(
+                sitzung["id"], daten={**daten, "fehlerhinweis": "",
+                                      "tipp_stufe": 0})
+            store.ereignis_schreiben(sitzung["id"],
+                                     "Weiter mit anderer Darstellung")
+            return zustand.wechsle_phase(sitzung["id"], zustand.ADAPTATION)
+    if sitzung["zustand"] == zustand.DIAGNOSING:
+        daten["unbekannte_antworten"] = 0
+        daten["unbekannt_stufe"] = 0
+        erste, _ = _diagnose_aufgaben(sitzung["konzept_id"])
+        zusatz = _diagnose_zusatz(sitzung["konzept_id"], daten, erste)
+        if zusatz:
+            gezeigt = list(daten.get("zusatz_gezeigt") or [])
+            gezeigt.append(zusatz["frage"])
+            daten["diagnose_zusatz"] = zusatz
+            daten["zusatz_gezeigt"] = gezeigt
+        store.sitzung_aktualisieren(sitzung["id"], daten=daten)
+    return store.sitzung(sitzung["id"])
 
 
 def diagnose_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
@@ -787,8 +847,8 @@ def voraussetzung_lernen_starten(sitzung: dict) -> dict:
 
     Die wartende Sitzung bleibt offen; die Grundlage laeuft als eigene
     Lernrunde im selben Thema, damit das Resume sie findet. Laeuft sie
-    schon, wird sie nicht verdoppelt. Trug auch sie nicht, hilft ein
-    Mensch statt eines zweiten Umwegs.
+    schon — auch eskaliert —, wird sie an ihrer letzten Stelle weiter
+    gefuehrt statt verdoppelt.
     """
     daten = _daten(sitzung)
     lokal = daten.get("voraussetzung_lokal")
@@ -796,17 +856,13 @@ def voraussetzung_lernen_starten(sitzung: dict) -> dict:
         return sitzung
     eintrag = store.eingabe(sitzung.get("eingabe_id")) or {}
     letzte = store.letzte_fuer_thema(eintrag.get("topic_id"), int(lokal))
-    if letzte and letzte["zustand"] not in zustand.ENDZUSTAENDE:
-        # Auch ein weitergefuehrter Umweg braucht den Rueckweg-Marker —
-        # sonst landet er bei MASTERED auf der Terminwahl und die wartende
-        # Sitzung findet nie mehr den Weg zurueck.
+    if letzte and letzte["zustand"] != zustand.MASTERED:
+        # Offen oder eskaliert: beides ist weiterfuehrbar. Auch ein
+        # weitergefuehrter Umweg braucht den Rueckweg-Marker — sonst landet
+        # er bei MASTERED auf der Terminwahl und die wartende Sitzung
+        # findet nie mehr den Weg zurueck.
         return _merke(letzte["id"], letzte, voraussetzung_detour=sitzung["id"])
-    if letzte and letzte["zustand"] == zustand.ESCALATED:
-        # Trug auch die Grundlage nicht, hilft ein Mensch. Erst die
-        # Merker loeschen — eskaliert darf nicht noch offen wirken.
-        ziel = zurueck_von_voraussetzung(sitzung)
-        return zustand.eskalieren(ziel["id"])
-    if letzte and letzte["zustand"] == zustand.MASTERED:
+    if letzte:
         return zurueck_von_voraussetzung(sitzung)       # geschafft genug
     store.ereignis_schreiben(sitzung["id"], "Voraussetzung wird gelernt",
                              nutzdaten={"konzept_id": int(lokal)})

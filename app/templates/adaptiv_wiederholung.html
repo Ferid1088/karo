@@ -32,10 +32,13 @@
   </form>
 </section>
 {% else %}
-{#- Kein erfundener Check: ohne gepruefte Aufgaben wird nichts gestellt. -#}
+{#- Kein erfundener Check: ohne gepruefte Aufgaben wird nichts gestellt.
+    Der Termin bleibt bestehen — Karo stellt ihn wieder, sobald neues
+    Material da ist. -#}
 <section class="card">
-  <p>Zu „{{ konzept.label }}“ gibt es gerade keine Check-Aufgaben.
-     Schau später noch einmal vorbei.</p>
+  <p>Zu „{{ konzept.label }}“ gibt es gerade keine neuen Check-Aufgaben.
+     Dein Termin bleibt bestehen — wir holen den Check nach, sobald neue
+     Aufgaben da sind.</p>
   <div class="actions"><a class="btn" href="/">Zum Tag</a></div>
 </section>
 {% endif %}
@@ -77,7 +80,8 @@
 </section>
 {% else %}
 <section class="card">
-  <p>Wann willst du es noch einmal versuchen?</p>
+  <p>Wann willst du es noch einmal versuchen? Dein Platz bleibt frei —
+     wir üben genau hier weiter.</p>
   {{ termin_wahl(eintrag.id, schirm.auswahl) }}
 </section>
 {% endif %}

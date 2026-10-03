@@ -135,7 +135,7 @@ def test_jede_domain_bildschirm_art_hat_einen_template_zweig(app_env):
     # Die Pflicht-Arten des Kreislaufs muessen die Domain auch erzeugen.
     for pflicht in ("anker", "diagnose", "vorhersage", "haken", "regel",
                     "beispiel", "aufgabe", "transfer", "anders",
-                    "wiederholung_waehlen", "geschafft", "eskaliert",
+                    "wiederholung_waehlen", "geschafft", "begleitung",
                     "voraussetzung", "voraussetzung_lernen",
                     "voraussetzung_zurueck", "voraussetzung_geschafft"):
         assert pflicht in arten, f"unerreichbare Art: {pflicht}"
@@ -283,7 +283,11 @@ def test_fehlende_aufgabe_wird_kein_leeres_formular(
 
     monkeypatch.setattr(inhalt_store, "aufgabe", lambda *a, **k: None)
     seite = client.get("/lernen/adaptiv")
-    assert "weiß Karo gerade nicht weiter" in seite.text
+    # Material erschöpft ist kein Aufgeben: Karo bietet eine andere
+    # Darstellung, Pause oder Hilfe — nie ein „ich weiß nicht weiter".
+    assert "machen wir anders" in seite.text
+    assert "Mit Karo weitermachen" in seite.text
+    assert "weiß Karo gerade nicht weiter" not in seite.text
     assert "Gut gemacht" not in seite.text
     assert 'name="antwort"' not in seite.text
 

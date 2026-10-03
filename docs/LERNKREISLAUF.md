@@ -13,7 +13,7 @@ denn sie messen verschieden, zählen verschieden und hören verschieden auf:
 | Datei | `app/adaptiv/` | `app/teaching.py`, `app/quizzes.py` |
 | Material | geprüfter Katalog (Lehrplan-Dienst) | Schulblätter + Modell |
 | Fortschritt | `lern_fortschritt` je Konzept/Fehlertyp | `topic_flag` je Thema |
-| Abbruch | nach 3 erfolglosen Runden → `ESCALATED` | nach `max_lernrunden` → `abgebrochen` |
+| Begleitung | nach `max_lehrrunden` → `ESCALATED` = Begleit-Schirm (weiter/pausieren/Hilfe), nie Abbruch | nach `max_lernrunden` → `abgebrochen` |
 | Modellaufrufe im Ablauf | **keine** | Fragen schreiben, Material erzeugen |
 | Stand seit Schritt 4 | **der Lernweg** | eingefroren, siehe `ABLOESUNG_KLASSISCH.md` |
 
@@ -172,6 +172,16 @@ Neu-Login.
 INPUT_RECEIVED → MATERIAL_ANALYZED → DIAGNOSING ─┬→ ERROR_IDENTIFIED → TEACHING ─┬→ MASTERED
                                                   ├→ MASTERED                     ├→ DIAGNOSING
                                                   └→ ESCALATED                    └→ ESCALATED
+                                                        ↑                                │
+                                                        └────────────────────────────────┘
+                                          ESCALATED → TEACHING (Fehlertyp bekannt)
+                                          ESCALATED → DIAGNOSING (kein Fehlertyp)
+
+ESCALATED ist eine Unterstützungsstufe, kein Ausgang: das Kind sieht den
+Begleit-Schirm und wählt selbst — weitermachen (`/fortsetzen`), pausieren
+(`/pause`), zusätzlich Hilfe holen (`/hilfe`) oder bewusst das Thema
+wechseln. Nur `MASTERED` schließt eine Sitzung; eine eskalierte bleibt
+für das Resume offen und auffindbar.
 
 TEACHING-Phasen:
 HOOK → RULE → WORKED_EXAMPLE → GUIDED_TASK ⇄ ADAPTATION
@@ -204,8 +214,11 @@ weckt und **nicht benotet** wird. Dann die erste Diagnoseaufgabe.
 - **falsch und im Katalog** → Fehlertyp erkannt, passende Erklärung geholt
   (nach Klassenstufe des Themas, sonst Profilklasse) → `TEACHING`/`HOOK`
 - **falsch und nicht im Katalog** → es wird **keine Fehlvorstellung
-  erfunden**. Hinweis, erneut versuchen; nach **3** unbekannten Antworten
-  → `ESCALATED`.
+  erfunden**. Der generische Pfad unterrichtet weiter: Hinweis, dann der
+  Lösungsweg der gestellten Aufgabe, dann eine andere geprüfte Aufgabe.
+  Erst wenn das Material ausgeht oder `adaptiv_unbekannte_antworten`
+  überschritten ist, kommt der Begleit-Schirm (`ESCALATED`) — mit
+  weitermachen, Pause und freiwilliger Hilfe.
 
 **Ausgang:** ein Fehlertyp mit Erklärung — oder Beherrschung, oder Eskalation.
 
@@ -281,10 +294,15 @@ später — erst wenn die Runden aufgebraucht sind (siehe Eskalation).
 - **Eskalation** (`sitzung.eskalieren`): nach `adaptiv_max_lehrrunden`,
   Standard **3**, erfolglosen Runden. Jede erfolglose Runde läuft zwingend
   durch `runde_gescheitert()`, und die eskaliert selbst — es gibt keinen Weg
-  daran vorbei. Danach wird **keine weitere Erklärung ausgeliefert**
-  (`darf_erklaeren`), und der Fehlertyp steht im Profil als
-  `braucht_mensch`.
-- Eskalation ist ein **normaler Ausgang**, kein Fehlerzustand.
+  daran vorbei. Eskalation erhöht die Unterstützung, sie beendet den
+  Lernweg **nicht**: der Begleit-Schirm bietet weitermachen, Pause und
+  freiwillige Zusatzhilfe; `fortsetzen` führt mit Fehlertyp in die andere
+  Darstellung (`ADAPTATION`), ohne Fehlertyp zurück in die Diagnose mit
+  neuer Aufgabe. Der Fehlertyp steht im Profil als `braucht_mensch` —
+  wer es danach ohne Mensch schafft, verliert den Marker wieder.
+- Eskalation ist eine **Unterstützungsstufe**, kein Ausgang und kein
+  Fehlerzustand. Das Thema bleibt offen, bis das Kind versteht oder
+  selbst entscheidet, aufzuhören.
 
 **Zuständig:** `app/adaptiv/unterricht.py` (Ablauf und Bildschirme),
 `app/adaptiv/sitzung.py` (Zustände, Zählung, Schwellen),

@@ -74,7 +74,7 @@ def _zeige(request: Request, sitzung: dict) -> HTMLResponse:
              "regel": 2, "beispiel": 3, "anders": 2, "transfer": 6,
              "voraussetzung": 5, "voraussetzung_lernen": 5,
              "voraussetzung_zurueck": 5, "voraussetzung_geschafft": 6,
-             "wiederholung_waehlen": 6, "geschafft": 6}
+             "wiederholung_waehlen": 6, "geschafft": 6, "begleitung": 5}
     step = steps.get(screen["art"], 5 if sitzung.get("phase") == "INDEPENDENT_TASK" else 4)
     return render(request, "adaptiv.html", sitzung=sitzung, schirm=screen,
                   bereich_titel=entry.get("thema_text") or concept.get("label", "Dein Thema"),
@@ -130,17 +130,19 @@ def _laufende(request: Request) -> dict | None:
             return session
         if request.query_params.get("sitzung"):
             raise HTTPException(404, "Diese Lernrunde gehört nicht zu diesem Lernbereich.")
-    # Resume after login, scoped in SQL; never resume the other area's last session.
+    # Resume after login, scoped in SQL; never resume the other area's last
+    # session. ESCALATED zaehlt als offen: das Thema bleibt auffindbar, Karo
+    # setzt am Begleit-Schirm fort statt vorne zu beginnen.
     eid = ctx["bereich_exam_id"]
     if eid:
         row = db.q1("""SELECT s.id FROM lern_sitzung s JOIN lern_eingabe i ON i.id=s.eingabe_id
             JOIN exam_topic x ON x.topic_id=i.topic_id WHERE x.exam_id=?
-            AND s.zustand NOT IN ('MASTERED','ESCALATED') ORDER BY s.id DESC LIMIT 1""", eid)
+            AND s.zustand != 'MASTERED' ORDER BY s.id DESC LIMIT 1""", eid)
     else:
         row = db.q1("""SELECT s.id FROM lern_sitzung s JOIN lern_eingabe i ON i.id=s.eingabe_id
             LEFT JOIN topic t ON t.id=i.topic_id WHERE (i.topic_id IS NULL OR
             (t.learning_visible=1 AND NOT EXISTS(SELECT 1 FROM exam_topic x WHERE x.topic_id=t.id)))
-            AND s.zustand NOT IN ('MASTERED','ESCALATED') ORDER BY s.id DESC LIMIT 1""")
+            AND s.zustand != 'MASTERED' ORDER BY s.id DESC LIMIT 1""")
     session = store.sitzung(row["id"]) if row else None
     return session if session and _owns(request, session) else None
 
@@ -282,6 +284,10 @@ ERWARTETE_BILDSCHIRME = {"anker": {"anker"}, "diagnose": {"diagnose"},
                        "voraussetzung_lernen": {"voraussetzung_lernen"},
                        "voraussetzung_weiter": {"voraussetzung_zurueck",
                                                "voraussetzung_geschafft"},
+                       "fortsetzen": {"begleitung", "inhalt_fehlt",
+                                      "unbekannt"},
+                       "pause": {"begleitung", "inhalt_fehlt", "unbekannt"},
+                       "hilfe": {"begleitung", "inhalt_fehlt", "unbekannt"},
                        "weiter": {"haken", "regel", "beispiel", "anders"}}
 
 
@@ -316,6 +322,22 @@ def _answer(request: Request, action: str, answer="", kennung=""):
         result = (unterricht.voraussetzung_weiter_zum_thema(active)
                   if screen["art"] == "voraussetzung_geschafft"
                   else unterricht.zurueck_von_voraussetzung(active))
+    elif action == "fortsetzen":
+        result = unterricht.fortsetzen(active)
+    elif action == "pause":
+        # Pause ist eine Wahl des Kindes: die Sitzung bleibt offen, der
+        # Einstiegspunkt bleibt markiert — das Resume setzt genau hier an.
+        store.ereignis_schreiben(active["id"], "Pause gewaehlt",
+                                 nutzdaten={"art": answer or "kurz"})
+        flash(request, "Dein Platz bleibt frei — wir machen später genau "
+                       "hier weiter.", "ok")
+        return zurueck(_context(request)["sitzung_zurueck"])
+    elif action == "hilfe":
+        store.ereignis_schreiben(active["id"], "Zusatzhilfe gewaehlt")
+        daten = dict(active.get("daten") or {})
+        daten["eltern_gerufen"] = True
+        store.sitzung_aktualisieren(active["id"], daten=daten)
+        result = store.sitzung(active["id"])
     elif action == "weiter":
         result = (unterricht.weiter_nach_adaptation(active)
                   if active["phase"] == zustand.ADAPTATION else unterricht.weiter(active))
@@ -383,6 +405,28 @@ def voraussetzung_antworten(request: Request,
                             kennung: str = Form("")):
     """Die kurze Diagnose zur Grundlage — jede Aufgabe eine Antwort (Z3)."""
     return _answer(request, "voraussetzung", antwort, kennung)
+
+
+@router.post("/fortsetzen")
+@exam_router.post("/fortsetzen")
+def fortsetzen(request: Request, kennung: str = Form("")):
+    """„Mit Karo weitermachen" — die Begleitung geht weiter, nie von vorn."""
+    return _answer(request, "fortsetzen", kennung=kennung)
+
+
+@router.post("/pause")
+@exam_router.post("/pause")
+def pause(request: Request, wert: str = Form(""), kennung: str = Form("")):
+    """Kurze Pause oder „das reicht fuer heute" — beides laesst die Sitzung
+    offen und fortsetzbar."""
+    return _answer(request, "pause", wert, kennung)
+
+
+@router.post("/hilfe")
+@exam_router.post("/hilfe")
+def hilfe_holen(request: Request, kennung: str = Form("")):
+    """Zusaetzliche menschliche Hilfe markieren — der Lernweg bleibt offen."""
+    return _answer(request, "hilfe", kennung=kennung)
 
 
 @router.post("/voraussetzung/lernen")

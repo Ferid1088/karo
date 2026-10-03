@@ -555,7 +555,9 @@ def themen_mit_sitzung(child_key: str = CHILD_KEY) -> dict:
             WHERE s.child_key = ? AND e.topic_id IS NOT NULL""", child_key)
     ergebnis: dict = {}
     for zeile in zeilen:
-        offen = zeile["zustand"] not in ("MASTERED", "ESCALATED")
+        # Eskaliert ist offen: das Thema wartet auf Fortsetzung, es ist
+        # nicht weg.
+        offen = zeile["zustand"] != "MASTERED"
         ergebnis[zeile["topic_id"]] = ergebnis.get(zeile["topic_id"], False) or offen
     return ergebnis
 
@@ -597,11 +599,15 @@ def sitzung(sitzung_id: int) -> dict | None:
 
 
 def offene_fuer_thema(topic_id: int) -> dict | None:
-    """Resume an in-progress topic on its pinned content version."""
+    """Resume an in-progress topic on its pinned content version.
+
+    Auch eine eskalierte Sitzung ist offen: wer festhaengte, setzt genau an
+    der Stelle fort — das Thema verschwindet nicht, weil es knifflig war.
+    """
     return _sitzung_aufbereiten(db.q1('''SELECT s.* FROM lern_sitzung s
         JOIN lern_eingabe e ON e.id=s.eingabe_id
         WHERE s.child_key=? AND e.topic_id=?
-        AND s.zustand NOT IN ('MASTERED','ESCALATED')
+        AND s.zustand != 'MASTERED'
         ORDER BY s.id DESC LIMIT 1''', CHILD_KEY, topic_id))
 
 

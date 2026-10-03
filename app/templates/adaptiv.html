@@ -267,13 +267,34 @@
   </form>
 </section>
 
-{% elif schirm.art == 'eskaliert' %}
+{% elif schirm.art == 'begleitung' %}
 <section class="card">
-  <p>Das war jetzt ein paar Mal knifflig — das liegt nicht an dir.</p>
-  <p>Diese Aufgabe schaut ihr euch am besten zu zweit an. Karo hat sich
-     gemerkt, worum es ging.</p>
+  <p>Das war knifflig — das liegt nicht an dir. Wir machen es jetzt
+     einfacher.</p>
+  <p>Ich gehe mit dir einen Schritt zurück und zeige dir erst nur den
+     wichtigsten Teil. Danach probieren wir es noch einmal zusammen.</p>
+  {% if schirm.eltern_gerufen %}
+  <p>Sag einer erwachsenen Person kurz Bescheid — sie kann zusätzlich mit
+     dir draufschauen. Dein Platz bleibt frei, weitermachen geht
+     jederzeit.</p>
+  {% endif %}
   <div class="actions">
-    <a class="btn" href="{{ sitzung_zurueck }}">Etwas anderes lernen</a>
+    <form method="post" action="{{ sitzung_base }}/fortsetzen?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+      <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
+      <button type="submit">Mit Karo weitermachen</button>
+    </form>
+    <form method="post" action="{{ sitzung_base }}/pause?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+      <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
+      <button type="submit" name="wert" value="kurz" class="ghost">Kurze Pause</button>
+      <button type="submit" name="wert" value="heute" class="ghost">Das reicht für heute</button>
+    </form>
+    {% if not schirm.eltern_gerufen %}
+    <form method="post" action="{{ sitzung_base }}/hilfe?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+      <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
+      <button type="submit" class="ghost">Zusätzliche Hilfe holen</button>
+    </form>
+    {% endif %}
+    <a class="btn ghost" href="{{ sitzung_zurueck }}">Anderes Thema wählen</a>
   </div>
 </section>
 
@@ -289,12 +310,25 @@
 
 {% else %}
 {#- Ein Bildschirm, den die Domain noch nicht kennt, darf niemals wie
-    „verstanden“ aussehen — sonst verbirgt er einen Dead End. -#}
+    „verstanden“ aussehen — und niemals wie „gib auf“. Fehlt Material oder
+    der naechste Schritt, geht es mit einer anderen Darstellung weiter;
+    pausieren und Hilfe holen bleiben freiwillige Entscheidungen des
+    Kindes. -#}
 <section class="card">
-  <p>Hier weiß Karo gerade nicht weiter. Das liegt nicht an dir —
-     frag am besten einmal einen Menschen.</p>
+  <p>Diese Stelle machen wir anders — kleiner und Schritt für Schritt.</p>
+  <p>Du kannst direkt weitermachen, kurz pausieren oder dir zusätzlich
+     helfen lassen. Du entscheidest.</p>
   <div class="actions">
-    <a class="btn" href="{{ sitzung_zurueck }}">Zurück</a>
+    <form method="post" action="{{ sitzung_base }}/fortsetzen?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+      <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
+      <button type="submit">Mit Karo weitermachen</button>
+    </form>
+    <form method="post" action="{{ sitzung_base }}/pause?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+      <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
+      <button type="submit" name="wert" value="kurz" class="ghost">Kurze Pause</button>
+      <button type="submit" name="wert" value="heute" class="ghost">Das reicht für heute</button>
+    </form>
+    <a class="btn ghost" href="{{ sitzung_zurueck }}">Anderes Thema wählen</a>
   </div>
 </section>
 {% endif %}
