@@ -333,6 +333,20 @@ geprüfte Diagnose — wird bestellt, dedupliziert über
 (Fach, Konzept, Rolle, Grund). Die Sitzung läuft mit dem besten sicheren
 vorhandenen Material weiter; kein Bildschirm sagt „geht gerade nicht".
 
+**Fulfillment** (`curriculum_dienst.anfragen_bedienen`): jede neue
+Lückenmeldung stellt den Hintergrundjob `inhalt_anfragen`. Er gibt offene
+Bestellungen konzept-adressiert beim Lehrplan-Dienst auf
+(`topic` trägt den `concept_key`, Rolle und Grund gehen als Kontext mit)
+und merkt die Auftragsnummer als `external_ref`. Der nächste Lauf fragt
+nur den Stand ab; eine `ready`-Lieferung wird wie jede andere geprüft,
+importiert und schließt die Bestellung (`erfuellt` + neues `konzept_id`).
+`unavailable` löst die Verknüpfung und bestellt später neu; eine
+Ablehnung, die Karos eigene Prüfung auslöste (`rejected_by_client`), oder
+eine Lieferung, die die lokale Prüfung nicht besteht, geht als Befund
+zurück und verwirft die Bestellung — fällt die Lücke danach wieder an,
+öffnet `inhalt_anfordern` sie erneut. Der Dienst ist dabei ausfallfest:
+Transportfehler unterbrechen den Lauf, nicht den Unterricht.
+
 **Zuständig:** `app/adaptiv/unterricht.py` (Ablauf und Bildschirme),
 `app/adaptiv/sitzung.py` (Zustände, Zählung, Schwellen),
 `app/adaptiv/naechste_aktion.py` (nächster Lernschritt),

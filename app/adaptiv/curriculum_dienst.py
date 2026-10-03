@@ -127,6 +127,98 @@ def job_wirkung_melden(payload: dict) -> dict:
     return {"gemeldet": wirkung_melden(config.load_safe())}
 
 
+def anfragen_bedienen(cfg) -> dict:
+    """Offene Inhalts-Bestellungen dem Lehrplan-Dienst uebergeben.
+
+    Pro Luecke genau ein Auftrag: `external_ref` haelt seine Nummer, ein
+    zweiter Lauf holt nur die fertige Lieferung ab. Ein Ausfall des
+    Dienstes unterbricht den Lauf, nie den Unterricht — die Bestellung
+    bleibt offen, bis der Dienst wieder da ist.
+    """
+    if not configured(cfg):
+        return {"bedient": 0}
+    passt, grund = vertrag_passt(cfg)
+    if not passt:
+        betrieb_melden(grund)
+        return {"bedient": 0}
+    bedient = 0
+    for zeile in store.inhalt_anfragen("offen"):
+        try:
+            bedient += _anfrage_bedienen(cfg, zeile)
+        except RuntimeError:
+            # Uebertragungsfehler: Dienst gerade nicht da — naechste Runde.
+            break
+        except jobs.PermanentFailure as fehler:
+            betrieb_melden(f"Inhaltsbestellung {zeile['id']} "
+                           f"({zeile['fach']}:{zeile['konzept_key']}): {fehler}")
+            store.inhalt_verwerfen(zeile["id"])
+    return {"bedient": bedient}
+
+
+def _anfrage_bedienen(cfg, zeile: dict) -> int:
+    """Eine Bestellung: beim Dienst aufgeben oder ihre Lieferung abholen."""
+    kontext = json.loads(zeile.get("kontext") or "{}")
+    klasse = int(kontext.get("klasse") or 0) or \
+        int(getattr(cfg, "learner_grade", 6) or 6)
+    ref = zeile.get("external_ref")
+    if ref:
+        result = request(cfg, "GET", f"/v1/lessons/{int(ref)}")
+    else:
+        # Konzept-adressiert, nicht themen-adressiert: `topic` traegt den
+        # concept_key, den der Dienst in seinem Graphen kennt. Was fehlt
+        # (Rolle) und warum (Grund), geht als Kontext mit — Rohantworten
+        # oder Namen des Kindes verlassen die App nicht.
+        anfrage = {"subject": zeile["fach"], "grade": klasse,
+                   "topic": zeile["konzept_key"], "format": format_spec(),
+                   "requested_role": zeile["rolle"],
+                   "request_reason": zeile["grund"]}
+        result = request(cfg, "POST", "/v1/lessons", anfrage)
+    status = result.get("status")
+    if status == "unavailable":
+        if result.get("reason_code") == "rejected_by_client":
+            store.inhalt_verwerfen(zeile["id"])
+            return 0
+        # „Nicht jetzt" ist kein „nie": Verknuepfung loesen, naechster
+        # Lauf bestellt erneut — wie `prepare` bei Warteschlangen-Drosselung.
+        store.inhalt_anfrage_verknuepfen(zeile["id"], None)
+        return 0
+    eid = _export_id(result)
+    if not ref:
+        store.inhalt_anfrage_verknuepfen(zeile["id"], eid)
+    if status != "ready":
+        return 0                    # pending: der Dienst arbeitet noch
+    # Der Titel (nicht der Schluessel) ist der Themenabgleich beim Import:
+    # Schluessel wie „MA.NEGATIVE_ZAHLEN" stimmen nie mit einem
+    # Lektionstitel ueberein, die Anfrage ist schon konzept-adressiert.
+    try:
+        cid = import_lesson(cfg, result, kontext.get("titel") or None,
+                            zeile["fach"], klasse)
+    except VertragVerletzt as verstoss:
+        betrieb_melden(f"Lieferung zu {zeile['konzept_key']} passt nicht "
+                       f"zum Vertrag: {verstoss}")
+        request(cfg, "POST", f"/v1/lessons/{eid}/reject",
+                {"reason": f"Vertrag {CONTRACT_VERSION}: {verstoss}",
+                 "reason_code": "contract"})
+        store.inhalt_verwerfen(zeile["id"])
+        return 0
+    except (schemas.InhaltUngueltig, ValueError, TypeError, KeyError):
+        request(cfg, "POST", f"/v1/lessons/{eid}/reject", {
+            "reason": "Lokale Karo-Prüfung fehlgeschlagen: Schema, Einstieg, "
+                      "Klasse, Themenzuordnung oder Lösung prüfen.",
+            "reason_code": "content"})
+        store.inhalt_verwerfen(zeile["id"])
+        return 0
+    store.inhalt_erfuellt(zeile["id"], cid)
+    return 1
+
+
+@jobs.handler("inhalt_anfragen")
+def job_inhalt_anfragen(payload: dict) -> dict:
+    """Bestelllauf im Hintergrund: Luecken bestellen, Lieferungen
+    einsortieren. Ausgeloest von jeder neuen Lueckenmeldung."""
+    return anfragen_bedienen(config.load_safe())
+
+
 def configured(cfg) -> bool:
     # Incomplete configuration must fail closed, never silently generate locally.
     return any(settings(cfg))

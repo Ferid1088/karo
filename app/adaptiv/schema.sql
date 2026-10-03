@@ -275,6 +275,7 @@ CREATE TABLE IF NOT EXISTS lern_inhalt_anfrage (
     kontext     TEXT NOT NULL DEFAULT '{}',   -- Niveau, Fehlertyp, Klasse
     status      TEXT NOT NULL DEFAULT 'offen',-- offen | erfuellt | verworfen
     anzahl      INTEGER NOT NULL DEFAULT 1,   -- wie oft sie anfiel
+    external_ref TEXT,                        -- Export-Nr. beim Lehrplan-Dienst
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL,
     UNIQUE(fach, konzept_key, rolle, grund)

@@ -46,6 +46,9 @@ _NACHGETRAGENE_SPALTEN = [
     # kein geteilter Lernstand: eine im Pruefungsthema gesehene Aufgabe
     # gilt im eigenen Thema weiter als neu.
     ("lern_antwort", "scope", "TEXT"),
+    # Die Auftragsnummer, unter der der Lehrplan-Dienst eine Bestellung
+    # bearbeitet: damit findet der Folgeaufruf seine Lieferung wieder.
+    ("lern_inhalt_anfrage", "external_ref", "TEXT"),
 ]
 
 
@@ -444,14 +447,34 @@ def inhalt_anfordern(fach: str, konzept_key: str, rolle: str, grund: str,
                                                  excluded.konzept_id),
                            kontext    = excluded.kontext,
                            anzahl     = lern_inhalt_anfrage.anzahl + 1,
+                           -- Fällt die Luecke nach Lieferung oder Verwerfen
+                           -- erneut an, ist die alte Antwort offenbar nicht
+                           -- genug: neue Bestellung, neuer Auftrag.
+                           status     = 'offen',
+                           external_ref = CASE
+                               WHEN lern_inhalt_anfrage.status = 'offen'
+                               THEN lern_inhalt_anfrage.external_ref
+                               ELSE NULL END,
                            updated_at = excluded.updated_at""",
                   (fach or "", konzept_key, konzept_id, rolle, grund,
                    json.dumps(kontext or {}, ensure_ascii=False),
                    jetzt, jetzt))
-        return dict(c.execute(
+        zeile = dict(c.execute(
             """SELECT * FROM lern_inhalt_anfrage
                 WHERE fach=? AND konzept_key=? AND rolle=? AND grund=?""",
             (fach or "", konzept_key, rolle, grund)).fetchone())
+    # Die Bestellung wird erst nuetzlich, wenn jemand sie zum Dienst traegt:
+    # ein Hintergrundauftrag pro Lueckenmeldung, dedupliziert. Ohne
+    # eingerichteten Dienst bleibt sie einfach offen — der Unterricht laeuft
+    # mit dem besten vorhandenen Material weiter.
+    try:
+        from .. import config, jobs
+        from . import curriculum_dienst          # meldet den Job an
+        if curriculum_dienst.configured(config.load_safe()):
+            jobs.enqueue("inhalt_anfragen", dedup_key="inhalt_anfragen")
+    except Exception:                            # noqa: BLE001 - die
+        pass                                     # Bestellung steht ohnehin
+    return zeile
 
 
 def inhalt_anfragen(status: str = "offen") -> list[dict]:
@@ -459,6 +482,38 @@ def inhalt_anfragen(status: str = "offen") -> list[dict]:
     return [dict(z) for z in db.q(
         """SELECT * FROM lern_inhalt_anfrage WHERE status=?
             ORDER BY updated_at DESC""", status)]
+
+
+def inhalt_anfrage_verknuepfen(anfrage_id: int, external_ref) -> None:
+    """Die Bestellung ist beim Dienst angekommen: seine Auftragsnummer
+    merken, damit der naechste Lauf die fertige Lieferung findet statt
+    neu zu bestellen. `None` loest die Verknuepfung wieder."""
+    with db.tx() as c:
+        c.execute("""UPDATE lern_inhalt_anfrage
+                        SET external_ref=?, updated_at=? WHERE id=?""",
+                  (None if external_ref is None else str(external_ref),
+                   db.now(), anfrage_id))
+
+
+def inhalt_erfuellt(anfrage_id: int, konzept_id: int | None = None) -> None:
+    """Die Lieferung ist importiert: die Luecke ist geschlossen, und der
+    Verweis auf das neue lokale Konzept macht nachvollziehbar, womit."""
+    with db.tx() as c:
+        c.execute("""UPDATE lern_inhalt_anfrage
+                        SET status='erfuellt',
+                            konzept_id=COALESCE(?, konzept_id),
+                            updated_at=? WHERE id=?""",
+                  (konzept_id, db.now(), anfrage_id))
+
+
+def inhalt_verwerfen(anfrage_id: int) -> None:
+    """Endgueltig unlieferbar — z. B. nach Karos eigener Ablehnung. Die
+    Zeile bleibt als Gedaechtnis stehen; `inhalt_anfordern` oeffnet sie
+    wieder, wenn die Luecke erneut anfaellt."""
+    with db.tx() as c:
+        c.execute("""UPDATE lern_inhalt_anfrage
+                        SET status='verworfen', updated_at=? WHERE id=?""",
+                  (db.now(), anfrage_id))
 
 
 def konzept_schluessel(konzept_id: int | None) -> str | None:
