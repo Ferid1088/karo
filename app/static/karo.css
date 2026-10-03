@@ -732,7 +732,7 @@ a.tab-btn .archiv-zahl { margin-left: 0.3rem; min-width: 20px; height: 18px; fon
 .sub-nav .exam-nav-pair { position: relative; display: inline-flex; align-items: center; flex: 0 0 90px; height: 90px; margin-left: auto !important; margin-right: 0; z-index: 5; }
 /* Klassenarbeit-Kopf: das Banner reicht vom linken Rand bis zum runden
    Kalender-Knopf. Beide stehen in einer Zeile; nichts ragt in den Inhalt. */
-.learning-ui.exam-page .sub-nav {
+.exam-page .sub-nav {
   max-width: var(--seite);
   width: calc(100% - 3rem);
   margin-inline: auto;
@@ -744,8 +744,8 @@ a.tab-btn .archiv-zahl { margin-left: 0.3rem; min-width: 20px; height: 18px; fon
   background: transparent;
   border-bottom: 0;
 }
-.learning-ui.exam-page .exam-nav-pair { display: contents; }
-.learning-ui.exam-page .exam-nav-banner {
+.exam-page .exam-nav-pair { display: contents; }
+.exam-page .exam-nav-banner {
   display: block;
   order: 1;
   flex: 1 1 0;
@@ -758,10 +758,10 @@ a.tab-btn .archiv-zahl { margin-left: 0.3rem; min-width: 20px; height: 18px; fon
   border: 1px solid #f1e6c8;
   border-radius: 18px;
 }
-.learning-ui.exam-page .kalender-tab { order: 2; flex: none; }
+.exam-page .kalender-tab { order: 2; flex: none; }
 @media (max-width: 620px) {
   .sub-nav a.kalender-tab img { width: 56px; height: 56px; }
   .sub-nav .exam-nav-pair { flex-basis: 56px; height: 56px; }
-  .learning-ui.exam-page .sub-nav { width: calc(100% - 2rem); gap: .5rem; padding: .5rem 0; }
-  .learning-ui.exam-page .exam-nav-banner { height: 90px; border-radius: 12px; }
+  .exam-page .sub-nav { width: calc(100% - 2rem); gap: .5rem; padding: .5rem 0; }
+  .exam-page .exam-nav-banner { height: 90px; border-radius: 12px; }
 }

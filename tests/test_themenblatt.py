@@ -98,10 +98,15 @@ def test_upload_seite_bleibt_im_klassenarbeitsbereich(client, fake_llm,
     # Der Bereich Klassenarbeit ist markiert: Prüfungs-Seitenklasse und
     # Klassenarbeit-Unterzeile — im Elternbereich trägt „Lernstand" den
     # aktiven Hauptpunkt (die Arbeiten hängen dort).
-    assert 'class="learning-ui exam-page' in r.text
+    assert 'class="exam-page' in r.text
     assert 'aria-label="Klassenarbeit"' in r.text
     assert re.search(r'href="/messung/fortschritt"[^>]*aria-current=page',
                      r.text)
+    # Kein Lernbereich-Kontext: weder Seitenklasse noch Lern-Stylesheets.
+    assert "learning-ui" not in r.text
+    assert "learning-main" not in r.text
+    assert "/static/learning.css" not in r.text
+    assert "/static/learning-session.css" not in r.text
     # Keine Lern-Navigation aktiv — die Kinder-Nav zeigt sie hier gar nicht.
     assert 'class="learning-entry"' not in r.text
     # Fachliche Sprache der Klassenarbeit — keine Lern-Formulare.
@@ -158,6 +163,60 @@ def test_lern_upload_lehnt_klassenarbeits_zweck_ab(client, fake_llm,
     assert app_env.db.q("SELECT id FROM material_paket") == []
 
 
+def test_themenblatt_erbt_keinen_lernbereich_kontext():
+    """Statisch: Router, Basis und Templates des Themenblatt-Wegs haben
+    keine fachliche Abhängigkeit auf den Lernbereich — weder dessen
+    Template-Kontext noch dessen Dienste, Routen oder Begriffe."""
+    import pathlib
+    wurzel = pathlib.Path(__file__).resolve().parent.parent
+
+    router = (wurzel / "app/routers/themenblatt.py").read_text()
+    # Keine Lern-Dienste und keine Lern-Adressen im Code (Doku darf die
+    # Trennung benennen — gesucht wird nur die Benutzung).
+    assert not re.search(r"import.*learning", router)
+    assert "learning_hub." not in router
+    assert "create_topic" not in router
+    assert not re.search(r"\buebernehmen\(", router), \
+        "die Lern-Übernahme — hier läuft pruefinhalte_uebernehmen"
+    assert not re.search(r"['\"]/lernen", router)
+
+    for name in ("exam_base.html", "themenblatt_upload.html",
+                 "themenblatt_pruefen.html"):
+        text = (wurzel / "app/templates" / name).read_text()
+        for verboten in ("learning_base", "learning_ui", "learning-main",
+                         "/static/learning.", "/lernen", "learning_hub",
+                         "create_topic", "Lernthema", "Lernmaterial",
+                         "MATERIAL_SCHEMA"):
+            assert verboten not in text, f"{name}: {verboten}"
+
+    # Die exam_base liegt unter base.html — allgemeine Navigation und
+    # Design bleiben gemeinsam, nur der Bereichskontext ist eigen.
+    assert 'extends "base.html"' in \
+        (wurzel / "app/templates/exam_base.html").read_text()
+
+
+def test_lernmaterial_erbt_keinen_klassenarbeits_kontext():
+    """Und umgekehrt: der Lernmaterial-Weg kennt keine Klassenarbeits-
+    Domain — höchstens den dokumentierten Redirect der alten Adresse."""
+    import pathlib
+    wurzel = pathlib.Path(__file__).resolve().parent.parent
+
+    router = (wurzel / "app/routers/lernmaterial.py").read_text()
+    for verboten in ("EXAM_MATERIAL_SCHEMA", "themenblatt_prompt",
+                     "pruefinhalte", "exam.create", "exam_material"):
+        assert verboten not in router, f"lernmaterial.py: {verboten}"
+    # Die einzigen /klassenarbeit-Erwähnungen sind Redirect-Ziele der
+    # Kompatibilitäts-Adresse — niemals fachliche Verarbeitung.
+    assert '"/klassenarbeit/themenblatt' in router
+
+    for name in ("learning_upload.html", "material_pruefen.html"):
+        text = (wurzel / "app/templates" / name).read_text()
+        for verboten in ('href="/klassenarbeit', 'action="/klassenarbeit',
+                         "exam_base", "exam_ui", "Prüfungsinhalt",
+                         "pruefinhalte"):
+            assert verboten not in text, f"{name}: {verboten}"
+
+
 # --------------------------------------------------------------------------
 # Der volle Weg: einlesen, prüfen, ins Formular übernehmen
 # --------------------------------------------------------------------------
@@ -173,7 +232,8 @@ def test_pruefinhalte_landen_im_formular(client, fake_llm, app_env):
     assert "Brüche addieren" in seite.text
     assert "Taschenrechner ist nicht erlaubt." in seite.text
     # Immer noch im Klassenarbeits-Bereich — nichts zeigt auf Lernen.
-    assert 'class="learning-ui exam-page' in seite.text
+    assert 'class="exam-page' in seite.text
+    assert "learning-ui" not in seite.text
     assert 'aria-label="Klassenarbeit"' in seite.text
     assert 'class="learning-entry"' not in seite.text
     assert 'Zurück zur Klassenarbeit' in seite.text

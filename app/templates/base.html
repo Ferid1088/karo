@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="/static/simple.css?v={{ asset_version|default('0') }}">
   <link rel="stylesheet" href="/static/areas.css?v={{ asset_version|default('0') }}-nav-spacing2">
   <link rel="stylesheet" href="/static/learning-mascot.css?v=2">
-  {% if learning_ui|default(false) %}<link rel="stylesheet" href="/static/learning.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/learning-exam.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/learning-session.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/exam-detail.css?v={{ asset_version|default('0') }}-journeys3"><link rel="stylesheet" href="/static/exam-overview-calendar.css?v={{ asset_version|default('0') }}-2">{% endif %}
+  {% if learning_ui|default(false) %}<link rel="stylesheet" href="/static/learning.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/learning-exam.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/learning-session.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/exam-detail.css?v={{ asset_version|default('0') }}-journeys3"><link rel="stylesheet" href="/static/exam-overview-calendar.css?v={{ asset_version|default('0') }}-2">{% elif exam_ui|default(false) %}<link rel="stylesheet" href="/static/exam-detail.css?v={{ asset_version|default('0') }}-journeys3"><link rel="stylesheet" href="/static/exam-overview-calendar.css?v={{ asset_version|default('0') }}-2">{% endif %}
   {% if world_page|default(false) %}<link rel="stylesheet" href="/static/meine-welt.css?v={{ asset_version|default('0') }}">{% endif %}
   {% block page_styles %}{% endblock %}
   <script src="/static/simple.js?v={{ asset_version|default('0') }}" defer></script>
@@ -48,7 +48,7 @@
   }
 </script>
 </head>
-<body class="{{ 'learning-ui ' if learning_ui|default(false) }}{{ 'exam-page ' if learning_ui|default(false) and path.startswith('/klassenarbeit') }}{{ 'nur-ansehen' if nur_ansehen|default(false) }}">
+<body class="{{ 'learning-ui ' if learning_ui|default(false) }}{{ 'exam-page ' if exam_ui|default(false) or (learning_ui|default(false) and path.startswith('/klassenarbeit')) }}{{ 'nur-ansehen' if nur_ansehen|default(false) }}">
 {% macro csrf_input() -%}
 <input type="hidden" name="{{ csrf_field }}" value="{{ csrf }}">
 {%- endmacro %}
@@ -66,7 +66,7 @@
     {# Im Lernbereich stand hier dasselbe Wort wie im aktiven Navigationspunkt
        daneben ("Lernplatz") — ein Etikett, das nichts erklaert. Die anderen
        Bereiche behalten es, dort benennt es den Bereich wirklich. #}
-    {% if not learning_ui|default(false) %}<span class="area-label"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">{% if adult_page %}<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>{% else %}<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1-6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/>{% endif %}</svg>{{ 'Elternbereich' if adult_page else ('Ziele planen' if plans_page|default(false) else ('Meine Welt' if world_page|default(false) else 'Kinderbereich')) }}</span>{% endif %}
+    {% if not (learning_ui|default(false) or exam_ui|default(false)) %}<span class="area-label"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">{% if adult_page %}<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>{% else %}<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1-6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/>{% endif %}</svg>{{ 'Elternbereich' if adult_page else ('Ziele planen' if plans_page|default(false) else ('Meine Welt' if world_page|default(false) else 'Kinderbereich')) }}</span>{% endif %}
   </div>
   {# Diese Zeile bleibt auf jeder Seite dieselbe. Vorher tauschte jeder
      Bereich sie gegen seine eigenen Punkte aus: wer "Meine Welt" drueckte,
@@ -109,7 +109,7 @@
 {% set unterpunkte = [] %}
 {# "Heute" erbt dieselbe Grundlage wie der Lernbereich, ist aber ein
    Hauptpunkt: dort waeren die Lern-Unterpunkte fehl am Platz. #}
-{% if learning_ui|default(false) and path.startswith(('/lernen', '/klassenarbeit', '/lernzyklus', '/quiz', '/material')) %}
+{% if (learning_ui|default(false) or exam_ui|default(false)) and path.startswith(('/lernen', '/klassenarbeit', '/lernzyklus', '/quiz', '/material')) %}
   {# Kein eigener Punkt fuer "Neues Thema": der Knopf steht auf der
      Themenseite, wo er hingehoert. Und keine "Uebersicht" neben "Meine
      Themen" — das war dieselbe Seite zweimal. #}

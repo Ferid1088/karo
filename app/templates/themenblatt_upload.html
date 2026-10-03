@@ -1,4 +1,4 @@
-{% extends "learning_base.html" %}
+{% extends "exam_base.html" %}
 {% block title %}Themenblatt hochladen{% endblock %}
 {% block page_styles %}<link rel="stylesheet" href="/static/material-paket.css?v={{ asset_version|default('0') }}">{% endblock %}
 {% block content %}
@@ -6,12 +6,9 @@
    mit allem, was dort schon eingetragen war (entwurf). #}
 <a class="back-link" href="{{ zurueck_url }}">← Zurück zur Klassenarbeit</a>
 
-<section class="learn-heading">
-  <div>
-    <h1>Themenblatt für die Klassenarbeit</h1>
-    <p>Zeige {{ companion_name }} das Themenblatt — die erkannten Prüfungsinhalte landen im Formular der Klassenarbeit.</p>
-  </div>
-  <img src="/static/karo-owl-book.png" alt="" width="100">
+<section class="card">
+  <h1><img class="pruefung-zeichen" src="/static/pruefung-symbol.svg" alt="" aria-hidden="true">Themenblatt für die Klassenarbeit</h1>
+  <p class="hint">Zeige {{ companion_name }} das Themenblatt — die erkannten Prüfungsinhalte landen im Formular der Klassenarbeit.</p>
 </section>
 
 <section class="card">
