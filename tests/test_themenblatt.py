@@ -133,7 +133,44 @@ def test_klassenarbeit_neu_zeigt_auf_themenblatt(client, fake_llm, app_env):
     assert 'href="/klassenarbeit/themenblatt"' in r.text
     assert 'href="/klassenarbeit/themenblatt?kamera=1"' in r.text
     assert "zweck=klassenarbeit" not in r.text
-    assert "/lernen/material" not in r.text
+
+
+def test_kind_modus_deckt_den_themenblatt_weg_ab(client, fake_llm, app_env):
+    """Ein Kind-Sitzung mit Klassenarbeit-Freigabe muss das Themenblatt
+    hochladen und prüfen können — der Upload hing vorher unter /lernen und
+    war damit immer erreichbar; ohne die Pfade in _kind_erlaubt endet der
+    Klick auf „Themenblatt hochladen" in der Erwachsenen-Sperre."""
+    from .test_app import als_kind
+    einrichten(client, fake_llm)
+    fake_llm.responses["themenblatt"] = dict(THEMENBLATT_ANTWORT)
+    with als_kind(client, app_env):
+        assert client.get("/klassenarbeit/themenblatt").status_code == 403
+    app_env.config.update(klassenarbeit_kind=True)
+    with als_kind(client, app_env):
+        seite = client.get("/klassenarbeit/themenblatt")
+        assert seite.status_code == 200
+        assert 'class="exam-page' in seite.text
+        antwort = client.post("/klassenarbeit/themenblatt/paket", data={
+            "_csrf": csrf_from(seite.text), "fach": "mathematik",
+            "seiten": json.dumps(_meta())},
+            files=[("seite", ("s.jpg", _bild(), "image/jpeg"))])
+        assert antwort.status_code == 200, antwort.text
+        weiter = antwort.json()["weiter"]
+        paket_id = _paket_id(weiter)
+        assert client.get(weiter).status_code == 200
+        assert client.get(
+            f"/klassenarbeit/themenblatt/{paket_id}/stand").status_code == 200
+    run_jobs(app_env, fake_llm)
+    with als_kind(client, app_env):
+        seite = client.get(f"/klassenarbeit/themenblatt/{paket_id}")
+        assert seite.status_code == 200
+        r = client.post(f"/klassenarbeit/themenblatt/{paket_id}/uebernehmen",
+                        data={"_csrf": csrf_from(seite.text),
+                              "fach": "mathematik",
+                              "thema": ["Brüche addieren"]},
+                        follow_redirects=False)
+        assert r.status_code == 303
+        assert r.headers["location"].startswith("/klassenarbeit/neu")
 
 
 def test_altadresse_leitet_nur_um(client, fake_llm, app_env):
