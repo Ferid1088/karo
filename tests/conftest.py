@@ -5,16 +5,18 @@ Datenverzeichnis. Damit ist der komplette Weg prüfbar — Einrichtung,
 Wissensbasis, Themenvorschlag, Prüfung, Lernzyklus mit Gegenprüfung — ohne
 Netz und ohne Kosten.
 
-Der einzige externe Anbieter ist Devin (asynchron per Session). `FakeDevin`
-bildet `DevinBackend._api` nach: `POST /sessions` legt eine Session an, die
-beim ersten `GET` schon `finished` ist und ihr `structured_output` liefert.
-Damit übt die Suite den echten Session/Lebenszyklus — anlegen, parken,
-abholen — statt nur einer synchronen Attrappe.
+`FakeAI` bildet die HTTP-Ebene beider Adapter nach (`app.ai.providers.*`
+→ `api_request`): Devin bekommt Sessions, die beim zweiten `GET`
+`finished` sind — die Suite übt den echten Lebenszyklus anlegen → parken
+→ abholen. OpenRouter antwortet synchron mit einer Completion, deren
+Inhalt dieselbe schema-gesteuerte Fake-Antwort ist. Welcher Provider
+aktiv ist, steht wie in Produktion in `Config.ai_provider`.
 """
 
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 import types
 from pathlib import Path
@@ -22,25 +24,39 @@ from pathlib import Path
 import pytest
 
 
-class FakeDevin:
-    """Bildet die Devin-Sessions-API nach (`DevinBackend._api`-Ebene)."""
+class FakeAI:
+    """Bildet die Anbieter-APIs auf der `api_request`-Ebene nach."""
 
     def __init__(self, fake):
         self.fake = fake
         self.sessions: dict[str, dict] = {}
         self.created: list[dict] = []      # alle POST /sessions-Nutzdaten
+        self.completions: list[dict] = []  # alle OpenRouter-Completions
         self.counter = 0
-        self.probes = 0                    # Zugangsprüfungen (GET /sessions?)
+        self.probes = 0                    # Zugangsprüfungen
         self.working_once = False          # erster GET liefert "working"
 
-    def api(self, method: str, path: str, payload: dict | None = None):
+    # -- verteilt auf die beiden Anbieter ------------------------------------
+    def request(self, provider: str, method: str, base_url: str, path: str, *,
+                headers: dict | None = None, payload: dict | None = None,
+                timeout: float = 60.0):
         from app.ai import AIAuthError, AIError
 
         if self.fake.fail_auth:
             raise AIAuthError(
-                f"Devin API {method} {path}: 401 — der DEVIN_API_KEY "
-                "wird abgelehnt.")
-        # Zugangsprobe (verify) — keine Session, nur die Liste.
+                f"{provider} API {method} {path}: 401 — der "
+                "Zugangsschlüssel wird abgelehnt.")
+        if "devin" in base_url:
+            return self._devin(method, path, payload)
+        if "openrouter" in base_url:
+            return self._openrouter(method, path, payload)
+        raise AIError(f"FakeAI: unbekannter Anbieter {base_url}",
+                      retryable=False)
+
+    # -- Devin: asynchrone Sessions ------------------------------------------
+    def _devin(self, method: str, path: str, payload: dict | None):
+        from app.ai import AIError
+
         if method == "GET" and path.startswith("/sessions?"):
             self.probes += 1
             return {"sessions": []}
@@ -75,8 +91,40 @@ class FakeDevin:
             if sid in self.sessions:
                 self.sessions[sid]["status_enum"] = "finished"
             return {}
-        raise AIError(f"FakeDevin: unbekannter Aufruf {method} {path}",
+        raise AIError(f"FakeAI: unbekannter Devin-Aufruf {method} {path}",
                       retryable=False)
+
+    # -- OpenRouter: synchrone Completions ------------------------------------
+    def _openrouter(self, method: str, path: str, payload: dict | None):
+        from app.ai import AIError
+
+        if method == "GET" and path == "/key":
+            self.probes += 1
+            return {"data": {"limit": None}}
+        if method == "POST" and path == "/chat/completions":
+            self.completions.append(dict(payload or {}))
+            fmt = (payload or {}).get("response_format") or {}
+            schema = (fmt.get("json_schema") or {}).get("schema") or {}
+            inhalt = self.fake.antwort(schema)
+            self.counter += 1
+            self.fake.calls.append(
+                {"backend": "openrouter",
+                 "session_id": f"gen-test-{self.counter}",
+                 "purpose": fmt.get("json_schema", {}).get("name")})
+            return {
+                "id": f"gen-test-{self.counter}",
+                "model": (payload or {}).get("model", "test-modell"),
+                "choices": [{
+                    "finish_reason": ("length" if self.fake.stop_reason
+                                      == "max_tokens" else "stop"),
+                    "message": {"role": "assistant",
+                                "content": json.dumps(inhalt,
+                                                      ensure_ascii=False)},
+                }],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 20},
+            }
+        raise AIError(f"FakeAI: unbekannter OpenRouter-Aufruf "
+                      f"{method} {path}", retryable=False)
 
 
 class _FakeKI:
@@ -87,7 +135,7 @@ class _FakeKI:
         self.calls: list[dict] = []
         self.responses: dict = {}
         self.stop_reason = "end_turn"
-        self.devin = FakeDevin(self)
+        self.devin = FakeAI(self)   # historischer Name — bedient beide APIs
 
     def antwort(self, schema: dict):
         """Waehlt die Antwort anhand der Pflichtfelder des Schemas.
@@ -138,13 +186,14 @@ FAKE = _FakeKI()
 @pytest.fixture
 def fake_llm():
     """Setzt den Antwortvorrat zurück. Der Name ist historisch gewachsen —
-    dahinter steht heute ausschließlich der gefälschte Devin-Anbieter."""
+    dahinter steht der gefälschte KI-Anbieter (beide Adapter)."""
     FAKE.fail_auth = False
     FAKE.calls.clear()
     FAKE.responses = {}
     FAKE.stop_reason = "end_turn"
     FAKE.devin.sessions.clear()
     FAKE.devin.created.clear()
+    FAKE.devin.completions.clear()
     FAKE.devin.counter = 0
     FAKE.devin.probes = 0
     FAKE.devin.working_once = False
@@ -163,9 +212,10 @@ def app_env(tmp_path, monkeypatch):
     drive.mkdir()
     monkeypatch.setenv("KARO_DATA_DIR", str(daten))
     monkeypatch.setenv("KARO_DRIVE_DIR", str(drive))
-    # Der einzige Provider-Schlüssel — kommt aus der Umgebung, nie aus der
+    # Die Provider-Schlüssel — kommen aus der Umgebung, nie aus der
     # Konfigurationsdatei.
     monkeypatch.setenv("DEVIN_API_KEY", "test-devin-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
 
     for name in [m for m in list(sys.modules) if m.startswith("app")]:
         del sys.modules[name]
@@ -176,10 +226,11 @@ def app_env(tmp_path, monkeypatch):
     importlib.reload(db)
     db._local.__dict__.clear()
 
-    # Die Devin-HTTP-Ebene durch die Session-Attrappe ersetzen — erst nach
-    # dem Neuladen der Module, sonst zeigt der Patch auf eine tote Klasse.
-    from app.ai import devin as devin_mod
-    monkeypatch.setattr(devin_mod.DevinBackend, "_api", FAKE.devin.api)
+    # Die HTTP-Ebene beider Adapter durch die Attrappe ersetzen — erst nach
+    # dem Neuladen der Module, sonst zeigt der Patch auf tote Objekte.
+    from app.ai.providers import devin as devin_mod, openrouter as or_mod
+    monkeypatch.setattr(devin_mod, "api_request", FAKE.devin.request)
+    monkeypatch.setattr(or_mod, "api_request", FAKE.devin.request)
 
     from app import main
 

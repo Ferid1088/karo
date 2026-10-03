@@ -77,26 +77,31 @@ an den Hersteller.
 
 ---
 
-## Zugang: `DEVIN_API_KEY`
+## Zugang: der API-Schlüssel des KI-Anbieters
 
-Einziger KI-Anbieter ist die Devin-API — asynchron, pro Aufruf eine Session.
-Der Schlüssel kommt **ausschließlich aus der Umgebung**, nie aus der
+Der KI-Anbieter ist eine Konfigurationsentscheidung: `ai_provider` in
+`config.json` wählt den Adapter (`"devin"` Standard, `"openrouter"` als
+Alternative — siehe `docs/CONFIG.md`). Der Schlüssel des jeweils aktiven
+Anbieters kommt **ausschließlich aus der Umgebung**, nie aus der
 Konfigurationsdatei:
 
 ```bash
 # .env neben der docker-compose.yml
 DEVIN_API_KEY=…
+# bzw. OPENROUTER_API_KEY=… bei ai_provider="openrouter"
 ```
 
-Karo arbeitet asynchron: ein Auftrag legt eine Devin-Session an, parkt sich
-selbst (`not_before`), fragt später erneut nach und übernimmt dann das
-`structured_output`. Eltern merken davon nichts — die Seite zeigt „in
-Arbeit", bis das Ergebnis da ist. Fehlt der Schlüssel, bleiben alle
-Einstellungen erreichbar und Karo meldet klar, was fehlt — es gibt keinen
-zweiten Anbieter und keinen stillen Fallback.
+Karo arbeitet asynchron: ein Auftrag legt einen Lauf beim Anbieter an,
+parkt sich selbst (`not_before`), fragt später erneut nach und übernimmt
+dann das strukturierte Ergebnis — synchrone Anbieter liefern direkt,
+derselbe Weg. Eltern merken davon nichts — die Seite zeigt „in Arbeit",
+bis das Ergebnis da ist. Fehlt der Schlüssel, bleiben alle Einstellungen
+erreichbar und Karo meldet klar, was fehlt — es gibt keinen stillen
+Fallback auf einen anderen Anbieter.
 
 Alle Modellaufrufe laufen über die Fassade `AIClient` in `app/ai/` — kein
-Modul spricht direkt mit der API.
+Modul spricht direkt mit einer Anbieter-API, kein Domain-Code kennt
+Anbieter-Namen oder -Zustände.
 
 ---
 
@@ -190,9 +195,10 @@ make publish
 
 ## Einrichtung beim ersten Start
 
-**Schritt 1 — Zugang.** Karo zeigt, ob `DEVIN_API_KEY` gesetzt ist, und prüft
-die Verbindung auf Wunsch mit einer echten Anfrage. Der Schlüssel wird nicht
-in der Oberfläche eingetippt und nicht in `config.json` gespeichert — geändert
+**Schritt 1 — Zugang.** Karo zeigt, ob der Schlüssel des gewählten
+Anbieters gesetzt ist (z. B. `DEVIN_API_KEY`), und prüft die Verbindung
+auf Wunsch mit einer echten Anfrage. Der Schlüssel wird nicht in der
+Oberfläche eingetippt und nicht in `config.json` gespeichert — geändert
 wird er in der Umgebung (`.env`), danach Neustart. Dazu Vorname und
 Klassenstufe des Kindes; beides bleibt auf diesem Rechner.
 
@@ -204,7 +210,7 @@ Feld behält das bestehende Passwort.
 
 ### Wo die Zugangsdaten liegen
 
-`DEVIN_API_KEY` lebt nur in der Umgebung (`.env`), niemals in
+Der Provider-Schlüssel lebt nur in der Umgebung (`.env`), niemals in
 `/data/config.json`. Die übrigen Einstellungen liegen in `/data/config.json`
 im Docker-Volume auf Ihrem Rechner, mit Dateirechten `0600`. Nichts davon im
 Image, im Quellcode, in Git oder in den Protokollen — ein Formatter schwärzt
@@ -212,8 +218,9 @@ Schlüssel- und Tokenmuster einschließlich der in Fehlermeldungen und
 Tracebacks, bevor eine Zeile geschrieben wird. Beim Start prüft Karo diese
 Schwärzung selbst und verweigert sonst den Dienst.
 
-Schlüssel wechseln: `DEVIN_API_KEY` in `.env` ändern und den Container neu
-starten.
+Schlüssel wechseln: die Variable in `.env` ändern und den Container neu
+starten. Anbieter wechseln: `ai_provider` in `config.json` plus die
+Secret-Variable des neuen Anbieters — kein Code-Diff.
 
 ---
 
@@ -371,7 +378,7 @@ gehen verloren — die Wahrheit steht in Karo, nicht in der Tabelle.
 
 ## Datenschutz
 
-An Devin gehen — nur Text, niemals Bilder:
+An den KI-Anbieter gehen — nur Text, niemals Bilder:
 
 * Klassenstufe, Fach und Thema
 * der abgelesene Text der Blätter und die Antworten des Kindes im Wortlaut
@@ -424,9 +431,10 @@ ist kein Backup.
 make test
 ```
 
-Die Tests laufen ohne Modellkosten: ein nachgebildeter Devin-Session-Dienst
-(`FakeDevin` in `tests/conftest.py`) bildet den echten Lebenszyklus nach —
-Session anlegen, parken, pollen, `structured_output` abholen.
+Die Tests laufen ohne Modellkosten: ein nachgebildeter Anbieter-Dienst
+(`FakeAI` in `tests/conftest.py`) bildet den echten Lebenszyklus beider
+Adapter nach — asynchrone Sessions anlegen, parken, pollen, Ergebnis
+abholen, und synchrone Completions.
 
 Die wichtigsten:
 
@@ -448,9 +456,16 @@ Die wichtigsten:
 app/
   main.py         FastAPI, Routen, Einrichtungsweiche, Zugangskontrolle, CSRF
   ai/
-    base.py       DER Vertrag: Protokoll, Ausnahmen, AIPending
-    devin.py      Devin-Session-Provider (einziger externer Anbieter)
+    base.py       DER Vertrag: Ausnahmen, AIPending
+    types.py      AIRequest/AIRun — das neutrale Auftrags- und Laufmodell
+    provider.py   AIProvider-Protokoll: start/poll
+    registry.py   Anbieter-Auswahl — einzige Stelle, die Namen auflöst
+    http.py       gemeinsame HTTP-Ebene + Fehler-Einordnung der Adapter
+    runs.py       ai_run — persistierte Lauf-Kennungen
     client.py     AIClient — die einzige Naht zum Modell, mit Audit
+    providers/    Adapter — alles API-spezifische lebt nur hier
+      devin.py        asynchron per Session (Standard)
+      openrouter.py   synchron per Chat-Completions
   config.py       Zugangsdaten und Einstellungen, atomar in /data/config.json
   prompts.py      Prompts und Antwortschemata
   pii.py          Entfernt personenbezogene Angaben vor jedem Aufruf

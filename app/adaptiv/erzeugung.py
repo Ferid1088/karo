@@ -32,8 +32,8 @@ QUELLE = "erzeugt"
 #: mittendrin ab, und die Prüfung verwirft sie als unvollständig.
 MAX_TOKENS = config.ops().llm_lektion_max_tokens
 
-#: Devin arbeitet asynchron — das Zeitlimit für eine Lektion steht in
-#: ops.devin_max_session_seconds, nicht an einem einzelnen HTTP-Aufruf.
+#: Der KI-Anbieter arbeitet asynchron — das Zeitlimit für eine Lektion
+#: steht in ops.ai_max_run_seconds, nicht an einem einzelnen HTTP-Aufruf.
 
 #: Welche Rolle als Auswahl gestellt wird statt als Rechnung.
 _ALS_AUSWAHL = {"vorhersage", "transfer"}
@@ -211,9 +211,9 @@ def _handler_anmelden():
         from . import curriculum_dienst
         if curriculum_dienst.configured(cfg) or "curriculum_service" in payload:
             return curriculum_dienst.prepare(cfg, payload, thema, fach, klasse)
-        # §5: der Anbieter schreibt die Didaktik — Devin kennt keine
-        # Modellwahl, die Qualitätssicherung liegt in `schemas.pruefe_lektion`
-        # und `klassenpruefung.pruefen` hinterher.
+        # §5: der Anbieter schreibt die Didaktik — die Qualitätssicherung
+        # liegt in `schemas.pruefe_lektion` und `klassenpruefung.pruefen`
+        # hinterher, nicht in einer Modellwahl im Code.
         ergebnis = AIClient.from_config(cfg).complete(
             purpose="lektion_erzeugen",
             max_tokens=MAX_TOKENS,

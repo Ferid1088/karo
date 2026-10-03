@@ -367,19 +367,22 @@ CREATE TABLE IF NOT EXISTS llm_call (
 CREATE INDEX IF NOT EXISTS idx_llm_created ON llm_call(created_at);
 
 -- ==========================================================================
--- 9b. Asynchrone Anbieter-Sessions (Devin)
+-- 9b. KI-Läufe beim Anbieter (ai_run)
 -- ==========================================================================
--- Ordnet dem Fingerabdruck eines Aufrufs (Anbieter + System + Prompt) die
--- angelegte Session zu, damit ein Neustart oder ein zurückgestellter Job
--- dieselbe Session wiederfindet statt eine zweite anzulegen.
-CREATE TABLE IF NOT EXISTS provider_session (
+-- Ordnet dem Fingerabdruck eines Auftrags die Lauf-Kennung des Anbieters
+-- zu, damit ein zurückgestellter Job oder ein Neustart denselben Lauf
+-- wiederfindet statt einen zweiten anzulegen. Nur neutrale Felder — alles
+-- Anbieter-interne steht in `meta` (JSON, liest nur der Adapter).
+CREATE TABLE IF NOT EXISTS ai_run (
     call_key    TEXT PRIMARY KEY,
     provider    TEXT NOT NULL,
-    session_id  TEXT NOT NULL,
-    status      TEXT NOT NULL DEFAULT 'working',
-    nudged      INTEGER NOT NULL DEFAULT 0,
-    restarts    INTEGER NOT NULL DEFAULT 0,
+    run_id      TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    output      TEXT,
     detail      TEXT,
+    truncated   INTEGER NOT NULL DEFAULT 0,
+    meta        TEXT,
+    restarts    INTEGER NOT NULL DEFAULT 0,
     purpose     TEXT,
     created_ts  REAL NOT NULL,
     updated_ts  REAL NOT NULL

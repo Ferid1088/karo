@@ -605,7 +605,7 @@ def test_prompt_hash_stabil_und_empfindlich(
 
     aufrufe = app_env.db.q(
         "SELECT * FROM llm_call WHERE purpose='material_analyse' ORDER BY id")
-    # Devin ist asynchron: jeder neue Prompt erzeugt eine Park-Runde und damit
+    # Der Anbieter ist asynchron: jeder neue Prompt erzeugt eine Park-Runde und damit
     # eine zweite Audit-Zeile; identischer Text teilt sich außerdem die
     # Session (Fingerprint-Dedup). Aussagekräftig sind die unterschiedlichen
     # Prompt-Hashes: zwei gleiche Blätter → ein Hash, das dritte → ein neuer.
@@ -624,7 +624,7 @@ def test_andere_zwecke_behalten_ihr_vollaudit(
               "properties": {"ok": {"type": "boolean"}}}
     klient = AIClient.from_config(config.load_safe())
     try:
-        # Devin ist asynchron: der erste Aufruf legt die Session an und
+        # Der Anbieter ist asynchron: der erste Aufruf legt den Lauf an und
         # meldet „läuft noch" — erst der zweite holt das Ergebnis ab.
         klient.complete("verify_ping", f"AUDITVOLLMARKER {MARKER}", schema)
     except AIPending:

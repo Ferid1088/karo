@@ -1,12 +1,14 @@
 """AIClient — die einzige Stelle, an der Karo mit dem KI-Anbieter spricht.
 
-Waehlt das Backend (ausschliesslich Devin), protokolliert jeden Aufruf und
-prueft die Antwort, bevor sie weitergegeben wird. Der Rest der Anwendung
-kennt nur `complete(...)`.
+Waehlt den Anbieter-Adapter aus der Registry (die Wahrheit dafuer ist
+`Config.ai_provider`), protokolliert jeden Aufruf und prueft die Antwort,
+bevor sie weitergegeben wird. Der Rest der Anwendung kennt nur
+`complete(...)`.
 
-Devin ist asynchron: `complete()` kann `AIPending` werfen — dann hat das
-Backend eine Session angelegt oder sie laeuft noch. Der Job-Worker stellt
-den Auftrag zurueck; der naechste identische Aufruf holt das Ergebnis ab.
+Anbieter duerfen asynchron sein: `complete()` kann `AIPending` werfen —
+dann laeuft der Auftrag beim Anbieter noch (`ai_run` haelt seine Kennung).
+Der Job-Worker stellt den Auftrag zurueck; der naechste identische Aufruf
+holt das Ergebnis ab. Synchrone Anbieter liefern direkt — derselbe Weg.
 """
 
 from __future__ import annotations
@@ -24,10 +26,11 @@ from .base import (
     AIError,
     AIPending,
     AISchemaError,
-    AISetupError,
-    Backend,
-    RawResult,
 )
+from .provider import AIProvider
+from .registry import build as build_provider
+from .runs import get as run_get, key as run_key, save as run_save
+from .types import AIRequest, LAEUFT, STATUS_COMPLETED, STATUS_FAILED
 
 log = logging.getLogger("karo.ai")
 
@@ -44,27 +47,28 @@ class AIResult:
 
 
 class AIClient:
-    """Fassade. Kennt das Backend und entscheidet nach der Konfiguration."""
+    """Fassade. Kennt den Adapter und entscheidet nach der Konfiguration."""
 
-    def __init__(self, backend: Backend, modell: str = "") -> None:
-        self._backend = backend
+    def __init__(self, provider: AIProvider, modell: str = "") -> None:
+        self._provider = provider
         self.modell = modell
 
     # -- Aufbau -------------------------------------------------------------
 
     @classmethod
     def from_config(cls, cfg, timeout: float | None = None) -> "AIClient":
-        return cls(build_backend(cfg, timeout), getattr(cfg, "ai_provider", "devin"))
+        return cls(build_provider(cfg, timeout),
+                   getattr(cfg, "ai_provider", ""))
 
     @property
     def backend_name(self) -> str:
-        return self._backend.name
+        return self._provider.name
 
     # -- Setup-Hilfe --------------------------------------------------------
 
     def verify(self) -> str:
-        """Billige Zugangsprobe — keine Session, kein Auftrag."""
-        return self._backend.verify()
+        """Billige Zugangsprobe — kein Auftrag, kein Ergebnis."""
+        return self._provider.verify()
 
     # -- Der eigentliche Aufruf --------------------------------------------
 
@@ -77,11 +81,12 @@ class AIClient:
 
         Gibt entweder ein Objekt zurueck, das die Pflichtfelder des Schemas
         enthaelt, wirft `AIPending` (Anbieter arbeitet noch — Aufruf spaeter
-        wiederholen, die Session liegt gespeichert) oder eine AIError.
+        wiederholen, die Lauf-Kennung liegt gespeichert) oder eine AIError.
         Niemals Freitext, den jemand weiter unten hoffnungsvoll parst.
 
-        `web_search`/`web_fetch`: siehe `Backend.call()` — nur für echte
-        Websuche bzw. das Abrufen einer freigegebenen Quelle (`research.py`).
+        `web_search`/`web_fetch`: der Auftrag darf aus dem Netz antworten
+        bzw. eine konkrete, freigegebene Quelle abrufen (`research.py`) —
+        ob der Anbieter das kann, entscheidet der Adapter.
 
         `audit_prompt`: fuer Eingaben, deren Inhalt auch geschwärzt zu
         sensibel für den Audit-Speicher ist (z. B. Arbeitsblatt-OCR). Dann
@@ -89,21 +94,24 @@ class AIClient:
         Hash des Prompts samt Metadaten — und von der Antwort nur ihr
         Hash, nicht ihr Inhalt.
         """
-        gewaehlt = model or self.modell
         begonnen = time.monotonic()
+        request = AIRequest(purpose=purpose, user_prompt=prompt,
+                            system_prompt=system, schema=schema,
+                            max_output_tokens=max_tokens,
+                            model=model or "", web_search=web_search,
+                            web_fetch=web_fetch)
+        provider = self._provider
+        gewaehlt = model or self.modell
         call_id = _log_start(purpose, gewaehlt, audit_prompt or prompt,
-                             self._backend.name)
+                             provider.name)
         try:
-            roh = self._backend.call(prompt, schema, model=gewaehlt,
-                                     system=system, max_tokens=max_tokens,
-                                     web_search=web_search, web_fetch=web_fetch,
-                                     purpose=purpose)
+            run = self._fuehren(request, provider)
         except AIPending as ausstehend:
-            # Kein Fehler: die Session laeuft beim Anbieter weiter. Der Job
+            # Kein Fehler: der Auftrag laeuft beim Anbieter weiter. Der Job
             # wird zurueckgestellt und kommt spaeter mit derselben
             # Fingerabdruck-Kennung wieder.
             _log_finish(call_id, None, False,
-                        f"ausstehend (Session {ausstehend.session_id or '?'})",
+                        f"ausstehend (Lauf {ausstehend.run_id or '?'})",
                         0, 0, None, _ms(begonnen))
             raise
         except AIError as fehler:
@@ -111,47 +119,72 @@ class AIClient:
                         _ms(begonnen))
             raise
         except Exception as fehler:                      # pragma: no cover
-            log.exception("Unerwarteter Fehler im Backend %s", self._backend.name)
+            log.exception("Unerwarteter Fehler im Anbieter %s", provider.name)
             meldung = redact(str(fehler))[:300] or "Unbekannter Fehler."
             _log_finish(call_id, None, False, meldung, 0, 0, None, _ms(begonnen))
             raise AIError(meldung) from None
 
-        rohtext = json.dumps(roh.data, ensure_ascii=False)
+        rohtext = json.dumps(run.output, ensure_ascii=False)
         roh_archiv = (f"sha256:{hashlib.sha256(rohtext.encode('utf-8')).hexdigest()}"
                       if audit_prompt is not None else rohtext)
 
-        if roh.truncated:
+        if run.truncated:
             _log_finish(call_id, roh_archiv, False, "Antwort abgeschnitten",
-                        roh.tokens_in, roh.tokens_out, roh.cost_usd, _ms(begonnen))
+                        0, 0, None, _ms(begonnen))
             raise AISchemaError(
                 "Die Antwort des Anbieters wurde abgeschnitten und war deshalb "
                 "unvollständig. Nichts wurde gespeichert.")
 
-        fehlend = _missing_required(roh.data, schema)
+        fehlend = _missing_required(run.output, schema)
         if fehlend:
             _log_finish(call_id, roh_archiv, False, f"Felder fehlen: {fehlend}",
-                        roh.tokens_in, roh.tokens_out, roh.cost_usd, _ms(begonnen))
+                        0, 0, None, _ms(begonnen))
             raise AISchemaError(
                 "Die Antwort passte nicht zur erwarteten Struktur "
                 f"(fehlend: {', '.join(fehlend)}). Nichts wurde gespeichert.")
 
-        _log_finish(call_id, roh_archiv, True, None, roh.tokens_in,
-                    roh.tokens_out, roh.cost_usd, _ms(begonnen))
-        return AIResult(roh.data, roh.model, roh.tokens_in, roh.tokens_out,
-                        roh.cost_usd, _ms(begonnen), call_id)
+        meta = run.meta or {}
+        _log_finish(call_id, roh_archiv, True, None,
+                    int(meta.get("tokens_in") or 0),
+                    int(meta.get("tokens_out") or 0),
+                    meta.get("cost_usd"), _ms(begonnen))
+        return AIResult(run.output, str(meta.get("model") or gewaehlt),
+                        int(meta.get("tokens_in") or 0),
+                        int(meta.get("tokens_out") or 0),
+                        meta.get("cost_usd"), _ms(begonnen), call_id)
 
+    # -- Lauf-Orchestrierung -------------------------------------------------
 
-# --------------------------------------------------------------------------
-# Backend-Auswahl
-# --------------------------------------------------------------------------
+    def _fuehren(self, request: AIRequest, provider: AIProvider):
+        """Einen Lauf anlegen bzw. weiterführen — der neutrale Kern.
 
-def build_backend(cfg, timeout: float | None = None) -> Backend:
-    """`timeout` begrenzt die HTTP-Aufrufe zur API, nicht die Sessiondauer."""
-    if getattr(cfg, "ai_provider", "devin") != "devin":
-        raise AISetupError(
-            f"Unbekannter KI-Anbieter: {cfg.ai_provider!r}. Karo kennt nur 'devin'.")
-    from .devin import DevinBackend
-    return DevinBackend(timeout=timeout)
+        Fingerabdruck findet den Lauf → fertig: ausgeben → läuft:
+        pollen → immer noch: `AIPending` → gescheitert: `AIError`.
+        """
+        schluessel = run_key(provider.name, request.system_prompt,
+                             request.user_prompt, request.schema)
+        run = run_get(schluessel)
+
+        if run is not None and run.status == STATUS_FAILED:
+            raise AIError(f"KI-Lauf {run.run_id} aufgegeben: {run.error}",
+                          retryable=False)
+        if run is None:
+            run = provider.start(request)
+            run_save(schluessel, run, request.purpose)
+        if run.status in LAEUFT:
+            run = provider.poll(run, request)
+            run_save(schluessel, run, request.purpose)
+        if run.status in LAEUFT:
+            raise AIPending(f"KI-Lauf {run.run_id} läuft beim Anbieter",
+                            wait_seconds=getattr(provider, "poll_seconds", 60),
+                            run_id=run.run_id)
+        if run.status == STATUS_FAILED:
+            raise AIError(f"KI-Lauf {run.run_id} fehlgeschlagen: {run.error}",
+                          retryable=False)
+        if run.status != STATUS_COMPLETED or not run.output:
+            raise AIError(f"KI-Lauf {run.run_id} endete ohne Ergebnis",
+                          retryable=False)
+        return run
 
 
 # --------------------------------------------------------------------------
@@ -197,7 +230,10 @@ def _log_finish(call_id, rohtext, ok, fehler, tin, tout, kosten, ms) -> None:
 
 
 __all__ = [
-    "AIClient", "AIResult", "build_backend",
+    "AIClient", "AIResult", "build_provider",
     "AIError", "AIAuthError", "AIConnectionError",
     "AISchemaError", "AISetupError", "AIPending",
 ]
+
+# Re-Exporte fuer Importe via app.ai.client
+from .base import AIAuthError, AIConnectionError, AISetupError  # noqa: E402

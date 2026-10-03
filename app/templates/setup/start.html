@@ -2,12 +2,12 @@
   {{ csrf_input() }}
 
   <div class="card">
-    <h3>KI-Anbieter: Devin</h3>
-    <p class="hint">Karo nutzt ausschließlich die Devin-API. Der Schlüssel
-    kommt aus der Umgebungsvariablen <code>DEVIN_API_KEY</code> — er wird
-    nicht in der Konfiguration gespeichert.</p>
+    <h3>KI-Anbieter: {{ ai_name }}</h3>
+    <p class="hint">Der Schlüssel kommt aus der Umgebungsvariablen
+    <code>{{ ai_secret_env }}</code> — er wird nicht in der Konfiguration
+    gespeichert.</p>
     {% if not cfg.has_credentials %}
-    <div class="msg err"><b>DEVIN_API_KEY fehlt.</b> Bitte als
+    <div class="msg err"><b>{{ ai_secret_env }} fehlt.</b> Bitte als
     Umgebungsvariable setzen (z. B. in der <code>.env</code>-Datei) und
     Karo neu starten.</div>
     {% endif %}

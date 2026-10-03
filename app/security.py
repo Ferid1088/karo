@@ -114,7 +114,7 @@ REDACTED = "***redigiert***"
 _PATTERNS = [
     # Karo Curriculum client keys (also redact bare values, not only headers).
     re.compile(r"\bkc_[A-Za-z0-9_\-]{16,}"),
-    # OpenAI-artige und generische lange Schluessel (deckt sk-* aller Anbieter ab)
+    # Generische lange Schluessel (deckt sk-* aller Anbieter ab)
     re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}"),
     # AWS und Google, fuer den Fall eines spaeteren Anbieterwechsels
     re.compile(r"\b(AKIA|ASIA)[0-9A-Z]{16}\b"),

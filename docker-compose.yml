@@ -43,9 +43,11 @@ services:
       - KARO_LOG_LEVEL=INFO
       - KARO_DRIVE_PATH=${KARO_DRIVE_PATH:-}
       - TZ=Europe/Berlin
-      # Der einzige externe KI-Anbieter. Der Schlüssel kommt aus der .env
-      # neben dieser Datei — er wird nie in /data/config.json gespeichert.
+      # Der externe KI-Anbieter (welcher: "ai_provider" in config.json).
+      # Der Schlüssel des aktiven Anbieters kommt aus der .env neben
+      # dieser Datei — er wird nie in /data/config.json gespeichert.
       - DEVIN_API_KEY=${DEVIN_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
 
     # Die App schreibt eine JSON-Zeile pro Logeintrag nach stdout, der
     # Docker-Treiber sammelt sie. Ohne Grenze wuerde ein Dauerfehler

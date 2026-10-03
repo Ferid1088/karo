@@ -9,7 +9,7 @@
 
 {% if not cfg.setup_complete %}
 <div class="steps">
-  <span class="{{ 'on' if schritt == 'start' }}">1 · Devin & Lernperson</span>
+  <span class="{{ 'on' if schritt == 'start' }}">1 · KI & Lernperson</span>
   <span class="{{ 'on' if schritt == 'einstellungen' }}">2 · Einstellungen</span>
 </div>
 {% endif %}
@@ -18,22 +18,23 @@
 <form method="post" action="/setup/credentials">
   {{ csrf_input() }}
 
-  <div class="card" id="devin-verbindung">
-    <h3>KI-Anbieter: Devin
-      <span class="pill {{ 'gruen' if devin_ok else 'rot' }}">{{ 'verbunden' if devin_ok else 'getrennt' }}</span>
+  <div class="card" id="ai-verbindung">
+    <h3>KI-Anbieter: {{ ai_name }}
+      <span class="pill {{ 'gruen' if ai_ok else 'rot' }}">{{ 'verbunden' if ai_ok else 'getrennt' }}</span>
     </h3>
-    {% if devin_note %}<p class="hint">{{ devin_note }}</p>{% endif %}
-    <p class="hint">Karo nutzt ausschließlich die Devin-API für alle
-    KI-Funktionen (Erklärungen, Themenvorschläge, Prüfungen). Der Schlüssel
-    kommt aus der Umgebungsvariablen <code>DEVIN_API_KEY</code> — er wird
-    aus Sicherheitsgründen <b>nicht</b> in der Konfigurationsdatei
+    {% if ai_note %}<p class="hint">{{ ai_note }}</p>{% endif %}
+    <p class="hint">Der KI-Anbieter erstellt alle KI-Funktionen (Erklärungen,
+    Themenvorschläge, Prüfungen). Der Schlüssel kommt aus der
+    Umgebungsvariablen <code>{{ ai_secret_env }}</code> — er wird aus
+    Sicherheitsgründen <b>nicht</b> in der Konfigurationsdatei
     gespeichert.</p>
     {% if not cfg.has_credentials %}
     <div class="msg err" style="margin-top:.8rem">
-      <b>DEVIN_API_KEY fehlt.</b> Bitte den Schlüssel als Umgebungsvariable
-      setzen — beim Docker-Start in der <code>.env</code>-Datei
-      (<code>DEVIN_API_KEY=…</code>) oder als <code>-e DEVIN_API_KEY=…</code> —
-      und Karo neu starten. Danach diese Seite erneut aufrufen.
+      <b>{{ ai_secret_env }} fehlt.</b> Bitte den Schlüssel als
+      Umgebungsvariable setzen — beim Docker-Start in der
+      <code>.env</code>-Datei (<code>{{ ai_secret_env }}=…</code>) oder als
+      <code>-e {{ ai_secret_env }}=…</code> — und Karo neu starten. Danach
+      diese Seite erneut aufrufen.
     </div>
     {% endif %}
   </div>
@@ -62,8 +63,8 @@
 
   <button type="submit" {{ 'disabled' if not cfg.has_credentials }}>Verbindung prüfen</button>
   {% if not cfg.has_credentials %}
-  <p class="hint">Ohne gesetzten <code>DEVIN_API_KEY</code> kann die Verbindung
-  nicht geprüft werden.</p>
+  <p class="hint">Ohne gesetzten <code>{{ ai_secret_env }}</code> kann die
+  Verbindung nicht geprüft werden.</p>
   {% endif %}
 </form>
 
@@ -278,24 +279,25 @@
     <button type="button" data-storage-select>Auswählen</button>
   </div>
 </dialog>
-<details class="card setup-group settings-category" id="verbindungen" {{ 'open' if not devin_ok }}>
-  <summary><span><strong>Verbindungen</strong><small>Devin: {{ 'verbunden' if devin_ok else 'nicht verbunden' }}{% if cfg.legacy_lesson_generation_enabled %} · NotebookLM: {{ 'verbunden' if nlm_ok else 'nicht verbunden' }}{% endif %}</small></span></summary>
-  <p class="hint">Devin erstellt die Lerninhalte.{% if cfg.legacy_lesson_generation_enabled %} NotebookLM wird für das Format „NotebookLM“ benötigt.{% endif %}</p>
-<details class="disclosure settings-subsection" id="devin" {{ 'open' if not cfg.has_credentials }}><summary>Devin <span class="settings-inline-status">{{ 'Verbunden' if devin_ok else 'Nicht verbunden' }}</span></summary>
-<div class="card" id="devin-verbindung">
-  <h3>Devin-Verbindung
-    <span class="pill {{ 'gruen' if devin_ok else 'rot' }}">{{ 'verbunden' if devin_ok else 'getrennt' }}</span>
+<details class="card setup-group settings-category" id="verbindungen" {{ 'open' if not ai_ok }}>
+  <summary><span><strong>Verbindungen</strong><small>{{ ai_name }}: {{ 'verbunden' if ai_ok else 'nicht verbunden' }}{% if cfg.legacy_lesson_generation_enabled %} · NotebookLM: {{ 'verbunden' if nlm_ok else 'nicht verbunden' }}{% endif %}</small></span></summary>
+  <p class="hint">{{ ai_name }} erstellt die Lerninhalte.{% if cfg.legacy_lesson_generation_enabled %} NotebookLM wird für das Format „NotebookLM“ benötigt.{% endif %}</p>
+<details class="disclosure settings-subsection" id="ki" {{ 'open' if not cfg.has_credentials }}><summary>{{ ai_name }} <span class="settings-inline-status">{{ 'Verbunden' if ai_ok else 'Nicht verbunden' }}</span></summary>
+<div class="card" id="ai-verbindung">
+  <h3>{{ ai_name }}-Verbindung
+    <span class="pill {{ 'gruen' if ai_ok else 'rot' }}">{{ 'verbunden' if ai_ok else 'getrennt' }}</span>
   </h3>
-  {% if devin_note %}<p class="hint">{{ devin_note }}</p>{% endif %}
+  {% if ai_note %}<p class="hint">{{ ai_note }}</p>{% endif %}
   <p class="hint">Der Schlüssel liegt in der Umgebungsvariablen
-  <code>DEVIN_API_KEY</code> und wird bewusst nicht in Karo gespeichert.
+  <code>{{ ai_secret_env }}</code> und wird bewusst nicht in Karo gespeichert.
   Zum Trennen oder Wechseln: Variable anpassen und Karo neu starten.</p>
-  <form method="post" action="/setup/devin/pruefen" id="devin-pruefen-form">
+  <form method="post" action="/setup/ki/pruefen" id="ki-pruefen-form">
     {{ csrf_input() }}
     <button type="submit" {{ 'disabled' if not cfg.has_credentials }}>Verbindung erneut prüfen</button>
     {% if not cfg.has_credentials %}
-    <p class="hint" style="margin-top:.6rem">DEVIN_API_KEY ist nicht gesetzt —
-    den Schlüssel als Umgebungsvariable hinterlegen und Karo neu starten.</p>
+    <p class="hint" style="margin-top:.6rem">{{ ai_secret_env }} ist nicht
+    gesetzt — den Schlüssel als Umgebungsvariable hinterlegen und Karo neu
+    starten.</p>
     {% endif %}
   </form>
 </div>

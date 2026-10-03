@@ -10,7 +10,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from .. import config, connections, export, ingest, jobs, quizzes, security, materials, profile, teaching, faecher
 from ..config import ConfigUnreadable
 from ..domain import Ausgabe
-from ..ai import AIClient, AIError
+from ..ai import AIClient, AIError, display_name as ai_display_name, \
+    secret_env as ai_secret_env
 from .shared import render, flash, zurueck
 
 router = APIRouter()
@@ -123,10 +124,12 @@ def _setup_context(cfg) -> dict:
     from ..media import notebooklm, tts, video
     mp4_ok, mp4_grund = video.verfuegbar()
     nlm_ok, nlm_grund = notebooklm.verfuegbar()
-    devin_status = connections.status(cfg).get("devin", {})
+    ai_status = connections.status(cfg).get("ai", {})
     return {
-        "devin_ok": devin_status.get("ok", False),
-        "devin_note": devin_status.get("note", ""),
+        "ai_ok": ai_status.get("ok", False),
+        "ai_note": ai_status.get("note", ""),
+        "ai_name": ai_status.get("name") or ai_display_name(cfg),
+        "ai_secret_env": ai_secret_env(cfg) or "",
         "drive_ok": ingest.drive_available(),
         "drive_writable": ingest.drive_writable(),
         "drive_path": os.environ.get("KARO_DRIVE_PATH") or str(config.DRIVE_DIR),
@@ -145,10 +148,10 @@ def _setup_context(cfg) -> dict:
 def setup_form(request: Request):
     cfg = config.load_safe()
     # Nach abgeschlossener Einrichtung IMMER die Einstellungsseite zeigen,
-    # auch wenn der Schlüssel gerade fehlt (z. B. DEVIN_API_KEY nicht
-    # gesetzt) — sonst faellt die Seite zurueck auf den Einrichtungs-
-    # assistenten und der Zugriff auf alle anderen Einstellungen geht
-    # verloren. Die Devin-Karte dort zeigt den fehlenden Zugang ohnehin.
+    # auch wenn der Schlüssel gerade fehlt — sonst faellt die Seite
+    # zurueck auf den Einrichtungsassistenten und der Zugriff auf alle
+    # anderen Einstellungen geht verloren. Die Anbieter-Karte dort zeigt
+    # den fehlenden Zugang ohnehin.
     schritt = "einstellungen" if cfg.setup_complete or cfg.has_credentials \
         else "start"
     return render(request, "setup.html", schritt=schritt,
@@ -166,8 +169,9 @@ def setup_credentials(request: Request,
                       status_code=400, **_setup_context(cfg))
 
     if not cfg.has_credentials:
+        env = ai_secret_env(cfg) or "API-Schlüssel"
         return zurueck_setup(
-            "DEVIN_API_KEY ist nicht gesetzt. Den Schlüssel als "
+            f"{env} ist nicht gesetzt. Den Schlüssel als "
             "Umgebungsvariable hinterlegen (siehe .env.example) und Karo "
             "neu starten — er wird aus Sicherheitsgründen nicht in "
             "config.json gespeichert.")
@@ -347,14 +351,15 @@ async def setup_finish(request: Request, header_crop: str = Form("8"),
     return zurueck("/setup" if not erstmalig else "/")
 
 
-@router.post("/setup/devin/pruefen")
-def setup_devin_pruefen(request: Request):
-    """Verbindung erneut prüfen — der Schlüssel liegt in DEVIN_API_KEY,
-    nicht in der Konfiguration. „Trennen" heisst hier: Variable entfernen
-    und Karo neu starten."""
+@router.post("/setup/ki/pruefen")
+def setup_ki_pruefen(request: Request):
+    """Verbindung erneut prüfen — der Schlüssel liegt in der Umgebungs-
+    variablen des Anbieters, nicht in der Konfiguration. „Trennen" heisst
+    hier: Variable entfernen und Karo neu starten."""
     cfg = config.load_safe()
     if not cfg.has_credentials:
-        flash(request, "DEVIN_API_KEY ist nicht gesetzt — als Umgebungs-"
+        env = ai_secret_env(cfg) or "Der API-Schlüssel"
+        flash(request, f"{env} ist nicht gesetzt — als Umgebungs-"
                        "variable hinterlegen und Karo neu starten.", "err")
         return zurueck("/setup")
     try:
@@ -367,7 +372,7 @@ def setup_devin_pruefen(request: Request):
               "err")
         return zurueck("/setup")
     connections.status(config.load(), force=True)
-    flash(request, "Devin ist verbunden.")
+    flash(request, f"{ai_display_name(cfg)} ist verbunden.")
     return zurueck("/setup")
 
 

@@ -13,7 +13,7 @@ def test_klartext_nennt_den_grund_statt_der_bildqualitaet():
     ratenlimit = "Devin API POST /sessions: 429 Rate-Limit"
     assert "Anfragen" in klartext(ratenlimit)
     assert "Foto" not in klartext(ratenlimit)
-    assert "DEVIN_API_KEY" in klartext("DEVIN_API_KEY ist nicht gesetzt.")
+    assert "Zugangsschlüssel" in klartext("DEVIN_API_KEY ist nicht gesetzt.")
     assert "nicht mehr da" in klartext("Die Bilddatei abc.jpg fehlt.")
     assert "zu lange" in klartext("Der Aufruf hat zu lange gedauert und wurde abgebrochen.")
     # Unbekanntes bleibt wörtlich stehen, statt in eine Vermutung zu kippen.

@@ -1,6 +1,6 @@
 """End-to-End-Tests.
 
-Diese Tests fahren den kompletten Weg: Einrichtung über den Devin-Anbieter,
+Diese Tests fahren den kompletten Weg: Einrichtung über den KI-Anbieter,
 Wissensbasis, Themenvorschlag mit Freigabe, Prüfung am Bildschirm und auf
 Papier, Lernzyklus mit Gegenprüfung und Wiederholung.
 

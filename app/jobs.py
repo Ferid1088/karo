@@ -7,9 +7,9 @@ Wiederholungen laufen mit wachsendem Abstand. Ohne das verbraucht eine
 Ratenbegrenzung des Anbieters — deren Meldung lautet "in ein paar Minuten
 erneut versuchen" — alle drei Versuche innerhalb von Millisekunden.
 
-Devin ist asynchron: `AIPending` aus `app.ai` parkt den Auftrag (gleiches
-Payload, `not_before` = jetzt + Poll-Abstand), ohne einen Versuch zu
-verbrauchen. Die Session selbst liegt in `provider_session`.
+KI-Anbieter können asynchron sein: `AIPending` aus `app.ai` parkt den
+Auftrag (gleiches Payload, `not_before` = jetzt + Poll-Abstand), ohne
+einen Versuch zu verbrauchen. Die Lauf-Kennung liegt in `ai_run`.
 """
 
 from __future__ import annotations
@@ -164,7 +164,7 @@ def run_once() -> bool:
         _defer(job["id"], deferred)
     except AIPending as pending:
         _defer(job["id"], Deferred(payload,
-                                   pending.wait_seconds or _OPS.devin_poll_seconds))
+                                   pending.wait_seconds or _OPS.ai_poll_seconds))
     except PermanentFailure as exc:
         _fail_permanently(job["id"], str(exc))
     except Exception as exc:
@@ -294,7 +294,7 @@ def run_now(job_id: int) -> tuple[str, object]:
         return ("pending", None)
     except AIPending as pending:
         _defer(job_id, Deferred(payload,
-                                pending.wait_seconds or _OPS.devin_poll_seconds))
+                                pending.wait_seconds or _OPS.ai_poll_seconds))
         return ("pending", None)
     except PermanentFailure as exc:
         _fail_permanently(job_id, str(exc))

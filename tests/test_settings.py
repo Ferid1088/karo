@@ -54,7 +54,7 @@ def test_settings_has_one_place_for_each_connection(client, fake_llm,
     page = client.get('/setup')
     forms = Forms(page.text).forms
     assert sum(f['action'] == '/setup/notebooklm/anmelden' for f in forms) == 1
-    assert sum(f['action'] == '/setup/devin/pruefen' for f in forms) == 1
+    assert sum(f['action'] == '/setup/ki/pruefen' for f in forms) == 1
     assert sum(f['action'] == '/setup/finish' for f in forms) == 1
     assert page.text.count('name="default_ausgabe"') == 1
     assert 'data-settings-form' in page.text
@@ -121,7 +121,7 @@ def test_settings_save_does_not_reopen_google_login(client, fake_llm, app_env, m
     assert response.headers['location'] == '/setup'
 
 
-def test_disconnected_devin_keeps_settings_available(client, fake_llm, app_env,
+def test_disconnected_ai_keeps_settings_available(client, fake_llm, app_env,
                                                      monkeypatch):
     """Ist DEVIN_API_KEY nicht gesetzt, bleiben die Einstellungen erreichbar —
     sonst käme man nie mehr an die anderen Bereiche."""
@@ -130,7 +130,7 @@ def test_disconnected_devin_keeps_settings_available(client, fake_llm, app_env,
     page = client.get('/setup')
     assert 'data-settings-form' in page.text
     assert 'action="/setup/credentials"' not in page.text
-    assert 'action="/setup/devin/pruefen"' in page.text
+    assert 'action="/setup/ki/pruefen"' in page.text
 
 
 def test_child_profile_name_and_photo_are_saved_and_used(client, fake_llm,

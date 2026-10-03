@@ -51,7 +51,7 @@
   <summary><span>Technik &amp; Hilfe{% if counts.get('fehler', 0) %} · {{ counts.get('fehler', 0) }} Problem{{ 'e' if counts.get('fehler', 0) != 1 }}{% endif %}<small>Verbindungen, Hintergrundvorgänge und Protokoll</small></span></summary>
   <p>{{ counts.get('wartend', 0) + counts.get('laeuft', 0) }} Vorgänge werden gerade bearbeitet.</p>
   <div class="actions"><a class="btn ghost" href="/protokoll">Protokoll ansehen</a><a href="/hilfe">Alle Funktionen erklärt</a></div>
-  <div id="verbindungen-widget" class="actions"><a class="status" id="status-devin" href="/setup#devin-verbindung">Devin</a>{% if cfg.legacy_lesson_generation_enabled %}<a class="status" id="status-notebooklm" href="/setup#notebooklm-verbindung">NotebookLM</a>{% endif %}</div>
+  <div id="verbindungen-widget" class="actions"><a class="status" id="status-ai" href="/setup#ai-verbindung">{{ ai_name }}</a>{% if cfg.legacy_lesson_generation_enabled %}<a class="status" id="status-notebooklm" href="/setup#notebooklm-verbindung">NotebookLM</a>{% endif %}</div>
   {% for j in fehler %}<div class="item"><strong>Ein Vorgang braucht Hilfe</strong><details><summary>Fehlerdetails ansehen</summary><p>{{ j.last_error }}</p><code>{{ j.type }}</code></details><form method="post" action="/vorgang/{{ j.id }}/erneut">{{ csrf_input() }}<button class="ghost" type="submit">Erneut versuchen</button></form></div>{% endfor %}
   {% if einig.gesamt %}<p class="hint">Karo und Lernbegleitung waren sich bei {{ (einig.quote * 100)|round|int }} % der letzten {{ einig.gesamt }} Antworten einig. Das ist kein Lernfortschritt Ihres Kindes.</p>{% endif %}
 </details>

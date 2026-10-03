@@ -19,8 +19,6 @@ Geraet gelesen (siehe docs/Karo_Prompts_Schritt_fuer_Schritt.MD, Schritt 2).
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
-from typing import Any, Protocol
 
 _RATE = re.compile(r"(rate.?limit|429|too many requests|usage limit|quota|overloaded|529|"
                    r"limit reached|resets? at|credit balance)", re.I)
@@ -72,61 +70,16 @@ class AISetupError(AIError):
 class AIPending(Exception):
     """Der Anbieter arbeitet noch — der Auftrag wird zurückgestellt, nicht wiederholt.
 
-    Devin ist asynchron: `POST /v1/sessions` liefert sofort eine Kennung,
-    das Ergebnis kommt erst Minuten später. Diese Ausnahme ist kein Fehler:
-    sie verbraucht keinen Auftragsversuch, sondern sagt dem Worker „lege den
-    Auftrag zurück und frag mich in `wait_seconds` wieder". Beim nächsten
-    Lauf findet derselbe Aufruf seine Session über den gespeicherten
-    Fingerabdruck wieder.
+    Manche Anbieter sind asynchron: der Lauf ist angelegt, das Ergebnis
+    kommt erst später. Diese Ausnahme ist kein Fehler: sie verbraucht
+    keinen Auftragsversuch, sondern sagt dem Worker „lege den Auftrag
+    zurück und frag mich in `wait_seconds` wieder". Beim nächsten Lauf
+    findet derselbe Aufruf seinen Lauf über den gespeicherten
+    Fingerabdruck wieder (`ai_run`).
     """
 
     def __init__(self, msg: str, *, wait_seconds: float | None = None,
-                 session_id: str | None = None):
+                 run_id: str | None = None):
         super().__init__(msg)
         self.wait_seconds = wait_seconds
-        self.session_id = session_id
-
-
-@dataclass(frozen=True)
-class RawResult:
-    """Was ein Backend zurueckgibt, bevor protokolliert und geprueft wird."""
-
-    data: dict[str, Any]
-    model: str
-    tokens_in: int = 0
-    tokens_out: int = 0
-    cost_usd: float | None = None
-    truncated: bool = False
-
-
-class Backend(Protocol):
-    """Ein Weg zum Anbieter. Genau eine Implementierung: `devin.py`."""
-
-    name: str
-
-    def verify(self) -> str:
-        """Testet die Zugangsdaten mit einem billigen Abruf. Gibt den Anbieter zurück."""
-
-    def call(
-        self,
-        prompt: str,
-        schema: dict,
-        *,
-        model: str,
-        system: str = "",
-        max_tokens: int = 8192,
-        web_search: bool = False,
-        web_fetch: bool = False,
-        purpose: str = "",
-    ) -> RawResult:
-        """Ein Aufruf mit erzwungener Antwortstruktur.
-
-        Kann `AIPending` werfen: der asynchrone Anbieter hat eine Session
-        angelegt oder sie laeuft noch — der Aufrufer (Job-Worker) stellt den
-        Auftrag zurück und ruft spaeter erneut.
-
-        `web_search`/`web_fetch`: Hinweis an den Anbieter, dass der Auftrag
-        aus dem Netz antworten darf bzw. eine konkrete, freigegebene Quelle
-        abrufen soll (`research.py`). Ob die Session das Netz nutzt,
-        entscheidet der Anbieter.
-        """
+        self.run_id = run_id

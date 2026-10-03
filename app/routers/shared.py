@@ -51,10 +51,12 @@ _KLARTEXT = (
             "erneut versuchen."),
     ("zu lange gedauert", "Der Aufruf hat zu lange gedauert. Ein erneuter Versuch hilft meist."),
     ("fehlt", "Die hochgeladene Datei ist nicht mehr da. Bitte laden Sie sie erneut hoch."),
-    ("devin_api_key", "DEVIN_API_KEY ist nicht gesetzt oder wird abgelehnt. Bitte "
-                      "unter Einstellungen prüfen."),
-    ("401", "Der DEVIN_API_KEY wird abgelehnt. Bitte unter Einstellungen prüfen."),
-    ("403", "Der DEVIN_API_KEY wird abgelehnt. Bitte unter Einstellungen prüfen."),
+    ("api_key", "Der Zugangsschlüssel des KI-Anbieters ist nicht gesetzt oder "
+                "wird abgelehnt. Bitte unter Einstellungen prüfen."),
+    ("401", "Der Zugangsschlüssel des KI-Anbieters wird abgelehnt. Bitte unter "
+            "Einstellungen prüfen."),
+    ("403", "Der Zugangsschlüssel des KI-Anbieters wird abgelehnt. Bitte unter "
+            "Einstellungen prüfen."),
 )
 
 
@@ -88,6 +90,16 @@ try:
     ))
 except OSError:
     ASSET_VERSION = "0"
+
+
+def _ai_display_name(cfg) -> str:
+    """Anzeigename des gewaehlten Anbieters — kommt aus der Registry,
+    nicht aus einer Vorlage."""
+    from ..ai import display_name
+    try:
+        return display_name(cfg)
+    except Exception:
+        return "KI"
 
 
 def render(request: Request, name: str, status_code: int = 200,
@@ -134,6 +146,7 @@ def render(request: Request, name: str, status_code: int = 200,
         "wunsch_max_zeichen": config.ops().formular_wunsch_zeichen,
         "faecher": [(key, _faecher.NAMEN[key]) for key in _faecher.FAECHER],
         "aktives_fach": aktives_fach(request),
+        "ai_name": _ai_display_name(cfg),
     }
     basis.update(ctx)
     # The visible area follows the page, including shared pages enabled for children.

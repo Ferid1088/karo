@@ -40,12 +40,14 @@ def test_der_llm_client_hat_keinen_bildparameter():
     assert "prompt" in parameter and "schema" in parameter
 
 
-def test_auch_die_backends_nehmen_kein_bild():
-    """Sonst könnte jemand am Client vorbei direkt ein Backend rufen."""
-    from app.ai.devin import DevinBackend
+def test_auch_die_adapter_nehmen_kein_bild():
+    """Sonst könnte jemand am Client vorbei direkt einen Adapter rufen."""
+    from app.ai.registry import PROVIDERS
 
-    parameter = set(inspect.signature(DevinBackend.call).parameters)
-    assert not (parameter & set(VERDAECHTIG)), parameter
+    for klasse in PROVIDERS.values():
+        for methode in ("start", "poll"):
+            parameter = set(inspect.signature(getattr(klasse, methode)).parameters)
+            assert not (parameter & set(VERDAECHTIG)), (klasse, methode)
 
 
 def test_kein_codepfad_reicht_ein_bild_an_ein_modell():

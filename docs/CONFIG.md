@@ -85,28 +85,42 @@ Welt) nutzen diese Funktion.
 | `browser_ocr_max_kante` | int | 2 000 | `KARO_BROWSER_OCR_MAX_KANTE` | Zielkante beim Browser-PDF-Render. | dto. |
 | `browser_ocr_min_konfidenz` | int | 60 | `KARO_BROWSER_OCR_MIN_KONFIDENZ` | Tesseract.js-Konfidenz; darunter gelten Wörter als geraten. | dto. |
 
-## KI-Anbieter (Devin)
+## KI-Anbieter
 
-Der einzige externe KI-Anbieter ist Devin (asynchron per Session:
-`POST /v1/sessions` → später pollen → `structured_output`). Alle Aufrufe
-laufen über die Fassade `AIClient` (`app/ai/`); der Zugangsschlüssel kommt
-ausschließlich aus der Umgebungsvariable `DEVIN_API_KEY`.
+Karo ist anbieter-unabhängig: Domain-Code kennt nur `AIClient`
+(`app/ai/`). Welcher Adapter die Aufrufe bedient, steht allein in
+`Config.ai_provider` (`config.json`) — die Registry in
+`app/ai/registry.py` löst den Namen auf. Bekannte Anbieter:
+
+| `ai_provider` | Adapter | Secret-Env | Art |
+|---|---|---|---|
+| `"devin"` (Default) | `app/ai/providers/devin.py` | `DEVIN_API_KEY` | asynchron: `POST /v1/sessions` → pollen → `structured_output` |
+| `"openrouter"` | `app/ai/providers/openrouter.py` | `OPENROUTER_API_KEY` | synchron: `POST /chat/completions` |
+
+Ein Wechsel ist eine reine Konfigurationsänderung (`ai_provider` +
+die Env-Variable des neuen Anbieters + ggf. `ai_openrouter_model`) —
+kein Code-Diff nötig. Neuer Anbieter? Eine Zeile in `PROVIDERS` und
+eine Adapter-Datei unter `app/ai/providers/`, die `start()`/`poll()`
+implementiert.
 
 | Parameter | Typ | Default | Env-Override | Beschreibung | Verwendet in |
 |---|---|---|---|---|---|
-| `devin_base_url` | str | `https://api.devin.ai/v1` | `KARO_DEVIN_BASE_URL` | Basis-URL der Devin-API. | `app/ai/devin.py` |
-| `devin_poll_seconds` | int | 300 | `KARO_DEVIN_POLL_SECONDS` | Wartezeit, bis ein geparkter Auftrag die Session erneut abfragt. | `app/jobs.py`, `app/ai/devin.py` |
-| `devin_max_session_seconds` | int | 7 200 | `KARO_DEVIN_MAX_SESSION_SECONDS` | Höchstalter einer Session; danach gilt sie als gescheitert. | `app/ai/devin.py` |
-| `devin_http_timeout_seconds` | float | 60 | `KARO_DEVIN_HTTP_TIMEOUT_SECONDS` | HTTP-Deckel pro API-Anfrage (Anlegen, Pollen, Nudge). | dto. |
-| `devin_max_restarts` | int | 1 | `KARO_DEVIN_MAX_RESTARTS` | Neustarts abgelaufener/gescheiterter Sessions je Auftrag. | dto. |
-| `devin_max_acu` | int | 0 | `KARO_DEVIN_MAX_ACU` | ACU-Obergrenze pro Session (0 = ohne Limit anlegen). | dto. |
+| `ai_poll_seconds` | int | 300 | `KARO_AI_POLL_SECONDS` | Wartezeit, bis ein geparkter Auftrag den Lauf erneut abfragt. | `app/jobs.py`, Adapter |
+| `ai_max_run_seconds` | int | 7 200 | `KARO_AI_MAX_RUN_SECONDS` | Höchstalter eines Laufs; danach gilt er als gescheitert. | Adapter |
+| `ai_http_timeout_seconds` | float | 60 | `KARO_AI_HTTP_TIMEOUT_SECONDS` | HTTP-Deckel pro API-Anfrage (Anlegen, Pollen, Nudge). | `app/ai/http.py` |
+| `ai_max_restarts` | int | 1 | `KARO_AI_MAX_RESTARTS` | Neustarts abgelaufener/gescheiterter Läufe je Auftrag. | Adapter |
+| `ai_devin_base_url` | str | leer → Adapter-Default | `KARO_AI_DEVIN_BASE_URL` | Basis-URL des Devin-API-Adapters (Override). | `app/ai/providers/devin.py` |
+| `ai_devin_max_acu` | int | 0 | `KARO_AI_DEVIN_MAX_ACU` | ACU-Obergrenze pro Session (0 = ohne Limit anlegen). | dto. |
+| `ai_openrouter_base_url` | str | leer → Adapter-Default | `KARO_AI_OPENROUTER_BASE_URL` | Basis-URL des OpenRouter-Adapters (Override). | `app/ai/providers/openrouter.py` |
+| `ai_openrouter_model` | str | leer | `KARO_AI_OPENROUTER_MODEL` | Modellname für OpenRouter — Pflicht, wenn der Anbieter gewählt ist. | dto. |
 | `llm_default_max_tokens` | int | 8 192 | `KARO_LLM_DEFAULT_MAX_TOKENS` | Standard-Antwortbudget, wenn kein Aufruf ein anderes nennt. | `app/ai/client.py` |
 | `llm_fach_max_tokens` | int | 64 | `KARO_LLM_FACH_MAX_TOKENS` | Fachklassifikation: kurzer Aufruf, kurzes Budget. | `app/faecher.py` |
 | `llm_lektion_max_tokens` | int | 32 000 | `KARO_LLM_LEKTION_MAX_TOKENS` | Token-Budget für eine komplette Lernreihe. | `app/adaptiv/erzeugung.py` |
 
-`Config.ai_provider` ist fix `"devin"` — es gibt keine Backend-Wahl mehr.
-`Config.has_credentials` liest nur, ob `DEVIN_API_KEY` in der Umgebung
-steht; der Schlüssel wird nie in `config.json` gespeichert.
+`Config.has_credentials` fragt über die Registry, ob die Secret-Variable
+des gewählten Anbieters gesetzt ist; kein Schlüssel landet je in
+`config.json`. Lauf-Kennungen liegen provider-neutral in `ai_run`
+(`run_id`, `status`, `meta`-JSON für Adapter-Interna).
 
 ## Curriculum-Dienst
 
@@ -239,12 +253,13 @@ Diese Literale sind Domänenlogik, kein Betriebsparameter — sie bleiben im Cod
 ## Was **nicht** hier steht — und warum
 
 - **Secrets** (`curriculum_key`, Passwort-Hashes): liegen in
-  `/data/config.json`, siehe `docs/API_INVENTORY.md`. `DEVIN_API_KEY`
-  kommt ausschließlich aus der Umgebung.
+  `/data/config.json`, siehe `docs/API_INVENTORY.md`. Provider-Schlüssel
+  kommen ausschließlich aus der Umgebung.
 - **Pfade** (`KARO_DATA_DIR`, `KARO_DRIVE_DIR`, `KARO_DRIVE_PATH`,
   `NOTEBOOKLM_HOME`, `KARO_GIT_SHA`): Umgebungs-/Deployment-Größen, siehe
   `docs/ENVIRONMENT_VARIABLES.md`.
-- **KI-Anbieter**: fix Devin (`Config.ai_provider`); der Schlüssel lebt in
-  `DEVIN_API_KEY`, nicht in `config.json`.
+- **KI-Anbieter**: Wahl in `Config.ai_provider`; der Schlüssel lebt in
+  der Umgebungsvariable, die der Adapter benennt (`DEVIN_API_KEY`,
+  `OPENROUTER_API_KEY`), nicht in `config.json`.
 - **Adaptive Lernparameter** (`adaptiv_*` in `Config`): Produkteinstellungen der
   Familie, nicht Betrieb — bleiben auf der Einstellungsseite.

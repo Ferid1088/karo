@@ -4,7 +4,8 @@ Drei Gruppen:
 
 1. **Pfade/Deployment** — wo Karo Daten ablegt und wie es deployed ist
 2. **Ops-Overrides** — `KARO_<OPS_FELD>` überschreibt `config.ops()`-Defaults
-3. **Provider-Schlüssel** — `DEVIN_API_KEY` für den einzigen KI-Anbieter
+3. **Provider-Schlüssel** — die Secret-Variable des in
+   `Config.ai_provider` gewählten KI-Anbieters (z. B. `DEVIN_API_KEY`)
 
 Alle Ops-Overrides sind in `docs/CONFIG.md` einzeln beschrieben; hier nur die
 Nicht-Ops-Variablen.
@@ -39,9 +40,17 @@ Ports sind Deployment-Größen und stehen in den Deploy-Dateien selbst:
 
 ## KI-Anbieter-Schlüssel
 
-| Variable | Pflicht | Secret | Beschreibung | Verwendet in |
+Welche Variable gebraucht wird, entscheidet `Config.ai_provider` —
+die Registry (`app/ai/registry.py`) kennt die Zuordnung.
+
+| Variable | Anbieter (`ai_provider`) | Pflicht | Secret | Verwendet in |
 |---|---|---|---|---|
-| `DEVIN_API_KEY` | **ja** (für KI-Funktionen) | **ja** | Zugangsschlüssel der Devin-API — einziger externer KI-Anbieter. Wird ausschließlich aus der Umgebung gelesen und nie in `config.json` gespeichert. | `app/ai/devin.py`, `docker-compose.yml`, `.env.example` |
+| `DEVIN_API_KEY` | `devin` (Default) | **ja**, wenn aktiv | **ja** | `app/ai/providers/devin.py`, `docker-compose.yml`, `.env.example` |
+| `OPENROUTER_API_KEY` | `openrouter` | **ja**, wenn aktiv | **ja** | `app/ai/providers/openrouter.py`, `docker-compose.yml` |
+| `KARO_AI_OPENROUTER_MODEL` | `openrouter` | **ja**, wenn aktiv | nein | Ops-Override: Modellname, siehe `docs/CONFIG.md` |
+
+Alle werden ausschließlich aus der Umgebung gelesen und nie in
+`config.json` gespeichert.
 
 ## CI (`.github/workflows/pytest-full.yml`)
 
@@ -57,7 +66,7 @@ Ports sind Deployment-Größen und stehen in den Deploy-Dateien selbst:
 
 Jedes `Ops`-Feld in `app/config.py` hat einen Override nach dem Muster
 `KARO_<FELDNAME_IN_UPPERCASE>` — z. B. `KARO_UPLOAD_MAX_BYTES`,
-`KARO_DEVIN_POLL_SECONDS`, `KARO_NOTEBOOKLM_VNC_RFB_PORT`.
+`KARO_AI_POLL_SECONDS`, `KARO_NOTEBOOKLM_VNC_RFB_PORT`.
 Vier historische Namen bleiben aus Kompatibilität kürzer:
 
 | Ops-Feld | Env-Name |
@@ -72,7 +81,8 @@ Fallback.
 
 ## Secrets
 
-`DEVIN_API_KEY` steht **nur** in der Umgebung. Die übrigen Secrets liegen in
+Provider-Schlüssel (`DEVIN_API_KEY`, `OPENROUTER_API_KEY`) stehen **nur**
+in der Umgebung. Die übrigen Secrets liegen in
 `/data/config.json`: `curriculum_key`, `app_password_*`, `child_password_*`,
 und `/data/session.key` für die Session-Signatur.
 `.env` ist gitignored; siehe `.env.example` für die leeren Schlüssel.

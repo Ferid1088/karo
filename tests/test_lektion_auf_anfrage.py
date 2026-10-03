@@ -142,10 +142,10 @@ def test_das_wartende_kind_bekommt_eine_auskunft(client, fake_llm,
 # §5: die Lektion geht als eigene Session an den Anbieter
 # --------------------------------------------------------------------------
 
-def test_die_lektion_geht_als_session_an_devin(client, fake_llm,
-                                               app_env):
-    """Der Anbieter schreibt die Didaktik — unter Devin eine eigene Session
-    mit dem Lektions-Schema. Eine Modellwahl gibt es nicht mehr; die
+def test_die_lektion_geht_als_lauf_an_den_anbieter(client, fake_llm,
+                                                   app_env):
+    """Der Anbieter schreibt die Didaktik — als eigener Lauf mit dem
+    Lektions-Schema. Eine Modellwahl gibt es im Code nicht; die
     Qualitaetssicherung liegt in `schemas.pruefe_lektion` und der
     Klassenpruefung hinterher."""
     token = _kind(client, fake_llm, app_env, erzeugen=True)
@@ -160,10 +160,10 @@ def test_die_lektion_geht_als_session_an_devin(client, fake_llm,
 def test_die_lektion_bekommt_mehr_luft_als_ein_quiz(app_env):
     """Eine ganze Lernreihe ist um ein Vielfaches laenger als eine Fragerunde
     — mit der Vorgabe von 8192 Token bricht die Antwort mittendrin ab. Und
-    weil Devin asynchron antwortet, bekommt die Session deutlich mehr Zeit
+    weil der Anbieter asynchron antwortet, bekommt der Lauf deutlich mehr Zeit
     als ein synchroner Aufruf je haette."""
     from app import config
     from app.adaptiv import erzeugung
 
     assert erzeugung.MAX_TOKENS > 8192
-    assert config.ops().devin_max_session_seconds > 300
+    assert config.ops().ai_max_run_seconds > 300

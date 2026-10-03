@@ -201,6 +201,7 @@ def _faecher_vereinheitlichen(c: sqlite3.Connection) -> None:
 
 
 def _migrate(c: sqlite3.Connection) -> None:
+    _migrate_provider_session(c)
     for table, column, decl in _ADDED_COLUMNS:
         try:
             existing = {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
@@ -212,6 +213,27 @@ def _migrate(c: sqlite3.Connection) -> None:
                 log.info("Spalte %s.%s ergänzt", table, column)
             except sqlite3.Error as exc:      # pragma: no cover
                 log.warning("Konnte %s.%s nicht ergänzen: %s", table, column, exc)
+
+
+def _migrate_provider_session(c: sqlite3.Connection) -> None:
+    """provider_session → ai_run: neutrale Namen für beliebige Anbieter."""
+    tabellen = {r[0] for r in c.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'")}
+    if "provider_session" not in tabellen:
+        return
+    if "ai_run" in tabellen:
+        c.execute("DROP TABLE provider_session")
+        return
+    c.execute("ALTER TABLE provider_session RENAME TO ai_run")
+    c.execute("ALTER TABLE ai_run RENAME COLUMN session_id TO run_id")
+    c.execute("ALTER TABLE ai_run ADD COLUMN output TEXT")
+    c.execute("ALTER TABLE ai_run ADD COLUMN truncated INTEGER NOT NULL DEFAULT 0")
+    c.execute("ALTER TABLE ai_run ADD COLUMN meta TEXT")
+    c.execute("UPDATE ai_run SET meta='{\"nudged\":true}' WHERE nudged=1")
+    c.execute("UPDATE ai_run SET status='running' WHERE status='working'")
+    c.execute("UPDATE ai_run SET status='completed' WHERE status='finished'")
+    c.execute("ALTER TABLE ai_run DROP COLUMN nudged")
+    log.info("provider_session → ai_run migriert")
 
 
 def q(sql: str, *params) -> list[sqlite3.Row]:

@@ -51,9 +51,11 @@ class ConfigUnreadable(RuntimeError):
 @dataclass(frozen=True)
 class Config:
     # --- KI-Anbieter --------------------------------------------------------
-    # Genau ein externer Anbieter, und der heisst Devin. Der Schlüssel steht
-    # niemals in dieser Datei: er kommt ausschließlich aus der Umgebungs-
-    # variablen DEVIN_API_KEY (siehe .env.example).
+    # Welcher Adapter in `app.ai.registry.PROVIDERS` die allgemeinen
+    # KI-Aufrufe bedient — die einzige Stelle, an der die Wahl steht.
+    # Der Schlüssel steht niemals in dieser Datei: er kommt ausschließlich
+    # aus der Umgebungsvariablen, die der Adapter benennt (z. B.
+    # DEVIN_API_KEY, siehe .env.example).
     ai_provider: str = "devin"
 
     # Optionaler zentraler Inhaltsdienst. Kein stiller KI-Fallback bei Ausfall.
@@ -156,7 +158,9 @@ class Config:
     def has_credentials(self) -> bool:
         # Der Schluessel lebt nur in der Umgebung — absichtlich live gelesen,
         # damit ein nachtraeglich gesetzter Wert ohne Neuschreiben gilt.
-        return bool(os.environ.get("DEVIN_API_KEY"))
+        # Welche Variable das ist, weiss allein der gewaehlte Adapter.
+        from .ai import credentials_present
+        return credentials_present(self)
 
     def public_dict(self) -> dict:
         """Alles, was gefahrlos in ein Template oder ins Protokoll darf."""
@@ -415,18 +419,25 @@ class Ops:
     #: Browser-OCR: Konfidenz, unter der ein Wort als geraten gilt (0-100).
     browser_ocr_min_konfidenz: int = 60
 
-    # --- KI-Anbieter (Devin) ---------------------------------------------------
-    devin_base_url: str = "https://api.devin.ai/v1"
-    #: Abstand, mit dem ein gestellter Auftrag seine Session erneut abfragt.
-    devin_poll_seconds: int = 300
-    #: Danach wird eine laufende Session aufgegeben und der Job schlägt fehl.
-    devin_max_session_seconds: int = 7_200
-    #: Zeitlimit für einen einzelnen HTTP-Aufruf zur API (nicht für die Session).
-    devin_http_timeout_seconds: float = 60.0
-    #: Wie oft eine abgelaufene/fehlgeschlagene Session neu angelegt wird.
-    devin_max_restarts: int = 1
+    # --- KI-Anbieter (generisch) ----------------------------------------------
+    #: Abstand, mit dem ein gestellter Auftrag seinen Lauf erneut abfragt.
+    ai_poll_seconds: int = 300
+    #: Danach wird ein laufender Auftrag aufgegeben und der Job schlägt fehl.
+    ai_max_run_seconds: int = 7_200
+    #: Zeitlimit für einen einzelnen HTTP-Aufruf zum Anbieter (nicht für den Lauf).
+    ai_http_timeout_seconds: float = 60.0
+    #: Wie oft ein gescheiterter/abgelaufener Lauf neu angelegt wird.
+    ai_max_restarts: int = 1
+
+    # --- Adapter-spezifisch (nur für den gewählten Anbieter relevant) ---------
+    #: Leer = Standard des Adapters. Die API-URL gehört zum Provider-Wissen,
+    #: hier steht nur der Override-Haken.
+    ai_devin_base_url: str = ""
     #: ACU-Kostenrahmen pro Session; 0 = kein Limit.
-    devin_max_acu: int = 0
+    ai_devin_max_acu: int = 0
+    ai_openrouter_base_url: str = ""
+    #: Pflicht, wenn ai_provider="openrouter".
+    ai_openrouter_model: str = ""
     llm_default_max_tokens: int = 8_192
     #: Ad-hoc-Fachprüfung beim Themeneinlesen.
     llm_fach_max_tokens: int = 64
@@ -589,7 +600,12 @@ def _ops_parse(field_name: str, raw: str):
 
 
 #: Felder, bei denen 0 eine eigene Bedeutung trägt (hier: „kein Limit").
-_OPS_ZERO_OK = {"family_daily_topics", "devin_max_acu"}
+_OPS_ZERO_OK = {"family_daily_topics", "ai_devin_max_acu"}
+
+#: Felder, die leer sein dürfen (hier: nur nötig, wenn der Anbieter gewählt
+#: ist — die Pflicht meldet der Adapter selbst, siehe providers/openrouter).
+_OPS_LEER_OK = {"ai_openrouter_model", "ai_devin_base_url",
+                "ai_openrouter_base_url"}
 
 
 def _ops_validate(o: "Ops") -> None:
@@ -602,7 +618,8 @@ def _ops_validate(o: "Ops") -> None:
         if isinstance(wert, (int, float)) and wert <= 0 \
                 and f.name not in _OPS_ZERO_OK:
             probleme.append(f"{f.name} = {wert} — erwartet wird ein positiver Wert")
-        if isinstance(wert, str) and not wert.strip():
+        if isinstance(wert, str) and not wert.strip() \
+                and f.name not in _OPS_LEER_OK:
             probleme.append(f"{f.name} darf nicht leer sein")
         if isinstance(wert, tuple) and not wert:
             probleme.append(f"{f.name} darf nicht leer sein")
@@ -623,11 +640,13 @@ def _ops_validate(o: "Ops") -> None:
         probleme.append("paket_max_bild_bytes > paket_max_bytes")
     if o.jobs_defer_min_seconds > o.jobs_defer_max_seconds:
         probleme.append("jobs_defer_min_seconds > jobs_defer_max_seconds")
-    if not o.devin_base_url.startswith(("https://", "http://")):
-        probleme.append("devin_base_url muss eine http(s)-URL sein")
-    if o.devin_poll_seconds > o.jobs_defer_max_seconds:
+    for feld in ("ai_devin_base_url", "ai_openrouter_base_url"):
+        wert = getattr(o, feld)
+        if wert and not wert.startswith(("https://", "http://")):
+            probleme.append(f"{feld} muss eine http(s)-URL sein")
+    if o.ai_poll_seconds > o.jobs_defer_max_seconds:
         probleme.append(
-            "devin_poll_seconds > jobs_defer_max_seconds — gestellte Aufträge "
+            "ai_poll_seconds > jobs_defer_max_seconds — gestellte Aufträge "
             "würden später abgefragt als das Parken erlaubt")
     if o.adaptiv_zeit_spanne_min > o.adaptiv_zeit_spanne_max:
         probleme.append("adaptiv_zeit_spanne_min > adaptiv_zeit_spanne_max")
