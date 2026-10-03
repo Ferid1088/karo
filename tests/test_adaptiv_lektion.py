@@ -452,7 +452,9 @@ def test_unbekannte_antwort_erfindet_keine_fehlvorstellung(client, fake_llm,
     sitzung = app_env.db.q1("SELECT * FROM lern_sitzung ORDER BY id DESC LIMIT 1")
     assert sitzung["fehlertyp_id"] is None
     assert sitzung["zustand"] == "DIAGNOSING"
-    assert "Interessant" in seite.text
+    # Keine erfundene Fehlvorstellung — aber auch kein Dead End: die Seite
+    # traegt eine Lernintervention, kein blosses „probier es noch mal".
+    assert "genauer an" in seite.text
     assert fake_llm.calls == []
 
 

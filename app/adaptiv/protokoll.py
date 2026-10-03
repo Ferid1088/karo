@@ -20,6 +20,7 @@ from __future__ import annotations
 import datetime as dt
 
 from .. import config, db
+from . import store
 from .store import CHILD_KEY, _zeile
 
 #: Rollen, unter denen eine Antwort protokolliert wird.
@@ -207,12 +208,13 @@ def antwort_buchen(sitzung: dict, rolle: str, *, aufgabe: dict | None = None,
     jetzt = db.now()
     with db.tx() as c:
         zeile = c.execute(
-            """INSERT INTO lern_antwort (child_key, sitzung_id, aufgabe_id,
+            """INSERT INTO lern_antwort (child_key, scope, sitzung_id, aufgabe_id,
                    konzept_id, fach, phase, rolle, gezeigt_at, beantwortet_at,
                    antwort, richtig, tipp_genutzt, aktive_sekunden, zu_schnell,
                    created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (sitzung.get("child_key") or CHILD_KEY, sitzung_id,
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (sitzung.get("child_key") or CHILD_KEY,
+             store.fortschritt_scope(sitzung), sitzung_id,
              (aufgabe or {}).get("id"), sitzung.get("konzept_id"), fach,
              sitzung.get("phase"), rolle, gezeigt_at, jetzt,
              (antwort or None), (None if richtig is None else int(richtig)),
@@ -278,13 +280,16 @@ def nicht_ernsthaft(child_key: str = CHILD_KEY, von: str | None = None,
     return False
 
 
-def gesehene_aufgaben(konzept_id: int, child_key: str = CHILD_KEY) -> set[int]:
+def gesehene_aufgaben(konzept_id: int, scope: str = CHILD_KEY) -> set[int]:
     """Welche Aufgaben dieses Konzepts das Kind schon beantwortet hat.
 
     Die Wiederholung braucht neue Aufgaben. Ohne diese Liste waere „neu" eine
-    Behauptung.
+    Behauptung. Als gesehen zaehlt nur der eigene Lernraum — Zeilen mit
+    scope NULL stammen aus der Zeit vor der Spalte und gelten weiter als
+    global gesehen, damit nichts verloren geht.
     """
     return {z["aufgabe_id"] for z in db.q(
         "SELECT DISTINCT aufgabe_id FROM lern_antwort "
-        "WHERE child_key=? AND konzept_id=? AND aufgabe_id IS NOT NULL",
-        child_key, konzept_id)}
+        "WHERE konzept_id=? AND aufgabe_id IS NOT NULL "
+        "AND (scope=? OR scope IS NULL)",
+        konzept_id, scope)}

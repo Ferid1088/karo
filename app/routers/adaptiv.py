@@ -448,7 +448,8 @@ def wiederholung_pruefen(request: Request, wid: int,
                   "gesamt": ergebnis["gesamt"]}
     else:
         schirm = {"art": "auffrischung", "ergebnis": ergebnis,
-                  "auffrischung": wiederholung.auffrischung(eintrag["konzept_id"]),
+                  "auffrischung": wiederholung.auffrischung(
+                      eintrag["konzept_id"], child_key=eintrag["child_key"]),
                   "auswahl": wiederholung.auswahl(eintrag["konzept_id"])}
     return render(request, "adaptiv_wiederholung.html", eintrag=eintrag,
                   konzept=store.konzept(eintrag["konzept_id"]) or {},
@@ -464,11 +465,13 @@ def wiederholung_auffrischung(request: Request, wid: int,
     eintrag = _wiederholung_eintrag(wid)
     if eintrag["status"] != wiederholung.NICHT_BESTANDEN:
         return zurueck("/")
-    auffrischung = wiederholung.auffrischung(eintrag["konzept_id"])
+    auffrischung = wiederholung.auffrischung(eintrag["konzept_id"],
+                                             child_key=eintrag["child_key"])
     aufgabe = auffrischung.get("aufgabe") or {}
     schirm = {"art": "neuer_termin", "hat_aufgabe": bool(aufgabe),
               "aufgabe_richtig": (unterricht.ist_richtig(
-                  antwort, aufgabe.get("loesung", "")) if aufgabe else None),
+                  antwort, aufgabe.get("loesung", ""),
+                  aufgabe.get("antwort_art")) if aufgabe else None),
               "aufgabe_loesung": aufgabe.get("loesung", ""),
               "auswahl": wiederholung.auswahl(eintrag["konzept_id"])}
     return render(request, "adaptiv_wiederholung.html", eintrag=eintrag,
@@ -487,7 +490,8 @@ def wiederholung_termin(request: Request, wid: int, tage: str = Form("")):
     if eintrag["status"] != wiederholung.NICHT_BESTANDEN:
         return zurueck("/")
     if tage in [str(n) for n in wiederholung.ABSTAENDE]:
-        wiederholung.planen(eintrag["konzept_id"], int(tage))
+        wiederholung.planen(eintrag["konzept_id"], int(tage),
+                            child_key=eintrag["child_key"])
         flash(request, "Der Termin steht in deinem Tag.")
     return zurueck("/")
 

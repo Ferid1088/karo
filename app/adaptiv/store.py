@@ -40,6 +40,12 @@ _NACHGETRAGENE_SPALTEN = [
     ("lern_aufgabe", "optionen", "TEXT NOT NULL DEFAULT '[]'"),
     ("lern_aufgabe", "aufloesung", "TEXT"),
     ("lern_aufgabe", "erwartete_sekunden", "INTEGER"),
+    # Der Lernraum, dem eine Antwort zugehoert: 'installation' fuer
+    # themenlose Sitzungen, 'installation:topic:<id>' fuer ein Thema —
+    # dieselbe Regel wie `fortschritt_scope`. Geteiltes Curriculum, aber
+    # kein geteilter Lernstand: eine im Pruefungsthema gesehene Aufgabe
+    # gilt im eigenen Thema weiter als neu.
+    ("lern_antwort", "scope", "TEXT"),
 ]
 
 
@@ -60,6 +66,35 @@ def _spalten_nachziehen(c) -> None:
         vorhanden = {r["name"] for r in c.execute(f"PRAGMA table_info({tabelle})")}
         if vorhanden and spalte not in vorhanden:
             c.execute(f"ALTER TABLE {tabelle} ADD COLUMN {spalte} {deklaration}")
+    # Bestehende Antworten bekommen ihren Scope nachgerechnet: ueber die
+    # Sitzung zur Eingabe und von dort zum Thema. Themenlose Antworten
+    # bleiben im gemeinsamen 'installation'-Raum — sie gehoerten nie zu
+    # einem einzelnen Thema.
+    if "scope" in {r["name"] for r in c.execute("PRAGMA table_info(lern_antwort)")}:
+        c.execute("""UPDATE lern_antwort SET scope = (
+                       SELECT CASE WHEN e.topic_id IS NULL THEN a.child_key
+                              ELSE a.child_key || ':topic:' || e.topic_id END
+                         FROM lern_sitzung s JOIN lern_eingabe e
+                           ON e.id = s.eingabe_id
+                        WHERE s.id = a.sitzung_id)
+                     FROM lern_antwort a
+                     WHERE a.scope IS NULL AND EXISTS (
+                       SELECT 1 FROM lern_sitzung s JOIN lern_eingabe e
+                         ON e.id = s.eingabe_id WHERE s.id = a.sitzung_id)""")
+    # Bestehende Wiederholungstermine gehoerten oft zu einer Sitzung — und
+    # deren Eingabe kennt ihr Thema. Wo sich das rekonstruieren laesst,
+    # wandert der Termin in den Themen-Raum; Termine ohne Sitzungsbezug
+    # bleiben im gemeinsamen Raum, statt blind allen Themen zu gehoeren.
+    c.execute("""UPDATE lern_wiederholung SET child_key = (
+                   SELECT w.child_key || ':topic:' || e.topic_id
+                     FROM lern_sitzung s JOIN lern_eingabe e
+                       ON e.id = s.eingabe_id
+                    WHERE s.id = w.sitzung_id AND e.topic_id IS NOT NULL)
+                 FROM lern_wiederholung w
+                 WHERE w.child_key NOT LIKE '%:topic:%' AND EXISTS (
+                   SELECT 1 FROM lern_sitzung s JOIN lern_eingabe e
+                     ON e.id = s.eingabe_id
+                    WHERE s.id = w.sitzung_id AND e.topic_id IS NOT NULL)""")
 
 
 def _zeile(row) -> dict | None:
@@ -671,11 +706,28 @@ def fortschritt(konzept_id: int, fehlertyp_id: int | None = None,
         child_key, konzept_id, fehlertyp_id))
 
 
+def topic_scope(topic_id: int | None, child_key: str = CHILD_KEY) -> str:
+    """Der Lernraum eines Themas — die einzige Stelle, die ihn zusammensetzt.
+
+    'installation' ist der gemeinsame Raum themenloser Sitzungen;
+    'installation:topic:<id>' gehoert genau einem Thema. Ein eigenes
+    Lernthema und ein Pruefungsthema duerfen auf dasselbe Konzept zeigen —
+    ihr Lernstand darf sich trotzdem nie mischen.
+    """
+    return f"{child_key}:topic:{topic_id}" if topic_id else child_key
+
+
+def scope_teile(scope: str | None) -> tuple[str, int | None]:
+    """Den Scope wieder in (child_key, topic_id) zerlegen — fuer Abfragen,
+    die ueber `lern_eingabe.topic_id` filtern muessen."""
+    basis, _, topic = (scope or "").partition(":topic:")
+    return (basis or CHILD_KEY, int(topic) if topic.isdigit() else None)
+
+
 def fortschritt_scope(sitzung: dict) -> str:
     """Shared curriculum does not mean shared evidence of mastery."""
     entry = eingabe(sitzung.get("eingabe_id")) or {}
-    base = sitzung.get("child_key", CHILD_KEY)
-    return f"{base}:topic:{entry['topic_id']}" if entry.get("topic_id") else base
+    return topic_scope(entry.get("topic_id"), sitzung.get("child_key", CHILD_KEY))
 
 
 def fortschritt_buchen(konzept_id: int, fehlertyp_id: int | None, *,

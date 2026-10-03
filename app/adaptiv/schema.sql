@@ -269,6 +269,11 @@ CREATE INDEX IF NOT EXISTS idx_lern_voraussetzung ON lern_voraussetzung(konzept_
 CREATE TABLE IF NOT EXISTS lern_antwort (
     id              INTEGER PRIMARY KEY,
     child_key       TEXT NOT NULL DEFAULT 'installation',
+    -- Der Lernraum der Antwort ('installation' oder
+    -- 'installation:topic:<id>', siehe store.topic_scope): geteiltes
+    -- Curriculum, getrennter Lernstand. NULL bei Zeilen aus der Zeit
+    -- vor der Spalte — sie gelten als global gesehen.
+    scope           TEXT,
     sitzung_id      INTEGER REFERENCES lern_sitzung(id),
     aufgabe_id      INTEGER REFERENCES lern_aufgabe(id),
     konzept_id      INTEGER REFERENCES lern_konzept(id),

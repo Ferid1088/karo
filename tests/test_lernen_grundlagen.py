@@ -543,7 +543,11 @@ def test_verstanden_ist_noch_nicht_thema_sicher(app_env):
     assert zeile["learning_status"] == "verstanden"
     assert zeile["status_label"] == "Verstanden"
 
-    termin = wiederholung.planen(konzept_id, 2)
+    # Der Termin gehoert zum Lernraum des Themas — wie `wiederholung_gewaehlt`
+    # ihn im Laufzeitpfad setzt.
+    termin = wiederholung.planen(
+        konzept_id, 2, sitzung_id=sitzung["id"],
+        child_key=store.fortschritt_scope(sitzung))
     wiederholung.abschliessen(termin["id"], bestanden_=True)
 
     zeile = learning_hub.decorate([dict(topics.get(topic_id))])[0]

@@ -131,7 +131,8 @@ def abgeben(exam_id: int, topic_id: int, antworten: dict) -> dict:
         return eintrag
     gereinigt = {str(i): str(antworten.get(str(i), "")).strip()[:1000]
                  for i in range(len(eintrag["questions"]))}
-    treffer = sum(ist_richtig(gereinigt[str(i)], frage["loesung"])
+    treffer = sum(ist_richtig(gereinigt[str(i)], frage["loesung"],
+                              frage.get("art"))
                   for i, frage in enumerate(eintrag["questions"]))
     gesamt = len(eintrag["questions"])
     if gesamt >= 2:

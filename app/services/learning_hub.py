@@ -127,8 +127,10 @@ def decorate(rows: list[dict]) -> list[dict]:
         # Schritt 4a: verstanden ist noch nicht sicher. „Thema sicher" wird
         # ein Thema erst, wenn das Kind es nach ein paar Tagen noch einmal
         # konnte — vorher waere es ein Versprechen, das die Klassenarbeit
-        # kassiert.
-        fest = bool(concept and wiederholung.gefestigt(concept['id']))
+        # kassiert. Dasselbe Konzept im Pruefungsthema ist ein eigener
+        # Lernraum: dessen Festigung zaehlt hier nicht mit.
+        fest = bool(concept and wiederholung.gefestigt(
+            concept['id'], child_key=store.topic_scope(t['id'])))
         t['learning_status'] = ('sicher' if state == 'MASTERED' and fest else
                                 'verstanden' if state == 'MASTERED' else
                                 'bearbeitung' if state or t.get('learning_started_at') else 'neu')

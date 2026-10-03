@@ -254,7 +254,10 @@ def test_exam_plan_stays_on_topic_until_adaptive_mastery(app_env, monkeypatch):
     adaptiv_store.init()
     from app.adaptiv import lektionen, wiederholung
     konzept_id = lektionen.fuer_thema("Brüche addieren", "mathematik")["konzept_id"]
-    termin = wiederholung.planen(konzept_id, 2)
+    # Der Termin gehoert zum Pruefungsthema — nur dessen Festigung
+    # befreit genau dieses Thema aus der Planung.
+    termin = wiederholung.planen(
+        konzept_id, 2, child_key=adaptiv_store.topic_scope(first_id))
     wiederholung.abschliessen(termin["id"], bestanden_=True)
 
     # Ein sicheres Thema faellt aus der Planung heraus, das naechste rueckt vor.

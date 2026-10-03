@@ -113,11 +113,16 @@ def offene(child_key: str = CHILD_KEY, bis: dt.date | str | None = None) -> list
     vorbei ist.
     """
     grenze = str(bis or _heute())
+    # Neben dem angefragten Raum liegen die Themen-Raeume unter ihm
+    # ('installation:topic:<id>'): fuer das Tagesprogramm zählen sie alle —
+    # ein Kind hat einen Tag, nicht einen Tag pro Thema.
     zeilen = db.q(
         """SELECT w.*, k.label AS konzept_label, k.fach AS fach
              FROM lern_wiederholung w JOIN lern_konzept k ON k.id = w.konzept_id
-            WHERE w.child_key=? AND w.status=? AND w.faellig_am <= ?
-            ORDER BY w.faellig_am, w.id""", child_key, OFFEN, grenze)
+            WHERE (w.child_key=? OR w.child_key LIKE ?)
+              AND w.status=? AND w.faellig_am <= ?
+            ORDER BY w.faellig_am, w.id""",
+        child_key, child_key + ":topic:%", OFFEN, grenze)
     ergebnis = []
     for zeile in zeilen:
         eintr = _zeile(zeile)
@@ -204,8 +209,9 @@ def fuer_tag(tag: dt.date | None = None,
             """SELECT w.*, k.label AS konzept_label, k.fach AS fach
                  FROM lern_wiederholung w JOIN lern_konzept k
                    ON k.id = w.konzept_id
-                WHERE w.child_key=? AND w.status=? ORDER BY w.erledigt_am""",
-            child_key, BESTANDEN):
+                WHERE (w.child_key=? OR w.child_key LIKE ?) AND w.status=?
+                ORDER BY w.erledigt_am""",
+            child_key, child_key + ":topic:%", BESTANDEN):
         eintr = _zeile(zeile)
         if local_day(eintr["erledigt_am"]) == heute:
             eintr["ergebnis"] = _json(eintr.get("ergebnis"), {})
@@ -263,10 +269,12 @@ def auswerten(aufgaben: list[dict], antworten: list[str]) -> dict:
     Derselbe Massstab wie bei der Ersteinschaetzung und der Voraussetzung:
     eine Luecke ist eine Luecke, auch wenn drei andere sassen.
     """
-    from .unterricht import ist_richtig
+    from .antwortvergleich import check_answer
     gegeben = list(antworten) + [""] * len(aufgaben)
     einzeln = [{"frage": a.get("frage"), "antwort": gegeben[i],
-                "richtig": bool(ist_richtig(gegeben[i], a.get("loesung", "")))}
+                "richtig": bool(check_answer(
+                    gegeben[i], a.get("loesung", ""),
+                    a.get("antwort_art")))}
                for i, a in enumerate(aufgaben)]
     return {"aufgaben": einzeln,
             "richtig": sum(1 for e in einzeln if e["richtig"]),
@@ -281,12 +289,23 @@ def auffrischung(konzept_id: int, *, child_key: str = CHILD_KEY,
     Eine **andere** Erklaerung als beim letzten Mal und eine gefuehrte
     Aufgabe. Nicht die ganze Einheit noch einmal: das Kind hat das Thema
     schon verstanden, es ist ihm nur entfallen.
+
+    `child_key` darf ein Topic-Scope sein ('installation:topic:<id>') —
+    dann zaehlt die letzte Sitzung nur innerhalb dieses Themas. Die
+    Sitzungszeile selbst traegt immer den Basis-Schluessel, das Thema
+    steht in `lern_eingabe.topic_id`.
     """
     from . import inhalt_store, store
+    basis, topic_id = store.scope_teile(child_key)
     letzte = db.q1(
-        """SELECT fehlertyp_id, erklaerung_id FROM lern_sitzung
-            WHERE child_key=? AND konzept_id=? AND fehlertyp_id IS NOT NULL
-            ORDER BY id DESC LIMIT 1""", child_key, konzept_id) or {}
+        """SELECT s.fehlertyp_id, s.erklaerung_id
+             FROM lern_sitzung s
+             LEFT JOIN lern_eingabe e ON e.id = s.eingabe_id
+            WHERE s.child_key=? AND s.konzept_id=?
+              AND s.fehlertyp_id IS NOT NULL
+              AND e.topic_id IS ?
+            ORDER BY s.id DESC LIMIT 1""",
+        basis, konzept_id, topic_id) or {}
     fehlertyp_id = letzte["fehlertyp_id"] if letzte else None
     if fehlertyp_id is None:
         fehlertypen = store.fehlertypen(konzept_id)

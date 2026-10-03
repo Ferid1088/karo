@@ -80,7 +80,7 @@ def submit(exam_id, topic_id, answers):
             c.execute('UPDATE exam_rehearsal SET answers=? WHERE id=? AND finished_at IS NULL',
                       (json.dumps(cleaned, ensure_ascii=False), attempt['id']))
         raise ValueError("Beantworte bitte jede Aufgabe, bevor du abgibst.")
-    result = [ist_richtig(cleaned[str(i)], q["loesung"])
+    result = [ist_richtig(cleaned[str(i)], q["loesung"], q.get("art"))
               for i, q in enumerate(attempt["questions"])]
     with db.tx() as c:
         c.execute("""UPDATE exam_rehearsal SET answers=?,result=?,finished_at=?

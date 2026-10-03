@@ -89,7 +89,9 @@ def pruefen(antworten: list[str], aufgaben: list[dict]) -> bool:
     ein Anfang, keine Sicherheit — und auf einer halben Voraussetzung baut
     das nächste Konzept nicht.
     """
-    from .unterricht import ist_richtig
+    from .antwortvergleich import check_answer
     if not aufgaben or len(antworten) < len(aufgaben):
         return False
-    return all(ist_richtig(antworten[i], a["loesung"]) for i, a in enumerate(aufgaben))
+    return all(check_answer(antworten[i], a["loesung"],
+                          a.get("antwort_art"))
+               for i, a in enumerate(aufgaben))
