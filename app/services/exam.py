@@ -68,7 +68,7 @@ def create_exam(exam_date: str, scan_id: str = '', manual_topics: str = '', subj
     from .. import faecher
     fach = faecher.schluessel(subject)
     if fach is None:
-        raise ExamError("Bitte wähle das Fach der Klassenarbeit: Deutsch, Mathematik oder Englisch.")
+        raise ExamError(f"Bitte wähle das Fach der Klassenarbeit: {faecher.faecher_text()}.")
     # SUBJECT_MISMATCH: eine Mathearbeit mit „present perfect“ wird nicht
     # angelegt — lieber die Liste korrigieren als falsch lernen.
     fremd = []

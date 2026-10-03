@@ -1,6 +1,6 @@
 """Der Elternordner „Ohne Fach“.
 
-Karo nimmt nur Deutsch, Mathematik und Englisch an. Was aus früheren
+Karo nimmt nur gepflegte Fächer an. Was aus früheren
 Versionen ein anderes oder gar kein Fach hat (Themen, Klassenarbeiten,
 Schulblätter), wird nicht gelöscht und nicht geraten: es ist für das Kind
 unsichtbar und liegt hier, bis Eltern ein Fach wählen.
@@ -35,7 +35,7 @@ def anzahl() -> int:
 
 
 def zuordnen(art: str, eintrag_id: int, fach: str) -> None:
-    """Gibt einem Eintrag aus dem Ordner eines der drei Fächer."""
+    """Gibt einem Eintrag aus dem Ordner eines der gepflegten Fächer."""
     tabelle = ARTEN.get(art)
     if tabelle is None:
         raise ValueError("Unbekannte Art.")

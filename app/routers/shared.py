@@ -145,6 +145,9 @@ def render(request: Request, name: str, status_code: int = 200,
         "lernzeit_takt": learning_time.TAKT,
         "wunsch_max_zeichen": config.ops().formular_wunsch_zeichen,
         "faecher": [(key, _faecher.NAMEN[key]) for key in _faecher.FAECHER],
+        # Die Faecher-Reiter im Lernbereich: ein Reiter pro gepflegtem Fach.
+        "faecher_reiter": [("/lernen/" + key, _faecher.NAMEN[key])
+                           for key in _faecher.FAECHER],
         "aktives_fach": aktives_fach(request),
         "ai_name": _ai_display_name(cfg),
     }

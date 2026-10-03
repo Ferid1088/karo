@@ -71,7 +71,7 @@ class Config:
     # --- Lernende Person ---------------------------------------------------
     learner_name: str = ""          # bleibt lokal, dient dem Schwärzen
     learner_grade: int = 7
-    subject: str = "mathematik"     # Standardfach: deutsch | mathematik | englisch
+    subject: str = "mathematik"     # Standardfach: ein Schluessel aus faecher.FAECHER
 
     # --- Ausgabe des Lernmaterials ----------------------------------------
     default_ausgabe: str = "html"   # html | mp4 | notebooklm

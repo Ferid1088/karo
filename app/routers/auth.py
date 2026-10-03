@@ -191,7 +191,7 @@ def setup_credentials(request: Request,
     config.update(
         learner_name=learner_name.strip()[:60],
         learner_grade=klasse,
-        # Nur eines der drei Fächer; es ist der Reiter, mit dem Lernen öffnet.
+        # Nur ein gepflegtes Fach; es ist der Reiter, mit dem Lernen öffnet.
         subject=faecher.schluessel(subject) or "mathematik",
     )
     return render(request, "setup.html", schritt="einstellungen",

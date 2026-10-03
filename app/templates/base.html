@@ -118,9 +118,9 @@
   {% set unterpunkte = ([('/klassenarbeit/kalender', '')]
                         if role != 'child' or (cfg is defined and cfg.klassenarbeit_kind) else []) %}
   {% else %}
-  {# Die drei Fächer ersetzen "Meine Themen": jedes Fach ist ein eigener Reiter. #}
-  {% set unterpunkte = [('/lernen/deutsch', 'Deutsch'), ('/lernen/mathematik', 'Mathematik'),
-                        ('/lernen/englisch', 'Englisch')] %}
+  {# Jedes Fach ist ein eigener Reiter — die Liste kommt aus dem
+     Faecherregister, nicht aus dem Template. #}
+  {% set unterpunkte = faecher_reiter %}
   {% endif %}
 {% elif world_page|default(false) %}
   {% set unterpunkte = [('/welten', 'Heute'), ('/welten/jahr', 'Mein Jahr'),
@@ -132,7 +132,7 @@
 {% endif %}
 {% if unterpunkte %}
 <nav class="sub-nav" aria-label="{{ 'Klassenarbeit' if path.startswith('/klassenarbeit') else 'Lernbereich' if learning_ui|default(false) else ('Meine Welt' if world_page|default(false) else 'Ziele planen') }}">
-  {% for ziel, text in unterpunkte %}{% if text %}<a class="{{ 'pruefung-tab' if ziel == '/klassenarbeit' else 'learning-entry' if ziel == '/lernen' else '' }}" href="{{ ziel }}" {{ 'aria-current=page' if path == ziel or (ziel.startswith('/lernen/') and ziel == '/lernen/' ~ aktives_fach and not path.startswith(('/lernen/deutsch', '/lernen/mathematik', '/lernen/englisch'))) }}>{% if ziel == '/klassenarbeit' %}<img src="/static/pruefung-duo.jpg" alt="" aria-hidden="true" width="56" height="28">{% elif ziel == '/lernen' %}<img src="/static/karo-owl-book.png" alt="" aria-hidden="true" width="24" height="24">{% endif %}{{ text }}</a>{% else %}<span class="exam-nav-pair"><a class="kalender-tab" href="{{ ziel }}" title="Prüfungskalender" aria-label="Prüfungskalender" {{ 'aria-current=page' if path.startswith(ziel) }}><img src="/static/pruefungskalender-v2.png" alt="" aria-hidden="true"></a>{% if path.startswith('/klassenarbeit') %}<img class="exam-nav-banner" src="/static/pruefung-duo.jpg" alt="Prüfungen" aria-hidden="true">{% endif %}</span>{% endif %}{% endfor %}
+  {% for ziel, text in unterpunkte %}{% if text %}<a class="{{ 'pruefung-tab' if ziel == '/klassenarbeit' else 'learning-entry' if ziel == '/lernen' else '' }}" href="{{ ziel }}" {{ 'aria-current=page' if path == ziel or (ziel.startswith('/lernen/') and ziel == '/lernen/' ~ aktives_fach and not ((unterpunkte | map('first') | list) | select('in', path ~ '/') | list)) }}>{% if ziel == '/klassenarbeit' %}<img src="/static/pruefung-duo.jpg" alt="" aria-hidden="true" width="56" height="28">{% elif ziel == '/lernen' %}<img src="/static/karo-owl-book.png" alt="" aria-hidden="true" width="24" height="24">{% endif %}{{ text }}</a>{% else %}<span class="exam-nav-pair"><a class="kalender-tab" href="{{ ziel }}" title="Prüfungskalender" aria-label="Prüfungskalender" {{ 'aria-current=page' if path.startswith(ziel) }}><img src="/static/pruefungskalender-v2.png" alt="" aria-hidden="true"></a>{% if path.startswith('/klassenarbeit') %}<img class="exam-nav-banner" src="/static/pruefung-duo.jpg" alt="Prüfungen" aria-hidden="true">{% endif %}</span>{% endif %}{% endfor %}
 </nav>
 {% endif %}
 {% endif %}

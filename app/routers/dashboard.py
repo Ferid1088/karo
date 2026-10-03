@@ -45,7 +45,7 @@ def thema_anlegen(request: Request, thema: str = Form(''), fach: str = Form(''),
     from .shared import aktives_fach
     from .. import faecher
     if not faecher.schluessel(fach):
-        flash(request, 'Bitte wähle zuerst ein Fach: Deutsch, Mathematik oder Englisch.', 'warn')
+        flash(request, f'Bitte wähle zuerst ein Fach: {faecher.faecher_text()}.', 'warn')
         return zurueck('/lernen')
     fach = aktives_fach(request, fach)
     try:
@@ -147,7 +147,7 @@ def material_themen(request: Request, themen: str = Form(''),
     from .. import faecher
     fach = faecher.schluessel(fach)
     if fach is None:
-        flash(request, 'Bitte wähle zuerst ein Fach: Deutsch, Mathematik oder Englisch.', 'warn')
+        flash(request, f'Bitte wähle zuerst ein Fach: {faecher.faecher_text()}.', 'warn')
         return zurueck('/lernen/material')
     if not 1 <= klasse <= 13:
         flash(request, 'Bitte eine Klasse von 1 bis 13 wählen.', 'warn')

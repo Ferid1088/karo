@@ -17,7 +17,7 @@ def seed(app_env, monkeypatch):
             ('mathematik', 'aktiv', 0, None, None, None),  # exam only
             ('mathematik', 'aktiv', 1, '2026-09-27', None, None),
             ('mathematik', 'aktiv', 1, None, '2026-09-27', None),
-            ('biologie', 'aktiv', 1, None, None, None),
+            ('geschichte', 'aktiv', 1, None, None, None),
             ('mathematik', 'vorschlag', 1, None, None, None),
             ('mathematik', 'aktiv', 1, None, None, 1),
         ], 1):
@@ -30,7 +30,7 @@ def seed(app_env, monkeypatch):
             (2, 'englisch', '2026-09-28', None),
             (3, 'mathematik', '2026-09-29', '2026-09-27'),
             (4, 'mathematik', '2026-09-27', None),
-            (5, 'biologie', '2026-09-29', None),
+            (5, 'geschichte', '2026-09-29', None),
         ]:
             c.execute('INSERT INTO exam(id,subject,exam_date,deleted_at,created_at) VALUES(?,?,?,?,?)',
                       (i, subject, date, deleted, db.now()))

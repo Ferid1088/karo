@@ -16,6 +16,7 @@ import json
 
 from . import config
 from .domain import ErrorType, Flag, Stufe
+from karo_contract.faecher import FAECHER as _FAECHER
 
 ERROR_ENUM = [e.value for e in ErrorType]
 FLAG_ENUM = [f.value for f in Flag]
@@ -38,7 +39,7 @@ KB_SCHEMA = {
     "type": "object",
     "properties": {
         "fach": {
-            "type": "string", "enum": ["deutsch", "mathematik", "englisch", "andere"],
+            "type": "string", "enum": list(_FAECHER) + ["andere"],
             "description": "Zu welchem Schulfach das Blatt tatsächlich gehört — "
                            "unabhängig vom angegebenen Fach",
         },
@@ -134,7 +135,7 @@ TOPIC_SCHEMA = {
                     },
                     "fach": {
                         "type": "string",
-                        "enum": ["deutsch", "mathematik", "englisch", "andere"],
+                        "enum": list(_FAECHER) + ["andere"],
                         "description": "Schulfach dieses Themas",
                     },
                     "label": {
@@ -1265,8 +1266,8 @@ enthalten und an den Rändern abgehackt sein. {hinweis}
 
 Lies daraus:
 
-- `fach`: das Schulfach — „deutsch", „mathematik", „englisch" oder
-  „andere". Nur null, wenn der Text gar nichts hergibt.
+- `fach`: das Schulfach — {" oder ".join(f"„{f}“" for f in _FAECHER)}
+  oder „andere". Nur null, wenn der Text gar nichts hergibt.
 - `themen`: die Unterrichtsthemen des Blatts als kurze Stichworte, so wie
   sie im Unterricht heissen (z. B. „Brüche addieren", nicht ganze Sätze).
   Zu jedem Thema `seiten` — die Seitennummern, auf denen es behandelt wird
@@ -1341,8 +1342,8 @@ markiert. Er kann Fehler enthalten und an den Rändern abgehackt sein.
 
 Lies daraus:
 
-- `fach`: das Schulfach — „deutsch", „mathematik", „englisch" oder
-  „andere". Nur null, wenn der Text gar nichts hergibt.
+- `fach`: das Schulfach — {" oder ".join(f"„{f}“" for f in _FAECHER)}
+  oder „andere". Nur null, wenn der Text gar nichts hergibt.
 - `pruefungsinhalte`: die Inhalte, die in der Arbeit geprüft werden, als
   kurze Stichworte in der Sprache des Blatts (z. B. „Brüche addieren",
   nicht ganze Sätze). Zu jedem Inhalt `seiten` — die Seitennummern, auf

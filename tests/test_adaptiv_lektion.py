@@ -504,10 +504,10 @@ def test_unbekanntes_thema_startet_nicht_heimlich_die_bruchlektion(
 
     assert "noch keine Lernreihe" in seite.text
     assert "Würfel: Volumen" in seite.text
-    # Ein Thema aus keinem der drei Fächer wird gar nicht erst gesucht:
+    # Ein Thema aus keinem der gepflegten Fächer wird gar nicht erst gesucht:
     # das Kind erfährt, warum (SUBJECT_MISMATCH).
     fremd = client.post(f"{PFAD}/start",
-                        data={"_csrf": token, "thema": "Photosynthese", "fach": "mathematik"})
+                        data={"_csrf": token, "thema": "Vulkane", "fach": "mathematik"})
     assert "Das gehört zu keinem deiner Fächer" in fremd.text
     # Vor allem: keine Sitzung, kein Anker, keine Brüche.
     assert app_env.db.q("SELECT * FROM lern_sitzung") == []

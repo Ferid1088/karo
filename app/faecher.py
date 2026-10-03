@@ -57,11 +57,31 @@ _STICHWORTE = {
         "konjunktion", "gross und kleinschreibung", "das dass", "s laute",
         "argumentieren", "lesen", "leseverstehen", "deutsche",
     ),
+    "biologie": (
+        "biologie", "bio", "photosynthese", "fotosynthese", "zelle", "zellen",
+        "verdauung", "genetik", "chromosom", "chromosomen", "oekosystem",
+        "oekologie", "nervensystem", "immunsystem", "skelett", "blutkreislauf",
+        "atmung", "fortpflanzung", "evolution", "mitose", "meiose",
+        "organismus", "koerperzelle", "keimung", "bestaeubung",
+    ),
+    "physik": (
+        "physik", "geschwindigkeit", "beschleunigung", "kraft", "dichte",
+        "energie", "elektrischer strom", "elektrische spannung",
+        "stromkreis", "magnet", "magnetismus", "gravitation", "schwerkraft",
+        "schall", "optik", "lichtbrechung", "waermelehre", "hebel",
+        "schwingung", "reibung", "elektrizitaet", "elektrostatik",
+    ),
+    "chemie": (
+        "chemie", "atom", "atome", "molekuel", "molekuele",
+        "periodensystem", "reaktionsgleichung", "saeure",
+        "saeuren", "basen", "verbrennung", "oxidation", "redox",
+        "stoffeigenschaften", "salz", "salze", "metall", "metalle",
+        "teilchenmodell", "halogen", "edelgas",
+    ),
     ANDERE: (
-        "biologie", "physik", "chemie", "geschichte", "erdkunde", "geografie",
-        "geographie", "franzoesisch", "latein", "spanisch", "kunst", "musik",
-        "religion", "ethik", "sport", "informatik", "sachunterricht", "politik",
-        "photosynthese", "zelle", "zellen", "atom", "atome", "elektrischer strom",
+        "geschichte", "erdkunde", "geografie", "geographie", "franzoesisch",
+        "latein", "spanisch", "kunst", "musik", "religion", "ethik", "sport",
+        "informatik", "sachunterricht", "politik",
         "mittelalter", "roemer", "weltkrieg", "vulkane", "kontinente",
     ),
 }
@@ -96,6 +116,13 @@ def erkenne(text: str | None) -> str | None:
     return None
 
 
+def faecher_text() -> str:
+    """„Deutsch, Mathematik, … oder Chemie" — fuer Meldungen, die die
+    verfuegbaren Faecher aufzaehlen, statt sie im Text zu duplizieren."""
+    return ", ".join(NAMEN[f] for f in FAECHER[:-1]) \
+        + f" oder {NAMEN[FAECHER[-1]]}"
+
+
 FACH_SCHEMA = {
     "type": "object",
     "properties": {"fach": {"type": "string", "enum": [*FAECHER, ANDERE]}},
@@ -120,7 +147,7 @@ def _modell(text: str, fach: str) -> str | None:
             purpose="fach_pruefen",
             max_tokens=config.ops().llm_fach_max_tokens, schema=FACH_SCHEMA,
             prompt=("Zu welchem Schulfach gehört dieses Lernthema eines Schulkinds? "
-                    "Antworte mit deutsch, mathematik, englisch oder andere.\n"
+                    f"Antworte mit {', '.join(FAECHER)} oder andere.\n"
                     f"Aktives Fach: {NAMEN[fach]}\n"
                     f"Thema: {pii.scrub(text, cfg.learner_name)[:300]}"))
         wert = str((antwort.data or {}).get("fach", "")).strip().lower()

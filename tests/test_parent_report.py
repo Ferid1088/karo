@@ -17,7 +17,7 @@ def seed(app_env, monkeypatch):
         for tid, subject, visible, label in [
             (1,'mathematik',1,'Brüche'),(2,'mathematik',0,'Brüche'),
             (3,'deutsch',1,'Satzglieder'),(4,'englisch',1,'Simple past'),
-            (5,'mathematik',1,'Gelöscht'),(6,'biologie',1,'Nicht erlaubt'),
+            (5,'mathematik',1,'Gelöscht'),(6,'geschichte',1,'Nicht erlaubt'),
             (7,'mathematik',1,'Mehrdeutig'),(8,'mathematik',0,'Andere Prüfung')]:
             c.execute('''INSERT INTO topic(id,subject,code,label,state,learning_visible,created_at)
                 VALUES(?,?,?,?,'aktiv',?,'2026-09-01T00:00:00+00:00')''', (tid,subject,f'report.{tid}',label,visible))
@@ -75,7 +75,8 @@ def test_evidence_timezones_separation_corrections_and_no_writes(client, fake_ll
     assert day['active_days']==1 and day['new_secure']==1
     assert day['goal_reports']==2 and day['goal_minutes']==20 and day['goal_planned']==1
     assert day['exam_minutes']==30
-    assert day['subjects'][0]['key']=='deutsch' or {s['key'] for s in day['subjects']}=={'mathematik','deutsch','englisch'}
+    from app import faecher as _faecher
+    assert {s['key'] for s in day['subjects']} == set(_faecher.FAECHER)
     by_subject={s['key']:s for s in day['subjects']}
     assert (by_subject['mathematik']['right'],by_subject['mathematik']['answers'])==(1,2)
     assert by_subject['englisch']['right']==0  # later correction not projected into past snapshot

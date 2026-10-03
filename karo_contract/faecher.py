@@ -1,8 +1,9 @@
-"""Die drei Fächer: Deutsch, Mathematik, Englisch — strikt getrennt.
+"""Die Fächer, mit denen Karo lernt — strikt getrennt.
 
 Jedes Thema, jedes Schulblatt, jede Klassenarbeit und jede Lektion gehört zu
 genau einem dieser Fächer. Gespeichert wird immer der Schlüssel
-(`deutsch`, `mathematik`, `englisch`), angezeigt der Name.
+(`deutsch`, `mathematik`, `englisch`, `biologie`, `physik`, `chemie`),
+angezeigt der Name.
 
 Hier steht die einzige Entscheidung darüber, was ein Fach ist und ob ein
 Text in ein Fach gehört. Alle anderen Stellen fragen hier nach, statt eigene
@@ -24,11 +25,14 @@ import unicodedata
 
 log = logging.getLogger(__name__)
 
-FAECHER = ("deutsch", "mathematik", "englisch")
-NAMEN = {"deutsch": "Deutsch", "mathematik": "Mathematik", "englisch": "Englisch"}
+FAECHER = ("deutsch", "mathematik", "englisch",
+           "biologie", "physik", "chemie")
+NAMEN = {"deutsch": "Deutsch", "mathematik": "Mathematik",
+         "englisch": "Englisch", "biologie": "Biologie",
+         "physik": "Physik", "chemie": "Chemie"}
 #: Fuer SQL: `... WHERE subject IN {SQL_FAECHER}`. Nur feste Schluessel,
 #: keine Eingaben — deshalb darf es als Text in die Abfrage.
-SQL_FAECHER = "('deutsch','mathematik','englisch')"
+SQL_FAECHER = "(" + ",".join(f"'{fach}'" for fach in FAECHER) + ")"
 
 SUBJECT_MISMATCH = "SUBJECT_MISMATCH"
 ANDERE = "andere"
@@ -38,6 +42,12 @@ _ALIASE = {
     "mathematik": "mathematik", "mathe": "mathematik", "math": "mathematik",
     "maths": "mathematik", "mathematics": "mathematik", "ma": "mathematik",
     "englisch": "englisch", "english": "englisch", "engl": "englisch", "en": "englisch",
+    # Die Kuerzel sind die Fach-Codes des Lehrplan-Dienstes (Konzept-IDs
+    # heissen `BI.…`, `PH.…`, `CH.…`): so adressiert eine Anfrage das Fach,
+    # in dem der Dienst das Konzept wirklich fuehrt.
+    "biologie": "biologie", "bio": "biologie", "biology": "biologie", "bi": "biologie",
+    "physik": "physik", "physics": "physik", "ph": "physik",
+    "chemie": "chemie", "chemistry": "chemie", "ch": "chemie",
 }
 
 
@@ -59,7 +69,8 @@ class SubjectMismatch(FachFehler):
                     f"Wechsle oben zum Fach {NAMEN[erkannt]}.")
         else:
             text = ("Das gehört zu keinem deiner Fächer. Karo lernt mit dir "
-                    "Deutsch, Mathematik und Englisch.")
+                    + ", ".join(NAMEN[f] for f in FAECHER[:-1])
+                    + f" und {NAMEN[FAECHER[-1]]}.")
         super().__init__(text)
 
 

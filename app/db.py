@@ -170,7 +170,7 @@ _ADDED_COLUMNS = [
 def _faecher_vereinheitlichen(c: sqlite3.Connection) -> None:
     """Fachangaben auf die drei Schlüssel bringen — idempotent.
 
-    „Mathe“ und „Mathematik“ werden `mathematik`. Was keinem der drei Fächer
+    „Mathe“ und „Mathematik“ werden `mathematik`. Was keinem gepflegten Fach
     entspricht (etwa „Biologie“), bleibt unverändert stehen: es ist für das
     Kind unsichtbar und liegt im Elternordner, bis jemand ein Fach wählt.
     Ein Schulblatt ohne Fach erbt es, wenn alle seine Themen dasselbe haben.

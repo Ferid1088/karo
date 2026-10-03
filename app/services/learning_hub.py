@@ -140,7 +140,7 @@ def decorate(rows: list[dict]) -> list[dict]:
 
 
 def personal_topics(fach: str | None = None) -> list[dict]:
-    """Eigene Themen — nur der drei Fächer, mit ``fach`` nur dieses einen."""
+    """Eigene Themen — nur gepflegte Fächer, mit ``fach`` nur dieses einen."""
     erlaubt = (faecher.pflicht(fach),) if fach else faecher.FAECHER
     return decorate([t for t in topics.liste(topics.AKTIV)
                      if t['subject'] in erlaubt

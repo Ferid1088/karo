@@ -48,7 +48,7 @@ def _tabelle_da(name: str) -> bool:
 def karo_fach(fach_name: str = "") -> str:
     """Der Schlüssel des Fachs (deutsch/mathematik/englisch) — oder ''.
 
-    Karo deckt drei Fächer ab. Ohne Angabe gilt das Fach aus den
+    Ohne Angabe gilt das Fach aus den
     Einstellungen, wie vor der Trennung.
     """
     from ..faecher import schluessel
@@ -59,7 +59,7 @@ def karo_fach(fach_name: str = "") -> str:
 
 
 def zustaendig(fach_name: str) -> bool:
-    """Deckt Karo dieses Fach ab? Nur Deutsch, Mathematik und Englisch."""
+    """Deckt Karo dieses Fach ab? Nur die gepflegten Fächer."""
     from ..faecher import schluessel
     return schluessel(fach_name) is not None
 

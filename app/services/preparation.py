@@ -72,7 +72,7 @@ async def handle_wissen_upload(request: Request, rolle: str,
     # Das Fach kommt aus dem Reiter, in dem hochgeladen wird — nie geraten.
     fach = faecher.schluessel(formular.get("fach"))
     if fach is None:
-        flash(request, "Bitte zuerst ein Fach wählen: Deutsch, Mathematik oder Englisch.", "err")
+        flash(request, f"Bitte zuerst ein Fach wählen: {faecher.faecher_text()}.", "err")
         return zurueck("/wissen")
     aktives_fach(request, fach)
     ziel = _wissen_ziel(fach)

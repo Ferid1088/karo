@@ -1,4 +1,4 @@
-"""Deutsch, Mathematik und Englisch sind strikt getrennt.
+"""Die Fächer sind strikt getrennt.
 
 Jede Prüfung hier sichert eine Stelle, an der Inhalte zwischen den Fächern
 wandern könnten: Anlegen, Listen, Suche, Wissensbasis, Lektionen, Curriculum,
@@ -14,14 +14,20 @@ from .test_app import einrichten, kind_modus_aktivieren
 # Das Fach-Modul
 # --------------------------------------------------------------------------
 
-def test_nur_drei_faecher_und_ihre_schreibweisen():
+def test_faecher_und_ihre_schreibweisen():
     from app import faecher
-    assert faecher.FAECHER == ("deutsch", "mathematik", "englisch")
+    assert faecher.FAECHER == ("deutsch", "mathematik", "englisch",
+                             "biologie", "physik", "chemie")
     for wert, key in (("Mathe", "mathematik"), ("Mathematik", "mathematik"),
                       ("English", "englisch"), ("Englisch", "englisch"),
-                      ("deutsch", "deutsch"), ("German", "deutsch")):
+                      ("deutsch", "deutsch"), ("German", "deutsch"),
+                      ("Biologie", "biologie"), ("Physik", "physik"),
+                      ("Chemie", "chemie"),
+                      # Fach-Codes des Lehrplan-Dienstes: Konzept-IDs
+                      # tragen sie als Praefix (`BI.…`, `PH.…`, `CH.…`).
+                      ("BI", "biologie"), ("PH", "physik"), ("CH", "chemie")):
         assert faecher.schluessel(wert) == key
-    for fremd in ("Biologie", "", None, "Physik", "Französisch"):
+    for fremd in ("Geschichte", "", None, "Französisch", "Sport"):
         assert faecher.schluessel(fremd) is None
         with pytest.raises(faecher.FachFehler):
             faecher.pflicht(fremd)
@@ -31,7 +37,8 @@ def test_nur_drei_faecher_und_ihre_schreibweisen():
     ("Brüche addieren", "mathematik"), ("Prozentrechnung", "mathematik"),
     ("present perfect", "englisch"), ("irregular verbs", "englisch"),
     ("Kommasetzung", "deutsch"), ("Gedichte analysieren", "deutsch"),
-    ("Photosynthese", "andere"),
+    ("Photosynthese", "biologie"), ("Dichte von Stoffen", "physik"),
+    ("Periodensystem", "chemie"), ("Mittelalter", "andere"),
 ])
 def test_erkennung_ohne_modell(app_env, text, fach):
     from app import faecher
@@ -93,7 +100,7 @@ def test_ohne_fach_wird_nichts_angelegt(client, fake_llm, app_env):
     from app import faecher
     from app.services import learning_hub
     einrichten(client, fake_llm)
-    for fach in ("", "Biologie"):
+    for fach in ("", "Geschichte"):
         with pytest.raises(faecher.FachFehler):
             learning_hub.create_topic("Brüche addieren", fach, 7)
     assert app_env.db.q("SELECT id FROM topic") == []
@@ -202,7 +209,7 @@ def test_lektion_erzeugen_nur_mit_fach(app_env):
     with pytest.raises(faecher.FachFehler):
         erzeugung.anfordern("present perfect", "")
     with pytest.raises(faecher.FachFehler):
-        erzeugung.speichern({}, "Biologie")
+        erzeugung.speichern({}, "Geschichte")
 
 
 # --------------------------------------------------------------------------
@@ -278,7 +285,7 @@ def test_klassenarbeit_mit_fachfremdem_thema_wird_abgelehnt(client, fake_llm, ap
                          subject="mathematik")
     assert app_env.db.q("SELECT id FROM exam") == []
     with pytest.raises(exam.ExamError, match="Fach der Klassenarbeit"):
-        exam.create_exam("2099-01-01", manual_topics="Brüche addieren", subject="Biologie")
+        exam.create_exam("2099-01-01", manual_topics="Brüche addieren", subject="Geschichte")
 
 
 def test_pruefungen_und_heute_zeigen_das_fach(client, fake_llm, app_env):
@@ -302,19 +309,20 @@ def test_inhalte_ohne_gueltiges_fach_sieht_nur_der_elternordner(client, fake_llm
     einrichten(client, fake_llm)
     with app_env.db.tx() as c:
         tid = c.execute("""INSERT INTO topic(subject,code,label,state,created_at,learning_visible,grade)
-                           VALUES('Biologie','ALT.BIO','Zellen','aktiv',?,1,7)""",
+                           VALUES('Geschichte','ALT.GE','Mittelalter','aktiv',?,1,7)""",
                         (app_env.db.now(),)).lastrowid
         eid = c.execute("""INSERT INTO exam(subject,exam_date,themen,created_at)
-                           VALUES('Biologie','2099-03-01','[]',?)""", (app_env.db.now(),)).lastrowid
+                           VALUES('Geschichte','2099-03-01','[]',?)""", (app_env.db.now(),)).lastrowid
     app_env.config.update(klassenarbeit_kind=True)
     eltern = client.get("/eltern").text
     assert "2 Inhalte ohne gültiges Fach" in eltern and 'href="/eltern/ohne-fach"' in eltern
     ordner = client.get("/eltern/ohne-fach").text
-    assert "Zellen" in ordner and "bisher: Biologie" in ordner
+    assert "Mittelalter" in ordner and "bisher: Geschichte" in ordner
 
     kind_modus_aktivieren(client)
-    for fach in ("deutsch", "mathematik", "englisch"):
-        assert "Zellen" not in client.get(f"/lernen/{fach}").text
+    from app import faecher as _faecher
+    for fach in _faecher.FAECHER:
+        assert "Mittelalter" not in client.get(f"/lernen/{fach}").text
     assert client.get(f"/klassenarbeit/{eid}").status_code in (403, 404)
     assert client.get("/eltern/ohne-fach", follow_redirects=False).status_code == 403
 
@@ -339,11 +347,14 @@ def test_alte_fachnamen_werden_beim_start_vereinheitlicht(app_env):
         c.execute("""INSERT INTO topic(subject,code,label,state,created_at)
                      VALUES('Mathe','ALT.M','Dreisatz','aktiv',?)""", (app_env.db.now(),))
         c.execute("""INSERT INTO topic(subject,code,label,state,created_at)
-                     VALUES('Biologie','ALT.B','Zellen','aktiv',?)""", (app_env.db.now(),))
+                     VALUES('Bio','ALT.B','Zellen','aktiv',?)""", (app_env.db.now(),))
+        c.execute("""INSERT INTO topic(subject,code,label,state,created_at)
+                     VALUES('Sport','ALT.S','Ausdauer','aktiv',?)""", (app_env.db.now(),))
     app_env.db.init()
     faecher = {r["label"]: r["subject"] for r in app_env.db.q("SELECT label, subject FROM topic")}
     # Eindeutiges wird zugeordnet, Fremdes bleibt unverändert im Elternordner.
-    assert faecher == {"Dreisatz": "mathematik", "Zellen": "Biologie"}
+    assert faecher == {"Dreisatz": "mathematik", "Zellen": "biologie",
+                       "Ausdauer": "Sport"}
 
 
 def test_das_kind_sieht_die_meldung_bei_der_klassenarbeit(client, fake_llm, app_env):

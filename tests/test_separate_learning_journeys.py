@@ -168,9 +168,9 @@ def test_create_exam_guides_to_own_plan_and_retains_invalid_form(client, fake_ll
     page = client.post("/klassenarbeit", data={"_csrf": token, "exam_date": "2020-01-01",
                        "themen": "Behaltenes Thema", "fach": "mathematik"})
     assert "Behaltenes Thema" in page.text and 'value="mathematik" selected' in page.text
-    # Ein anderes Fach als die drei wird nicht angenommen; die Eingaben bleiben.
+    # Ein unbekanntes Fach wird nicht angenommen; die Eingaben bleiben.
     page = client.post("/klassenarbeit", data={"_csrf": token, "exam_date": "2026-11-03",
-                       "themen": "Behaltenes Thema", "fach": "Biologie"})
+                       "themen": "Behaltenes Thema", "fach": "Geschichte"})
     assert "Behaltenes Thema" in page.text and "Bitte wähle das Fach" in page.text
 
 
