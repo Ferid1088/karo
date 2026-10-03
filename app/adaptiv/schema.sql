@@ -256,6 +256,32 @@ CREATE TABLE IF NOT EXISTS lern_voraussetzung (
 );
 CREATE INDEX IF NOT EXISTS idx_lern_voraussetzung ON lern_voraussetzung(konzept_id);
 
+-- Fehlender Lehrstoff wird bestellt, nicht bedauert (Master-Invariante):
+-- eine Voraussetzung, die Karo nicht hat, eine Aufgabe, die der Katalog
+-- nicht mehr hergibt. Die Zeile beschreibt die fachliche Luecke — sie
+-- gehoert keinem Kind und traegt deshalb keine Kinddaten.
+--
+-- Dedup ueber (fach, konzept_key, rolle, grund): dieselbe Luecke wird
+-- nicht zweimal bestellt, egal wie oft sie anfaellt.
+CREATE TABLE IF NOT EXISTS lern_inhalt_anfrage (
+    id          INTEGER PRIMARY KEY,
+    fach        TEXT NOT NULL DEFAULT '',
+    konzept_key TEXT NOT NULL,          -- concept_id beim Lehrplan-Dienst
+    konzept_id  INTEGER REFERENCES lern_konzept(id),
+    -- Was fehlt: aufgabe | diagnose | voraussetzung | erklaerung
+    rolle       TEXT NOT NULL,
+    -- Warum: fehlt | erschoepft | unbrauchbar
+    grund       TEXT NOT NULL,
+    kontext     TEXT NOT NULL DEFAULT '{}',   -- Niveau, Fehlertyp, Klasse
+    status      TEXT NOT NULL DEFAULT 'offen',-- offen | erfuellt | verworfen
+    anzahl      INTEGER NOT NULL DEFAULT 1,   -- wie oft sie anfiel
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    UNIQUE(fach, konzept_key, rolle, grund)
+);
+CREATE INDEX IF NOT EXISTS idx_lern_inhalt_anfrage
+  ON lern_inhalt_anfrage(status, updated_at);
+
 -- Jede beantwortete Aufgabe, genau eine Zeile (Schritt 4a).
 --
 -- Bisher wusste Karo nur, wie eine Sitzung ausging: `lern_fortschritt` zaehlt

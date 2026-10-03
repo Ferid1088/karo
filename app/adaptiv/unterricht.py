@@ -148,10 +148,12 @@ def bildschirm(sitzung: dict) -> dict:
         sitzung = _naechste_uebungsrunde(sitzung)
     schirm = _bildschirm(sitzung)
     # Eine Aufgabe, die der Katalog nicht hergibt, darf kein leeres Formular
-    # werden: keine Antwortmoeglichkeit ist ein Dead End. Besser ehrlich —
-    # die generische Seite sagt, dass ein Mensch helfen soll.
+    # werden: keine Antwortmoeglichkeit ist ein Dead End. Die Luecke wird
+    # bestellt, und der Schirm bietet das beste sichere Weiterlernen an.
     if (schirm["art"] in ("vorhersage", "transfer", "aufgabe")
             and not schirm.get("aufgabe")):
+        _inhaltsluecke(sitzung, "aufgabe", "erschoepft",
+                       kontext={"phase": sitzung.get("phase")})
         schirm = {"art": "inhalt_fehlt", "phase": sitzung.get("phase"),
                   "hilfe": _hilfe(sitzung["konzept_id"],
                                   sitzung.get("phase"))}
@@ -354,8 +356,15 @@ def _neue_selbstaufgabe(sitzung: dict) -> dict | None:
     nachgerechnete Variante des Generators. Erst wenn beides versagt — zum
     Beispiel eine Aufgabenart, die der Generator nicht nachbauen kann — kommt
     die erste noch einmal: lieber bekannt als ein Dead End.
+
+    Welche der frischen Aufgaben dran ist, entscheidet `niveau`: nach
+    einem Fehler sinkt es (die naechste ist die einfachste freie), nach
+    Erfolgen steigt es. Ein starkes Kind langweilt sich nicht an
+    Aufgabe eins, ein kaempfendes wird nicht zweimal hintereinander
+    ueberfordert.
     """
-    gezeigt = set(_daten(sitzung).get("selbst_gezeigt") or [])
+    daten = _daten(sitzung)
+    gezeigt = set(daten.get("selbst_gezeigt") or [])
     # Was das Kind schon beantwortet hat, zaehlt auch ohne Marker — eine
     # Altsitzung aus der Parkplatz-Zeit kennt `selbst_gezeigt` nicht.
     gesehen = protokoll.gesehene_aufgaben(
@@ -365,6 +374,12 @@ def _neue_selbstaufgabe(sitzung: dict) -> dict | None:
     frisch = [a for a in kandidaten
               if a["frage"] not in gezeigt and a["id"] not in gesehen]
     if frisch:
+        niveau = int(daten.get("niveau") or 1)
+        # Naechstliegende Schwierigkeit; im Zweifel die leichtere.
+        frisch.sort(key=lambda a: (abs(int(a.get("schwierigkeit") or 1)
+                                       - niveau),
+                                   int(a.get("schwierigkeit") or 1),
+                                   a.get("position") or 0))
         return frisch[0]
     for vorlage in kandidaten:
         for variante in varianten.varianten(vorlage, 8):
@@ -496,6 +511,16 @@ def fortsetzen(sitzung: dict) -> dict:
     """
     daten = dict(sitzung.get("daten") or {})
     daten.pop("eltern_gerufen", None)
+    from . import naechste_aktion
+    schritt = naechste_aktion.fuer(sitzung)
+    store.ereignis_schreiben(sitzung["id"], "Naechster Schritt",
+                             nutzdaten=schritt)
+    if schritt["aktion"] in (naechste_aktion.VORAUSSETZUNG_LERNEN,):
+        return voraussetzung_lernen_starten(sitzung)
+    if schritt["aktion"] == naechste_aktion.VORAUSSETZUNG_PRUEFEN:
+        return store.sitzung(sitzung["id"])      # Diagnose-Schirm wartet
+    if schritt["aktion"] == naechste_aktion.ZURUECK_ZUM_ZIEL:
+        return voraussetzung_weiter_zum_thema(sitzung)
     if sitzung["zustand"] == zustand.ESCALATED:
         if sitzung.get("fehlertyp_id"):
             s = zustand.wechsle(sitzung["id"], zustand.TEACHING,
@@ -621,6 +646,34 @@ def _klasse(cfg=None) -> int:
     return int(getattr(cfg or config.load_safe(), "learner_grade", 6) or 6)
 
 
+def _inhaltsluecke(sitzung: dict, rolle: str, grund: str,
+                   konzept_id: int | None = None,
+                   konzept_key: str | None = None,
+                   kontext: dict | None = None) -> None:
+    """Fehlendes Material bestellen statt daran zu scheitern.
+
+    Die Anfrage beschreibt die fachliche Luecke (Konzept, Rolle, Grund)
+    und ist dedupliziert — dieselbe Luecke wird nicht zweimal bestellt.
+    Das Kind merkt davon nichts: der Schirm bleibt der beste sichere
+    Fallback, der schon da ist.
+    """
+    kid = konzept_id if konzept_id is not None else sitzung.get("konzept_id")
+    konzept = store.konzept(kid) if kid else {}
+    konzept = konzept or {}
+    key = konzept_key or store.konzept_schluessel(kid) or (
+        f"{konzept.get('fach','')}.{konzept.get('thema_key','')}."
+        f"{konzept.get('konzept_key','')}".strip("."))
+    daten = _daten(sitzung)
+    store.inhalt_anfordern(
+        konzept.get("fach", ""), key, rolle, grund, konzept_id=kid,
+        kontext={"niveau": daten.get("niveau"),
+                 "fehlertyp_id": sitzung.get("fehlertyp_id"),
+                 "klasse": _klasse(), **(kontext or {})})
+    store.ereignis_schreiben(
+        sitzung["id"], "Material angefordert",
+        nutzdaten={"rolle": rolle, "grund": grund, "konzept_key": key})
+
+
 def weiter(sitzung: dict) -> dict:
     """Ein Schritt im Lehrablauf, ohne Eingabe (HOOK → RULE → Beispiel → Übung)."""
     folge = {zustand.HOOK: zustand.RULE,
@@ -719,6 +772,12 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
             return ergebnis
         ergebnis = _merke(sitzung["id"], ergebnis, tipp_stufe=0,
                           fehlerhinweis=None, gefuehrt_fehler=0)
+        if phase == zustand.INDEPENDENT_TASK:
+            # Gesessen — die naechste Aufgabe darf eine Stufe hoch.
+            neues_niveau = int(aufgabe.get("schwierigkeit") or 1) + 1
+            _merke(sitzung["id"], ergebnis, niveau=neues_niveau)
+            store.ereignis_schreiben(sitzung["id"], "Schwierigkeit erhoeht",
+                                     nutzdaten={"niveau": neues_niveau})
         if phase == zustand.GUIDED_TASK:
             daten = _daten(sitzung)
             if daten.get("war_selbststaendig"):
@@ -758,13 +817,18 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     if phase == zustand.INDEPENDENT_TASK:
         # Die selbststaendige Aufgabe hat nicht gesessen: andere Darstellung,
         # dann gefuehrt, dann eine NEUE selbststaendige — nicht dieselbe.
+        # Das Niveau sinkt eine Stufe: die naechste Aufgabe wird leichter.
         daten = _daten(sitzung)
         gezeigt = list(daten.get("selbst_gezeigt") or [])
         if aufgabe.get("frage"):
             gezeigt.append(aufgabe["frage"])
+        niveau = max(1, int(aufgabe.get("schwierigkeit") or 1) - 1)
         ergebnis = _merke(sitzung["id"], ergebnis, tipp_stufe=0,
                           fehlerhinweis=None, war_selbststaendig=True,
-                          selbst_gezeigt=gezeigt, gefuehrt_fehler=0)
+                          selbst_gezeigt=gezeigt, gefuehrt_fehler=0,
+                          niveau=niveau)
+        store.ereignis_schreiben(sitzung["id"], "Schwierigkeit gesenkt",
+                                 nutzdaten={"niveau": niveau})
         return zustand.wechsle_phase(sitzung["id"], zustand.ADAPTATION)
 
     # Gefuehrt: dieselbe Fehlvorstellung oder drei Versuche fuehren zur
@@ -797,9 +861,21 @@ def voraussetzung_beantwortet(sitzung: dict, antworten: list[str], cfg=None) -> 
     lokal = daten.get("voraussetzung_lokal")
     aufgaben = _voraussetzungsaufgaben(lokal)
     if not aufgaben:
-        # Ohne Aufgaben laesst sich nichts feststellen: dann wie bisher.
+        # Das Konzept ist da (oder nur benannt), aber ohne gepruefte
+        # Diagnose ist es hier unbrauchbar: bestellen statt im Kreis
+        # fragen. Die Begleitung traegt weiter, bis das Material da ist.
+        if lokal:
+            _inhaltsluecke(sitzung, "diagnose", "unbrauchbar",
+                           konzept_id=int(lokal))
+            unbrauchbar = list(daten.get("voraussetzung_unbrauchbar") or [])
+            unbrauchbar.append(int(lokal))
+        else:
+            _inhaltsluecke(sitzung, "voraussetzung", "fehlt",
+                           konzept_key=daten.get("voraussetzung_offen"))
+            unbrauchbar = list(daten.get("voraussetzung_unbrauchbar") or [])
         _merke(sitzung["id"], sitzung, voraussetzung_offen=None,
-               voraussetzung_lokal=None, voraussetzung_titel=None)
+               voraussetzung_lokal=None, voraussetzung_titel=None,
+               voraussetzung_unbrauchbar=unbrauchbar)
         return zustand_modul.eskalieren(sitzung["id"], cfg=cfg)
 
     # Jede Aufgabe der kurzen Diagnose bekommt ihre eigene Zeile.
@@ -812,8 +888,14 @@ def voraussetzung_beantwortet(sitzung: dict, antworten: list[str], cfg=None) -> 
 
     if vor.pruefen(list(antworten), aufgaben):
         store.ereignis_schreiben(sitzung["id"], "Voraussetzung sitzt — es lag nicht daran")
+        # Bewiesen ist bewiesen: diese Voraussetzung darf die naechste
+        # Eskalation nicht noch einmal anbieten — gesucht wird die
+        # naechste offene, falls es eine gibt.
+        bestanden = list(daten.get("voraussetzung_bestanden") or [])
+        bestanden.append(int(lokal))
         _merke(sitzung["id"], sitzung, voraussetzung_offen=None,
-               voraussetzung_lokal=None, voraussetzung_titel=None)
+               voraussetzung_lokal=None, voraussetzung_titel=None,
+               voraussetzung_bestanden=bestanden)
         return zustand_modul.eskalieren(store.sitzung(sitzung["id"])["id"], cfg=cfg)
 
     store.ereignis_schreiben(sitzung["id"], "Voraussetzung fehlt — wird zuerst gelernt",
@@ -854,6 +936,17 @@ def voraussetzung_lernen_starten(sitzung: dict) -> dict:
     lokal = daten.get("voraussetzung_lokal")
     if not daten.get("voraussetzung_offen") or not lokal:
         return sitzung
+    from . import voraussetzung as vor
+    if int(lokal) in vor.detour_vorfahren(sitzung):
+        # Zyklus im Graphen: die „Voraussetzung" ist das Konzept, das oben
+        # in der Kette auf diesen Umweg wartet. Weiterzufragen hiesse A↔B
+        # im Kreis — stattdessen geht es zurueck an die eigene Stelle.
+        store.ereignis_schreiben(
+            sitzung["id"], "Voraussetzung wartet selbst auf diesen Umweg — "
+                           "Zyklus gestoppt", nutzdaten={"konzept_id": lokal})
+        return _merke(sitzung["id"], sitzung, voraussetzung_offen=None,
+                      voraussetzung_lokal=None, voraussetzung_titel=None,
+                      voraussetzung_lernen=None)
     eintrag = store.eingabe(sitzung.get("eingabe_id")) or {}
     letzte = store.letzte_fuer_thema(eintrag.get("topic_id"), int(lokal))
     if letzte and letzte["zustand"] != zustand.MASTERED:

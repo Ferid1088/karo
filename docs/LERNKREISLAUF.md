@@ -290,7 +290,16 @@ später — erst wenn die Runden aufgebraucht sind (siehe Eskalation).
   Voraussetzungen des Konzepts sitzen. Sitzt eine nicht, wird sie gelernt und
   das Kind kommt danach zurück — es wird **nicht** eskaliert. Sitzt sie, oder
   fehlt sie in der Bibliothek, geht es wie bisher weiter, und das Protokoll
-  sagt, was davon zutraf.
+  sagt, was davon zutraf. **Rekursiv:** die Umweg-Sitzung ist eine normale
+  Sitzung — scheitert sie, wird auch sie nach ihren Voraussetzungen gefragt.
+  So läuft die Kette Ziel → Vorstufe → deren Vorstufe bis zu einem
+  tragfähigen Stand und danach Stufe für Stufe zurück. `detour_vorfahren`
+  verhindert Zyklen: eine Voraussetzung, die in der Kette oberhalb schon
+  wartet, wird nicht erneut gelernt — die Begleitung trägt den Umweg.
+  Mehrere offene Voraussetzungen werden der Reihe nach abgearbeitet; eine
+  bestandene Kurzdiagnose wird nicht noch einmal geboten
+  (`voraussetzung_bestanden`), eine ohne geprüfte Aufgaben als unbrauchbar
+  markiert und bestellt (`voraussetzung_unbrauchbar`).
 - **Eskalation** (`sitzung.eskalieren`): nach `adaptiv_max_lehrrunden`,
   Standard **3**, erfolglosen Runden. Jede erfolglose Runde läuft zwingend
   durch `runde_gescheitert()`, und die eskaliert selbst — es gibt keinen Weg
@@ -304,10 +313,31 @@ später — erst wenn die Runden aufgebraucht sind (siehe Eskalation).
   Fehlerzustand. Das Thema bleibt offen, bis das Kind versteht oder
   selbst entscheidet, aufzuhören.
 
+**Schwierigkeit (`niveau`):** jede Aufgabe trägt `schwierigkeit`. Die
+nächste selbstständige Aufgabe wird am gespeicherten Niveau der Sitzung
+ausgerichtet — nach einem Fehler sinkt es eine Stufe, nach einem Erfolg
+steigt es. Ein starkes Kind langweilt sich nicht auf Stufe eins, ein
+kämpfendes wird nicht zweimal hintereinander überfordert.
+
+**Nächste Aktion** (`adaptiv/naechste_aktion.py`): eine Stelle entscheidet,
+welcher Lernschritt als Nächster kommt — Diagnose, Erklärung, Übung,
+Transfer, Voraussetzung prüfen oder lernen, zurück zum Ziel oder
+Begleitung. Es gibt kein Aufgeben: jede Antwort endet in einem Lernschritt
+oder einer Wahl des Kindes. `fortsetzen` fragt diese Schicht und schreibt
+die Entscheidung ins Ereignisprotokoll.
+
+**Fehlendes Material** (`lern_inhalt_anfrage`): was Karo zum Weiterlernen
+braucht und der Katalog nicht hat — eine Voraussetzung ohne lokales
+Konzept, eine Aufgabenart, die erschöpft ist, eine Voraussetzung ohne
+geprüfte Diagnose — wird bestellt, dedupliziert über
+(Fach, Konzept, Rolle, Grund). Die Sitzung läuft mit dem besten sicheren
+vorhandenen Material weiter; kein Bildschirm sagt „geht gerade nicht".
+
 **Zuständig:** `app/adaptiv/unterricht.py` (Ablauf und Bildschirme),
 `app/adaptiv/sitzung.py` (Zustände, Zählung, Schwellen),
+`app/adaptiv/naechste_aktion.py` (nächster Lernschritt),
 `app/adaptiv/katalog.py` (Fehlertyp erkennen, Erklärung holen),
-`app/adaptiv/store.py` (`fortschritt_buchen`).
+`app/adaptiv/store.py` (`fortschritt_buchen`, `inhalt_anfordern`).
 
 ### Klassischer Weg: Runden mit Stufen
 
@@ -391,14 +421,17 @@ mit zwei geprüften Aufgaben, ob die Voraussetzung sitzt:
 
 * sitzt sie nicht → erst sie lernen, dann zurück zum Thema
 * sitzt sie → eskalieren wie bisher, es lag nicht daran
-* ist sie nicht in der Bibliothek → eskalieren, und das Protokoll sagt warum
+* ist sie nicht in der Bibliothek → `lern_inhalt_anfrage`, und die
+  Begleitung läuft mit vorhandenem Material weiter
 
 Im Browser hat der Zustand ein eigenes Gesicht (`voraussetzung`): kurze,
 kindgerechte Begründung („kein Fehler, keine Strafe"), dann die zwei
 Aufgaben. Sitzt die Grundlage nicht, laeuft sie als eigene Lernrunde im
 selben Thema (`voraussetzung_detour` merkt sich die wartende Sitzung);
 danach geht es an die Stelle zurueck, an der es hakte — nicht an den
-Anfang und nicht zum Menschen.
+Anfang und nicht zum Menschen. Der Umweg ist rekursiv: scheitert er,
+fragt er nach seinen eigenen Voraussetzungen; die Kette endet an einem
+tragfähigen Stand und kehrt Stufe für Stufe zum Ziel zurück.
 
 **Zuständig:** `adaptiv/voraussetzung.py`, `sitzung.eskalieren`,
 `unterricht.bildschirm/voraussetzung_beantwortet/voraussetzung_lernen_starten`,

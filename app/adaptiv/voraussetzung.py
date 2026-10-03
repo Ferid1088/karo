@@ -13,9 +13,13 @@ das Kind erst die Voraussetzung und kommt danach zurück. Sitzt sie, war es
 nicht die Voraussetzung — dann eskaliert Karo wie bisher.
 
 Was hier NICHT passiert: raten. Steht keine Voraussetzung in der Lieferung,
-oder ist sie noch nicht importiert, bleibt es bei der Eskalation. Lieber
-einen Menschen holen als ein Kind auf ein Konzept schicken, das Karo gar
-nicht unterrichten kann.
+wird sie als Inhaltsanfrage bestellt (siehe `inhalt_anfordern`) und die
+Sitzung geht in die Begleitung statt ins Leere — das Thema bleibt offen.
+
+Der Graph ist rekursiv: der Umweg ist eine ganz normale Sitzung. Scheitert
+er, wird auch er nach fehlenden Voraussetzungen gefragt — so entsteht die
+Kette Ziel → Voraussetzung → deren Voraussetzung bis zu einem tragfähigen
+Stand, ohne dass der Code die Tiefe kennt oder begrenzt.
 """
 from __future__ import annotations
 
@@ -27,18 +31,48 @@ from . import inhalt_store, store
 AUFGABEN = config.ops().voraussetzung_aufgaben
 
 
-def offene(konzept_id: int, child_key: str = store.CHILD_KEY) -> list[dict]:
+def detour_vorfahren(sitzung: dict) -> set[int]:
+    """Konzept-IDs der wartenden Sitzungen oberhalb dieses Umwegs.
+
+    Jeder Umweg traegt in `daten["voraussetzung_detour"]` die Sitzung, die
+    auf ihn wartet. Der Kette nach oben zu folgen zeigt, welche Konzepte
+    gerade auf eine Voraussetzung warten — eine Voraussetzung, die dort
+    schon steht, ist ein Zyklus im Graph und darf keinen neuen Umweg
+    starten: sonst warten A auf B und B auf A im Kreis.
+    """
+    gefunden: set[int] = set()
+    aktuell = sitzung
+    for _ in range(50):                      # Schutz gegen kaputte Ketten
+        daten = dict(aktuell.get("daten") or {})
+        oben_id = daten.get("voraussetzung_detour")
+        if not oben_id:
+            break
+        oben = store.sitzung(int(oben_id))
+        if oben is None:
+            break
+        if oben.get("konzept_id"):
+            gefunden.add(int(oben["konzept_id"]))
+        aktuell = oben
+    return gefunden
+
+
+def offene(konzept_id: int, child_key: str = store.CHILD_KEY,
+           ohne: set[int] | None = None) -> list[dict]:
     """Voraussetzungen, die Karo unterrichten kann und die noch nicht sitzen.
 
     Nur solche mit `lokal`: eine Voraussetzung, die Karo nicht hat, kann es
-    auch nicht beibringen — die gehört in die Meldung an den Menschen, nicht
-    in einen Lernweg ins Leere.
+    auch nicht beibringen — sie wird als Inhaltsanfrage bestellt, nicht als
+    Lernweg ins Leere. `ohne` schliesst Konzepte aus, die diese Sitzung
+    schon erledigt hat oder die in der Umweg-Kette oberhalb warten
+    (Zyklusschutz).
     """
+    ausgenommen = {int(k) for k in (ohne or set())}
     offen = []
     for v in store.voraussetzungen(konzept_id):
-        if not v.get("lokal"):
+        lokal = v.get("lokal")
+        if not lokal or int(lokal) in ausgenommen:
             continue
-        if sitzt(v["lokal"], child_key):
+        if sitzt(int(lokal), child_key):
             continue
         offen.append(v)
     return offen

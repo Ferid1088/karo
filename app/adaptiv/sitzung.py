@@ -231,11 +231,18 @@ def eskalieren(sitzung_id: int, cfg=None) -> dict:
         return sitzung
 
     daten = dict(sitzung.get("daten") or {})
-    if sitzung["konzept_id"] and not daten.get("voraussetzung_geprueft"):
-        offen = vor.offene(sitzung["konzept_id"], store.fortschritt_scope(sitzung))
+    if sitzung["konzept_id"]:
+        # Erledigte oder unpruefbare Voraussetzungen und die Konzepte, die
+        # in der Umweg-Kette oberhalb warten (Zyklusschutz), fallen nicht
+        # noch einmal an — die naechste offene wird gesucht.
+        ohne = (vor.detour_vorfahren(sitzung)
+                | {int(k) for k in daten.get("voraussetzung_bestanden") or []}
+                | {int(k) for k in daten.get("voraussetzung_unbrauchbar") or []}
+                | {int(sitzung["konzept_id"])})
+        offen = vor.offene(sitzung["konzept_id"],
+                           store.fortschritt_scope(sitzung), ohne=ohne)
         if offen:
             # Erst die Voraussetzung, dann zurück. Kein Mensch nötig.
-            daten["voraussetzung_geprueft"] = True
             daten["voraussetzung_offen"] = offen[0]["voraussetzung"]
             daten["voraussetzung_lokal"] = offen[0]["lokal"]
             daten["voraussetzung_titel"] = offen[0].get("titel") or ""
@@ -249,13 +256,22 @@ def eskalieren(sitzung_id: int, cfg=None) -> dict:
         store.fortschritt_buchen(sitzung["konzept_id"], sitzung["fehlertyp_id"],
                                  mastery="braucht_mensch", braucht_mensch=True,
                                  child_key=store.fortschritt_scope(sitzung))
-        # Was Karo nicht unterrichten kann, gehört in die Meldung: sonst
-        # sucht der Mensch den Grund beim Kind.
-        ohne = vor.fehlende_ohne_lektion(sitzung["konzept_id"])
-        if ohne:
+        # Was Karo nicht unterrichten kann, geht als Bestellung an den
+        # Lehrplan-Dienst — die Begleitung lernt unterdessen weiter.
+        konzept = store.konzept(sitzung["konzept_id"]) or {}
+        for v in vor.fehlende_ohne_lektion(sitzung["konzept_id"]):
+            store.inhalt_anfordern(konzept.get("fach", ""),
+                                   v["voraussetzung"], "voraussetzung",
+                                   "fehlt",
+                                   kontext={"titel": v.get("titel") or "",
+                                            "konzept_key":
+                                                konzept.get("konzept_key", "")})
+        if vor.fehlende_ohne_lektion(sitzung["konzept_id"]):
             store.ereignis_schreiben(
                 sitzung_id, "Voraussetzung fehlt in der Bibliothek",
-                nutzdaten={"voraussetzungen": [v["voraussetzung"] for v in ohne]})
+                nutzdaten={"voraussetzungen": [
+                    v["voraussetzung"] for v in
+                    vor.fehlende_ohne_lektion(sitzung["konzept_id"])]})
     return ergebnis
 
 

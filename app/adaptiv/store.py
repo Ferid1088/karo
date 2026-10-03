@@ -422,6 +422,63 @@ def voraussetzungen(konzept_id: int) -> list[dict]:
             ORDER BY v.id""", konzept_id)]
 
 
+def inhalt_anfordern(fach: str, konzept_key: str, rolle: str, grund: str,
+                     konzept_id: int | None = None,
+                     kontext: dict | None = None) -> dict:
+    """Eine Lücke im Katalog bestellen — dedupliziert.
+
+    Dieselbe fachliche Lücke (Fach, Konzept, Rolle, Grund) bekommt eine
+    Zeile: beim erneuten Anfallen steigt `anzahl`, es entsteht keine
+    zweite Bestellung. Was hier steht, kann der Lehrplan-Dienst erzeugen
+    und prüfen — Karo lernt unterdessen mit dem besten vorhandenen
+    Material weiter.
+    """
+    jetzt = db.now()
+    with db.tx() as c:
+        c.execute("""INSERT INTO lern_inhalt_anfrage
+                       (fach, konzept_key, konzept_id, rolle, grund,
+                        kontext, created_at, updated_at)
+                     VALUES (?,?,?,?,?,?,?,?)
+                     ON CONFLICT(fach, konzept_key, rolle, grund) DO UPDATE
+                       SET konzept_id = COALESCE(lern_inhalt_anfrage.konzept_id,
+                                                 excluded.konzept_id),
+                           kontext    = excluded.kontext,
+                           anzahl     = lern_inhalt_anfrage.anzahl + 1,
+                           updated_at = excluded.updated_at""",
+                  (fach or "", konzept_key, konzept_id, rolle, grund,
+                   json.dumps(kontext or {}, ensure_ascii=False),
+                   jetzt, jetzt))
+        return dict(c.execute(
+            """SELECT * FROM lern_inhalt_anfrage
+                WHERE fach=? AND konzept_key=? AND rolle=? AND grund=?""",
+            (fach or "", konzept_key, rolle, grund)).fetchone())
+
+
+def inhalt_anfragen(status: str = "offen") -> list[dict]:
+    """Die Bestellliste — z. B. fuer den Importlauf des Lehrplan-Dienstes."""
+    return [dict(z) for z in db.q(
+        """SELECT * FROM lern_inhalt_anfrage WHERE status=?
+            ORDER BY updated_at DESC""", status)]
+
+
+def konzept_schluessel(konzept_id: int | None) -> str | None:
+    """Die concept_id, unter der der Lehrplan-Dienst das Konzept kennt.
+
+    Kuratierte Konzepte ohne Importzeile haben keine — dann bleibt der
+    lokale Schluessel `fach.thema_key.konzept_key` als Adresse uebrig.
+    """
+    if not konzept_id:
+        return None
+    zeile = db.q1("""SELECT provenance FROM lern_curriculum_import
+                      WHERE konzept_id=? LIMIT 1""", konzept_id)
+    if not zeile:
+        return None
+    try:
+        return (json.loads(zeile["provenance"]) or {}).get("concept_id")
+    except (ValueError, TypeError):
+        return None
+
+
 def wirkung_gemeldet(erklaerung_ids: list[int]) -> None:
     """Haelt fest, dass diese Erklaerung gemeldet wurde.
 
