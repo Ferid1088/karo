@@ -2,7 +2,7 @@
 
 import logging
 from fastapi import Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from starlette.status import HTTP_303_SEE_OTHER
@@ -194,6 +194,66 @@ def companion_name(request: Request) -> str:
         return "Karo"
     begleiter = _begleiter()
     return begleiter["name"] if begleiter else "Karo"
+
+
+# ---------------------------------------------------------------------------
+# Seiten-Uploads — geteilt von lernmaterial.py (/lernen) und themenblatt.py
+# (/klassenarbeit): Dateien entgegennehmen, nie die fachliche Auswertung.
+# ---------------------------------------------------------------------------
+
+def seiten_aus_formular(formular) -> tuple[list, list[dict]]:
+    """Dateien und ihre Metadaten aus dem mehrteiligen Formular.
+
+    `seite` sind die Bilddateien in Seitenfolge, `seiten` ein JSON-Array
+    derselben Länge mit {name, text, konfidenz, art} — die Reihenfolge ist
+    die, die das Kind in der Vorschau angeordnet hat.
+    """
+    import json
+    from .. import material_paket
+    try:
+        metadaten = json.loads(str(formular.get("seiten") or "[]"))
+    except json.JSONDecodeError:
+        raise material_paket.PaketFehler("Die Seitenangaben sind beschädigt.")
+    if not isinstance(metadaten, list):
+        raise material_paket.PaketFehler("Die Seitenangaben sind beschädigt.")
+    dateien = [d for d in formular.getlist("seite")
+               if getattr(d, "filename", "")]
+    return dateien, metadaten
+
+
+def vorab_groesse(request: Request) -> None:
+    """Content-Length prüfen, bevor der mehrteilige Rumpf gelesen wird —
+    ein zu großer Upload wird abgelehnt, ohne dass er im Speicher landet."""
+    from .. import material_paket
+    try:
+        angekuendigt = int(request.headers.get("content-length") or 0)
+    except ValueError:
+        angekuendigt = 0
+    # Zwei MB Luft für die Formularrahmen der Seiten.
+    if angekuendigt > material_paket.MAX_PAKET_BYTES + config.ops().paket_overhead_bytes:
+        raise material_paket.PaketFehler(
+            f"Der Upload ist zu groß — ein Paket darf höchstens "
+            f"{material_paket.MAX_PAKET_BYTES // 1_048_576} MB haben.")
+
+
+async def dateien_lesen(dateien) -> list[tuple[str, bytes]]:
+    from .. import material_paket
+    gelesen = []
+    for i, datei in enumerate(dateien, 1):
+        # Das größte Einzellimit (PDF) deckelt den Leseaufruf — welches der
+        # getrennten Limits greift, entscheidet material_paket am Dateityp.
+        daten = await datei.read(material_paket.MAX_PDF_BYTES + 1)
+        if not daten:
+            raise material_paket.PaketFehler(f"Seite {i} kam leer an.")
+        gelesen.append((datei.filename or f"seite-{i}.jpg", daten))
+    return gelesen
+
+
+def antwort(weiter: str, request: Request):
+    """fetch() bekommt JSON; ein abgeschicktes Formular den nächsten Schritt."""
+    if "text/html" in (request.headers.get("accept") or ""):
+        return zurueck(weiter)
+    return JSONResponse({"weiter": weiter})
 
 
 def aktives_fach(request: Request, wert: str | None = None) -> str:

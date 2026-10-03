@@ -12,12 +12,15 @@ Tesseract (`blatt_text.server_lesen`). Was in `material_seite.text` liegt,
 ist bereits durch `blatt_text.kopf_entfernen` und `pii.scrub` gelaufen —
 Namen, Klasse und Datum stehen dort nicht mehr drin.
 
-    Seiten hochgeladen
-      → job material_analyse: fehlende Seiten serverseitig lesen,
-        Fach erkennen, Themen vorschlagen (KI nur auf Text)
-      → Mensch bestätigt in der Prüfansicht
-      → zweck 'lernen': Themen landen im normalen Lernbereich
-        zweck 'klassenarbeit': Themen füllen das Formular der neuen Arbeit
+Dieses Modul ist der geteilte technische Kern: Seiten speichern, lesen,
+analysieren. `zweck` ist dabei nur der Ingest-Kontext, der die Analyse-
+Rezepte und die Übernahme-Domäne wählt — danach sind die Wege getrennt:
+
+    zweck 'lernen'         → `uebernehmen` legt Lernthemen an und ordnet
+                             Seitentexte der Wissensbasis zu
+    zweck 'klassenarbeit'  → `pruefinhalte_uebernehmen` gibt bestätigte
+                             Prüfungsinhalte ans Formular der neuen Arbeit —
+                             kein Lernthema, keine Wissensbasis
 """
 
 from __future__ import annotations
@@ -419,17 +422,6 @@ def holen(paket_id: int) -> dict:
     return paket
 
 
-def gewaehlte_themen(paket_id: int) -> list[str]:
-    """Die bestätigten Themen — nur für den Klassenarbeit-Zweck abrufbar."""
-    paket = _paket(paket_id)
-    if paket["zweck"] != "klassenarbeit" or paket["state"] != STATE_UEBERNOMMEN:
-        return []
-    try:
-        return list(json.loads(paket["ergebnis"] or "{}").get("gewaehlt") or [])
-    except (json.JSONDecodeError, TypeError):
-        return []
-
-
 # ---------------------------------------------------------------------------
 # Analyse-Job: lesen, verstehen, vorschlagen — aber nichts anlegen
 # ---------------------------------------------------------------------------
@@ -459,8 +451,8 @@ def _seite_nachlesen(seite: dict) -> None:
                   (stand, fehler, seite["id"]))
 
 
-def _analyse_modell(paket_id: int, fach_hint: str | None,
-                    seiten_texte: list[str]) -> dict:
+def _modell_aufruf(paket_id: int, fach_hint: str | None, purpose: str,
+                   seiten_anzahl: int, prompt: str, schema: dict) -> dict:
     """Das Modell liest geschwärzten Seitentext — nie ein Bild.
 
     Der Text darf zum Modell, aber er bleibt nicht dauerhaft im Audit:
@@ -473,25 +465,68 @@ def _analyse_modell(paket_id: int, fach_hint: str | None,
 
     from .ai import AIClient
     cfg = config.load_safe()
-    nummern = "\n\n".join(
-        f"=== Seite {i} ===\n{text}" for i, text in enumerate(seiten_texte, 1))
-    prompt = prompts.material_prompt(cfg.learner_grade, fach_hint, nummern)
     audit = (
         "[MATERIAL_ANALYSE_REDACTED]\n"
         f"upload_id={paket_id}\n"
-        f"page_count={len(seiten_texte)}\n"
+        f"page_count={seiten_anzahl}\n"
         f"subject={faecher.schluessel(fach_hint) or '-'}\n"
         f"input_chars={len(prompt)}\n"
         f"prompt_hash=sha256:"
         f"{hashlib.sha256(prompt.encode('utf-8')).hexdigest()}")
     ergebnis = AIClient.from_config(cfg).complete(
-        purpose="material_analyse",
-        prompt=prompt,
-        schema=prompts.MATERIAL_SCHEMA,
-        system=prompts.SYSTEM,
-        audit_prompt=audit)
-    daten = ergebnis.data if isinstance(ergebnis.data, dict) else {}
+        purpose=purpose, prompt=prompt, schema=schema,
+        system=prompts.SYSTEM, audit_prompt=audit)
+    return ergebnis.data if isinstance(ergebnis.data, dict) else {}
+
+
+def _analyse_lernen(paket_id: int, fach_hint: str | None,
+                    seiten_texte: list[str]) -> dict:
+    """Lernmaterial: das Modell liest die Unterrichtsthemen des Blatts."""
+    cfg = config.load_safe()
+    nummern = "\n\n".join(
+        f"=== Seite {i} ===\n{text}" for i, text in enumerate(seiten_texte, 1))
+    prompt = prompts.material_prompt(cfg.learner_grade, fach_hint, nummern)
+    daten = _modell_aufruf(paket_id, fach_hint, "material_analyse",
+                           len(seiten_texte), prompt, prompts.MATERIAL_SCHEMA)
     return _ergebnis_pruefen(daten, len(seiten_texte))
+
+
+def _analyse_klassenarbeit(paket_id: int, fach_hint: str | None,
+                           seiten_texte: list[str]) -> dict:
+    """Themenblatt: das Modell liest die Prüfungsinhalte der Arbeit.
+
+    Eigenes Schema, eigener Prompt (`prompts.EXAM_MATERIAL_SCHEMA` /
+    `themenblatt_prompt`) — das Ergebnis ist kein Lernvorschlag, sondern
+    füllt nur das Formular der neuen Klassenarbeit.
+    """
+    cfg = config.load_safe()
+    nummern = "\n\n".join(
+        f"=== Seite {i} ===\n{text}" for i, text in enumerate(seiten_texte, 1))
+    prompt = prompts.themenblatt_prompt(cfg.learner_grade, fach_hint, nummern)
+    daten = _modell_aufruf(paket_id, fach_hint, "themenblatt_analyse",
+                           len(seiten_texte), prompt,
+                           prompts.EXAM_MATERIAL_SCHEMA)
+    ergebnis = _ergebnis_pruefen(
+        {"fach": daten.get("fach"),
+         "themen": daten.get("pruefungsinhalte")}, len(seiten_texte))
+    ergebnis["hinweise"] = [
+        " ".join(str(h).split())[:200]
+        for h in (daten.get("hinweise") or [])[:10]
+        if str(h or "").strip()][:10]
+    termin = str(daten.get("termin") or "").strip()
+    try:
+        import datetime as _dt
+        _dt.date.fromisoformat(termin)
+    except ValueError:
+        termin = ""
+    ergebnis["termin"] = termin or None
+    return ergebnis
+
+
+#: Welches Rezept der Analyse-Job fährt — der Ingest-Kontext waehlt, die
+#: Domain entscheidet nicht mehr mit.
+_ANALYSE = {"lernen": _analyse_lernen,
+            "klassenarbeit": _analyse_klassenarbeit}
 
 
 def _ergebnis_pruefen(daten: dict, seiten_anzahl: int) -> dict:
@@ -570,8 +605,8 @@ def job_material_analyse(payload: dict) -> None:
     fach_hint = (faecher.name(paket["subject"]) if paket["subject"]
                  else None)
     try:
-        ergebnis = _analyse_modell(paket_id, fach_hint,
-                                   [s["text"] for s in gelesen])
+        ergebnis = _ANALYSE[paket["zweck"]](
+            paket_id, fach_hint, [s["text"] for s in gelesen])
     except AIPending:
         raise                           # der Anbieter arbeitet noch — Job parken
     except Exception as exc:                # noqa: BLE001 - Meldung steht in fehler
@@ -614,27 +649,49 @@ def job_material_analyse(payload: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Übernehmen: erst jetzt entstehen Themen — nach der Bestätigung
+# Übernehmen: erst jetzt entsteht etwas — nach der Bestätigung, je Domain
 # ---------------------------------------------------------------------------
 
-def uebernehmen(paket_id: int, fach: str, themen: list[str],
-                klasse: int | None = None) -> dict:
-    """Die bestätigten Themen ins Lernen übernehmen bzw. an die Arbeit geben.
-
-    Jedes Thema läuft durch denselben Weg wie ein von Hand eingetragenes —
-    `learning_hub.create_topic` mit seiner Fachprüfung. Seiteninhalte, die
-    zu einem übernommenen Thema gehören, werden in der Wissensbasis diesem
-    Thema zugeordnet.
-    """
-    paket = _paket(paket_id)
-    if paket["state"] != STATE_BEREIT:
-        raise PaketFehler("Dieses Material ist nicht bereit zum Übernehmen.")
-    fach = faecher.pflicht(fach)
+def _namen_pruefen(themen: list[str], was: str) -> list[str]:
     namen = list(dict.fromkeys(
         " ".join(t.split()) for t in themen if t and t.strip()))
     namen = [n for n in namen if len(n) <= 200][:MAX_THEMEN]
     if not namen:
-        raise PaketFehler("Bitte mindestens ein Thema auswählen oder eintragen.")
+        raise PaketFehler(f"Bitte mindestens {was} auswählen oder eintragen.")
+    return namen
+
+
+def _abschliessen(paket: dict, ergebnis: dict, fach: str,
+                  gewaehlt: list[str], abgewiesen: list[str]) -> None:
+    """Paket auf übernommen stellen — die geteilte technische Buchung."""
+    ergebnis["gewaehlt"] = gewaehlt + abgewiesen
+    with db.tx() as c:
+        c.execute("UPDATE material_paket SET state=?, subject=?, ergebnis=?, "
+                  "updated_at=? WHERE id=?",
+                  (STATE_UEBERNOMMEN, fach,
+                   json.dumps(ergebnis, ensure_ascii=False), db.now(),
+                   paket["id"]))
+    _protokoll("material_import_completed", upload_id=paket["id"],
+               purpose=paket["zweck"], topics=len(gewaehlt),
+               rejected=len(abgewiesen))
+
+
+def uebernehmen(paket_id: int, fach: str, themen: list[str],
+                klasse: int | None = None) -> dict:
+    """Lernen: die bestätigten Themen werden Lernthemen.
+
+    Jedes Thema läuft durch denselben Weg wie ein von Hand eingetragenes —
+    `learning_hub.create_topic` mit seiner Fachprüfung. Seiteninhalte, die
+    zu einem übernommenen Thema gehören, werden in der Wissensbasis diesem
+    Thema zugeordnet. Nur für Pakete des Lernbereichs.
+    """
+    paket = _paket(paket_id)
+    if paket["zweck"] != "lernen":
+        raise PaketFehler("Dieses Paket gehört zu einer Klassenarbeit.")
+    if paket["state"] != STATE_BEREIT:
+        raise PaketFehler("Dieses Material ist nicht bereit zum Übernehmen.")
+    fach = faecher.pflicht(fach)
+    namen = _namen_pruefen(themen, "ein Thema")
 
     aktuell = holen(paket_id)
     ergebnis = aktuell["ergebnis"]
@@ -653,33 +710,59 @@ def uebernehmen(paket_id: int, fach: str, themen: list[str],
             seiten_dokumente[int(seite["position"])] = seite["document_id"]
 
     angelegt, abgewiesen = [], []
-    if paket["zweck"] == "lernen":
-        for name in namen:
-            try:
-                topic_id = learning_hub.create_topic(
-                    name, fach, klasse, modell=False)
-            except faecher.SubjectMismatch:
-                abgewiesen.append(name)
-                continue
-            angelegt.append(name)
-            # Seiten mit diesem Thema bekommen ihre Abschnitte zugeordnet —
-            # eine Seite geht an das erste Thema, das sie beansprucht.
-            for pos in quell_seiten.get(normalisiere_thema(name), []):
-                dokument = seiten_dokumente.get(int(pos))
-                if dokument and not db.q1(
-                        "SELECT 1 FROM kb_chunk WHERE document_id=? "
-                        "AND topic_id IS NOT NULL", dokument):
-                    blatt_text.zuordnen(dokument, topic_id)
-    else:
-        angelegt = namen
+    for name in namen:
+        try:
+            topic_id = learning_hub.create_topic(
+                name, fach, klasse, modell=False)
+        except faecher.SubjectMismatch:
+            abgewiesen.append(name)
+            continue
+        angelegt.append(name)
+        # Seiten mit diesem Thema bekommen ihre Abschnitte zugeordnet —
+        # eine Seite geht an das erste Thema, das sie beansprucht.
+        for pos in quell_seiten.get(normalisiere_thema(name), []):
+            dokument = seiten_dokumente.get(int(pos))
+            if dokument and not db.q1(
+                    "SELECT 1 FROM kb_chunk WHERE document_id=? "
+                    "AND topic_id IS NOT NULL", dokument):
+                blatt_text.zuordnen(dokument, topic_id)
 
-    ergebnis["gewaehlt"] = angelegt + abgewiesen
-    with db.tx() as c:
-        c.execute("UPDATE material_paket SET state=?, subject=?, ergebnis=?, "
-                  "updated_at=? WHERE id=?",
-                  (STATE_UEBERNOMMEN, fach,
-                   json.dumps(ergebnis, ensure_ascii=False), db.now(), paket_id))
-    _protokoll("material_import_completed", upload_id=paket_id,
-               purpose=paket["zweck"], topics=len(angelegt),
-               rejected=len(abgewiesen))
+    _abschliessen(paket, ergebnis, fach, angelegt, abgewiesen)
     return {"angelegt": angelegt, "abgewiesen": abgewiesen}
+
+
+def pruefinhalte_uebernehmen(paket_id: int, fach: str,
+                             themen: list[str]) -> dict:
+    """Klassenarbeit: die bestätigten Prüfungsinhalte für das Formular.
+
+    Legt absichtlich **nichts** an: kein Lernthema (`learning_hub` wird nie
+    gerufen), kein Eintrag in der Wissensbasis. Die Prüfungsthemen
+    entstehen erst beim Anlegen der Arbeit (`exam.create_exam`) — hier
+    wird nur gemerkt, was der Mensch auf dem Themenblatt bestätigt hat.
+    """
+    paket = _paket(paket_id)
+    if paket["zweck"] != "klassenarbeit":
+        raise PaketFehler("Dieses Paket gehört zum Lernbereich.")
+    if paket["state"] != STATE_BEREIT:
+        raise PaketFehler("Dieses Material ist nicht bereit zum Übernehmen.")
+    fach = faecher.pflicht(fach)
+    namen = _namen_pruefen(themen, "einen Prüfungsinhalt")
+
+    _abschliessen(paket, holen(paket_id)["ergebnis"], fach, namen, [])
+    return {"inhalte": namen, "fach": fach}
+
+
+def gewaehlte_pruefinhalte(paket_id: int) -> dict:
+    """Das abgeschlossene Themenblatt-Ergebnis für das Klassenarbeitsformular:
+    `themen`, `fach`, `termin` — leer, wenn das Paket nicht dazu gehört oder
+    noch nicht übernommen wurde."""
+    paket = _paket(paket_id)
+    if paket["zweck"] != "klassenarbeit" or paket["state"] != STATE_UEBERNOMMEN:
+        return {}
+    try:
+        ergebnis = json.loads(paket["ergebnis"] or "{}")
+    except json.JSONDecodeError:
+        return {}
+    return {"themen": list(ergebnis.get("gewaehlt") or []),
+            "fach": paket["subject"],
+            "termin": ergebnis.get("termin")}

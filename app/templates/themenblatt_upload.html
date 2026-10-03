@@ -1,31 +1,32 @@
 {% extends "learning_base.html" %}
-{% block title %}Material einlesen{% endblock %}
+{% block title %}Themenblatt hochladen{% endblock %}
 {% block page_styles %}<link rel="stylesheet" href="/static/material-paket.css?v={{ asset_version|default('0') }}">{% endblock %}
 {% block content %}
-{# Nur der Lernbereich: das Themenblatt einer Klassenarbeit laeuft ueber
-   /klassenarbeit/themenblatt mit eigenen Seiten. #}
-<a class="back-link" href="/lernen/{{ fach }}">← Zurück zu {{ fach_name }}</a>
+{# Klassenarbeit-Domain: Rueckweg fuehrt zum Formular der neuen Arbeit —
+   mit allem, was dort schon eingetragen war (entwurf). #}
+<a class="back-link" href="{{ zurueck_url }}">← Zurück zur Klassenarbeit</a>
 
 <section class="learn-heading">
   <div>
-    <h1>Arbeitsblatt oder Foto</h1>
-    <p>Zeige {{ companion_name }} dein Blatt — es findet die Themen für dich.</p>
+    <h1>Themenblatt für die Klassenarbeit</h1>
+    <p>Zeige {{ companion_name }} das Themenblatt — die erkannten Prüfungsinhalte landen im Formular der Klassenarbeit.</p>
   </div>
   <img src="/static/karo-owl-book.png" alt="" width="100">
 </section>
 
 <section class="card">
   <h2>Deine Seiten</h2>
-  <form method="post" action="/lernen/material/paket" enctype="multipart/form-data" data-paket-form>
+  <form method="post" action="{{ upload_url }}" enctype="multipart/form-data" data-paket-form>
     {{ csrf_input() }}
-    <input type="hidden" name="zweck" value="lernen">
     <input type="hidden" name="fach" value="{{ fach }}">
+    <input type="hidden" name="termin" value="{{ entwurf.termin or '' }}">
+    <input type="hidden" name="themen" value="{{ entwurf.themen or '' }}">
 
     {# Der Bereich, den material-paket.js mit der Vorschau befüllt — ohne
        JavaScript bleibt er unsichtbar und das einfache Dateifeld darunter
        ist der Weg. #}
     <div class="paket-zone" data-paket-zone hidden
-         data-zweck="lernen" data-fach="{{ fach }}"
+         data-zweck="klassenarbeit" data-fach="{{ fach }}"
          data-max-seiten="{{ max_seiten }}" data-kopf-prozent="{{ kopf_prozent }}"
          data-min-zeichen="{{ min_zeichen }}"
          data-ocr-max-seiten="{{ ocr_max_seiten }}"
@@ -35,7 +36,7 @@
          data-max-bild-mb="{{ max_bild_mb }}" data-max-pdf-mb="{{ max_pdf_mb }}"
          data-max-paket-mb="{{ max_paket_mb }}"
          data-csrf-name="{{ csrf_field }}" data-csrf="{{ csrf }}"
-         data-url="/lernen/material/paket">
+         data-url="{{ upload_url }}">
       <div class="paket-liste" data-paket-liste></div>
       <p class="hint" data-paket-zaehler>0 von {{ max_seiten }} Seiten</p>
       <div class="actions">
@@ -59,21 +60,6 @@
     </div>
   </form>
 </section>
-
-<details class="card disclosure">
-  <summary>Themen lieber selbst eintragen</summary>
-  <form method="post" action="/lernen/material/uebernehmen">
-    {{ csrf_input() }}
-    <input type="hidden" name="fach" value="{{ fach }}">
-    <div class="field">
-      <label for="themen">Themen (ein Thema pro Zeile)</label>
-      <textarea id="themen" name="themen" rows="4" required
-                placeholder="Brüche addieren&#10;Brüche kürzen"></textarea>
-      <p class="hint">{{ companion_name }} zeigt dir dazu gleich ein Material zum Üben.</p>
-    </div>
-    <button type="submit">Themen speichern</button>
-  </form>
-</details>
 
 <script src="/static/blatt-lesen.js?v={{ asset_version|default('0') }}" defer></script>
 <script src="/static/material-paket.js?v={{ asset_version|default('0') }}" defer></script>

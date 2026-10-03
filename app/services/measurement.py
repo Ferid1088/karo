@@ -169,17 +169,47 @@ def render_klassenarbeit_kalender(request: Request, monat: str = ""):
 
 
 def render_klassenarbeit_neu(request: Request, draft: dict | None = None):
-    """Beide Wege zu einer neuen Arbeit: selbst eintragen oder Blatt hochladen."""
+    """Beide Wege zu einer neuen Arbeit: selbst eintragen oder Blatt hochladen.
+
+    Kommt der Aufruf vom Themenblatt-Upload (`?material={paket_id}`),
+    stehen die dort bestätigten Prüfungsinhalte schon im Feld — als
+    gewöhnlicher Text, Termin, Fach und das Anlegen entscheidet weiterhin
+    das Formular. Mitgereiste Werte (`?termin=&fach=&themen=`) bleiben
+    erhalten: das Themenblatt ergänzt das Formular, es überschreibt nicht,
+    was der Mensch eingetragen hat.
+    """
     from .. import exam_plan, material_paket
+    import datetime as dt
     entwurf = dict(draft or {})
-    # Aus der Material-Prüfung zurück: die bestätigten Themen stehen schon
-    # im Feld, bleiben aber gewöhnlicher Text — Termin, Fach und das Anlegen
-    # entscheidet weiterhin das Formular.
-    material_id = str(request.query_params.get("material") or "")
-    if material_id.isdigit() and not entwurf.get("themen"):
-        themen = material_paket.gewaehlte_themen(int(material_id))
-        if themen:
-            entwurf["themen"] = "\n".join(themen)
+    q = request.query_params
+
+    termin = str(q.get("termin") or "").strip()[:10]
+    try:
+        dt.date.fromisoformat(termin)
+    except ValueError:
+        termin = ""
+    if termin:
+        entwurf["exam_date"] = termin
+    fach = faecher.schluessel(q.get("fach"))
+    if fach:
+        entwurf["fach"] = fach
+    manuell = [z.strip() for z in str(q.get("themen") or "")
+               .replace(",", "\n").splitlines() if z.strip()]
+
+    material_id = str(q.get("material") or "")
+    if material_id.isdigit():
+        auswahl = material_paket.gewaehlte_pruefinhalte(int(material_id))
+        if auswahl:
+            # Manuelle Zeilen bleiben, bestätigte Inhalte kommen dazu —
+            # keine Dubletten.
+            vorhanden = {t.casefold() for t in manuell}
+            manuell += [t for t in auswahl["themen"]
+                        if t.casefold() not in vorhanden]
+            entwurf.setdefault("fach", auswahl["fach"])
+            if not entwurf.get("exam_date") and auswahl.get("termin"):
+                entwurf["exam_date"] = auswahl["termin"]
+    if manuell:
+        entwurf["themen"] = "\n".join(dict.fromkeys(manuell))
     return render(request, "klassenarbeit_neu.html",
                   adult_page=not config.load().klassenarbeit_kind,
                   scan=exam_plan.offene_scan(), draft=entwurf)

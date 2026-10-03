@@ -102,7 +102,13 @@ def test_die_handschrift_wird_nirgends_mehr_abgelesen():
     for pfad in sorted((APP / "templates").rglob("*.html")):
         for gefunden in ziel.findall(pfad.read_text(encoding="utf-8")):
             sauber = re.sub(r"\{\{[^}]*\}\}", "<id>", gefunden)
-            assert sauber in erlaubt or sauber.endswith("/thema"), (pfad.name, gefunden)
+            # `/klassenarbeit/themenblatt/*` trifft den Namen, nicht das
+            # Verbot: das sind Paket-Aktionen (entfernen, erneut,
+            # uebernehmen) — gelesen wird auf dem Geraet, kein Formular
+            # schickt dort ein Blatt an eine Ablese-Route.
+            assert (sauber in erlaubt or sauber.endswith("/thema")
+                    or sauber.startswith("/klassenarbeit/themenblatt")), \
+                (pfad.name, gefunden)
 
     from app import quizzes
     assert not hasattr(quizzes, "blatt_hochladen")

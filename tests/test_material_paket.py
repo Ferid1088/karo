@@ -44,12 +44,11 @@ def _pdf(seiten: int = 3) -> bytes:
     return puffer.getvalue()
 
 
-def _upload(client, dateien, fach="mathematik", zweck="lernen",
-            metadaten=None):
+def _upload(client, dateien, fach="mathematik", metadaten=None):
     """POST wie material-paket.js: `seite` = Bilder, `seiten` = JSON dazu."""
     seite = client.get("/lernen/material")
     assert seite.status_code == 200
-    daten = {"_csrf": csrf_from(seite.text), "zweck": zweck, "fach": fach,
+    daten = {"_csrf": csrf_from(seite.text), "zweck": "lernen", "fach": fach,
              "seiten": json.dumps(
                  metadaten if metadaten is not None else [{}] * len(dateien))}
     return client.post("/lernen/material/paket", data=daten,
@@ -71,10 +70,10 @@ def _seiten(app_env, paket_id):
         paket_id)
 
 
-def _bereit(client, fake_llm, app_env, dateien, metadaten, zweck="lernen"):
+def _bereit(client, fake_llm, app_env, dateien, metadaten):
     """Paket hochladen und bis zur Prüfung laufen lassen."""
     fake_llm.responses["material"] = dict(MATERIAL_ANTWORT)
-    antwort = _upload(client, dateien, zweck=zweck, metadaten=metadaten)
+    antwort = _upload(client, dateien, metadaten=metadaten)
     assert antwort.status_code == 200, antwort.text
     paket_id = _paket_id(antwort)
     run_jobs(app_env, fake_llm)
@@ -437,37 +436,38 @@ def test_fachfremdes_thema_wird_nicht_angelegt(
     assert "English vocabulary words" not in labels
 
 
-def test_klassenarbeit_uebernimmt_themen_ins_formular(
-        client, fake_llm, app_env, monkeypatch):
-    """Zweck klassenarbeit: die bestätigten Themen füllen das Formular,
-    Termin und Anlegen bleiben der übliche Weg."""
+def test_uebernehmen_verweigert_fremde_zwecke(
+        client, fake_llm, app_env):
+    """Die Domain-Grenze im Kern: `uebernehmen` legt Lernthemen an und darf
+    nur Lernpakete bedienen; `pruefinhalte_uebernehmen` nur Themenblätter.
+    Der volle Klassenarbeits-Weg hat eigene Tests in test_themenblatt.py."""
+    from app import material_paket
     einrichten(client, fake_llm)
-    monkeypatch.setattr("app.db.today", lambda: "2026-09-27")
-    paket_id = _bereit(client, fake_llm, app_env,
-                       [("s.jpg", _bild(), "image/jpeg")], _meta(),
-                       zweck="klassenarbeit")
 
-    seite = client.get(f"/lernen/material/{paket_id}")
-    r = client.post(f"/lernen/material/{paket_id}/uebernehmen", data={
-        "_csrf": csrf_from(seite.text), "fach": "mathematik",
-        "thema": ["Brüche addieren", "Brüche kürzen"],
-    }, follow_redirects=False)
-    assert r.status_code == 303
-    assert r.headers["location"].startswith("/klassenarbeit/neu")
+    # Ein Lernpaket bereitstellen — mit dem gewöhnlichen Lern-Upload.
+    lern_id = _bereit(client, fake_llm, app_env,
+                      [("s.jpg", _bild(), "image/jpeg")], _meta())
 
-    # Das Formular trägt die Themen schon — als bearbeitbarer Text.
-    formular = client.get(r.headers["location"])
-    assert "Brüche addieren" in formular.text
-    assert "Brüche kürzen" in formular.text
+    # Ein Themenblatt-Paket direkt im Kern anlegen (seine HTTP-Routen
+    # liegen in routers/themenblatt.py).
+    fake_llm.responses["themenblatt"] = {
+        "fach": "mathematik",
+        "pruefungsinhalte": [
+            {"titel": "Brüche addieren", "seiten": [1], "konfidenz": 0.9}],
+        "hinweise": [], "termin": None}
+    kla_id = material_paket.anlegen(
+        zweck="klassenarbeit", subject="mathematik",
+        dateien=[("s.jpg", _bild())], metadaten=_meta())
+    run_jobs(app_env, fake_llm)
+    assert app_env.db.q1(
+        "SELECT state FROM material_paket WHERE id=?", kla_id)["state"] \
+        == "bereit"
 
-    # Termin bleibt ein kontrolliertes Feld, die Arbeit entsteht erst hier.
-    csrf = csrf_from(formular.text)
-    r = client.post("/klassenarbeit", data={
-        "_csrf": csrf, "fach": "mathematik", "exam_date": "2026-10-01",
-        "themen": "Brüche addieren\nBrüche kürzen"}, follow_redirects=True)
-    assert r.status_code == 200
-    exam = app_env.db.q1("SELECT * FROM exam ORDER BY id DESC LIMIT 1")
-    assert exam["exam_date"] == "2026-10-01"
+    with pytest.raises(material_paket.PaketFehler, match="Klassenarbeit"):
+        material_paket.uebernehmen(kla_id, "mathematik", ["Brüche addieren"])
+    with pytest.raises(material_paket.PaketFehler, match="Lernbereich"):
+        material_paket.pruefinhalte_uebernehmen(
+            lern_id, "mathematik", ["Brüche addieren"])
 
 
 def test_ohne_thema_wird_nichts_uebernommen(

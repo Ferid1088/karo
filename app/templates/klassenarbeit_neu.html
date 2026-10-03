@@ -19,14 +19,35 @@
 Brüche kürzen
 Textaufgaben">{{ draft.get('themen', '') }}</textarea>
     {# Oder das Themenblatt einlesen lassen: im Browser gelesen, nur Text
-       geht weiter — die erkannten Themen landen oben im Feld und bleiben
-       änderbar. Termin, Fach und das Anlegen entscheidet das Formular. #}
+       geht weiter — die erkannten Prüfungsinhalte landen oben im Feld und
+       bleiben änderbar. Termin, Fach und das Anlegen entscheidet das
+       Formular. Alles davon bleibt unter /klassenarbeit — das Skript
+       reicht den bisherigen Formularstand an den Upload weiter. #}
     <p class="hint">oder</p>
     <p class="actions">
-      <a class="learn-zweit-action" href="/lernen/material?zweck=klassenarbeit">📄 Themenblatt hochladen</a>
-      <a class="learn-zweit-action" href="/lernen/material?zweck=klassenarbeit&amp;kamera=1">Foto machen</a>
+      <a class="learn-zweit-action" href="/klassenarbeit/themenblatt" data-formularstand>📄 Themenblatt hochladen</a>
+      <a class="learn-zweit-action" href="/klassenarbeit/themenblatt?kamera=1" data-formularstand>Foto machen</a>
     </p>
     <button type="submit">Klassenarbeit anlegen →</button>
   </form>
 </section>
+
+<script>
+// Was im Formular schon steht (Termin, Fach, eigene Themen), geht beim
+// Klick zum Themenblatt-Upload mit — und kommt von dort wieder zurück.
+document.querySelectorAll("a[data-formularstand]").forEach(function (link) {
+  link.addEventListener("click", function () {
+    var formular = link.closest("form");
+    if (!formular) return;
+    var ziel = new URL(link.getAttribute("href"), location.origin);
+    var termin = formular.elements["exam_date"].value;
+    var fach = formular.elements["fach"].value;
+    var themen = formular.elements["themen"].value;
+    if (termin) ziel.searchParams.set("termin", termin);
+    if (fach) ziel.searchParams.set("fach", fach);
+    if (themen.trim()) ziel.searchParams.set("themen", themen.trim());
+    link.setAttribute("href", ziel.pathname + ziel.search);
+  });
+});
+</script>
 {% endblock %}

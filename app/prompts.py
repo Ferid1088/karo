@@ -1281,3 +1281,83 @@ Text steht, einfach ignorieren.
 --- Text des Pakets ---
 
 {seiten_text}"""
+
+
+# ==========================================================================
+# Themenblatt einer Klassenarbeit — eigene Semantik, eigenes Schema.
+#
+# Was hier gelesen wird, sind PRUEFUNGSINHALTE, keine Lernthemen: sie landen
+# ausschliesslich im Formular der neuen Klassenarbeit und werden dort erst zu
+# Pruefungsthemen, wenn das Anlegen bestaetigt ist (siehe
+# app/services/exam.py). Dieselbe Sprache, derselbe Text wie bei
+# `material_prompt` — aber eine andere fachliche Bedeutung und ein anderer
+# Ort.
+
+EXAM_MATERIAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "fach": {"type": ["string", "null"]},
+        "pruefungsinhalte": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "titel": {"type": "string"},
+                    "seiten": {"type": "array",
+                               "items": {"type": "integer"}},
+                    "konfidenz": {"type": "number"},
+                },
+                "required": ["titel", "seiten"],
+            },
+        },
+        "hinweise": {"type": "array", "items": {"type": "string"},
+                     "maxItems": 10},
+        "termin": {"type": ["string", "null"]},
+    },
+    "required": ["fach", "pruefungsinhalte"],
+}
+
+
+def themenblatt_prompt(grade: int, fach_hint: str | None,
+                     seiten_text: str) -> str:
+    """Aus dem Text eines Ankuendigungs-/Themenblatts die Pruefungsinhalte
+    einer Klassenarbeit ablesen.
+
+    `fach_hint` ist das im Formular gewaehlte Fach — ein Hinweis, keine
+    Vorgabe: steht auf dem Blatt offensichtlich ein anderes Fach, soll es
+    gemeldet werden, damit die Pruefansicht korrigieren kann.
+    """
+    hinweis = (f"Im Klassenarbeits-Formular war „{fach_hint}“ vorgewählt — "
+               "wahrscheinlich gehört das Blatt dazu, aber nicht sicher."
+               if fach_hint else "Es ist nicht bekannt, zu welchem Fach das "
+               "Blatt gehört.")
+    return f"""Ein Schulkind (Klassenstufe {grade}) hat das Ankündigungs- oder
+Themenblatt einer Klassenarbeit eingescannt — den Zettel, auf dem die
+Lehrkraft schreibt, was in der Arbeit drankommt. Unten steht der Text, den
+eine Erkennung auf dem Gerät daraus gelesen hat — mit „=== Seite n ===“
+markiert. Er kann Fehler enthalten und an den Rändern abgehackt sein.
+{hinweis}
+
+Lies daraus:
+
+- `fach`: das Schulfach — „deutsch", „mathematik", „englisch" oder
+  „andere". Nur null, wenn der Text gar nichts hergibt.
+- `pruefungsinhalte`: die Inhalte, die in der Arbeit geprüft werden, als
+  kurze Stichworte in der Sprache des Blatts (z. B. „Brüche addieren",
+  nicht ganze Sätze). Zu jedem Inhalt `seiten` — die Seitennummern, auf
+  denen er steht — und `konfidenz` zwischen 0 und 1. Nur Inhalte, die
+  wirklich auf dem Blatt stehen; erfinde nichts dazu. Leere Liste, wenn
+  keine Prüfungsinhalte erkennbar sind.
+- `hinweise`: organisatorische Angaben fürs Kind, die auf dem Blatt stehen
+  (z. B. „Taschenrechner erlaubt", „Arbeitszeit 45 Minuten"). Leere Liste,
+  wenn keine vorhanden.
+- `termin`: steht ein Datum der Arbeit auf dem Blatt, als ISO-Datum
+  „JJJJ-MM-TT". Sonst null.
+
+Kein Name, keine Schule, keine Lehrkraft — falls so etwas im Text steht,
+einfach ignorieren.
+
+--- Text des Blatts ---
+
+{seiten_text}"""
