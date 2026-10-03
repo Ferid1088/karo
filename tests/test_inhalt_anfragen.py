@@ -180,6 +180,26 @@ def test_erneute_luecke_oeffnet_erfuellte_bestellung(dienst):
     assert wieder["anzahl"] == 2
 
 
+def test_fachfolgt_dem_schluessel_nicht_der_sitzung(dienst):
+    """Eine Voraussetzung kann fachfremd sein: unter einer Englisch-Sitzung
+    fehlt `MA.…` — bestellt wird in Mathematik, nicht in Englisch. Sonst
+    sucht der Dienst im falschen Curriculum und die Lieferung scheitert an
+    der Huellenpruefung."""
+    from app.adaptiv import store
+    zeile = _anfrage(fach="englisch", key="MA.GEO.WUERFEL",
+                     rolle="voraussetzung", grund="fehlt")
+    assert zeile["fach"] == "mathematik"
+
+
+def test_schluessel_ohne_fachkuerzel_behaelt_das_sitzungsfach(dienst):
+    """Lokale Schluessel ohne erkennbares Kuerzel bleiben beim Fach der
+    Sitzung — nichts wird geraten."""
+    from app.adaptiv import store
+    zeile = _anfrage(fach="deutsch", key="satzglieder.praedikat",
+                     rolle="voraussetzung", grund="fehlt")
+    assert zeile["fach"] == "deutsch"
+
+
 def test_bestellung_loest_hintergrundlauf_aus(dienst):
     """Jede neue Lueckenmeldung stellt den Bestelljob — sonst waere die
     Anfrage eine Zeile, die niemand liest."""

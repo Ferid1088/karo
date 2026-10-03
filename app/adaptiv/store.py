@@ -437,6 +437,13 @@ def inhalt_anfordern(fach: str, konzept_key: str, rolle: str, grund: str,
     Material weiter.
     """
     jetzt = db.now()
+    # Der Schluessel adressiert das Konzept — traegt er ein Fachkuerzel
+    # (Dienst-Konzepte heissen `MA.`/`DE.`/…, lokale `fach.thema.konzept`),
+    # ist das verbindlicher als das Fach der meldenden Sitzung: eine
+    # Physik-Voraussetzung kann durchaus ein Mathe-Konzept sein, und im
+    # falschen Fach sucht der Dienst sie nie.
+    from karo_contract.faecher import schluessel as _fachschluessel
+    fach = _fachschluessel(str(konzept_key or "").split(".")[0]) or fach
     with db.tx() as c:
         c.execute("""INSERT INTO lern_inhalt_anfrage
                        (fach, konzept_key, konzept_id, rolle, grund,
