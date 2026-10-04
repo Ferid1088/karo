@@ -102,8 +102,13 @@ def platzhalter(vorlage: str) -> list[str]:
 
 
 def belegen(vorlage: str, bedingungen: list[str] | None = None, *,
-            seed: int | str = 0, bereich: tuple[int, int] = (1, 12)) -> dict[str, int]:
+            seed: int | str = 0,
+            bereich: tuple[int, int] | dict[str, tuple[int, int]] = (1, 12)) -> dict[str, int]:
     """Zahlen fuer die Platzhalter finden, die alle Bedingungen erfuellen.
+
+    `bereich` gilt als Paar fuer alle Platzhalter oder als
+    ``{name: (unten, oben)}`` je Platzhalter — ein Geldwert in Tausendern
+    und ein Prozentsatz in Zehnern kommen sonst aus demselben Wuerfel.
 
     Fester Seed: dieselbe Lektion bekommt immer dieselben Aufgaben. Sonst
     stuende in der Datenbank eine andere Aufgabe als im Lernmaterial, und
@@ -113,9 +118,9 @@ def belegen(vorlage: str, bedingungen: list[str] | None = None, *,
     if not namen:
         return {}
     wuerfel = random.Random(f"{seed}:{vorlage}")
-    unten, oben = bereich
+    je = bereich if isinstance(bereich, dict) else {n: bereich for n in namen}
     for _ in range(MAX_VERSUCHE):
-        belegung = {n: wuerfel.randint(unten, oben) for n in namen}
+        belegung = {n: wuerfel.randint(*je[n]) for n in namen}
         if erfuellt(bedingungen or [], belegung):
             return belegung
     raise VorlageUnbrauchbar(
@@ -213,10 +218,7 @@ def typischer_fehler(fehler_key: str, belegung: dict[str, int]) -> str | None:
 MAX_BEREICH = 100_000
 
 
-def _bereich_pruefen(roh, vorlage: str) -> tuple[int, int]:
-    """`bereich` ist [unten, oben] ganzer Zahlen — oder Vorgabe 1–12."""
-    if roh is None:
-        return (1, 12)
+def _paar_pruefen(roh, vorlage: str) -> tuple[int, int]:
     try:
         unten, oben = roh
     except (TypeError, ValueError):
@@ -229,6 +231,29 @@ def _bereich_pruefen(roh, vorlage: str) -> tuple[int, int]:
         raise VorlageUnbrauchbar(
             f"bereich ist absurd groß: {roh!r} (in {vorlage!r})")
     return (unten, oben)
+
+
+def _bereich_pruefen(roh, vorlage: str,
+                     namen: list[str]) -> dict[str, tuple[int, int]]:
+    """`bereich` ist [unten, oben] für alle Platzhalter — oder
+    {"name": [unten, oben]} je Platzhalter (Vorgabe 1–12).
+
+    Die Mapping-Form muss jeden Platzhalter nennen und keine fremden:
+    ein Wert, der schweigend im Standard wuerfelt oder gar nicht gilt,
+    waere ein unsichtbarer Autorenfehler.
+    """
+    if roh is None:
+        return {n: (1, 12) for n in namen}
+    if isinstance(roh, dict):
+        fremd = sorted(n for n in roh if n not in namen)
+        fehlt = sorted(n for n in namen if n not in roh)
+        if fremd or fehlt:
+            raise VorlageUnbrauchbar(
+                f"bereich passt nicht zu den Platzhaltern {namen}: "
+                f"unbekannt {fremd or '—'}, fehlend {fehlt or '—'}")
+        return {n: _paar_pruefen(roh[n], vorlage) for n in namen}
+    paar = _paar_pruefen(roh, vorlage)
+    return {n: paar for n in namen}
 
 
 def bauen(vorlage: dict, *, seed: int | str = 0, fehler_key: str = "") -> dict:
@@ -245,7 +270,7 @@ def bauen(vorlage: dict, *, seed: int | str = 0, fehler_key: str = "") -> dict:
         raise VorlageUnbrauchbar(
             f"bedingungen ist keine Liste: {roh_bedingungen!r}")
     bedingungen = [str(b) for b in roh_bedingungen]
-    bereich = _bereich_pruefen(vorlage.get("bereich"), muster)
+    bereich = _bereich_pruefen(vorlage.get("bereich"), muster, platzhalter(muster))
     belegung = belegen(muster, bedingungen, seed=seed, bereich=bereich)
     aufgabe = einsetzen(muster, belegung)
     # Erst fragen, ob eine Unbekannte gesucht ist: „4x − 3 = 9" laesst sich

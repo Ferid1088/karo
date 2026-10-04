@@ -317,3 +317,26 @@ def test_drei_seeds_drei_verschiedene_gueltige_aufgaben():
         assert Fraction(g["loesung"]) == Fraction(a, b) + Fraction(c, d)
         # Der Kindertext enthält die Aufgabe, keinen Platzhalter.
         assert "{" not in g["frage"] and g["ausdruck"] in g["frage"]
+
+
+def test_bereich_je_platzhalter():
+    """Geld in Tausendern und Prozentsatz in Zehnern: ein Paar fuer beide ist
+    genau die Fehlerklasse, an der wiederholt echte Exporte scheiterten."""
+    v = {"vorlage": "{a} * {b} / 1000", "frage": "Du sparst {a} €.",
+         "bedingungen": ["a % 100 == 0", "b >= 5", "b <= 50",
+                          "a * b / 1000 <= 400", "b % 10 == 0"],
+         "bereich": {"a": [100, 9900], "b": [1, 99]}}
+    fertig = aufgaben.bauen(v, seed="s")
+    assert fertig["belegung"]["a"] % 100 == 0
+    assert fertig["belegung"]["b"] % 10 == 0
+    assert 5 <= fertig["belegung"]["b"] <= 50
+
+
+@pytest.mark.parametrize("bereich", [
+    {"a": [1, 99]},                        # zweiter Platzhalter fehlt
+    {"a": [1, 99], "x": [1, 9]},           # fremder Name
+    {"a": [1, 99], "b": [99, 1]},          # Paar umgedreht
+    {"a": "100-9900", "b": [1, 99]},       # Paar als Text
+])
+def test_bereich_je_platzhalter_muss_vollstaendig_und_wahr_sein(bereich):
+    _abweisend({"vorlage": "{a} + {b}", "bereich": bereich})

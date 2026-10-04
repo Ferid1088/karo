@@ -952,9 +952,18 @@ def _aufgabe_schema(mit_fehler: bool = False, mit_optionen: bool = False) -> dic
                                    "Erlaubt sind + - * / % ( ) < > == != and "
                                    "or sowie kgv, ggt, abs, min, max.",
                 },
-                "bereich": {"type": "array", "maxItems": 2,
-                            "items": {"type": "integer"},
-                            "description": "Von/bis für die Zahlen, Standard 1 bis 12"},
+                "bereich": {
+                    "description": "Von/bis für die Zahlen, Standard 1 bis 12 — "
+                                   "ein Paar für alle Platzhalter oder je "
+                                   "Platzhalter ein Paar",
+                    "anyOf": [
+                        {"type": "array", "maxItems": 2,
+                         "items": {"type": "integer"}},
+                        {"type": "object", "additionalProperties":
+                            {"type": "array", "maxItems": 2,
+                             "items": {"type": "integer"}}},
+                    ],
+                },
             },
             "required": ["vorlage"],
         },
@@ -1186,11 +1195,12 @@ So wird unterrichtet:
   Aufgabe wird. Erlaubt sind + - * / % ( ) sowie < > == != and or und die
   Funktionen kgv, ggt, abs, min, max — sonst nichts, kein Text und kein
   Markup. Alle Bedingungen zusammen müssen sich mit Zahlen erfüllen lassen;
-  Karo würfelt jeden Platzhalter zufällig aus „bereich" (Vorgabe: 1 bis 12).
-  Braucht ein Wert Hunderter oder Zehntel, setze „bereich" selbst, z. B.
-  [100, 900] — eine Bedingung wie „k % 100 == 0" ist mit der Vorgabe nie
-  erfüllbar. Füll „frage" und „loesung" trotzdem lesbar aus — Karo ersetzt
-  beides durch das Gerechnete.
+  Karo würfelt aus „bereich" (Vorgabe: 1 bis 12). Als Paar [u, o] gilt es
+  für alle Platzhalter gemeinsam — bei verschiedenen Größenordnungen
+  (Geld in Tausendern, Prozentsatz unter 100) gib „bereich" je Platzhalter
+  an: {{"a": [100, 9900], "b": [1, 99]}}. Eine Bedingung wie „k % 100 == 0"
+  ist mit der Vorgabe nie erfüllbar. Füll „frage" und „loesung" trotzdem
+  lesbar aus — Karo ersetzt beides durch das Gerechnete.
   Ohne Zahlen (Zuordnen, Begründen, Sprache) lässt du „vorlage" weg.
 - Jede Erklärung: ein Haken, der an die eigene Antwort anknüpft; eine
   Erkenntnis, die das Kind selbst zieht; eine Regel als Handlung. Kein „das
