@@ -340,3 +340,21 @@ def test_bereich_je_platzhalter():
 ])
 def test_bereich_je_platzhalter_muss_vollstaendig_und_wahr_sein(bereich):
     _abweisend({"vorlage": "{a} + {b}", "bereich": bereich})
+
+
+def test_geteilter_bereich_wird_durch_bedingungen_eingeengt():
+    """EXP-196: geteilter Bereich [1, 9900] plus „b <= 5" und „a % 100 == 0"
+    ist ein Raum aus 98 Millionen — Zufall verfehlt ihn sicher, die Schranken
+    der Bedingungen machen ihn durchzaehlbar."""
+    fertig = aufgaben.bauen(
+        {"vorlage": "{a} * {b} / 100",
+         "frage": "{a} € zu {b} %: {aufgabe}.",
+         "bedingungen": ["a % 100 == 0", "b <= 5", "b >= 1", "a >= 200"],
+         "bereich": [1, 9900]}, seed="zinsen")
+    a, b = fertig["belegung"]["a"], fertig["belegung"]["b"]
+    assert a % 100 == 0 and a >= 200 and 1 <= b <= 5
+
+
+def test_widerspruechliche_schranken_weisen_ehrlich_ab():
+    _abweisend({"vorlage": "{a}", "bereich": [1, 9],
+                "bedingungen": ["a >= 5", "a <= 3"]})

@@ -107,6 +107,61 @@ def platzhalter(vorlage: str) -> list[str]:
     return gesehen
 
 
+#: Was den Wuerfelraum verkleinert, bevor der erste Wurf faellt:
+#: „b kleiner 5" schneidet den Bereich zu, „a % 100 == 0" laesst nur
+#: Vielfache. Ein geteilter Bereich [1, 9900] mit einer engen Schranke
+#: waere sonst ein Zufallstreffer unter 98 Millionen — und das
+#: Durchzaehlen greift erst, wenn der Raum ehrlich klein ist.
+_OPS = {"<", ">", "<=", ">=", "==", "!="}
+_SCHRANKE = re.compile(
+    r"^([a-z][a-z0-9_]*)\s*([<>=!]+)\s*(-?\d+)$")
+_SCHRANKE_REV = re.compile(
+    r"^(-?\d+)\s*([<>=!]+)\s*([a-z][a-z0-9_]*)$")
+_TEILER = re.compile(r"^([a-z][a-z0-9_]*)\s*%\s*([1-9]\d*)\s*==\s*0$")
+
+
+def _raenge(namen: list[str], je: dict[str, tuple[int, int]],
+            bedingungen: list[str]) -> list[range]:
+    """Wuerfel-Bereiche, schon um das verengt, was eine einfache
+    Bedingung vor dem ersten Wurf festlegt."""
+    grenzen = {n: [je[n][0], je[n][1], 1] for n in namen}
+    for roh in bedingungen or []:
+        text = str(roh).strip()
+        m = _TEILER.match(text)
+        if m and m.group(1) in grenzen:
+            grenzen[m.group(1)][2] = math.lcm(
+                grenzen[m.group(1)][2], int(m.group(2)))
+            continue
+        m = _SCHRANKE.match(text)
+        if m and m.group(1) in grenzen and m.group(2) in _OPS:
+            name, op, w = m.group(1), m.group(2), int(m.group(3))
+        else:
+            m = _SCHRANKE_REV.match(text)
+            if not m or m.group(3) not in grenzen or m.group(2) not in _OPS:
+                continue
+            name, w = m.group(3), int(m.group(1))
+            op = {"<": ">", "<=": ">=", ">": "<", ">=": "<=",
+                  "==": "==", "!=": "!="}[m.group(2)]
+        if op in ("==", "!="):
+            continue
+        if op in (">", ">="):
+            grenzen[name][0] = max(grenzen[name][0], w + (op == ">"))
+        else:
+            grenzen[name][1] = min(grenzen[name][1], w - (op == "<"))
+    raenge = []
+    for n in namen:
+        lo, hi, schritt = grenzen[n]
+        if schritt > 1:
+            lo += (-lo) % schritt
+        r = range(lo, hi + 1, schritt)
+        if not len(r):
+            raise VorlageUnbrauchbar(
+                f"Bedingungen lassen für {{{n}}} keinen Wert in "
+                f"{tuple(grenzen[n][:2])}.")
+        raenge.append(r)
+    return raenge
+
+
 def belegen(vorlage: str, bedingungen: list[str] | None = None, *,
             seed: int | str = 0,
             bereich: tuple[int, int] | dict[str, tuple[int, int]] = (1, 12)) -> dict[str, int]:
@@ -125,7 +180,7 @@ def belegen(vorlage: str, bedingungen: list[str] | None = None, *,
         return {}
     wuerfel = random.Random(f"{seed}:{vorlage}")
     je = bereich if isinstance(bereich, dict) else {n: bereich for n in namen}
-    raenge = [range(je[n][0], je[n][1] + 1) for n in namen]
+    raenge = _raenge(namen, je, bedingungen or [])
     gesamt = math.prod(len(r) for r in raenge)
     if gesamt <= MAX_ENUMERATION:
         # Kleiner Raum: vollzählig ab einem zufälligen Einstieg — eine
@@ -142,7 +197,7 @@ def belegen(vorlage: str, bedingungen: list[str] | None = None, *,
                 return belegung
     else:
         for _ in range(MAX_VERSUCHE):
-            belegung = {n: wuerfel.randint(*je[n]) for n in namen}
+            belegung = {n: wuerfel.choice(r) for n, r in zip(namen, raenge)}
             if erfuellt(bedingungen or [], belegung):
                 return belegung
     raise VorlageUnbrauchbar(
