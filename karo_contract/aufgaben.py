@@ -33,6 +33,12 @@ from .rechnen import NichtRechenbar, wert
 #: verletzt — die Bedingungen sind der didaktische Teil.
 MAX_VERSUCHE = 400
 
+#: Bis zu dieser Kombinatorik zaehlt der Wuerfel vollzaehlig durch — eine
+#: erfuellbare Belegung kann dann nicht zufaellig verfehlt werden (Geld in
+#: Tausendern mal Prozentsatz in Zehnern ~1e6). Darueber bleibt es beim
+#: Zufallswurf mit MAX_VERSUCHE.
+MAX_ENUMERATION = 1_000_000
+
 _PLATZHALTER = re.compile(r"\{([a-z][a-z0-9_]*)\}")
 
 
@@ -119,10 +125,26 @@ def belegen(vorlage: str, bedingungen: list[str] | None = None, *,
         return {}
     wuerfel = random.Random(f"{seed}:{vorlage}")
     je = bereich if isinstance(bereich, dict) else {n: bereich for n in namen}
-    for _ in range(MAX_VERSUCHE):
-        belegung = {n: wuerfel.randint(*je[n]) for n in namen}
-        if erfuellt(bedingungen or [], belegung):
-            return belegung
+    raenge = [range(je[n][0], je[n][1] + 1) for n in namen]
+    gesamt = math.prod(len(r) for r in raenge)
+    if gesamt <= MAX_ENUMERATION:
+        # Kleiner Raum: vollzählig ab einem zufälligen Einstieg — eine
+        # erfüllbare Kombination wird sicher gefunden, statt mit
+        # Wahrscheinlichkeit ~1/Raum zwischen den Würfen zu verschwinden.
+        start = wuerfel.randrange(gesamt)
+        for schritt in range(gesamt):
+            rest = (start + schritt) % gesamt
+            belegung = {}
+            for name, r in zip(namen, raenge):
+                belegung[name] = r[rest % len(r)]
+                rest //= len(r)
+            if erfuellt(bedingungen or [], belegung):
+                return belegung
+    else:
+        for _ in range(MAX_VERSUCHE):
+            belegung = {n: wuerfel.randint(*je[n]) for n in namen}
+            if erfuellt(bedingungen or [], belegung):
+                return belegung
     raise VorlageUnbrauchbar(
         f"Keine Zahlen gefunden, die alle Bedingungen erfüllen: {vorlage} "
         f"mit {bedingungen}")
