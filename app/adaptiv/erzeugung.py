@@ -140,8 +140,17 @@ def _freigeben(konzept_id: int, fehlertyp_ids: list) -> None:
 # --------------------------------------------------------------------------
 
 def auftrag_schluessel(thema: str, fach: str, klasse: int | None = None) -> str:
-    """Ein Thema, ein Auftrag. Zweimal klicken erzeugt nicht zweimal."""
-    return f"lektion:{normalisiere(thema)}" + (f':{normalisiere(fach or "")}:{klasse or ""}' if fach or klasse else '')
+    """Ein Thema, ein Auftrag. Zweimal klicken erzeugt nicht zweimal.
+
+    Der Schluessel loest die Klasse immer zur Profilklasse auf, wenn der
+    Aufrufer keine nennt — schreibende (`anfordern`) und lesende
+    (`thema_stand`) Seite muessen denselben Schluessel berechnen, sonst
+    sieht eine Familie den laufenden Auftrag als „fehlt".
+    """
+    if not klasse:
+        from .. import config
+        klasse = config.load_safe().learner_grade
+    return f"lektion:{normalisiere(thema)}" + (f':{normalisiere(fach or "")}:{klasse}' if fach or klasse else '')
 
 
 def anfordern(thema: str, fach: str, klasse: int | None = None,
