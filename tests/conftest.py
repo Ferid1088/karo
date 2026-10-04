@@ -75,8 +75,8 @@ class FakeAI:
         if method == "GET" and path.startswith("/sessions/"):
             sid = path.rsplit("/", 1)[-1]
             if sid not in self.sessions:
-                raise AIError(f"Devin API GET {path}: unbekannte Session",
-                              retryable=False)
+                # Wie die echte api_request-Einordnung: Status im Text.
+                raise AIError(f"Devin API GET {path}: 404", retryable=False)
             eintrag = self.sessions[sid]
             if eintrag["status_enum"] == "working":
                 # Einmal warten, dann fertig — deckt das Parken ab.

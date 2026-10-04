@@ -970,6 +970,74 @@ def _aufgabe_schema(mit_fehler: bool = False, mit_optionen: bool = False) -> dic
         "tipps": {"type": "array", "maxItems": 3, "items": {"type": "string"},
                   "description": "Hinweise, die zum Denken führen, nicht zur "
                                  "Lösung"},
+        "antwort_art": {
+            "type": "string",
+            "description": "Wie die Antwort ausgewertet wird: „begriffe“ bei "
+                           "Erklärungen im eigenen Wortlaut; ohne Angabe "
+                           "normaler Vergleich"},
+        "rubrik": {
+            "type": "object",
+            "description": "Nur bei antwort_art „begriffe“: die Bewertungsregel "
+                           "einer offenen Antwort — lokal, ohne Modellaufruf",
+            "properties": {
+                "begriffe": {
+                    "type": "array", "minItems": 1, "maxItems": 8,
+                    "items": {"anyOf": [{"type": "string"},
+                                        {"type": "array", "minItems": 2,
+                                         "maxItems": 5,
+                                         "items": {"type": "string"}}]},
+                    "description": "Pflicht-Begriffe einer vollständigen "
+                                   "Antwort. Ein Eintrag ist ein Begriff "
+                                   "oder eine Liste gleichwertiger "
+                                   "Schreibweisen (Flexion, Synonyme) — "
+                                   "eine davon genügt"},
+                "mindestens": {"type": "integer", "minimum": 1,
+                               "description": "ab wie vielen Begriffen die "
+                                              "Antwort voll zählt; ohne "
+                                              "Angabe: alle"},
+                "hinweise": {"type": "object",
+                             "additionalProperties": {"type": "string"},
+                             "description": "optionale Sätze je Lage: "
+                                            "„teilweise“, „fehlt“, "
+                                            "„misconception“, „unbekannt“"},
+                "missverstaendnisse": {
+                    "type": "array", "maxItems": 8,
+                    "items": {"type": "object", "required": ["begriffe"],
+                              "properties": {
+                                  "begriffe": {"type": "array", "minItems": 1,
+                                               "maxItems": 8,
+                                               "items": {"type": "string"},
+                                               "description": "Formulierungen, "
+                                                              "die GENAU diese "
+                                                              "Fehlvorstellung "
+                                                              "verraten"},
+                                  "key": {"type": "string"},
+                                  "hinweis": {"type": "string"}}},
+                    "description": "Bekannte Fehlvorstellungen dieser "
+                                   "Aufgabe — schlagen auch eine sonst "
+                                   "vollständige Antwort (Widerspruch)"},
+                "klaerung": {
+                    "type": "object", "required": ["frage", "loesung"],
+                    "properties": {
+                        "frage": {"type": "string",
+                                  "description": "z. B. „Welche Aussage "
+                                                 "meinst du?“"},
+                        "loesung": {"type": "string",
+                                    "description": "die richtige Auswahl "
+                                                   "bzw. Kurzantwort"},
+                        "optionen": {"type": "array", "minItems": 2,
+                                     "maxItems": 6,
+                                     "items": {"type": "string"}},
+                        "akzeptiert": {"type": "array", "maxItems": 8,
+                                       "items": {"type": "string"},
+                                       "description": "bei Kurzantwort: alle "
+                                                      "richtigen Schreibweisen"}},
+                    "description": "Folgeaufgabe, wenn eine Antwort nicht "
+                                   "sicher einzuordnen ist — immer selbst "
+                                   "auswertbar (Auswahl oder Kurzantwort)"},
+            },
+            "required": ["begriffe"],
+        },
     }
     pflicht = ["frage", "loesung"]
     if mit_fehler:
@@ -1202,6 +1270,26 @@ So wird unterrichtet:
   ist mit der Vorgabe nie erfüllbar. Füll „frage" und „loesung" trotzdem
   lesbar aus — Karo ersetzt beides durch das Gerechnete.
   Ohne Zahlen (Zuordnen, Begründen, Sprache) lässt du „vorlage" weg.
+- Offene Erklärungsaufgaben (Begründen, Beschreiben in eigenen Worten —
+  besonders in Deutsch, Englisch und den Naturwissenschaften) bekommen
+  „antwort_art": "begriffe" und eine „rubrik". Karo bewertet sie lokal und
+  fragt niemals ein Modell:
+  * „begriffe": die Pflicht-Begriffe einer vollständigen Antwort. Formuliere
+    pro Begriff die Schreibweisen mit, die ein Kind realistisch benutzt —
+    als Liste: [["sauerstoff", "o2", "sauerstoff wird gebraucht"], "energie"].
+  * „mindestens" nur, wenn eine Teilmenge schon voll zählen soll.
+  * „missverstaendnisse": die typischen Fehlvorstellungen DIESER Aufgabe als
+    Formulierungen, an denen man sie erkennt — sie schlagen auch eine sonst
+    vollständige Antwort. Aus den Fehlvorstellungen des Konzepts ableiten,
+    nicht frei erfinden.
+  * „klaerung": eine selbst auswertbare Folgefrage für Antworten, die nicht
+    einzuordnen sind — zum Beispiel „Welche Aussage meinst du?" mit zwei bis
+    vier „optionen"; die richtige steht in „loesung".
+  * „hinweise": Sätze, die Karo dem Kind zeigt — „teilweise" (welcher Teil
+    fehlt), „fehlt", „misconception", „unbekannt".
+  Was das Kind nennt, ohne dass es der Aufgabe entspricht, zählt nicht:
+  Teilwissen ist „teilweise", Nicht-Einordnen führt zur Klärung — beides ist
+  besser als ein pauschales „falsch".
 - Jede Erklärung: ein Haken, der an die eigene Antwort anknüpft; eine
   Erkenntnis, die das Kind selbst zieht; eine Regel als Handlung. Kein „das
   ist falsch". Kein Lob, keine Emojis, keine Fachwörter vor dem Bild.

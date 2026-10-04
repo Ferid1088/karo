@@ -13,7 +13,8 @@ from fractions import Fraction
 
 from . import inhalt_store, katalog, protokoll, sitzung as zustand, store
 from . import varianten
-from .antwortvergleich import check_answer, bewerte, RICHTIG, TEILWEISE
+from .antwortvergleich import (check_answer, bewerte, bewerte_klaerung,
+                               RICHTIG, TEILWEISE, UNBEKANNT)
 from .normalisierung import normalisiere
 
 #: Schritte innerhalb von DIAGNOSING (§11: Anker, dann produktives Scheitern).
@@ -266,6 +267,18 @@ def _bildschirm(sitzung: dict) -> dict:
         return {"art": "geschafft", "hilfe": _hilfe(konzept_id, None),
                 "phase": None, "wiederholung_am": wiederholung_am}
 
+    # Eine offene Klärungsaufgabe ersetzt den sonstigen Schirm: die letzte
+    # Antwort liess sich nicht sicher einordnen, also fragt Karo erst
+    # deterministisch nach — statt zu raten oder ein Modell zu bemuehen.
+    klaerung = daten.get("klaerung")
+    if isinstance(klaerung, dict) and klaerung.get("frage"):
+        return {"art": "klaerung", "phase": phase,
+                "frage": klaerung["frage"],
+                "hinweis": daten.get("klaerung_hinweis"),
+                "aktion": _klaerung_aktion(sitzung, daten),
+                "optionen": [(o, o) for o in (klaerung.get("optionen") or [])],
+                "hilfe": _hilfe(konzept_id, phase)}
+
     if zustand_name == zustand.DIAGNOSING:
         erstkontakt = katalog.erstkontakt_fuer(konzept_id) or {}
         if daten.get("schritt", SCHRITT_ANKER) == SCHRITT_ANKER:
@@ -350,6 +363,48 @@ def _bildschirm(sitzung: dict) -> dict:
 # --------------------------------------------------------------------------
 # Antworten verarbeiten
 # --------------------------------------------------------------------------
+
+def _klaerung_aktion(sitzung: dict, daten: dict) -> str:
+    """An welchen Endpunkt die Klärungsantwort geht — dieselbe Aktion wie
+    die Aufgabe, deren Antwort unklar war."""
+    if sitzung.get("zustand") == zustand.DIAGNOSING:
+        return "diagnose"
+    if (sitzung.get("phase") == zustand.INDEPENDENT_TASK
+            and daten.get("gerechnet")):
+        return "transfer"
+    return "aufgabe"
+
+
+def _klaerung_aufgeben(sitzung: dict, befund: dict) -> dict:
+    """UNBEKANNT mit hinterlegter Klärung: die unklare Freitextantwort wird
+    in eine deterministisch bewertbare Aufgabe ueberfuehrt. Die Klärung
+    haengt an der Sitzung — `_bildschirm` zeigt sie, bis sie beantwortet ist.
+    """
+    store.ereignis_schreiben(sitzung["id"], "Klaerung gestellt",
+                             nutzdaten={"hinweis": befund.get("hinweis")})
+    return _merke(sitzung["id"], sitzung,
+                  klaerung=befund["klaerung"],
+                  klaerung_hinweis=befund.get("hinweis"))
+
+
+def _klaerung_ergebnis(sitzung: dict, antwort: str, cfg=None) -> dict | None:
+    """Steht eine Klärungsaufgabe offen, wird SIE bewertet — nicht die
+    ursprüngliche Aufgabe. Der Befund geht in den normalen Pfad, als sei er
+    das Urteil der ursprünglichen Aufgabe: richtig geht weiter, falsch
+    loest denselben Hilfe- und Adaptionsweg aus wie jede falsche Antwort.
+    """
+    daten = _daten(sitzung)
+    klaerung = daten.get("klaerung")
+    if not isinstance(klaerung, dict) or not klaerung.get("frage"):
+        return None
+    befund = bewerte_klaerung(antwort, klaerung)
+    _buchen(sitzung, protokoll.KLAERUNG, aufgabe=klaerung, antwort=antwort,
+            richtig=befund["urteil"] == RICHTIG, cfg=cfg)
+    store.ereignis_schreiben(sitzung["id"], "Klaerung beantwortet",
+                             nutzdaten={"urteil": befund["urteil"]})
+    _merke(sitzung["id"], sitzung, klaerung=None, klaerung_hinweis=None)
+    return befund
+
 
 def _uebungsaufgabe(sitzung: dict, phase: str) -> dict | None:
     """Welche Uebungsaufgabe diese Runde stellt.
@@ -613,11 +668,17 @@ def diagnose_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
                       fehlerhinweis="Schreib bitte eine Antwort ins Feld. Bei einer Rechnung "
                                     "nutze eine Zahl, zum Beispiel 2 oder 5/6.")
 
-    befund = _urteil(antwort, gestellt)
+    befund = _klaerung_ergebnis(sitzung, antwort, cfg)
+    if befund is None:
+        befund = _urteil(antwort, gestellt)
+        _buchen(sitzung, protokoll.DIAGNOSE,
+                aufgabe=gestellt if gestellt.get("id") else None,
+                antwort=antwort,
+                richtig=(None if befund["urteil"] == UNBEKANNT
+                         else befund["urteil"] == RICHTIG), cfg=cfg)
+        if befund["urteil"] == UNBEKANNT and befund.get("klaerung"):
+            return _klaerung_aufgeben(sitzung, befund)
     richtig = befund["urteil"] == RICHTIG
-    _buchen(sitzung, protokoll.DIAGNOSE,
-            aufgabe=gestellt if gestellt.get("id") else None,
-            antwort=antwort, richtig=richtig, cfg=cfg)
     if richtig:
         ergebnis = zustand.antwort_richtig(sitzung["id"], antwort, cfg=cfg,
                                            darf_abschliessen=bool(daten.get('zweite_diagnose')))
@@ -733,10 +794,15 @@ def transfer_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     if aufgabe is None:
         return _naechste_uebungsrunde(sitzung)
 
-    befund = _urteil(antwort, aufgabe)
+    befund = _klaerung_ergebnis(sitzung, antwort, cfg)
+    if befund is None:
+        befund = _urteil(antwort, aufgabe)
+        _buchen(sitzung, protokoll.TRANSFER, aufgabe=aufgabe, antwort=antwort,
+                richtig=(None if befund["urteil"] == UNBEKANNT
+                         else befund["urteil"] == RICHTIG), cfg=cfg)
+        if befund["urteil"] == UNBEKANNT and befund.get("klaerung"):
+            return _klaerung_aufgeben(sitzung, befund)
     richtig = befund["urteil"] == RICHTIG
-    _buchen(sitzung, protokoll.TRANSFER, aufgabe=aufgabe, antwort=antwort,
-            richtig=richtig, cfg=cfg)
     if richtig:
         ergebnis = zustand.antwort_richtig(sitzung["id"], antwort, cfg=cfg)
         if ergebnis["zustand"] == zustand.MASTERED:
@@ -792,10 +858,15 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
                       fehlerhinweis="Schreib bitte eine Antwort ins Feld. Bei einer Rechnung "
                                     "nutze eine Zahl, zum Beispiel 2 oder 3/4.")
 
-    befund = _urteil(antwort, aufgabe)
+    befund = _klaerung_ergebnis(sitzung, antwort, cfg)
+    if befund is None:
+        befund = _urteil(antwort, aufgabe)
+        _buchen(sitzung, protokoll.AUFGABE, aufgabe=aufgabe, antwort=antwort,
+                richtig=(None if befund["urteil"] == UNBEKANNT
+                         else befund["urteil"] == RICHTIG), cfg=cfg)
+        if befund["urteil"] == UNBEKANNT and befund.get("klaerung"):
+            return _klaerung_aufgeben(sitzung, befund)
     richtig = befund["urteil"] == RICHTIG
-    _buchen(sitzung, protokoll.AUFGABE, aufgabe=aufgabe, antwort=antwort,
-            richtig=richtig, cfg=cfg)
     if richtig:
         # Die Rechnung allein beendet die selbstständige Phase nicht — der
         # Transfer danach gehört dazu.

@@ -248,6 +248,49 @@ def test_devin_abgelaufene_session_wird_begrenzt_neu_gestartet(
         client.complete(purpose="probe", prompt="Aufgabe", schema=SCHEMA)
 
 
+def test_devin_404_poll_startet_begrenzt_neu(fake_llm, app_env):
+    """Die lokale Zeile kennt die Session, Devin nicht mehr: missing_remote
+    ist ein Neustart, kein Auftrags-Fail — und er bleibt begrenzt."""
+    from app.ai import AIClient, AIPending, AIError
+
+    app_env.db.init()
+    fake_llm.devin.working_once = True
+    client = AIClient.from_config(app_env.config.load_safe())
+    with pytest.raises(AIPending):
+        client.complete(purpose="probe", prompt="Aufgabe", schema=SCHEMA)
+    sid = next(iter(fake_llm.devin.sessions))
+    del fake_llm.devin.sessions[sid]                 # remote ist sie weg
+    with pytest.raises(AIPending):
+        client.complete(purpose="probe", prompt="Aufgabe", schema=SCHEMA)
+    assert len(fake_llm.devin.sessions) == 1         # restart, nicht Fail
+    assert app_env.db.q1("SELECT restarts FROM ai_run")["restarts"] == 1
+
+    # Die neue Session geht ebenfalls verloren — das Limit greift.
+    del fake_llm.devin.sessions[next(iter(fake_llm.devin.sessions))]
+    with pytest.raises(AIError):
+        client.complete(purpose="probe", prompt="Aufgabe", schema=SCHEMA)
+
+
+def test_devin_404_restart_legt_kein_duplikat_an(fake_llm, app_env):
+    """Nach missing_remote führt derselbe Auftrag zu genau einer neuen
+    Session — kein zweiter Parallel-Bau."""
+    from app.ai import AIClient, AIPending
+
+    app_env.db.init()
+    fake_llm.devin.working_once = True
+    client = AIClient.from_config(app_env.config.load_safe())
+    with pytest.raises(AIPending):
+        client.complete(purpose="probe", prompt="Aufgabe", schema=SCHEMA)
+    del fake_llm.devin.sessions[next(iter(fake_llm.devin.sessions))]
+    with pytest.raises(AIPending):
+        client.complete(purpose="probe", prompt="Aufgabe", schema=SCHEMA)
+    neu = next(iter(fake_llm.devin.sessions))
+    fake_llm.devin.sessions[neu]["status_enum"] = "working"
+    with pytest.raises(AIPending):
+        client.complete(purpose="probe", prompt="Aufgabe", schema=SCHEMA)
+    assert len(fake_llm.devin.sessions) == 1 and len(fake_llm.devin.created) == 2
+
+
 def test_devin_zu_alte_session_gilt_als_fehlgeschlagen(fake_llm, app_env):
     from app.ai import AIClient, AIPending, AIError
 

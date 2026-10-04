@@ -26,6 +26,7 @@ from .store import CHILD_KEY, _zeile
 #: Rollen, unter denen eine Antwort protokolliert wird.
 ANKER = "anker"
 DIAGNOSE = "diagnose"
+KLAERUNG = "klaerung"
 VORHERSAGE = "vorhersage"
 AUFGABE = "aufgabe"
 TRANSFER = "transfer"

@@ -300,9 +300,10 @@ def neu(request: Request):
 
 # Welche Aktion ein Bildschirm jeweils hergibt. Alles andere ist ein
 # veraltetes Formular und wird nur neu gerendert, nie ausgewertet.
-ERWARTETE_BILDSCHIRME = {"anker": {"anker"}, "diagnose": {"diagnose"},
-                       "vorhersage": {"vorhersage"}, "transfer": {"transfer"},
-                       "aufgabe": {"aufgabe"}, "tipp": {"aufgabe"},
+ERWARTETE_BILDSCHIRME = {"anker": {"anker"}, "diagnose": {"diagnose", "klaerung"},
+                       "vorhersage": {"vorhersage"},
+                       "transfer": {"transfer", "klaerung"},
+                       "aufgabe": {"aufgabe", "klaerung"}, "tipp": {"aufgabe"},
                        "wiederholung": {"wiederholung_waehlen"},
                        "voraussetzung": {"voraussetzung"},
                        "voraussetzung_lernen": {"voraussetzung_lernen"},

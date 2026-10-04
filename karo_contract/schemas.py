@@ -33,7 +33,7 @@ AUFGABE_FELDER = ("frage", "loesung")
 #: Wie eine Antwort ausgewertet wird (Vertrag 1.5). Ohne Angabe bleibt die
 #: Aufgabe beim bisherigen Verhalten — das Feld ist bewusst optional.
 _ANTWORT_ARTEN = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
-_RUBRIK_HINWEISE = ("teilweise", "fehlt", "misconception")
+_RUBRIK_HINWEISE = ("teilweise", "fehlt", "misconception", "unbekannt")
 
 
 def _rubrik_pruefen(daten: Any, pfad: str) -> dict:
@@ -80,6 +80,59 @@ def _rubrik_pruefen(daten: Any, pfad: str) -> dict:
             str(k).strip()[:40]: str(v).strip()
             for k, v in hinweise.items()
             if str(k).strip() in _RUBRIK_HINWEISE and str(v).strip()}
+
+    # Bekannte Fehlvorstellungen dieser Aufgabe (Vertrag 1.5+). Ein Treffer
+    # schlägt „richtig" UND „teilweise" — eine Antwort mit korrektem Kern
+    # und falschem Zusatz ist widersprüchlich, nicht richtig.
+    fehldeutungen = daten.get("missverstaendnisse")
+    if isinstance(fehldeutungen, list):
+        sauber_miss = []
+        for eintrag in fehldeutungen[:8]:
+            if not isinstance(eintrag, dict):
+                continue
+            zeichen = []
+            for b in (eintrag.get("begriffe") or [])[:8]:
+                if isinstance(b, str) and b.strip():
+                    zeichen.append(b.strip())
+            if not zeichen:
+                continue
+            sauber_miss.append({"begriffe": zeichen,
+                                **({"key": str(eintrag["key"]).strip()[:40]}
+                                   if str(eintrag.get("key") or "").strip() else {}),
+                                **({"hinweis": str(eintrag["hinweis"]).strip()}
+                                   if str(eintrag.get("hinweis") or "").strip() else {})})
+        if sauber_miss:
+            sauber["missverstaendnisse"] = sauber_miss
+
+    # Die Klärungsaufgabe für Antworten, die nicht sicher einzuordnen sind:
+    # eine schwer bewertbare Freitextantwort wird in eine deterministisch
+    # bewertbare Aufgabe überführt — niemals an ein Modell weitergereicht.
+    klaerung = daten.get("klaerung")
+    if isinstance(klaerung, dict) and str(klaerung.get("frage") or "").strip():
+        sauber["klaerung"] = _klaerung_pruefen(klaerung, pfad)
+    return sauber
+
+
+def _klaerung_pruefen(daten: dict, pfad: str) -> dict:
+    """Die Klärungsaufgabe: Auswahl („Welche Aussage meinst du?") oder kurze
+    Textantwort. Immer lokal auswertbar — das ist ihr ganzer Zweck."""
+    sauber = {"frage": str(daten["frage"]).strip()}
+    loesung = str(daten.get("loesung") or "").strip()
+    if not loesung:
+        raise InhaltUngueltig(f"„{pfad}.rubrik.klaerung.loesung“ fehlt.")
+    optionen = [str(o).strip() for o in (daten.get("optionen") or [])
+                if str(o).strip()][:6]
+    if optionen:
+        if loesung not in optionen:
+            raise InhaltUngueltig(
+                f"„{pfad}.rubrik.klaerung.loesung“ steht nicht unter den "
+                "Optionen — sonst kann die Klärung nie als richtig zählen.")
+        sauber["optionen"] = optionen
+    akzeptiert = [str(a).strip() for a in (daten.get("akzeptiert") or [])
+                  if str(a).strip()][:8]
+    sauber["loesung"] = loesung
+    if akzeptiert:
+        sauber["akzeptiert"] = akzeptiert
     return sauber
 
 #: Markup, Skript oder Style — nichts davon darf je in einem Inhalt stehen.

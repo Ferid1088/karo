@@ -164,7 +164,9 @@ def test_partial_antwort_urteil_dreistufig(app_env):
     leer = vergleich.bewerte(
         "keine Ahnung", aufgabe.get("loesung"), aufgabe.get("antwort_art"),
         aufgabe["rubrik"])
-    assert leer["urteil"] == vergleich.FALSCH
+    # Nicht einordbar ist keine falsche Antwort: unbekannt, nie richtig.
+    assert leer["urteil"] == vergleich.UNBEKANNT
+    assert leer["urteil"] != vergleich.RICHTIG
 
 
 def test_level0_reise_grosse_luecke(app_env):

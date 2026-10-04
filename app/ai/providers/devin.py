@@ -149,12 +149,24 @@ class DevinProvider:
                         sid, request.purpose)
             return run
 
-        info = self._api("GET", f"/sessions/{sid}")
-        state = str(info.get("status_enum") or info.get("status") or "working").lower()
+        try:
+            info = self._api("GET", f"/sessions/{sid}")
+            state = str(info.get("status_enum") or info.get("status")
+                        or "working").lower()
+        except AIError as exc:
+            if ": 404" not in str(exc):
+                raise
+            # Die lokale Session-Zeile existiert noch, der Anbieter kennt
+            # sie nicht mehr — wie „expired": begrenzt neu starten statt
+            # den Auftrag sofort scheitern zu lassen.
+            info, state = None, "missing_remote"
+            run.meta["missing_remote"] = int(run.meta.get("missing_remote") or 0) + 1
+            log.warning("ai_session_missing run_id=%s purpose=%s", sid,
+                        request.purpose)
         log.info("ai_request_pending run_id=%s status=%s purpose=%s",
                  sid, state, request.purpose)
 
-        out = info.get("structured_output")
+        out = (info or {}).get("structured_output")
         if state == _FERTIG or (state == _BLOCKIERT and isinstance(out, dict) and out):
             if not isinstance(out, dict) or not out:
                 run.status = STATUS_FAILED
@@ -173,17 +185,26 @@ class DevinProvider:
                 run.error = "wartet weiterhin auf Eingabe"
                 return run
             # Einmal antworten: die Regeln verbieten Rückfragen, trotzdem kann
-            # Devin blockieren.
-            self._api("POST", f"/sessions/{sid}/message", {"message": _NUDGE})
-            run.meta["nudged"] = True
-            run.status = STATUS_RUNNING
-            return run
-
+            # Devin blockieren. Kann auch diese Session weg sein — dann
+            # zaehlt sie unten als verloren und wird begrenzt neu gestartet.
+            try:
+                self._api("POST", f"/sessions/{sid}/message", {"message": _NUDGE})
+            except AIError as exc:
+                if ": 404" not in str(exc):
+                    raise
+                state = "missing_remote"
+                run.meta["missing_remote"] = int(
+                    run.meta.get("missing_remote") or 0) + 1
+            else:
+                run.meta["nudged"] = True
+                run.status = STATUS_RUNNING
+                return run
         if state in _LAEUFT:
             run.status = STATUS_RUNNING
             return run
 
-        # expired / failed / unbekannt: einmal neu versuchen, dann aufgeben.
+        # expired / failed / missing_remote / unbekannt: begrenzt neu
+        # versuchen, dann aufgeben — nie unendlich Provider-Kosten laufen.
         if run.restarts < self.max_restarts:
             neu = self._create(request)
             log.info("ai_request_started run_id=%s purpose=%s restart=1",

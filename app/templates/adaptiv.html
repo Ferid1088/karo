@@ -129,6 +129,25 @@
   </form>
 </section>
 
+{% elif schirm.art == 'klaerung' %}
+<section class="card">
+  {% if schirm.hinweis %}<p>{{ schirm.hinweis }}</p>{% endif %}
+  <p><strong>{{ schirm.frage }}</strong></p>
+  <form method="post" action="{{ sitzung_base }}/{{ schirm.aktion }}?sitzung={{ sitzung.id }}">{{ csrf_input() }}
+    <input type="hidden" name="kennung" value="{{ schirm.kennung }}">
+    {% if schirm.optionen %}
+    <div class="actions">
+      {% for wert, beschriftung in schirm.optionen %}
+      <button type="submit" name="antwort" value="{{ wert }}">{{ beschriftung }}</button>
+      {% endfor %}
+    </div>
+    {% else %}
+    <input type="text" name="antwort" aria-label="Deine Antwort" placeholder="Deine Antwort …" maxlength="1000" autofocus>
+    <button type="submit">Prüfen</button>
+    {% endif %}
+  </form>
+</section>
+
 {% elif schirm.art == 'vorhersage' %}
 <section class="card">
   <p>{{ schirm.inhalt.get('haken', '') }}</p>

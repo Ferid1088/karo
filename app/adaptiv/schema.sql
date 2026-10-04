@@ -310,7 +310,7 @@ CREATE TABLE IF NOT EXISTS lern_antwort (
     konzept_id      INTEGER REFERENCES lern_konzept(id),
     fach            TEXT,
     phase           TEXT,
-    rolle           TEXT NOT NULL,        -- anker, diagnose, vorhersage, aufgabe, transfer, voraussetzung, wiederholung
+    rolle           TEXT NOT NULL,        -- anker, diagnose, klaerung, vorhersage, aufgabe, transfer, voraussetzung, wiederholung
     gezeigt_at      TEXT,
     beantwortet_at  TEXT NOT NULL,
     antwort         TEXT,

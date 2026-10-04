@@ -245,23 +245,35 @@ def _gleicher_text(antwort, loesung) -> bool:
 _RUBRIK_ARTEN = {"begriffe", "rubric", "rubrik"}
 
 #: Das Urteil einer Antwort: mehr als richtig/falsch, weil eine halbe
-#: Erklärung eben keine falsche ist (Partial Correctness).
+#: Erklärung eben keine falsche ist (Partial Correctness), und mehr als
+#: drei Werte, weil eine Antwort, die sich nicht sicher einordnen laesst,
+#: keine falsche ist — sie bekommt eine Klärungsaufgabe, kein Minus.
 RICHTIG = "richtig"
 TEILWEISE = "teilweise"
 FALSCH = "falsch"
+UNBEKANNT = "unbekannt"
 
 
 def _wort_treffer(begriff: str, text: str) -> bool:
     """Steht der geforderte Begriff als eigenes Wort in der Antwort?
 
-    Der Begriff ist ein Wortanfang: „dativ" trifft „Dativobjekt" genauso
-    wie „Dativ-Objekt", „herstell" trifft „herstellt" und „herstellst" —
-    Flexion ist keine andere Antwort. Was am Wortanfang nicht steht,
-    zählt nicht: „ist" bleibt in „bist" unsichtbar.
+    Ein Wortanfang mit kurzer Endung zählt: „herstell" trifft „herstellt"
+    und „herstellst", „energie" trifft „energien" — Flexion ist keine
+    andere Antwort. Eine längere Endung ist ein anderes Wort: „wasser"
+    trifft in „wasserstoff" nicht, „licht" nicht in „lichtjahr" — ein
+    Kompositum ist kein Treffer. Kurze Begriffe („h2", „weg") stehen
+    ganz allein oder gar nicht: „h2o" ist kein Sauerstoff-„h2", und
+    „wegen" nennt keinen „weg". Was am Wortanfang nicht steht, zählt
+    ebenfalls nicht: „ist" bleibt in „bist" unsichtbar.
     """
     if not begriff or not text:
         return False
-    return bool(re.search(r"(?<![a-z0-9])" + re.escape(begriff), text))
+    # Bis zu drei Buchstaben Endung sind Flexion — und nur bei Begriffen,
+    # die lang genug sind, dass eine Endung kein anderes Wort überdeckt.
+    ende = r"[a-z]{0,3}" if len(begriff) >= 4 else ""
+    muster = (r"(?<![a-z0-9])" + re.escape(begriff) + ende
+              + r"(?![a-z0-9])")
+    return bool(re.search(muster, text))
 
 
 def _rubrik_bewerten(antwort: str, rubrik: dict) -> dict:
@@ -271,6 +283,15 @@ def _rubrik_bewerten(antwort: str, rubrik: dict) -> dict:
     ist die Antwort „teilweise" — das Kind hat schon etwas erkannt, nur
     fehlt ein Stueck. Die Liste der fehlenden Begriffe geht mit, damit
     der Unterricht genau dieses Stueck nachholt statt von vorn zu beginnen.
+
+    `missverstaendnisse` gehen vor: ein Treffer macht die Antwort falsch,
+    auch wenn alle geforderten Begriffe drinstehen — „Licht fuer die
+    Fotosynthese, aber die Nahrung kommt aus dem Boden" ist ein
+    Widerspruch, kein Treffer.
+
+    Gar kein Begriff und keine Fehlvorstellung heisst: nicht sicher
+    einzuordnen. Das ist „unbekannt", nicht „falsch" — mit der
+    `klaerung`-Aufgabe der Rubrik, wenn eine hinterlegt ist.
     """
     gruppen = []
     for eintrag in (rubrik.get("begriffe") or []):
@@ -285,19 +306,72 @@ def _rubrik_bewerten(antwort: str, rubrik: dict) -> dict:
     if not gruppen:
         return {"urteil": FALSCH, "fehlende": [], "hinweis": None}
     text = normalisiere_thema(antwort)
+    hinweise = rubrik.get("hinweise") or {}
+
+    for fehl in (rubrik.get("missverstaendnisse") or []):
+        varianten = [normalisiere_thema(b) for b in (fehl.get("begriffe") or [])]
+        if any(v and _wort_treffer(v, text) for v in varianten):
+            return {"urteil": FALSCH, "fehlende": [],
+                    "missverstaendnis": fehl.get("key") or None,
+                    "hinweis": fehl.get("hinweis")
+                               or hinweise.get("misconception")
+                               or hinweise.get("fehlt")}
+
     fehlende = [varianten[0] for varianten in gruppen
                 if not any(_wort_treffer(normalisiere_thema(w), text)
                            for w in varianten)]
     gefunden = len(gruppen) - len(fehlende)
     schwelle = int(rubrik.get("mindestens") or len(gruppen))
-    hinweise = rubrik.get("hinweise") or {}
     if gefunden >= schwelle:
         return {"urteil": RICHTIG, "fehlende": [], "hinweis": None}
     if gefunden > 0:
         return {"urteil": TEILWEISE, "fehlende": fehlende,
                 "hinweis": hinweise.get("teilweise")}
-    return {"urteil": FALSCH, "fehlende": fehlende,
-            "hinweis": hinweise.get("fehlt") or hinweise.get("misconception")}
+    klaerung = rubrik.get("klaerung")
+    befund = {"urteil": UNBEKANNT, "fehlende": fehlende,
+              "hinweis": hinweise.get("unbekannt")}
+    if isinstance(klaerung, dict) and klaerung.get("frage"):
+        befund["klaerung"] = klaerung
+    return befund
+
+
+def _klaerung_bewerten(antwort: str | None, klaerung: dict) -> dict:
+    """Die Klärungsaufgabe ist immer deterministisch: Auswahl per Text,
+    Buchstabe oder Nummer — sonst normalisierter Textvergleich."""
+    gegeben = normalisiere_thema(antwort)
+    optionen = [normalisiere_thema(o) for o in (klaerung.get("optionen") or [])]
+    loesung_norm = normalisiere_thema(klaerung.get("loesung"))
+    if optionen:
+        try:
+            richtig_index = optionen.index(loesung_norm)
+        except ValueError:
+            richtig_index = -1
+        wahl = -1
+        if gegeben:
+            if gegeben in optionen:
+                wahl = optionen.index(gegeben)
+            elif re.fullmatch(r"[a-z]", gegeben):
+                wahl = ord(gegeben) - ord("a")
+            elif re.fullmatch(r"\d{1,2}", gegeben):
+                wahl = int(gegeben) - 1
+        richtig = 0 <= wahl == richtig_index
+        return {"urteil": RICHTIG if richtig else FALSCH,
+                "fehlende": [], "hinweis": None}
+    akzeptiert = {loesung_norm} | {normalisiere_thema(a)
+                                   for a in (klaerung.get("akzeptiert") or [])}
+    richtig = bool(gegeben) and gegeben in akzeptiert
+    return {"urteil": RICHTIG if richtig else FALSCH,
+            "fehlende": [], "hinweis": None}
+
+
+def bewerte_klaerung(antwort: str | None, klaerung: dict | None) -> dict:
+    """Bewertet die Antwort auf eine Klärungsaufgabe — wirft nie."""
+    try:
+        if not isinstance(klaerung, dict) or not klaerung.get("frage"):
+            return {"urteil": FALSCH, "fehlende": [], "hinweis": None}
+        return _klaerung_bewerten(antwort or "", klaerung)
+    except Exception:
+        return {"urteil": FALSCH, "fehlende": [], "hinweis": None}
 
 
 def bewerte(antwort: str | None, loesung: str | None,
