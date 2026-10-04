@@ -24,6 +24,8 @@ def normalisiere(text: str | None) -> str:
     wert = wert.replace(":", "/").replace("÷", "/")
     wert = _ERLAUBT.sub(" ", wert)
     wert = wert.replace(",", ".")
+    # Ein Satzpunkt ist keine Dezimalstelle: „…20 s." == „…20 s".
+    wert = re.sub(r"\.(?![0-9])", " ", wert)
     # "2 / 5" → "2/5", aber "1/2 + 1/3" behält seine Teile.
     wert = re.sub(r"\s*/\s*", "/", wert)
     wert = re.sub(r"\s*([+\-=])\s*", r" \1 ", wert)

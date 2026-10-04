@@ -28,6 +28,19 @@ def test_umlaute_werden_ausgeschrieben(app_env):
     assert normalisiere("Maß") == "mass"
 
 
+def test_satzpunkt_ist_keine_dezimalstelle(app_env):
+    """Ein Punkt am Satzende darf die Bewertung nicht kippen (Canary-Fund:
+    „Strecke: 80 m, Zeit: 20 s" galt als falsch, weil die Lösung einen
+    abschließenden Punkt trug). Dezimalpunkte bleiben erhalten."""
+    from app.adaptiv.normalisierung import normalisiere
+
+    assert normalisiere("Strecke: 80 m, Zeit: 20 s") == \
+        normalisiere("Strecke: 80 m, Zeit: 20 s.")
+    assert normalisiere("Mia läuft 100 m in 25 s.") == \
+        normalisiere("Mia läuft 100 m in 25 s")
+    assert normalisiere("2.5") == "2.5"
+
+
 def test_auch_zerlegt_eingegebene_umlaute(app_env):
     """Manche Tastaturen und Zwischenablagen liefern „u" + Trema getrennt.
     Für das Kind ist das dasselbe Wort."""
