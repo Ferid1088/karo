@@ -254,8 +254,8 @@ FALSCH = "falsch"
 UNBEKANNT = "unbekannt"
 
 
-def _wort_treffer(begriff: str, text: str) -> bool:
-    """Steht der geforderte Begriff als eigenes Wort in der Antwort?
+def _treffer_stelle(begriff: str, text: str):
+    """Erste Fundstelle des Begriffs als eigenes Wort — oder None.
 
     Ein Wortanfang mit kurzer Endung zählt: „herstell" trifft „herstellt"
     und „herstellst", „energie" trifft „energien" — Flexion ist keine
@@ -267,13 +267,37 @@ def _wort_treffer(begriff: str, text: str) -> bool:
     ebenfalls nicht: „ist" bleibt in „bist" unsichtbar.
     """
     if not begriff or not text:
-        return False
+        return None
     # Bis zu drei Buchstaben Endung sind Flexion — und nur bei Begriffen,
     # die lang genug sind, dass eine Endung kein anderes Wort überdeckt.
     ende = r"[a-z]{0,3}" if len(begriff) >= 4 else ""
     muster = (r"(?<![a-z0-9])" + re.escape(begriff) + ende
               + r"(?![a-z0-9])")
-    return bool(re.search(muster, text))
+    return re.search(muster, text)
+
+
+#: Negierungswoerter, die einen Treffer in ihr Gegenteil verwandeln.
+#: „braucht keinen Sauerstoff" nennt den Begriff, meint aber das
+#: Gegenteil — dieser Treffer darf nicht zaehlen.
+_NEGATIONEN = ("kein", "keine", "keinen", "keiner", "keinem", "keines",
+               "nicht", "ohne", "nie", "niemals", "weder")
+
+
+def _negiert(text: str, position: int) -> bool:
+    """Steht eine Negation kurz vor dem Treffer? Drei Worte Rueckblick
+    reichen fuer „keinen Sauerstoff", „ohne Sauerstoff" und
+    „braucht nie Sauerstoff". Eine verneinte Nennung ist kein Beleg
+    dafuer, dass das Kind den Begriff fachlich verwendet hat — der
+    Treffer zaehlt dann nicht."""
+    vorn = text[:position].split()
+    return bool(vorn) and any(w in _NEGATIONEN for w in vorn[-3:])
+
+
+def _wort_treffer(begriff: str, text: str) -> bool:
+    """Steht der geforderte Begriff als eigenes, nicht verneintes Wort
+    in der Antwort? Siehe `_treffer_stelle` und `_negiert`."""
+    stelle = _treffer_stelle(begriff, text)
+    return stelle is not None and not _negiert(text, stelle.start())
 
 
 def _rubrik_bewerten(antwort: str, rubrik: dict) -> dict:

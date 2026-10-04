@@ -216,12 +216,17 @@ def test_widerspruch_schlaegt_vollstaendige_antwort(app_env):
         s, "Sauerstoff wird aufgenommen, Glucose wird abgebaut, "
            "Energie wird frei, aber nur in der Lunge")
     assert s["zustand"] != "MASTERED"
-    # Der widerspruechliche Kern wurde nicht als richtig gebucht.
+    # Der widerspruechliche Kern wurde nicht als richtig gebucht — und das
+    # Urteil samt Fehlvorstellung steht lesbar in der Antwortzeile, damit die
+    # Auswertung spaeter Fragen wie „welche Erklaerung wirkt nicht?" beantworten
+    # kann, ohne Rohantworten erneut zu deuten.
     from app import db
     zeile = db.q1(
-        "SELECT richtig FROM lern_antwort WHERE sitzung_id = ? "
-        "ORDER BY id DESC LIMIT 1", s["id"])
+        "SELECT richtig, urteil, missverstaendnis FROM lern_antwort "
+        "WHERE sitzung_id = ? ORDER BY id DESC LIMIT 1", s["id"])
     assert zeile is not None and zeile["richtig"] != 1
+    assert zeile["urteil"] == "falsch"
+    assert zeile["missverstaendnis"] == "F1"
 
 
 def test_teilantwort_zielt_auf_fehlenden_teil(app_env):
@@ -244,6 +249,13 @@ def test_teilantwort_zielt_auf_fehlenden_teil(app_env):
     s = unterricht.anker_beantwortet(s, "")
     s = unterricht.diagnose_beantwortet(s, "Die Zelle braucht Sauerstoff.")
     assert s["zustand"] != "MASTERED"
+    # `richtig` allein koennte 'teilweise' nicht von 'falsch' trennen —
+    # die Zeile traegt das Urteil.
+    from app import db
+    zeile = db.q1(
+        "SELECT urteil FROM lern_antwort WHERE sitzung_id = ? "
+        "ORDER BY id DESC LIMIT 1", s["id"])
+    assert zeile is not None and zeile["urteil"] == "teilweise"
 
 
 def test_klaerung_kein_modellaufruf(fake_llm, app_env):

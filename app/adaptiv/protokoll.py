@@ -175,6 +175,8 @@ def mindestzeit(cfg=None) -> int:
 def antwort_buchen(sitzung: dict, rolle: str, *, aufgabe: dict | None = None,
                    antwort: str | None = None, richtig: bool | None = None,
                    fach: str | None = None, klasse: int | None = None,
+                   urteil: str | None = None,
+                   missverstaendnis: str | None = None,
                    cfg=None) -> dict:
     """Genau eine Zeile je beantworteter Aufgabe. Nur anhaengen, nie aendern.
 
@@ -211,14 +213,15 @@ def antwort_buchen(sitzung: dict, rolle: str, *, aufgabe: dict | None = None,
         zeile = c.execute(
             """INSERT INTO lern_antwort (child_key, scope, sitzung_id, aufgabe_id,
                    konzept_id, fach, phase, rolle, gezeigt_at, beantwortet_at,
-                   antwort, richtig, tipp_genutzt, aktive_sekunden, zu_schnell,
-                   created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   antwort, richtig, urteil, missverstaendnis, tipp_genutzt,
+                   aktive_sekunden, zu_schnell, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (sitzung.get("child_key") or CHILD_KEY,
              store.fortschritt_scope(sitzung), sitzung_id,
              (aufgabe or {}).get("id"), sitzung.get("konzept_id"), fach,
              sitzung.get("phase"), rolle, gezeigt_at, jetzt,
              (antwort or None), (None if richtig is None else int(richtig)),
+             urteil, missverstaendnis,
              tipp, round(aktiv, 1), zu_schnell, jetzt)).lastrowid
         c.execute("DELETE FROM lern_uhr WHERE sitzung_id=?", (sitzung_id,))
     return {"id": zeile, "aktive_sekunden": round(aktiv, 1),

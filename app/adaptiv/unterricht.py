@@ -399,7 +399,8 @@ def _klaerung_ergebnis(sitzung: dict, antwort: str, cfg=None) -> dict | None:
         return None
     befund = bewerte_klaerung(antwort, klaerung)
     _buchen(sitzung, protokoll.KLAERUNG, aufgabe=klaerung, antwort=antwort,
-            richtig=befund["urteil"] == RICHTIG, cfg=cfg)
+            richtig=befund["urteil"] == RICHTIG, urteil=befund["urteil"],
+            cfg=cfg)
     store.ereignis_schreiben(sitzung["id"], "Klaerung beantwortet",
                              nutzdaten={"urteil": befund["urteil"]})
     # Die Klärung ist verbraucht — in der Datenbank UND in dieser
@@ -681,7 +682,9 @@ def diagnose_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
                 aufgabe=gestellt if gestellt.get("id") else None,
                 antwort=antwort,
                 richtig=(None if befund["urteil"] == UNBEKANNT
-                         else befund["urteil"] == RICHTIG), cfg=cfg)
+                         else befund["urteil"] == RICHTIG),
+                urteil=befund["urteil"],
+                missverstaendnis=befund.get("missverstaendnis"), cfg=cfg)
         if befund["urteil"] == UNBEKANNT and befund.get("klaerung"):
             return _klaerung_aufgeben(sitzung, befund)
     richtig = befund["urteil"] == RICHTIG
@@ -728,6 +731,8 @@ def _herkunft(sitzung: dict, cfg=None) -> tuple[str | None, int]:
 
 def _buchen(sitzung: dict, rolle: str, *, aufgabe: dict | None = None,
             antwort: str | None = None, richtig: bool | None = None,
+            urteil: str | None = None,
+            missverstaendnis: str | None = None,
             cfg=None) -> None:
     """Eine beantwortete Aufgabe festhalten (Schritt 4a).
 
@@ -736,7 +741,9 @@ def _buchen(sitzung: dict, rolle: str, *, aufgabe: dict | None = None,
     """
     fach, klasse = _herkunft(sitzung, cfg)
     protokoll.antwort_buchen(sitzung, rolle, aufgabe=aufgabe, antwort=antwort,
-                             richtig=richtig, fach=fach, klasse=klasse, cfg=cfg)
+                             richtig=richtig, fach=fach, klasse=klasse,
+                             urteil=urteil, missverstaendnis=missverstaendnis,
+                             cfg=cfg)
 
 
 def _klasse(cfg=None) -> int:
@@ -805,7 +812,9 @@ def transfer_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
         befund = _urteil(antwort, aufgabe)
         _buchen(sitzung, protokoll.TRANSFER, aufgabe=aufgabe, antwort=antwort,
                 richtig=(None if befund["urteil"] == UNBEKANNT
-                         else befund["urteil"] == RICHTIG), cfg=cfg)
+                         else befund["urteil"] == RICHTIG),
+                urteil=befund["urteil"],
+                missverstaendnis=befund.get("missverstaendnis"), cfg=cfg)
         if befund["urteil"] == UNBEKANNT and befund.get("klaerung"):
             return _klaerung_aufgeben(sitzung, befund)
     richtig = befund["urteil"] == RICHTIG
@@ -869,7 +878,9 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
         befund = _urteil(antwort, aufgabe)
         _buchen(sitzung, protokoll.AUFGABE, aufgabe=aufgabe, antwort=antwort,
                 richtig=(None if befund["urteil"] == UNBEKANNT
-                         else befund["urteil"] == RICHTIG), cfg=cfg)
+                         else befund["urteil"] == RICHTIG),
+                urteil=befund["urteil"],
+                missverstaendnis=befund.get("missverstaendnis"), cfg=cfg)
         if befund["urteil"] == UNBEKANNT and befund.get("klaerung"):
             return _klaerung_aufgeben(sitzung, befund)
     richtig = befund["urteil"] == RICHTIG

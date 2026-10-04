@@ -47,6 +47,11 @@ _NACHGETRAGENE_SPALTEN = [
     # kein geteilter Lernstand: eine im Pruefungsthema gesehene Aufgabe
     # gilt im eigenen Thema weiter als neu.
     ("lern_antwort", "scope", "TEXT"),
+    # Das Rubrik-Urteil ('richtig'/'teilweise'/'falsch'/'unbekannt') und der
+    # Key einer erkannten Fehlvorstellung — damit die Auswertung 'teilweise'
+    # von 'falsch' trennen kann, ohne alte Antworten umzudeuten.
+    ("lern_antwort", "urteil", "TEXT"),
+    ("lern_antwort", "missverstaendnis", "TEXT"),
     # Die Auftragsnummer, unter der der Lehrplan-Dienst eine Bestellung
     # bearbeitet: damit findet der Folgeaufruf seine Lieferung wieder.
     ("lern_inhalt_anfrage", "external_ref", "TEXT"),

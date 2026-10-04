@@ -270,3 +270,55 @@ def test_bewerte_wirft_nie():
                    {"begriffe": [None, 42]}, {"begriffe": [["a"]]}):
         urteil = bewerte("x", "", "begriffe", rubrik)["urteil"]
         assert urteil in (RICHTIG, TEILWEISE, FALSCH, UNBEKANNT)
+
+
+# --------------------------------------------------------------------------
+# Negation und Teilwort-Kollisionen — begriff genannt heisst nicht
+# begriff gemeint.
+# --------------------------------------------------------------------------
+
+def test_negierter_begriff_zaehlt_nicht():
+    """„braucht keinen Sauerstoff" nennt den Begriff, meint das
+    Gegenteil — und darf nicht als Abdeckung zählen."""
+    befund = bewerte(
+        "Die Zelle braucht keinen Sauerstoff, baut aber Glucose ab "
+        "und setzt Energie frei.",
+        "", "begriffe", BIO_RUBRIK)
+    assert befund["urteil"] == TEILWEISE
+    assert any("sauerstoff" in f for f in befund["fehlende"])
+
+
+def test_negierte_misconception_ist_kein_treffer():
+    """„findet nicht nur in der Lunge statt" ist richtiges Wissen —
+    die Negation darf den Misconception-Schutz nicht auslösen."""
+    befund = bewerte("Zellatmung findet nicht nur in der Lunge statt, "
+                     "sondern in jeder Zelle.",
+                     "", "begriffe",
+                     {"begriffe": [["zellatmung"]],
+                      "missverstaendnisse": BIO_RUBRIK["missverstaendnisse"]})
+    assert befund.get("missverstaendnis") is None
+
+
+def test_alles_negiert_ist_unbekannt_statt_richtig():
+    befund = bewerte("Ohne Sauerstoff, ohne Glucose, ohne Energie.",
+                     "", "begriffe", BIO_RUBRIK)
+    assert befund["urteil"] == UNBEKANNT
+
+
+@pytest.mark.parametrize("antwort", [
+    "Der Kraftstoff ist wichtig.",          # „kraftstoff" ≠ „kraft"
+    "Das Atommodell hilft beim Denken.",    # „atommodell" ≠ „atom"
+    "Ein Lichtjahr ist sehr weit.",         # „lichtjahr" ≠ „licht"
+    "Wasserstoff ist ein Gas.",             # „wasserstoff" ≠ „wasser"
+])
+def test_teilwort_kollisionen_treffen_nicht(antwort):
+    rubrik = {"begriffe": ["kraft", "atom", "licht", "wasser"]}
+    befund = bewerte(antwort, "", "begriffe", rubrik)
+    assert befund["urteil"] != RICHTIG
+
+
+def test_flexion_bleibt_treffer():
+    """Kurze Endung ist Flexion, keine Kollision."""
+    rubrik = {"begriffe": ["sauerstoff", "energie"]}
+    assert bewerte("Sauerstoffe sind Energien pur.", "", "begriffe",
+                   rubrik)["urteil"] == RICHTIG

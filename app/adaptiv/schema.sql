@@ -315,6 +315,12 @@ CREATE TABLE IF NOT EXISTS lern_antwort (
     beantwortet_at  TEXT NOT NULL,
     antwort         TEXT,
     richtig         INTEGER,              -- NULL, wo nicht bewertet wird (Anker, Vorhersage)
+    -- Das feinere Urteil hinter `richtig`: 'richtig'/'teilweise'/'falsch'/
+    -- 'unbekannt' aus der Begriffs-Rubrik, sonst NULL. Fuer die Auswertung,
+    -- welche Erklaerungen wirken — 'richtig' allein kann 'teilweise' von
+    -- 'falsch' nicht trennen.
+    urteil          TEXT,
+    missverstaendnis TEXT,                -- Rubrik-Key einer erkannten Fehlvorstellung
     tipp_genutzt    INTEGER NOT NULL DEFAULT 0,
     -- Aktive Zeit dieser Aufgabe in Sekunden, gedeckelt. Getrennt von
     -- `learning_time`, das weiter den Elternbericht traegt: das misst
