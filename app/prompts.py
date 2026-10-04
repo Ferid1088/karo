@@ -1176,14 +1176,22 @@ So wird unterrichtet:
 
   Die Bedingungen sind der didaktische Teil: sie entscheiden, wie schwer die
   Aufgabe wird. Erlaubt sind + - * / % ( ) sowie < > == != and or und die
-  Funktionen kgv, ggt, abs, min, max. Füll „frage" und „loesung" trotzdem
-  lesbar aus — Karo ersetzt beides durch das Gerechnete.
+  Funktionen kgv, ggt, abs, min, max — sonst nichts, kein Text und kein
+  Markup. Alle Bedingungen zusammen müssen sich mit Zahlen erfüllen lassen;
+  Karo würfelt jeden Platzhalter zufällig aus „bereich" (Vorgabe: 1 bis 12).
+  Braucht ein Wert Hunderter oder Zehntel, setze „bereich" selbst, z. B.
+  [100, 900] — eine Bedingung wie „k % 100 == 0" ist mit der Vorgabe nie
+  erfüllbar. Füll „frage" und „loesung" trotzdem lesbar aus — Karo ersetzt
+  beides durch das Gerechnete.
   Ohne Zahlen (Zuordnen, Begründen, Sprache) lässt du „vorlage" weg.
 - Jede Erklärung: ein Haken, der an die eigene Antwort anknüpft; eine
   Erkenntnis, die das Kind selbst zieht; eine Regel als Handlung. Kein „das
   ist falsch". Kein Lob, keine Emojis, keine Fachwörter vor dem Bild.
 - Das Bild beschreibst du in Worten: was zu sehen ist, was sich bewegt, was
   gleich bleibt. Was gleich bleibt, ist das Wichtigste.
+- Halte die Lektion kompakt: das gesamte JSON unter 24000 Zeichen. Lieber
+  wenige gute Aufgaben und Erklärungen als ausufernde Listen — übergroße
+  Lektionen kann die Prüfkette nicht verarbeiten, sie werden verworfen.
 
 Darstellungen wählst du aus, du erfindest sie nicht. Erlaubt ist
 ausschließlich eine dieser Komponenten mit genau ihren Parametern:
