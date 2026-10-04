@@ -15,11 +15,13 @@ from .test_app import einrichten, kind_modus_aktivieren
 # --------------------------------------------------------------------------
 
 def test_register_fuehrt_die_fuenf_komponenten():
-    """§3: FractionStrip, NumberLine, AreaModel, Balance, GenericStepFlow."""
+    """§3: FractionStrip, NumberLine, AreaModel, Balance, GenericStepFlow —
+    dazu die fachneutralen ConceptMap und DataTable für alle anderen Fächer."""
     from app.adaptiv import komponenten
 
     assert set(komponenten.ids()) == {"FractionStrip", "NumberLine",
                                       "AreaModel", "Balance",
+                                      "ConceptMap", "DataTable",
                                       "GenericStepFlow"}
 
 
@@ -121,10 +123,11 @@ def test_komponenten_kennen_ihr_fach():
 
     assert komponenten.FRACTION_STRIP.dient("mathematik")
     assert not komponenten.FRACTION_STRIP.dient("biologie")
-    # Der Rückfall trägt jedes Fach, sonst wäre er keiner.
+    # Der Rückfall trägt jedes Fach, sonst wäre er keiner — ebenso die
+    # fachneutralen ConceptMap und DataTable.
     assert komponenten.FALLBACK.dient("biologie")
     assert [e["component"] for e in komponenten.fuer_modell("biologie")] == [
-        komponenten.FALLBACK.id]
+        "ConceptMap", "DataTable", komponenten.FALLBACK.id]
 
 
 # --------------------------------------------------------------------------

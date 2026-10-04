@@ -6,7 +6,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
-from .. import config, topics, db
+from .. import config, faecher, topics, db
 from ..adaptiv import (erzeugung, lektionen, protokoll,
                       sitzung as zustand, store, unterricht, wiederholung)
 from ..services import learning_hub, grade_guidance
@@ -27,8 +27,8 @@ def _context(request: Request) -> dict:
     raw = request.path_params.get("exam_id")
     eid = int(raw) if raw is not None and str(raw).isdigit() else None
     if raw is not None and (eid is None or not db.q1(
-            "SELECT id FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL"
-            " AND subject IN ('deutsch','mathematik','englisch')", eid)):
+            f"SELECT id FROM exam WHERE id=? AND deleted_at IS NULL AND purged_at IS NULL"
+            f" AND subject IN {faecher.SQL_FAECHER}", eid)):
         raise HTTPException(404, "Diese Klassenarbeit gibt es nicht.")
     return {
         "bereich_exam_id": eid,
@@ -40,6 +40,24 @@ def _context(request: Request) -> dict:
         "bereich_name": "Prüfungsvorbereitung" if eid else "Meine Themen",
         "show_nav": False, "adult_page": False,
     }
+
+
+def _pruefungskontext(exam_id: int | None) -> dict | None:
+    """Der Terminkontext, den eine Exam-Sitzung mitfuehrt (§29).
+
+    Datum und Tagesbudget reisen in der Sitzung, nicht in der URL — die
+    Schritt-Entscheidung soll auch nach dem Resume noch wissen, wieviel
+    Zeit dem Kind bleibt.
+    """
+    if not exam_id:
+        return None
+    arbeit = db.q1("SELECT exam_date FROM exam WHERE id=?", exam_id)
+    if not arbeit or not arbeit["exam_date"]:
+        return None
+    budget = db.q1("SELECT minutes FROM exam_schedule WHERE exam_id=?",
+                   exam_id)
+    return {"exam_id": exam_id, "exam_date": arbeit["exam_date"],
+            "minuten_tag": budget["minutes"] if budget else None}
 
 
 def _topic(request: Request, raw: str) -> dict | None:
@@ -118,7 +136,9 @@ def klasse_bestaetigen(request: Request, confirmation: str = Form('')):
         return _grade_gate(request, concept, proof['thema'], (topic or {}).get('id')) or zurueck(ctx['sitzung_zurueck'])
     grade_guidance.acknowledge(info)
     previous = store.letzte_fuer_thema((topic or {}).get('id'), concept['id'])
-    return _zeige(request, previous or unterricht.starte(concept['id'], proof['thema'], (topic or {}).get('id')))
+    return _zeige(request, previous or unterricht.starte(
+        concept['id'], proof['thema'], (topic or {}).get('id'),
+        pruefung=_pruefungskontext(ctx['bereich_exam_id'])))
 
 
 def _laufende(request: Request) -> dict | None:
@@ -226,7 +246,9 @@ def start_thema(request: Request, thema: str = Form(""),
     warning = _grade_gate(request, store.konzept(lesson['konzept_id']), thema, tid)
     if warning is not None:
         return warning
-    return _zeige(request, unterricht.starte(lesson["konzept_id"], thema, tid))
+    return _zeige(request, unterricht.starte(
+        lesson["konzept_id"], thema, tid,
+        pruefung=_pruefungskontext(ctx['bereich_exam_id'])))
 
 
 @router.get("/status")
@@ -270,8 +292,10 @@ def neu(request: Request):
                           entry.get('thema_text') or '', entry.get('topic_id'))
     if warning is not None:
         return warning
-    return _zeige(request, unterricht.starte(active["konzept_id"],
-        entry.get("thema_text", ""), entry.get("topic_id")))
+    return _zeige(request, unterricht.starte(
+        active["konzept_id"], entry.get("thema_text", ""),
+        entry.get("topic_id"),
+        pruefung=_pruefungskontext(ctx['bereich_exam_id'])))
 
 
 # Welche Aktion ein Bildschirm jeweils hergibt. Alles andere ist ein

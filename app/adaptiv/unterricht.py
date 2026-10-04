@@ -13,7 +13,7 @@ from fractions import Fraction
 
 from . import inhalt_store, katalog, protokoll, sitzung as zustand, store
 from . import varianten
-from .antwortvergleich import check_answer
+from .antwortvergleich import check_answer, bewerte, RICHTIG, TEILWEISE
 from .normalisierung import normalisiere
 
 #: Schritte innerhalb von DIAGNOSING (§11: Anker, dann produktives Scheitern).
@@ -50,14 +50,38 @@ def als_bruch(text: str | None) -> Fraction | None:
 
 
 def ist_richtig(antwort: str | None, loesung: str,
-                antwort_art: str | None = None) -> bool:
+                antwort_art: str | None = None,
+                rubrik: dict | None = None) -> bool:
     """6/8 ist dieselbe Antwort wie 3/4 — und 2x+6 wie 2(x+3).
 
     Der eigentliche Vergleich lebt in `antwortvergleich.check_answer` und
     wertet je nach `antwort_art` der Aufgabe aus; ohne Angabe versucht er
     nacheinander Gleichung, Term, Zahl und Zeichenkette.
     """
-    return check_answer(antwort, loesung, antwort_art)
+    return check_answer(antwort, loesung, antwort_art, rubrik)
+
+
+def _urteil(antwort: str | None, aufgabe: dict) -> dict:
+    """Bewertet gegen die Aufgabe: richtig / teilweise / falsch.
+
+    `teilweise` tritt nur bei Aufgaben mit Begriffs-Rubrik auf — das Kind
+    hat schon etwas Richtiges genannt, nur fehlt ein Stueck. Das Urteil
+    traegt die fehlenden Begriffe mit, damit das Feedback sie nennt.
+    """
+    return bewerte(antwort, aufgabe.get("loesung", ""),
+                   aufgabe.get("antwort_art"), aufgabe.get("rubrik"))
+
+
+def _teilweise_hinweis(befund: dict) -> str | None:
+    """Was das Kind bei „teilweise" lesen soll: die Rubrik weiss es am
+    besten; sonst nennen wir die fehlenden Begriffe selbst."""
+    if befund.get("hinweis"):
+        return befund["hinweis"]
+    fehlende = befund.get("fehlende") or []
+    if fehlende:
+        return ("Ein Teil deiner Antwort stimmt schon. Ergänze noch: "
+                + ", ".join(fehlende[:4]) + ".")
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -65,11 +89,16 @@ def ist_richtig(antwort: str | None, loesung: str,
 # --------------------------------------------------------------------------
 
 def starte(konzept_id: int, thema_text: str = "",
-           topic_id: int | None = None) -> dict:
+           topic_id: int | None = None,
+           pruefung: dict | None = None) -> dict:
     """Manuell eingetipptes Thema → normalisierte Eingabe → Diagnose (§13).
 
     `topic_id` ist gesetzt, wenn der Einstieg von einer Themenkarte kam —
     daran erkennt die Lernuebersicht spaeter, woran gerade gearbeitet wird.
+    `pruefung` traegt den Terminkontext einer Klassenarbeit (Datum,
+    Tagesbudget) in die Sitzung — die Schritt-Entscheidung soll wissen, wie
+    viel Zeit noch bleibt, auch wenn der Browser die URL laengst verlassen
+    hat.
     """
     konzept = store.konzept(konzept_id) or {}
     eingabe_id = store.eingabe_anlegen("manuell", fach=konzept.get('fach', ''),
@@ -79,7 +108,8 @@ def starte(konzept_id: int, thema_text: str = "",
     s = zustand.starten(eingabe_id=eingabe_id, konzept_id=konzept_id)
     s = zustand.wechsle(s["id"], zustand.MATERIAL_ANALYZED, "Thema erkannt")
     s = zustand.wechsle(s["id"], zustand.DIAGNOSING, "Diagnose beginnt")
-    return _merke(s["id"], s, schritt=SCHRITT_ANKER)
+    return _merke(s["id"], s, schritt=SCHRITT_ANKER,
+                  pruefung=pruefung)
 
 
 def laufende_oder_neue(konzept_id: int) -> dict:
@@ -583,7 +613,8 @@ def diagnose_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
                       fehlerhinweis="Schreib bitte eine Antwort ins Feld. Bei einer Rechnung "
                                     "nutze eine Zahl, zum Beispiel 2 oder 5/6.")
 
-    richtig = ist_richtig(antwort, loesung, gestellt.get("antwort_art"))
+    befund = _urteil(antwort, gestellt)
+    richtig = befund["urteil"] == RICHTIG
     _buchen(sitzung, protokoll.DIAGNOSE,
             aufgabe=gestellt if gestellt.get("id") else None,
             antwort=antwort, richtig=richtig, cfg=cfg)
@@ -702,8 +733,8 @@ def transfer_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     if aufgabe is None:
         return _naechste_uebungsrunde(sitzung)
 
-    richtig = ist_richtig(antwort, aufgabe["loesung"],
-                        aufgabe.get("antwort_art"))
+    befund = _urteil(antwort, aufgabe)
+    richtig = befund["urteil"] == RICHTIG
     _buchen(sitzung, protokoll.TRANSFER, aufgabe=aufgabe, antwort=antwort,
             richtig=richtig, cfg=cfg)
     if richtig:
@@ -727,7 +758,10 @@ def transfer_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     gezeigt = list(_daten(sitzung).get("transfer_gezeigt") or [])
     gezeigt.append(aufgabe["frage"])
     ergebnis = _merke(sitzung["id"], ergebnis, tipp_stufe=0,
-                      fehlerhinweis=None, transfer_gezeigt=gezeigt,
+                      fehlerhinweis=(_teilweise_hinweis(befund)
+                                     if befund["urteil"] == TEILWEISE
+                                     else None),
+                      transfer_gezeigt=gezeigt,
                       war_selbststaendig=False)
     return zustand.wechsle_phase(sitzung["id"], zustand.ADAPTATION)
 
@@ -758,8 +792,8 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
                       fehlerhinweis="Schreib bitte eine Antwort ins Feld. Bei einer Rechnung "
                                     "nutze eine Zahl, zum Beispiel 2 oder 3/4.")
 
-    richtig = ist_richtig(antwort, aufgabe["loesung"],
-                        aufgabe.get("antwort_art"))
+    befund = _urteil(antwort, aufgabe)
+    richtig = befund["urteil"] == RICHTIG
     _buchen(sitzung, protokoll.AUFGABE, aufgabe=aufgabe, antwort=antwort,
             richtig=richtig, cfg=cfg)
     if richtig:
@@ -824,7 +858,10 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
             gezeigt.append(aufgabe["frage"])
         niveau = max(1, int(aufgabe.get("schwierigkeit") or 1) - 1)
         ergebnis = _merke(sitzung["id"], ergebnis, tipp_stufe=0,
-                          fehlerhinweis=None, war_selbststaendig=True,
+                          fehlerhinweis=(_teilweise_hinweis(befund)
+                                         if befund["urteil"] == TEILWEISE
+                                         else None),
+                          war_selbststaendig=True,
                           selbst_gezeigt=gezeigt, gefuehrt_fehler=0,
                           niveau=niveau)
         store.ereignis_schreiben(sitzung["id"], "Schwierigkeit gesenkt",
@@ -836,12 +873,17 @@ def aufgabe_beantwortet(sitzung: dict, antwort: str, cfg=None) -> dict:
     fehler = int(_daten(sitzung).get("gefuehrt_fehler", 0)) + 1
     if gleiche_fehlvorstellung or fehler >= 3:
         ergebnis = _merke(sitzung["id"], ergebnis, tipp_stufe=0,
-                          fehlerhinweis=None, war_selbststaendig=False,
+                          fehlerhinweis=(_teilweise_hinweis(befund)
+                                         if befund["urteil"] == TEILWEISE
+                                         else None),
+                          war_selbststaendig=False,
                           gefuehrt_fehler=0)
         return zustand.wechsle_phase(sitzung["id"], zustand.ADAPTATION)
 
     daten = _daten(ergebnis)
-    hinweis = ("Noch nicht. Schau dir das Bild noch einmal an."
+    hinweis = (_teilweise_hinweis(befund)
+               if befund["urteil"] == TEILWEISE
+               else "Noch nicht. Schau dir das Bild noch einmal an."
                if fehler == 1 else _zwischenschritt(aufgabe))
     return _merke(sitzung["id"], ergebnis,
                   tipp_stufe=int(daten.get("tipp_stufe", 0)) + 1,
@@ -883,7 +925,8 @@ def voraussetzung_beantwortet(sitzung: dict, antworten: list[str], cfg=None) -> 
         _buchen(sitzung, protokoll.VORAUSSETZUNG, aufgabe=aufgabe,
                 antwort=antwort,
                 richtig=ist_richtig(antwort, aufgabe.get("loesung", ""),
-                                    aufgabe.get("antwort_art")),
+                                    aufgabe.get("antwort_art"),
+                                    aufgabe.get("rubrik")),
                 cfg=cfg)
 
     if vor.pruefen(list(antworten), aufgaben):
@@ -960,7 +1003,8 @@ def voraussetzung_lernen_starten(sitzung: dict) -> dict:
     store.ereignis_schreiben(sitzung["id"], "Voraussetzung wird gelernt",
                              nutzdaten={"konzept_id": int(lokal)})
     umweg = starte(int(lokal), daten.get("voraussetzung_titel") or "",
-                   topic_id=eintrag.get("topic_id"))
+                   topic_id=eintrag.get("topic_id"),
+                   pruefung=daten.get("pruefung"))
     return _merke(umweg["id"], umweg, voraussetzung_detour=sitzung["id"])
 
 

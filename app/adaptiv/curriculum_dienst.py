@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -172,6 +173,11 @@ def _anfrage_bedienen(cfg, zeile: dict) -> int:
                    "topic": zeile["konzept_key"], "format": format_spec(),
                    "requested_role": zeile["rolle"],
                    "request_reason": zeile["grund"]}
+        if re.match(r"^[A-Z]{2}\.", zeile["konzept_key"] or ""):
+            # Eine Dienst-Konzept-ID (z. B. aus einer gelieferten
+            # Voraussetzung) gehoert in ihr eigenes Feld — als Thementext
+            # wuerde der Resolver sie nicht als sich selbst erkennen.
+            anfrage["concept_id"] = zeile["konzept_key"]
         result = request(cfg, "POST", "/v1/lessons", anfrage)
     status = result.get("status")
     if status == "unavailable":

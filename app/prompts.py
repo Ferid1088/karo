@@ -1108,7 +1108,7 @@ LEKTION_SCHEMA = {
                         "text": {"type": "string"},
                         "visualisierung": VISUALISIERUNG_SCHEMA_PLATZ,
                     },
-                    "required": ["text", "visualisierung"],
+                    "required": ["text"],
                 }
                 for phase in ADAPTIV_HILFE_PHASEN
             },

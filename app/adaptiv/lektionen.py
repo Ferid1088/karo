@@ -26,6 +26,14 @@ def saee_alle() -> None:
     """Idempotent — darf bei jedem Aufruf laufen."""
     for modul in MODULE:
         modul.saeen()
+    # Die kuratierten Fach-Slices aller sechs Faecher (karo_contract.slices):
+    # derselbe Bestand, den der Lehrplan-Dienst saet — geht bei Karo durch
+    # denselben geprueften Importpfad wie eine Lieferung. Der Schalter laesst
+    # Fixture-Kataloge bewusst ohne den Slice-Bestand laufen.
+    from .. import config
+    if config.ops().curated_slices_enabled:
+        from . import slices
+        slices.seed()
 
 
 def verfuegbar(fach: str | None = None) -> list[dict]:

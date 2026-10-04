@@ -274,7 +274,7 @@ def auswerten(aufgaben: list[dict], antworten: list[str]) -> dict:
     einzeln = [{"frage": a.get("frage"), "antwort": gegeben[i],
                 "richtig": bool(check_answer(
                     gegeben[i], a.get("loesung", ""),
-                    a.get("antwort_art")))}
+                    a.get("antwort_art"), a.get("rubrik")))}
                for i, a in enumerate(aufgaben)]
     return {"aufgaben": einzeln,
             "richtig": sum(1 for e in einzeln if e["richtig"]),

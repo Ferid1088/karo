@@ -488,6 +488,10 @@ class Ops:
     lernzeit_tagesdeckel_seconds: int = 8 * 3_600
 
     # --- Adaptives Lernen (Produktverhalten, nicht Familien-Setup) -----------------
+    #: Die kuratierten Fach-Slices beim Saeen in den Katalog legen. Aus nur
+    #: fuer Bestaende, die bewusst ohne kuratierten Bestand laufen (z. B.
+    #: Tests mit einem minimalen Fixture-Katalog).
+    curated_slices_enabled: bool = True
     #: Geschätzte Basisdauer einer Antwort je Interaktionsart.
     adaptiv_grundzeit_auswahl_seconds: int = 25
     adaptiv_grundzeit_bruch_seconds: int = 60

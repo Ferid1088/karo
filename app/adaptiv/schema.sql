@@ -101,6 +101,10 @@ CREATE TABLE IF NOT EXISTS lern_aufgabe (
   typischer_fehler TEXT,
   -- Nicht jede Aufgabe ist ein Bruch: Vorhersage und Transfer sind Auswahlen.
   antwort_art    TEXT NOT NULL DEFAULT 'bruch',
+  -- Offene Fachantworten tragen ihre Bewertungsregel mit: welche Begriffe
+  -- eine vollstaendige Antwort nennen muss, ab wann sie „richtig" gilt und
+  -- was das Kind bei „teilweise" bzw. „fehlt" zu lesen bekommt (Vertrag 1.5).
+  rubrik         TEXT,
   -- Wie lange diese Aufgabe ueblicherweise dauert (Schritt 4a). Kommt aus dem
   -- Curriculum, wenn es etwas dazu sagt; sonst aus `protokoll.erwartung()`.
   -- Sie begrenzt die aktive Zeit nach oben: eine Aufgabe, die eine halbe

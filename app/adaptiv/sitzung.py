@@ -323,6 +323,13 @@ def antwort_richtig(sitzung_id: int, antwort: str | None = None, cfg=None,
                                      sitzung["fehlertyp_id"], mastery="sicher",
                                      braucht_mensch=False,
                                      child_key=store.fortschritt_scope(sitzung))
+            # Und auf Konzeptebene: die abgeschlossene Sitzung ist selbst
+            # der Beleg — sonst würde eine gemeisterte Voraussetzung nur
+            # deshalb wieder angeboten, weil ihre Fehlertypen nie einzeln
+            # durchlaufen wurden.
+            store.fortschritt_buchen(sitzung["konzept_id"], None,
+                                     mastery="sicher", braucht_mensch=False,
+                                     child_key=store.fortschritt_scope(sitzung))
         return wechsle(sitzung_id, MASTERED, "Beherrschung erreicht")
 
     if sitzung["konzept_id"]:

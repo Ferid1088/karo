@@ -45,10 +45,12 @@ def _aufgabe_schreiben(fehlertyp_id: int, rolle: str, aufgabe: dict,
         fehlertyp_id, rolle, aufgabe["frage"], aufgabe["loesung"],
         tipps=aufgabe.get("tipps"), schritte=aufgabe.get("schritte"),
         typischer_fehler=aufgabe.get("typischer_fehler"),
-        antwort_art=(inhalt_store.AUSWAHL if rolle in _ALS_AUSWAHL
-                     else inhalt_store.BRUCH),
+        antwort_art=(aufgabe.get("antwort_art")
+                     or (inhalt_store.AUSWAHL if rolle in _ALS_AUSWAHL
+                         else inhalt_store.BRUCH)),
         optionen=aufgabe.get("optionen"),
         aufloesung=aufgabe.get("aufloesung"),
+        rubrik=aufgabe.get("rubrik"),
         # Sagt das Curriculum, wie lange die Aufgabe dauert, gilt das. Wer
         # sie geschrieben hat, weiss es besser als eine Schaetzung nach
         # Antwortart und Klasse (Schritt 4a).

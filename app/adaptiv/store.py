@@ -40,6 +40,7 @@ _NACHGETRAGENE_SPALTEN = [
     ("lern_aufgabe", "optionen", "TEXT NOT NULL DEFAULT '[]'"),
     ("lern_aufgabe", "aufloesung", "TEXT"),
     ("lern_aufgabe", "erwartete_sekunden", "INTEGER"),
+    ("lern_aufgabe", "rubrik", "TEXT"),
     # Der Lernraum, dem eine Antwort zugehoert: 'installation' fuer
     # themenlose Sitzungen, 'installation:topic:<id>' fuer ein Thema —
     # dieselbe Regel wie `fortschritt_scope`. Geteiltes Curriculum, aber

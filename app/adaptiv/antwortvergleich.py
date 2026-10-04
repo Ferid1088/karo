@@ -20,11 +20,12 @@ verglichen — lieber einmal zu streng als einmal falsch richtig.
 
 from __future__ import annotations
 
+import re
 from fractions import Fraction
 
 from karo_contract import rechnen
 
-from .normalisierung import normalisiere
+from .normalisierung import normalisiere, normalisiere_thema
 
 #: Welche `antwort_art` auf welchen Vergleich weist.
 _ZAHLEN = {"bruch", "fraction", "zahl", "integer", "ganzzahl",
@@ -241,18 +242,94 @@ def _gleicher_text(antwort, loesung) -> bool:
     return bool(links) and links == rechts
 
 
+_RUBRIK_ARTEN = {"begriffe", "rubric", "rubrik"}
+
+#: Das Urteil einer Antwort: mehr als richtig/falsch, weil eine halbe
+#: Erklärung eben keine falsche ist (Partial Correctness).
+RICHTIG = "richtig"
+TEILWEISE = "teilweise"
+FALSCH = "falsch"
+
+
+def _wort_treffer(begriff: str, text: str) -> bool:
+    """Steht der geforderte Begriff als eigenes Wort in der Antwort?
+
+    Der Begriff ist ein Wortanfang: „dativ" trifft „Dativobjekt" genauso
+    wie „Dativ-Objekt", „herstell" trifft „herstellt" und „herstellst" —
+    Flexion ist keine andere Antwort. Was am Wortanfang nicht steht,
+    zählt nicht: „ist" bleibt in „bist" unsichtbar.
+    """
+    if not begriff or not text:
+        return False
+    return bool(re.search(r"(?<![a-z0-9])" + re.escape(begriff), text))
+
+
+def _rubrik_bewerten(antwort: str, rubrik: dict) -> dict:
+    """Begriffe zaehlen, die eine vollstaendige Antwort nennen muss.
+
+    `mindestens` ist die Schwelle fuer „richtig"; darunter, aber ueber null,
+    ist die Antwort „teilweise" — das Kind hat schon etwas erkannt, nur
+    fehlt ein Stueck. Die Liste der fehlenden Begriffe geht mit, damit
+    der Unterricht genau dieses Stueck nachholt statt von vorn zu beginnen.
+    """
+    gruppen = []
+    for eintrag in (rubrik.get("begriffe") or []):
+        # Ein Eintrag ist ein Begriff — oder eine Liste gleichwertiger
+        # Schreibweisen, von denen eine genuegt (Flexion, Synonyme).
+        if isinstance(eintrag, (list, tuple)):
+            varianten = [str(b).strip() for b in eintrag if str(b).strip()]
+            if varianten:
+                gruppen.append(varianten)
+        elif str(eintrag).strip():
+            gruppen.append([str(eintrag).strip()])
+    if not gruppen:
+        return {"urteil": FALSCH, "fehlende": [], "hinweis": None}
+    text = normalisiere_thema(antwort)
+    fehlende = [varianten[0] for varianten in gruppen
+                if not any(_wort_treffer(normalisiere_thema(w), text)
+                           for w in varianten)]
+    gefunden = len(gruppen) - len(fehlende)
+    schwelle = int(rubrik.get("mindestens") or len(gruppen))
+    hinweise = rubrik.get("hinweise") or {}
+    if gefunden >= schwelle:
+        return {"urteil": RICHTIG, "fehlende": [], "hinweis": None}
+    if gefunden > 0:
+        return {"urteil": TEILWEISE, "fehlende": fehlende,
+                "hinweis": hinweise.get("teilweise")}
+    return {"urteil": FALSCH, "fehlende": fehlende,
+            "hinweis": hinweise.get("fehlt") or hinweise.get("misconception")}
+
+
+def bewerte(antwort: str | None, loesung: str | None,
+            antwort_art: str | None = None,
+            rubrik: dict | None = None) -> dict:
+    """Bewertet eine Antwort: richtig / teilweise / falsch.
+
+    Wirft nie — wie `check_answer` ist jede unklare Eingabe bestenfalls
+    teilweise. Hat die Aufgabe eine Begriffs-Rubrik (Vertrag 1.5), zaehlt
+    die Abdeckung; ohne Rubrik bleibt es beim Zweiwert-Urteil des
+    bisherigen Vergleichs.
+    """
+    try:
+        art = (antwort_art or "").strip().lower()
+        if rubrik and (not art or art in _RUBRIK_ARTEN):
+            return _rubrik_bewerten(antwort or "", rubrik)
+        urteil = RICHTIG if _check(antwort, loesung, antwort_art) else FALSCH
+        return {"urteil": urteil, "fehlende": [], "hinweis": None}
+    except Exception:
+        return {"urteil": FALSCH, "fehlende": [], "hinweis": None}
+
+
 def check_answer(antwort: str | None, loesung: str | None,
-                 antwort_art: str | None = None) -> bool:
+                 antwort_art: str | None = None,
+                 rubrik: dict | None = None) -> bool:
     """Ist die Antwort auf diese Aufgabe fachlich richtig?
 
     Wirft nie: eine nicht vergleichbare Eingabe ist einfach falsch oder
     faellt auf den Zeichenkettenvergleich zurueck. Eine leere Antwort ist
     nie richtig.
     """
-    try:
-        return _check(antwort, loesung, antwort_art)
-    except Exception:
-        return False
+    return bewerte(antwort, loesung, antwort_art, rubrik)["urteil"] == RICHTIG
 
 
 def _check(antwort: str | None, loesung: str | None,

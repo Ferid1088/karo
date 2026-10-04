@@ -30,6 +30,58 @@ INHALT_FELDER = ("haken", "erkenntnis", "regel")
 BILD_FELDER = ("zeigt", "bewegt", "bleibt_gleich")
 AUFGABE_FELDER = ("frage", "loesung")
 
+#: Wie eine Antwort ausgewertet wird (Vertrag 1.5). Ohne Angabe bleibt die
+#: Aufgabe beim bisherigen Verhalten — das Feld ist bewusst optional.
+_ANTWORT_ARTEN = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+_RUBRIK_HINWEISE = ("teilweise", "fehlt", "misconception")
+
+
+def _rubrik_pruefen(daten: Any, pfad: str) -> dict:
+    """Eine Begriffs-Rubrik für offene Antworten (Vertrag 1.5).
+
+    `begriffe` benennt, was eine vollständige Antwort nennen muss;
+    `mindestens` ist die Schwelle für „richtig" — darunter, aber über null,
+    liegt „teilweise richtig". `hinweise` gibt je Befund einen Text, den das
+    Kind sieht. Keine Rubrik erfunden, wo keine gebraucht wird: das Feld
+    bleibt optional.
+    """
+    if not isinstance(daten, dict):
+        raise InhaltUngueltig(f"„{pfad}.rubrik“ ist kein Objekt.")
+    begriffe = daten.get("begriffe")
+    # Ein Eintrag ist ein geforderter Begriff — oder eine Liste gleichwerti-
+    # ger Schreibweisen („gas", „gase"; „entweicht", „entweichen"): ohne
+    # Varianten bestraft die Wortform-Bewertung Flexion und Synonyme.
+    bereinigt: list = []
+    if isinstance(begriffe, list):
+        for eintrag in begriffe[:12]:
+            if isinstance(eintrag, (list, tuple)):
+                gruppe = [str(b).strip() for b in eintrag
+                          if isinstance(b, str) and b.strip()][:6]
+                if gruppe:
+                    bereinigt.append(gruppe)
+            elif isinstance(eintrag, str) and eintrag.strip():
+                bereinigt.append(eintrag.strip())
+    if not bereinigt:
+        raise InhaltUngueltig(
+            f"„{pfad}.rubrik.begriffe“ fehlt — ohne geforderte Begriffe kann "
+            "keine Antwort teilweise richtig sein.")
+    sauber = {"begriffe": bereinigt}
+    mindestens = daten.get("mindestens")
+    if mindestens is not None:
+        if not isinstance(mindestens, int) or isinstance(mindestens, bool) \
+                or not 1 <= mindestens <= len(sauber["begriffe"]):
+            raise InhaltUngueltig(
+                f"„{pfad}.rubrik.mindestens“ muss zwischen 1 und "
+                f"{len(sauber['begriffe'])} liegen.")
+        sauber["mindestens"] = mindestens
+    hinweise = daten.get("hinweise")
+    if isinstance(hinweise, dict):
+        sauber["hinweise"] = {
+            str(k).strip()[:40]: str(v).strip()
+            for k, v in hinweise.items()
+            if str(k).strip() in _RUBRIK_HINWEISE and str(v).strip()}
+    return sauber
+
 #: Markup, Skript oder Style — nichts davon darf je in einem Inhalt stehen.
 _MARKUP = re.compile(
     # Ohne Leerzeichen hinter dem Zeichen: „<div" ist ein Element, „a < b"
@@ -246,6 +298,18 @@ def _aufgabe_pruefen(daten: Any, rolle: str, seed: str = "", fehler_key: str = "
         _nachrechnen(schritt, f"{rolle}.schritte")
     # `aufloesung` wird NICHT nachgerechnet: sie erklaert, warum eine Auswahl
     # falsch ist, und zitiert dabei die falsche Rechnung. Siehe _NACHZURECHNEN.
+
+    # Vertrag 1.5: Antwortart und Rubrik gehoeren zur Aufgabe. Ohne sie wuerde
+    # jede offene Antwort als Rechnung oder Rohtext verglichen — eine
+    # teilweise richtige Erklaerung waere dann nur „falsch".
+    art = str(daten.get("antwort_art") or "").strip().lower()
+    if art:
+        if not _ANTWORT_ARTEN.fullmatch(art):
+            raise InhaltUngueltig(
+                f"„{rolle}.antwort_art“ ist keine gueltige Antwortart.")
+        sauber["antwort_art"] = art
+    if daten.get("rubrik") is not None:
+        sauber["rubrik"] = _rubrik_pruefen(daten["rubrik"], rolle)
     return sauber
 
 

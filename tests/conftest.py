@@ -217,6 +217,10 @@ def app_env(tmp_path, monkeypatch):
     # Konfigurationsdatei.
     monkeypatch.setenv("DEVIN_API_KEY", "test-devin-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
+    # Der Fixture-Katalog bleibt minimal: die kuratierten Slices saet
+    # saee_alle() in Produktion mit — Tests, die sie brauchen, rufen
+    # slices.seed() selbst (siehe test_adaptiv_slices).
+    monkeypatch.setenv("KARO_CURATED_SLICES_ENABLED", "0")
 
     for name in [m for m in list(sys.modules) if m.startswith("app")]:
         del sys.modules[name]

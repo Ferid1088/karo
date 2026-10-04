@@ -388,7 +388,9 @@ def test_richtige_antworten_fuehren_zu_beherrschung(client, fake_llm,
     assert _phase(app_env)["zustand"] == zustand.MASTERED
     assert "verstanden" in seite.text
 
-    fortschritt = app_env.db.q1("SELECT * FROM lern_fortschritt ORDER BY id DESC LIMIT 1")
+    fortschritt = app_env.db.q1("""SELECT * FROM lern_fortschritt
+                                   WHERE fehlertyp_id IS NOT NULL
+                                   ORDER BY id DESC LIMIT 1""")
     assert fortschritt["mastery"] == "sicher"
     assert fortschritt["erfolge"] == 3
 

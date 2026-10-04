@@ -92,8 +92,15 @@ def sitzt(konzept_id: int, child_key: str = store.CHILD_KEY) -> bool:
 
     Verstanden heißt: jede Fehlvorstellung des Konzepts steht im Fortschritt
     auf „sicher". Eine davon offen genügt, um es nicht als sicher zu zählen —
-    die Fehlvorstellung ist die Einheit, nicht das Konzept.
+    die Fehlvorstellung ist die Einheit, nicht das Konzept. Daneben gilt
+    eine abgeschlossene Sitzung auf dem Konzept selbst als Beleg: wer die
+    Leiter bis zum Transfer durchlaufen hat, sitzt — auch wenn der Weg nicht
+    jede Fehlvorstellung einzeln besucht hat.
     """
+    stand_konzept = store.fortschritt(konzept_id, None,
+                                      child_key=child_key) or {}
+    if stand_konzept.get("mastery") == "sicher":
+        return True
     fehlertypen = store.fehlertypen(konzept_id)
     if not fehlertypen:
         return False
@@ -127,5 +134,5 @@ def pruefen(antworten: list[str], aufgaben: list[dict]) -> bool:
     if not aufgaben or len(antworten) < len(aufgaben):
         return False
     return all(check_answer(antworten[i], a["loesung"],
-                          a.get("antwort_art"))
+                          a.get("antwort_art"), a.get("rubrik"))
                for i, a in enumerate(aufgaben))

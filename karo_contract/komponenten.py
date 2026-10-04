@@ -121,6 +121,39 @@ BALANCE = _eintragen(Komponente(
     barrierefreiheit="„Waage: links {links}, rechts {rechts}“",
 ))
 
+CONCEPT_MAP = _eintragen(Komponente(
+    id="ConceptMap", version=1,
+    zweck="Begriffe und ihre Beziehungen als Netz — für Zusammenhänge, "
+          "die ein Rechenweg nicht zeigt (Fotosynthese, Teilchenmodelle, "
+          "Satzglieder).",
+    faecher=(),
+    parameter={
+        "knoten": {"typ": LISTE_TEXT, "pflicht": True,
+                   "zweck": "Begriffe, die gezeigt werden"},
+        "kanten": {"typ": LISTE_TEXT,
+                   "zweck": "Beziehungen als „A → B“"},
+    },
+    animationen=("none",),
+    renderer="concept_map",
+    barrierefreiheit="„Begriffsnetz mit {anzahl} Begriffen“",
+))
+
+DATA_TABLE = _eintragen(Komponente(
+    id="DataTable", version=1,
+    zweck="Werte untereinander — zum Vergleichen von Messwerten, "
+          "Einheiten oder Sprachformen.",
+    faecher=(),
+    parameter={
+        "spalten": {"typ": LISTE_TEXT, "pflicht": True,
+                    "zweck": "Spaltenueberschriften"},
+        "zeilen": {"typ": LISTE_TEXT, "pflicht": True,
+                   "zweck": "Zeilen als „Wert 1 | Wert 2 | …“"},
+    },
+    animationen=("none",),
+    renderer="data_table",
+    barrierefreiheit="„Tabelle mit {anzahl} Zeilen“",
+))
+
 GENERIC_STEP_FLOW = _eintragen(Komponente(
     id="GenericStepFlow", version=1,
     zweck="Nummerierte Schritte in Worten. Trägt jedes Fach und dient als "

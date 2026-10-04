@@ -36,6 +36,7 @@ def _aufgabe_aufbereiten(row) -> dict | None:
     eintrag["optionen"] = _json(eintrag.get("optionen"), [])
     eintrag["schritte"] = _json(eintrag.get("schritte"), [])
     eintrag["visualisierung"] = _json(eintrag.get("visualisierung"), None)
+    eintrag["rubrik"] = _json(eintrag.get("rubrik"), None)
     return eintrag
 
 
@@ -46,6 +47,7 @@ def aufgabe_sichern(fehlertyp_id: int, rolle: str, frage: str, loesung: str,
                     typischer_fehler: str | None = None,
                     antwort_art: str = BRUCH, optionen: list | None = None,
                     aufloesung: str | None = None,
+                    rubrik: dict | None = None,
                     erwartete_sekunden: int | None = None, *,
                     quelle: str = "kuratiert", geprueft: bool = True) -> int:
     """Idempotent über (fehlertyp, rolle, position) — erneutes Säen ändert nur."""
@@ -53,6 +55,7 @@ def aufgabe_sichern(fehlertyp_id: int, rolle: str, frage: str, loesung: str,
              aufloesung, json.dumps(tipps or [], ensure_ascii=False),
              json.dumps(schritte or [], ensure_ascii=False),
              json.dumps(visualisierung, ensure_ascii=False) if visualisierung else None)
+    rubrik_json = json.dumps(rubrik, ensure_ascii=False) if rubrik else None
     with db.tx() as c:
         vorhanden = c.execute(
             "SELECT id, geprueft_am FROM lern_aufgabe "
@@ -63,9 +66,9 @@ def aufgabe_sichern(fehlertyp_id: int, rolle: str, frage: str, loesung: str,
                 """UPDATE lern_aufgabe SET frage=?, loesung=?, typischer_fehler=?,
                        antwort_art=?, optionen=?, aufloesung=?, tipps=?,
                        schritte=?, visualisierung=?, schwierigkeit=?,
-                       erwartete_sekunden=?, aktiv=1 WHERE id=?""",
+                       erwartete_sekunden=?, rubrik=?, aktiv=1 WHERE id=?""",
                 (frage, loesung, typischer_fehler, *werte, schwierigkeit,
-                 erwartete_sekunden, vorhanden["id"]))
+                 erwartete_sekunden, rubrik_json, vorhanden["id"]))
             if geprueft and not vorhanden["geprueft_am"]:
                 c.execute("UPDATE lern_aufgabe SET geprueft_am=? WHERE id=?",
                           (db.now(), vorhanden["id"]))
@@ -74,11 +77,11 @@ def aufgabe_sichern(fehlertyp_id: int, rolle: str, frage: str, loesung: str,
             """INSERT INTO lern_aufgabe (fehlertyp_id, rolle, position, frage,
                     loesung, typischer_fehler, antwort_art, optionen,
                     aufloesung, tipps, schritte, visualisierung,
-                    schwierigkeit, erwartete_sekunden, quelle, geprueft_am,
-                    created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    schwierigkeit, erwartete_sekunden, rubrik, quelle,
+                    geprueft_am, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (fehlertyp_id, rolle, position, frage, loesung, typischer_fehler,
-             *werte, schwierigkeit, erwartete_sekunden, quelle,
+             *werte, schwierigkeit, erwartete_sekunden, rubrik_json, quelle,
              db.now() if geprueft else None, db.now())).lastrowid
 
 

@@ -30,6 +30,24 @@ BEGLEITEN = "BEGLEITEN"
 GESCHAFFT = "GESCHAFFT"
 
 
+def _tage_bis_pruefung(daten: dict) -> int | None:
+    """Wie viele Tage bis zur Klassenarbeit — None ohne Terminkontext.
+
+    Die Sitzung traegt den Termin in `daten.pruefung` mit, seitdem sie im
+    Exam-Bereich begann (§29): der Schirm weiss sonst nichts von der Uhr.
+    """
+    import datetime as dt
+    termin = (daten.get("pruefung") or {}).get("exam_date")
+    if not termin:
+        return None
+    try:
+        tag = dt.date.fromisoformat(str(termin)[:10])
+    except (TypeError, ValueError):
+        return None
+    from ..woche import plaene
+    return (tag - plaene.today()).days
+
+
 def fuer(sitzung: dict) -> dict:
     """Welche Lernaktion jetzt dran ist — rein aus dem Sitzungsstand.
 
@@ -45,6 +63,15 @@ def fuer(sitzung: dict) -> dict:
         if daten.get("voraussetzung_lernen"):
             return {"aktion": VORAUSSETZUNG_LERNEN,
                     "grund": "Voraussetzung fehlt — Umweg steht bereit"}
+        tage = _tage_bis_pruefung(daten)
+        if tage is not None and tage <= 1:
+            # Ist die Arbeit morgen, kostet die kurze Pruefung nur Zeit:
+            # die fehlende Voraussetzung wird sie kaum widerlegen. Direkt
+            # das fehlende Stueck ueben ist der kuerzere ehrliche Weg —
+            # Mastery wird trotzdem erst mit Bestehen vergeben.
+            return {"aktion": VORAUSSETZUNG_LERNEN,
+                    "grund": "Pruefung nahe — ohne Umweg-Umweg direkt das "
+                             "fehlende Stueck lernen"}
         return {"aktion": VORAUSSETZUNG_PRUEFEN,
                 "grund": "Voraussetzung fraglich — kurz prüfen"}
 
