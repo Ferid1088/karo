@@ -167,3 +167,21 @@ def test_die_lektion_bekommt_mehr_luft_als_ein_quiz(app_env):
 
     assert erzeugung.MAX_TOKENS > 8192
     assert config.ops().ai_max_run_seconds > 300
+
+
+def test_exam_auftrag_ohne_klasse_ist_fuer_das_wartende_kind_sichtbar(app_env):
+    """Der Klassenarbeits-Weg ruft `anfordern` ohne Klassenstufe (das Konzept
+    bestimmt sie, nicht das Profil). Der Dedup-Schluessel darf trotzdem nicht
+    ohne Klasse gebaut werden — sonst sieht `/lernen/adaptiv/status` den
+    laufenden Auftrag nicht und das Kind wartet blind."""
+    from app.adaptiv import erzeugung
+    app_env.config.update(adaptive_learning_enabled=True,
+                          llm_error_creation_enabled=True)
+    app_env.db.init()
+
+    erzeugung.anfordern("Geschwindigkeit", "physik", None, gebraucht_am="2026-10-15")
+
+    klasse = app_env.config.load().learner_grade
+    assert erzeugung.laeuft("Geschwindigkeit", "physik", klasse) is True
+    # Und eine zweite Anfrage auf dem Lernweg dedupliziert dagegen:
+    assert erzeugung.anfordern("Geschwindigkeit", "physik", klasse) is None

@@ -162,13 +162,17 @@ def anfordern(thema: str, fach: str, klasse: int | None = None,
     from . import curriculum_dienst
     cfg = config.load()
     fach = pflicht(fach)
+    # Der Klassenarbeits-Weg ruft ohne Klasse — das Konzept bestimmt sie,
+    # nicht das Profil. Der Dedup-Schluessel braucht sie trotzdem aufgeloest:
+    # sonst sucht `/lernen/adaptiv/status` unter der Profilklasse und sieht
+    # den laufenden Auftrag nicht.
+    klasse = klasse or cfg.learner_grade
     payload = {"thema": thema, 'fach': fach, 'klasse': klasse}
     if gebraucht_am:
         payload["gebraucht_am"] = gebraucht_am
     if curriculum_dienst.configured(cfg):
         payload.update(curriculum_service=curriculum_dienst.settings(cfg)[0],
-                       curriculum_started=time.time(),
-                       klasse=klasse or cfg.learner_grade)
+                       curriculum_started=time.time())
     return jobs.enqueue("lektion_erzeugen", payload,
                         dedup_key=auftrag_schluessel(thema, fach, klasse))
 
