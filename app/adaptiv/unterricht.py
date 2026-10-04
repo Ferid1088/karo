@@ -402,7 +402,13 @@ def _klaerung_ergebnis(sitzung: dict, antwort: str, cfg=None) -> dict | None:
             richtig=befund["urteil"] == RICHTIG, cfg=cfg)
     store.ereignis_schreiben(sitzung["id"], "Klaerung beantwortet",
                              nutzdaten={"urteil": befund["urteil"]})
-    _merke(sitzung["id"], sitzung, klaerung=None, klaerung_hinweis=None)
+    # Die Klärung ist verbraucht — in der Datenbank UND in dieser
+    # Sitzungskopie. Schriebe `_merke` spaeter im selben Aufruf die alte
+    # Kopie zurueck, stuende die Klärung wieder offen im Schirm.
+    daten["klaerung"] = None
+    daten["klaerung_hinweis"] = None
+    sitzung["daten"] = daten
+    store.sitzung_aktualisieren(sitzung["id"], daten=daten)
     return befund
 
 
