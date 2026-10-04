@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from karo_contract import aufgaben, schemas
+from karo_contract import aufgaben, rechnen, schemas
 
 BRUCH = {"vorlage": "{a}/{b} + {c}/{d}",
          "frage": "Rechne {aufgabe}.",
@@ -229,3 +229,91 @@ def test_eine_regel_darf_weiter_nicht_falsch_rechnen():
     with pytest.raises(schemas.InhaltUngueltig, match="nachgerechnet"):
         schemas._nachrechnen("Rechne so: 2 + 2 = 5.", "fehlertyp[0].erklaerung.regel")
     schemas._nachrechnen("Rechne so: 2 + 2 = 4.", "fehlertyp[0].erklaerung.regel")
+
+
+# ------------------------------------------------------ Adversarial (DSL)
+#
+# Alles, was ein Modell an der Vorlage verbiegen kann, muss abgewiesen
+# werden — sauber als Befund, nie als Absturz und nie als `ready`.
+
+def _abweisend(vorlage: dict):
+    with pytest.raises(schemas.InhaltUngueltig, match="keine Aufgabe"):
+        schemas._aufgabe_pruefen(
+            {"frage": "x", "loesung": "y", "vorlage": vorlage},
+            "beispiel", seed="adv")
+
+
+def test_bedingungen_muessen_eine_liste_sein():
+    _abweisend({"vorlage": "{a} + {b}", "bedingungen": "b != d"})
+
+
+@pytest.mark.parametrize("bereich", [
+    [900, 100],          # umgedreht
+    "abc",               # Text statt Zahlenpaar
+    [1, 12, 3],          # drei Werte
+    [1.5, 12],           # keine ganzen Zahlen
+    [1, 10**9],          # absurd groß
+    5,                   # kein Paar
+])
+def test_ein_ungueltiger_bereich_wird_abgewiesen(bereich):
+    _abweisend({"vorlage": "{a} + {b}", "bereich": bereich})
+
+
+def test_ein_gueltiger_bereich_ausserhalb_der_vorgabe_funktioniert():
+    """`k % 100 == 0` braucht eben mehr als 1–12 — das ist der Sinn von
+    `bereich`, kein Missbrauch."""
+    fertig = aufgaben.bauen(
+        {"vorlage": "{k} / 100", "bedingungen": ["k % 100 == 0"],
+         "bereich": [100, 900]}, seed="s")
+    assert fertig["belegung"]["k"] % 100 == 0
+    assert 100 <= fertig["belegung"]["k"] <= 900
+
+
+def test_eine_bedingung_darf_nicht_potenzieren():
+    """`a ** 999999` ist gültige Syntax und eine DoS-Falle in jedem Wurf."""
+    with pytest.raises(aufgaben.VorlageUnbrauchbar):
+        aufgaben.erfuellt(["a ** 999999 > 0"], {"a": 2})
+
+
+def test_division_durch_null_in_bedingung_und_aufgabe():
+    # In der Bedingung: 0 wird als Belegung verworfen, nicht ausgewertet —
+    # bleibt nur die 0, erschoepft sich der Wuerfel ehrlich.
+    with pytest.raises(aufgaben.VorlageUnbrauchbar, match="Bedingungen"):
+        aufgaben.belegen("{b}", ["10/b > 1"], seed="s", bereich=(0, 0))
+    # In der Aufgabe selbst: „1/0" ist nicht rechenbar.
+    with pytest.raises(aufgaben.VorlageUnbrauchbar):
+        aufgaben.bauen({"vorlage": "1/{b}", "bereich": [0, 0]}, seed="s")
+
+
+def test_eine_vorlage_ohne_rechnung_ist_keine_aufgabe():
+    _abweisend({"vorlage": "Hallo {a}", "frage": "Sag: {aufgabe}"})
+    _abweisend({"vorlage": "{a} Äpfel und {b} Birnen"})
+
+
+def test_die_gerechnete_loesung_ersetzt_eine_falsch_behauptete():
+    """Die „inkonsistente Lösung" kann im Vorlagenpfad nicht entstehen —
+    sie wird gar nicht erst gelesen."""
+    geprueft = schemas._aufgabe_pruefen(
+        {"frage": "egal", "loesung": "42", "vorlage": BRUCH},
+        "beispiel", seed="konsistenz")
+    assert rechnen.stimmt(f"{geprueft['loesung']}") is not False
+
+
+# ------------------------------------------------------ Happy path (DSL)
+#
+# §12: dieselbe Vorlage muss je Seed andere gültige Aufgaben liefern —
+# fachlich äquivalent, rechnerisch richtig, verschieden im Text.
+
+def test_drei_seeds_drei_verschiedene_gueltige_aufgaben():
+    gebaut = [aufgaben.bauen(BRUCH, seed=f"variante:{n}") for n in (1, 2, 3)]
+    fragen = {g["frage"] for g in gebaut}
+    assert len(fragen) == 3, "die Varianten unterscheiden sich nicht"
+    for g in gebaut:
+        a, b, c, d = (g["belegung"][k] for k in "abcd")
+        # Alle Bedingungen gelten — das ist der didaktische Kern.
+        assert b != d and a < b and c < d and aufgaben.kgv(b, d) <= 24
+        # Die Lösung ist gerechnet, nicht behauptet.
+        from fractions import Fraction
+        assert Fraction(g["loesung"]) == Fraction(a, b) + Fraction(c, d)
+        # Der Kindertext enthält die Aufgabe, keinen Platzhalter.
+        assert "{" not in g["frage"] and g["ausdruck"] in g["frage"]

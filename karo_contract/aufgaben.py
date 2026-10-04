@@ -62,10 +62,15 @@ _BEDINGUNG_OK = re.compile(r"^[a-z0-9_\s+\-*/%().,<>=!&|]+$")
 
 
 def _pruefe_bedingung(text: str) -> str:
-    """Nur Rechnen und Vergleichen. Kein Punkt, keine Klammeraffen, kein Import."""
+    """Nur Rechnen und Vergleichen. Kein Punkt, keine Klammeraffen, kein Import.
+
+    `**` faellt aus, obwohl es die Zeichenliste erlaubt: Potenzen braucht
+    keine Schulbedingung, und `a ** 999999` rechnet in jedem einzelnen
+    Wurf eine Zahl, die niemand mehr lesen kann.
+    """
     if not _BEDINGUNG_OK.match(text or ""):
         raise VorlageUnbrauchbar(f"Bedingung enthält Unerlaubtes: {text!r}")
-    if "__" in text or "lambda" in text:
+    if "__" in text or "**" in text or "lambda" in text:
         raise VorlageUnbrauchbar(f"Bedingung enthält Unerlaubtes: {text!r}")
     return text
 
@@ -202,6 +207,30 @@ def typischer_fehler(fehler_key: str, belegung: dict[str, int]) -> str | None:
         return None
 
 
+#: Groessenordnung, bis zu der eine Vorlage noch wuerfeln darf. Zahlen
+#: jenseits davon ergeben Aufgaben, die kein Kind mehr lesen kann — und
+#: Bedingungen wie `kgv` rechnen auf absurden Werten.
+MAX_BEREICH = 100_000
+
+
+def _bereich_pruefen(roh, vorlage: str) -> tuple[int, int]:
+    """`bereich` ist [unten, oben] ganzer Zahlen — oder Vorgabe 1–12."""
+    if roh is None:
+        return (1, 12)
+    try:
+        unten, oben = roh
+    except (TypeError, ValueError):
+        raise VorlageUnbrauchbar(
+            f"bereich ist kein Zahlenpaar: {roh!r} (in {vorlage!r})") from None
+    if type(unten) is not int or type(oben) is not int or unten > oben:
+        raise VorlageUnbrauchbar(
+            f"bereich ist ungültig: {roh!r} (in {vorlage!r})")
+    if max(abs(unten), abs(oben)) > MAX_BEREICH:
+        raise VorlageUnbrauchbar(
+            f"bereich ist absurd groß: {roh!r} (in {vorlage!r})")
+    return (unten, oben)
+
+
 def bauen(vorlage: dict, *, seed: int | str = 0, fehler_key: str = "") -> dict:
     """Aus Vorlage und Bedingungen eine fertige Aufgabe machen.
 
@@ -211,8 +240,12 @@ def bauen(vorlage: dict, *, seed: int | str = 0, fehler_key: str = "") -> dict:
     muster = str(vorlage.get("vorlage") or "").strip()
     if not muster:
         raise VorlageUnbrauchbar("Die Vorlage hat kein Muster.")
-    bedingungen = [str(b) for b in (vorlage.get("bedingungen") or [])]
-    bereich = tuple(vorlage.get("bereich") or (1, 12))
+    roh_bedingungen = vorlage.get("bedingungen") or []
+    if not isinstance(roh_bedingungen, list):
+        raise VorlageUnbrauchbar(
+            f"bedingungen ist keine Liste: {roh_bedingungen!r}")
+    bedingungen = [str(b) for b in roh_bedingungen]
+    bereich = _bereich_pruefen(vorlage.get("bereich"), muster)
     belegung = belegen(muster, bedingungen, seed=seed, bereich=bereich)
     aufgabe = einsetzen(muster, belegung)
     # Erst fragen, ob eine Unbekannte gesucht ist: „4x − 3 = 9" laesst sich

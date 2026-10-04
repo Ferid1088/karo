@@ -253,7 +253,10 @@ def _vorlage_einsetzen(daten: dict, rolle: str, seed: str, fehler_key: str) -> d
     from . import aufgaben
     try:
         gebaut = aufgaben.bauen(muster, seed=f"{seed}:{rolle}", fehler_key=fehler_key)
-    except aufgaben.VorlageUnbrauchbar as fehler:
+    except (aufgaben.VorlageUnbrauchbar, ArithmeticError, ValueError,
+            TypeError, NameError, SyntaxError) as fehler:
+        # Die Vorlage kommt aus einem Modell: alles, was der Interpreter
+        # an ihr findet, ist ein Befund — nie ein Absturz der Pruefkette.
         raise InhaltUngueltig(f"„{rolle}.vorlage“ ergibt keine Aufgabe: {fehler}") from None
     ersetzt = {**daten, "frage": gebaut["frage"], "loesung": gebaut["loesung"]}
     if gebaut.get("typischer_fehler"):

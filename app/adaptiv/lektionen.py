@@ -12,7 +12,8 @@ ist, als so tun, als sei alles da.
 
 from __future__ import annotations
 
-from karo_contract.huelle import trifft_thema
+from karo_contract.huelle import (bedeutungswoerter, treffergrad,
+                                  trifft_thema)
 
 from . import inhalte_brueche, store
 from .normalisierung import normalisiere_thema
@@ -67,6 +68,12 @@ def fuer_thema(thema_text: str | None, fach: str | None, klasse: int | None = No
     Bewusst ein simpler Stichwortabgleich: eine echte Zuordnung beliebiger
     Themen braucht die Zerlegung aus Meilenstein 4. Was hier nicht trifft,
     darf nicht heimlich in der Bruchlektion landen.
+
+    Treffen mehrere Lektionen, gewinnt die genaueste (`treffergrad`): die
+    Lektion, die so heisst wie das Thema, schlägt eine, die es nur über
+    ein lose passendes Stichwort erwischt — sonst bekäme „Brüche mit
+    verschiedenen Nennern addieren" die Gleichnamig-Lektion, weil beide
+    das Stichwort „brueche addieren" teilen.
     """
     from ..faecher import schluessel
     gesucht = normalisiere_thema(thema_text)
@@ -74,30 +81,24 @@ def fuer_thema(thema_text: str | None, fach: str | None, klasse: int | None = No
     # heraus die Mathematiklektion.
     if not gesucht or not schluessel(fach):
         return None
+    bester, bester_grad = None, 0
     for lektion in verfuegbar(fach):
         konzept = store.konzept(lektion['konzept_id']) or {}
         if klasse and not konzept.get('klasse_von', 1) <= klasse <= konzept.get('klasse_bis', 13):
             continue
-        if _trifft(gesucht, lektion):
-            return lektion
-    return None
-
-
-#: Wörter, die in fast jedem deutschen Themennamen stehen. Sie stiften keine
-#: Verwandtschaft: „Volumen bei VERSCHIEDENEN Maßeinheiten" und „Brüche mit
-#: VERSCHIEDENEN Nennern addieren" haben nichts miteinander zu tun.
-_FUELLWOERTER = frozenset({
-    "und", "oder", "mit", "bei", "von", "der", "die", "das", "den", "dem",
-    "ein", "eine", "einen", "einem", "im", "in", "zu", "zum", "zur", "auf",
-    "fuer", "aus", "als", "am", "ist", "sind", "verschiedenen", "verschiedene",
-    "verschiedener", "eines", "einer", "ganzen", "ganze",
-})
+        grad = treffergrad(gesucht, lektion)
+        if grad > bester_grad:
+            bester, bester_grad = lektion, grad
+    return bester
 
 
 def _sinnwoerter(text: str | None) -> set:
-    """Die Wörter eines Themennamens, die etwas bedeuten."""
-    return {w for w in normalisiere_thema(text).split()
-            if len(w) > 2 and w not in _FUELLWOERTER}
+    """Die Wörter eines Themennamens, die etwas bedeuten.
+
+    Dieselbe Liste wie `trifft_thema` — sonst faenden Vorschlaege Worte
+    bedeutungsvoll, die die Zuordnung ignoriert (oder umgekehrt).
+    """
+    return set(bedeutungswoerter(text))
 
 
 def empfehlungen(thema_text: str | None, fach: str, hoechstens: int = 3) -> list[dict]:

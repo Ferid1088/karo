@@ -1023,7 +1023,10 @@ LEKTION_SCHEMA = {
                     "type": "array", "maxItems": 6, "items": {"type": "string"},
                     "description": "Wonach ein Kind suchen könnte. Sie "
                                    "benennen DIESES Konzept, nicht das ganze "
-                                   "Gebiet: „brueche“ träfe auch das Kürzen.",
+                                   "Gebiet: „brueche“ träfe auch das Kürzen. "
+                                   "Das angefragte Thema wortgleich hierher "
+                                   "oder ins Label, sonst greift die "
+                                   "Zuordnung nicht.",
                 },
             },
             "required": ["konzept_key", "thema_key", "label", "klasse_von",
