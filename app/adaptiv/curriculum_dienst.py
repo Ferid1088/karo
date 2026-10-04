@@ -234,9 +234,12 @@ def format_spec() -> dict:
     # Stable across topics/grades: these are request fields, not format versions.
     return {"id": FORMAT_ID, "schema": prompts.LEKTION_SCHEMA,
             "registry": komponenten.fuer_modell(),
+            # Das Register reist als eigenes Vertragsfeld mit — eine zweite
+            # Kopie in den Anweisungen bliesse den Auftrag des Autors ueber
+            # das Anbieter-Limit auf.
             "instructions": prompts.lektion_prompt(
                 grade=None, subject="aus der Anfrage",
-                thema="das angefragte Konzept")}
+                thema="das angefragte Konzept", register_einbetten=False)}
 
 
 class _NoRedirect(HTTPRedirectHandler):

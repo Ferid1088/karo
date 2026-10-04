@@ -1130,18 +1130,23 @@ LEKTION_SCHEMA = {
 }
 
 
-def lektion_prompt(grade: int | None, subject: str, thema: str) -> str:
+def lektion_prompt(grade: int | None, subject: str, thema: str,
+                   register_einbetten: bool = True) -> str:
     """Der Auftrag an Modell A: eine ganze Lektion zu einem Themennamen.
 
     Das Register wird als Metadaten mitgegeben — Bezeichnung, Zweck,
     Parameter, erlaubte Animationen. Niemals der Renderer: ein Modell soll
     gar nicht erst erfahren, wie gezeichnet wird, damit es nicht versucht,
-    es selbst zu tun (§3).
+    es selbst zu tun (§3). Im Curriculum-Vertrag reist das Register als
+    eigenes Feld neben den Anweisungen; dann entfällt die Kopie hier.
     """
     from .adaptiv import komponenten
 
-    register = json.dumps(komponenten.fuer_modell(), ensure_ascii=False,
-                          indent=2)
+    register = (json.dumps(komponenten.fuer_modell(), ensure_ascii=False,
+                           indent=2) if register_einbetten else
+                "(das Register der erlaubten Komponenten liegt dieser "
+                "Anfrage als eigenes Feld bei — verwende nur dessen "
+                "Komponenten-IDs und Parameter)")
     return f"""Du entwirfst eine fachlich eingeordnete Lernreihe im Fach {subject}.
 
 Die Klassenstufe des anfragenden Kindes bestimmt NICHT die Einordnung des Inhalts.
