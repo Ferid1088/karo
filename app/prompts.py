@@ -1192,6 +1192,12 @@ So wird unterrichtet:
 - Halte die Lektion kompakt: das gesamte JSON unter 24000 Zeichen. Lieber
   wenige gute Aufgaben und Erklärungen als ausufernde Listen — übergroße
   Lektionen kann die Prüfkette nicht verarbeiten, sie werden verworfen.
+- Zahlen und Rechnungen bleiben maschinell lesbar: nur Ziffern, Punkt,
+  Minus und Bruchstrich („1.05", „3/4"). Keine hochgestellten Zeichen,
+  Unicode-Brüche oder Exponenten („1.05³", „²", „¼", „×") in Zahlenfeldern —
+  Prosa darf sie ausschreiben, Rechnungsfelder nicht.
+- Verwende nur die Felder und Werte aus dem Schema — keine erfundenen
+  Optionen oder Zusatzfelder, auch wenn sie plausibel klingen.
 
 Darstellungen wählst du aus, du erfindest sie nicht. Erlaubt ist
 ausschließlich eine dieser Komponenten mit genau ihren Parametern:
