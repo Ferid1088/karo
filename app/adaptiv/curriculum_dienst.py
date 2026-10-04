@@ -390,6 +390,17 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
         raise jobs.Deferred(payload, _OPS.curriculum_poll_seconds)
     safe_topic = pii.scrub(thema, cfg.learner_name)
     if payload.get("curriculum_export"):
+        if (payload.get("gebraucht_am")
+                and payload.get("gebraucht_am_gemeldet") != payload["gebraucht_am"]):
+            # Kam die Frist erst nach der Bestellung dazu (ein spaeterer
+            # Prüfungsauftrag deduplizierte auf diesen Job), meldet der
+            # Dienst sie nach: sein eigener Merge dedupliziert auf denselben
+            # Export und zieht needed_by auf das fruehere Datum.
+            request(cfg, "POST", "/v1/lessons",
+                    {"subject": fach, "grade": grade, "topic": safe_topic,
+                     "format": format_spec(),
+                     "needed_by": payload["gebraucht_am"]})
+            payload["gebraucht_am_gemeldet"] = payload["gebraucht_am"]
         result = request(cfg, "GET", f"/v1/lessons/{int(payload['curriculum_export'])}")
     else:
         # Wie viele neue Themen diese Familie heute bestellt. Der Dienst
@@ -413,6 +424,8 @@ def prepare(cfg, payload: dict, thema: str, fach: str, grade: int) -> dict:
             # drei Wochen.
             anfrage["needed_by"] = payload["gebraucht_am"]
         result = request(cfg, "POST", "/v1/lessons", anfrage)
+        if anfrage.get("needed_by"):
+            payload["gebraucht_am_gemeldet"] = anfrage["needed_by"]
     status = result.get("status")
     if status == "ready" and payload.get("budget_schluessel"):
         # Der Dienst hatte es schon fertig. Das kostet ihn nichts, also

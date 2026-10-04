@@ -345,3 +345,57 @@ def test_repeated_bad_exports_stop_after_two_rework_requests(app_env, bridge, mo
     assert jobs.run_now(jid)[0] == "failed"
     assert len(rejects) == 2
     assert job(app_env, jid)["state"] == "fehler"
+
+
+def test_pruefungsfrist_wird_gemergt_und_dem_dienst_gemeldet(app_env, bridge, monkeypatch):
+    """Dedupe durfte die Examens-Frist nicht wegwerfen: kommt eine
+    Klassenarbeit auf ein schon bestelltes Thema, geht ihr Datum in den
+    laufenden Auftrag — und als needed_by an den Dienst."""
+    from app import jobs
+    from app.adaptiv import erzeugung
+    calls = []
+
+    def pending(cfg, method, path, body=None):
+        calls.append((method, path, dict(body or {})))
+        return {"status": "pending", "export_id": 17, "retry_after": 15}
+    monkeypatch.setattr(bridge, "request", pending)
+    jid = enqueue()
+    assert jobs.run_now(jid)[0] == "pending"
+    assert json.loads(job(app_env, jid)["payload"]).get("gebraucht_am") is None
+    # Dieselbe Lücke, jetzt mit Prüfungsdatum: kein zweiter Job, aber die
+    # Frist bleibt nicht auf der Strecke.
+    assert erzeugung.anfordern(TOPIC, "Mathematik", 6, gebraucht_am="2026-10-10") is None
+    payload = json.loads(job(app_env, jid)["payload"])
+    assert payload["gebraucht_am"] == "2026-10-10"
+    assert jobs.run_now(jid)[0] == "pending"
+    # Nachmeldung beim Dienst (sein Merge zieht needed_by vor), dann weiter GET.
+    assert calls[1][0] == "POST" and calls[1][2]["needed_by"] == "2026-10-10"
+    assert calls[2][0] == "GET"
+    assert jobs.run_now(jid)[0] == "pending"
+    assert calls[3][0] == "GET"     # nur einmal nachmelden, nicht bei jedem Poll
+
+
+def test_pruefungsfrist_direkt_beim_ersten_auftrag(app_env, bridge, monkeypatch):
+    from app import jobs
+    from app.adaptiv import erzeugung
+    calls = []
+    monkeypatch.setattr(bridge, "request",
+                        lambda cfg, m, p, body=None: (calls.append((m, p, dict(body or {}))),
+                                                      {"status": "pending", "export_id": 17,
+                                                       "retry_after": 15})[1])
+    jid = erzeugung.anfordern(TOPIC, "Mathematik", 6, gebraucht_am="2026-10-10")
+    assert jobs.run_now(jid)[0] == "pending"
+    assert calls[0][2]["needed_by"] == "2026-10-10"
+    assert jobs.run_now(jid)[0] == "pending"
+    # Frist schon gemeldet — kein erneuter POST beim Pollen.
+    assert calls[1][0] == "GET"
+
+
+def test_frueheste_frist_gewinnt(app_env, bridge, monkeypatch):
+    from app import jobs
+    from app.adaptiv import erzeugung
+    jid = erzeugung.anfordern(TOPIC, "Mathematik", 6, gebraucht_am="2026-10-05")
+    assert erzeugung.anfordern(TOPIC, "Mathematik", 6, gebraucht_am="2026-10-20") is None
+    assert json.loads(job(app_env, jid)["payload"])["gebraucht_am"] == "2026-10-05"
+    assert erzeugung.anfordern(TOPIC, "Mathematik", 6, gebraucht_am="2026-10-03") is None
+    assert json.loads(job(app_env, jid)["payload"])["gebraucht_am"] == "2026-10-03"

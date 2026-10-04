@@ -88,10 +88,20 @@ def enqueue_in_transaction(c, job_type: str, payload: dict | None = None,
     payload = payload or {}
     if dedup_key:
         row = c.execute(
-            "SELECT id, state FROM job WHERE dedup_key = ?", (dedup_key,)
+            "SELECT id, state, payload FROM job WHERE dedup_key = ?", (dedup_key,)
         ).fetchone()
         if row is not None:
             if row["state"] in ("wartend", "laeuft"):
+                if payload.get("gebraucht_am"):
+                    # Gleiche Luecke, aber eine Klassenarbeit rueckt die
+                    # Frist vor: sie gehoert zum laufenden Auftrag, nicht in
+                    # den Muelleimer. Das frueheste Datum gewinnt.
+                    vorhanden = json.loads(row["payload"] or "{}")
+                    alt = vorhanden.get("gebraucht_am")
+                    if not alt or payload["gebraucht_am"] < alt:
+                        vorhanden["gebraucht_am"] = payload["gebraucht_am"]
+                        c.execute("UPDATE job SET payload=? WHERE id=?",
+                                  (json.dumps(vorhanden, ensure_ascii=False), row["id"]))
                 return None
             c.execute("UPDATE job SET dedup_key = NULL WHERE id = ?", (row["id"],))
     cur = c.execute(
