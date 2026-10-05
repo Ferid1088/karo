@@ -12,6 +12,8 @@ ist, als so tun, als sei alles da.
 
 from __future__ import annotations
 
+import threading
+
 from karo_contract.huelle import (bedeutungswoerter, treffergrad,
                                   trifft_thema)
 
@@ -37,6 +39,38 @@ def saee_alle() -> None:
         slices.seed()
 
 
+_saat_lock = threading.Lock()
+_module_gesaet = False
+_slices_gesaet = False
+
+
+def _saat_sicherstellen() -> None:
+    """Die statischen Saaten einmal je Prozess.
+
+    `saee_alle()` bleibt für Aufrufer, die wirklich nachsaen wollen —
+    `verfuegbar()` fragte frueher bei jedem einzelnen Thema nach und
+    schrieb dabei Hunderte Male denselben Bestand: ein Dashboard-Aufruf
+    lief damit minutenlang nur Saat-Schleifen. Lieferungen landen auf
+    ihrem eigenen Importpfad im Katalog und brauchen diese Saat nicht;
+    der Lesezugriff danach bleibt live. Geht der Slice-Schalter erst
+    spaeter an, zieht der naechste Aufruf die Slices nach.
+    """
+    global _module_gesaet, _slices_gesaet
+    from .. import config
+    if _module_gesaet and (_slices_gesaet
+                           or not config.ops().curated_slices_enabled):
+        return
+    with _saat_lock:
+        if not _module_gesaet:
+            for modul in MODULE:
+                modul.saeen()
+            _module_gesaet = True
+        if config.ops().curated_slices_enabled and not _slices_gesaet:
+            from . import slices
+            slices.seed()
+            _slices_gesaet = True
+
+
 def verfuegbar(fach: str | None = None) -> list[dict]:
     """Alle auslieferbaren Lektionen — aus dem Katalog, nicht aus `MODULE`.
 
@@ -45,7 +79,7 @@ def verfuegbar(fach: str | None = None) -> list[dict]:
     geschrieben hat, grundsaetzlich unauffindbar.
     """
     from ..faecher import pflicht
-    saee_alle()
+    _saat_sicherstellen()
     nur = pflicht(fach) if fach else None
     return [{"konzept_id": k["id"], "label": k["label"], "fach": k["fach"],
              "konzept_key": k["konzept_key"], "stichworte": k["stichworte"]}

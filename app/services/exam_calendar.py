@@ -114,18 +114,6 @@ def get(exam_id: int) -> dict | None:
     }
 
 
-def _content_rows(exam_id: int) -> list[dict]:
-    """Prüfungsthemen in Lernreihenfolge, bereits sichere Themen zuletzt.
-
-    Der Kalender bleibt beim ersten noch nicht MASTERED Thema. Nach dessen
-    Abschluss wird beim nächsten Render automatisch das nächste Thema aktiv.
-    """
-    from .learning_hub import exam_topics
-    members = exam_topics(exam_id)
-    return [{"inhalt": t['label'], "topic_id": t['id']} for t in members
-            if t['learning_status'] != 'sicher']
-
-
 def calendar(exam_id: int) -> list[dict]:
     """Alle Tage von heute bis einschließlich Prüfungstag.
 
@@ -139,7 +127,17 @@ def calendar(exam_id: int) -> list[dict]:
         return []
 
     saved = get_days(exam_id)
-    content = _content_rows(exam_id)
+    # Die Prüfungsthemen einmal holen — Inhaltsliste und Ersatzzeile
+    # fragten frueher je Tag erneut danach, die Themenverteilung kostet
+    # sonst denselben Rundgang noch einmal.
+    from .learning_hub import exam_topics
+    members = exam_topics(exam_id)
+    # Prüfungsthemen in Lernreihenfolge, bereits sichere Themen zuletzt.
+    # Der Kalender bleibt beim ersten noch nicht MASTERED Thema. Nach dessen
+    # Abschluss wird beim nächsten Render automatisch das nächste Thema aktiv.
+    content = [{"inhalt": t['label'], "topic_id": t['id']} for t in members
+               if t['learning_status'] != 'sicher']
+    geladen: dict[int, dict | None] = {}
     result = []
 
     positive_days = sorted(
@@ -167,20 +165,21 @@ def calendar(exam_id: int) -> list[dict]:
         row = None
         tagesthemen = verteilt.get(str(day), []) if not is_simulation else []
         if minutes > 0 and not is_simulation:
-            from .learning_hub import exam_topics
             if tagesthemen:
                 row = {"inhalt": " · ".join(z["label"] for z in tagesthemen),
                        "topic_id": tagesthemen[0]["topic_id"]}
             else:
                 row = content[0] if content else None
                 row = row or {
-                    "inhalt": ("Alles sicher – Zeit zum Wiederholen" if exam_topics(exam_id)
+                    "inhalt": ("Alles sicher – Zeit zum Wiederholen" if members
                                else "Zuerst Prüfungsthemen ergänzen"),
                     "topic_id": None,
                 }
 
         topic_id = row.get("topic_id") if row else None
-        topic = topics.get(int(topic_id)) if topic_id else None
+        if topic_id is not None and topic_id not in geladen:
+            geladen[topic_id] = topics.get(int(topic_id))
+        topic = geladen.get(topic_id) if topic_id else None
         thema = ((topic or {}).get("label") or (row or {}).get("inhalt")
                  or "Wiederholen für die Klassenarbeit")
 
@@ -231,6 +230,14 @@ def today_task() -> dict | None:
              AND e.subject IN {faecher.SQL_FAECHER}
            ORDER BY e.exam_date,e.id""", today)]
     for exam in exams:
+        # Ein Tagespaket gibt es nur an Tagen mit geplanten Minuten oder
+        # an der Generalprobe. Beides steht in den gespeicherten Tagen —
+        # ohne den billigen Check baute jeder Aufruf den ganzen Kalender
+        # jeder anstehenden Arbeit, samt Themenverteilung je Tag.
+        saved = get_days(exam["id"])
+        if int(saved.get(today, 0) or 0) <= 0 \
+                and today != (simulation_date(exam["id"]) or ""):
+            continue
         task = next(
             (item for item in calendar(exam["id"])
              if item["date"] == today and (item["minutes"] > 0 or item["is_simulation"])),
