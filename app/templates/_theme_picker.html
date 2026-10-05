@@ -1,0 +1,55 @@
+{# Kleiner Design-Picker in der Kopfzeile des Kinderbereichs.
+
+   Ein <details>-Element statt eines Dialogs: oeffnet auch ohne
+   JavaScript, jede Kachel ist ein echtes Formular — die Wahl funktioniert
+   dann einfach mit Neuladen. Das Skript macht daraus die Sofort-Vorschau
+   und den Klassenwechsel im selben Popover. #}
+<details class="theme-picker" data-design-picker
+         data-csrf-field="{{ csrf_field }}" data-csrf="{{ csrf }}"
+         data-ziel="{{ path }}" data-selected="{{ theme_picker.selected }}"
+         data-grade="{{ theme_picker.grade }}">
+  <summary class="theme-tab" title="Dein Design ändern" aria-label="Dein Design ändern">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.4-.5-.8-.5-1.3 0-.9.7-1.6 1.7-1.6H17a4 4 0 0 0 4-4c0-4.4-4-7.2-9-7.2Z"/><circle cx="7.5" cy="11.5" r="1.3"/><circle cx="10.5" cy="7.5" r="1.3"/><circle cx="15" cy="7.5" r="1.3"/><circle cx="17.5" cy="11" r="1.3"/></svg>
+    <span>Design</span>
+  </summary>
+  <div class="theme-pop" role="dialog" aria-label="Dein Design">
+    <p class="theme-pop-titel">Dein Design
+      <span class="theme-klasse-label" data-grade-label>Klasse {{ theme_picker.grade }}</span></p>
+    <div class="theme-grid" data-theme-grid style="--spalten: {{ theme_picker.columns }}">
+      {% for t in theme_picker.themes %}
+      <form method="post" action="/themes/waehlen" class="theme-tile{{ ' aktiv' if t.id == theme_picker.selected }}" data-theme-id="{{ t.id }}">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf }}">
+        <input type="hidden" name="theme_id" value="{{ t.id }}">
+        <input type="hidden" name="ziel" value="{{ path }}">
+        <button type="submit" class="theme-tile-btn"
+                style="--ta: {{ t.visual.accent[0] }}; --tb: {{ t.visual.accent[1] }}">
+          <span class="theme-emoji" aria-hidden="true">{{ t.visual.icon }}</span>
+          <span class="theme-name">{{ t.name }}</span>
+          <span class="theme-tags">{{ t.interest_tags[:2]|join(' · ') }}</span>
+          <span class="theme-check" aria-hidden="true">✓</span>
+          <span class="sr">ausgewählt</span>
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+    <form method="post" action="/themes/waehlen" class="theme-reset" data-theme-reset>
+      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf }}">
+      <input type="hidden" name="theme_id" value="default">
+      <input type="hidden" name="ziel" value="{{ path }}">
+      <button type="submit" class="theme-reset-btn">Karo-Standard</button>
+    </form>
+    {% if theme_picker.grades|length > 1 %}
+    <div class="theme-entdecken">
+      <p class="theme-mehr-label">Weitere Designs</p>
+      <div class="theme-klassen" role="group" aria-label="Klassen wechseln">
+        {% for g in theme_picker.grades %}
+        <button type="button"
+                class="theme-klasse{{ ' aktiv eigen' if g == theme_picker.grade }}"
+                data-grade="{{ g }}"{% if g == theme_picker.grade %} aria-current="true"{% endif %}>{{ g }}</button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <script type="application/json" id="theme-daten">{{ theme_picker|tojson }}</script>
+</details>

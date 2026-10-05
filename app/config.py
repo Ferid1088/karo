@@ -145,6 +145,24 @@ class Config:
     adaptiv_wiederholung_aufgaben: int = 4
     adaptiv_aehnlichkeit_schwelle: float = 0.82
 
+    # --- Design-Themes (Interessen-Welten des Kinderbereichs) ----------------
+    # Reine Oberflaechen-Personalisierung: Farbwelten, aus denen das Kind im
+    # kleinen Kopf-Picker waehlt. Zentrale Steuerung aller Parameter — keine
+    # Zahlen im Code. Kategorisiert wird nur ueber Interessen, nie ueber
+    # Geschlecht.
+    themes: dict = field(default_factory=lambda: {
+        "enabled": True,
+        "min_grade": 1,
+        "max_grade": 13,
+        # Das Kind sieht seine Klasse und je zwei Stufen darunter/darueber.
+        "grade_range_offset": 2,
+        "themes_per_grade": 10,
+        "desktop_columns": 2,
+        "personalization_enabled": True,
+        # So viele vergangene Wahlen fliessen in die Reihenfolge ein.
+        "history_size": 12,
+    })
+
     setup_complete: bool = False
 
     def __repr__(self) -> str:  # pragma: no cover

@@ -1,0 +1,403 @@
+/* ==========================================================================
+   Design-Themes: Interessen-Welten des Kinderbereichs
+   ==========================================================================
+   Drei Teile:
+     1. Reifebaender — Ecken und Zurueckhaltung wachsen mit der Klasse.
+     2. Familien — EIN Token-Block je Gestaltungsfamilie. Themes mit derselben
+        Familie teilen sich diesen Block (Theme-Familien statt Einzel-CSS).
+     3. Kopf-Picker — der kleine Tab und das Popover.
+
+   Alles laeuft ueber die vorhandenen Design-Tokens; keine Komponente wird
+   je Theme nachgebaut. Alle Familien sind hell wie die sechs Farbwelten —
+   die Lernflaechen von Karo setzen helle Flaechen voraus; wer Dunkel
+   moechte, waehlt weiterhin die Farbwelt "dunkel" in den Eltern-Settings.
+   ========================================================================== */
+
+/* --- 1. Reifebaender -------------------------------------------------------
+   Band 1–4 kommt aus app.themes.band_for_grade und haengt an
+   <html data-theme-band>. Wirkt nur, wenn auch eine Familie gewaehlt ist. */
+:root[data-theme-band="1"] { --radius: 26px; --radius-sm: 16px; }
+:root[data-theme-band="2"] { --radius: 22px; --radius-sm: 14px; }
+:root[data-theme-band="3"] { --radius: 16px; --radius-sm: 10px; }
+:root[data-theme-band="4"] { --radius: 12px; --radius-sm: 8px;  }
+
+/* --- 2. Familien -----------------------------------------------------------
+   Schema je Familie: heller Farbgrund, weisse Flaeche, dunkler Text,
+   gesaettigte Akzentfarbe (--ink). Kontraste wie in den Farbwelten. */
+
+:root[data-theme-family="dino"] {
+  --ground: #e8f7e9; --surface: #fff; --surface-2: #dcf0de;
+  --text: #1a4620; --muted: #3f7045; --faint: #7aa884;
+  --border: #b7e3bb; --border-firm: #82c98c;
+  --ink: #2e7d32; --ink-soft: #d8f0da;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(46,125,50,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="rescue"] {
+  --ground: #ffefea; --surface: #fff; --surface-2: #ffe0d5;
+  --text: #5d1c10; --muted: #96422e; --faint: #c98878;
+  --border: #ffc9b8; --border-firm: #ff9d82;
+  --ink: #d63d1e; --ink-soft: #ffe0d5;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(214,61,30,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="bau"] {
+  --ground: #fff6dd; --surface: #fff; --surface-2: #faedc4;
+  --text: #5a4300; --muted: #8a6a1a; --faint: #bfa35f;
+  --border: #f4dc9a; --border-firm: #eac25e;
+  --ink: #a57300; --ink-soft: #faedc4;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(176,124,0,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="space"] {
+  --ground: #e6edff; --surface: #fff; --surface-2: #d9e4ff;
+  --text: #172a66; --muted: #46549c; --faint: #8595cc;
+  --border: #bcccf7; --border-firm: #8ba6ef;
+  --ink: #3350cc; --ink-soft: #d9e4ff;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(51,80,204,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="blocks"] {
+  --ground: #e9f5ff; --surface: #fff; --surface-2: #d6ecfc;
+  --text: #123f63; --muted: #3f6a94; --faint: #7fa5c6;
+  --border: #b9dcf5; --border-firm: #82c0ec;
+  --ink: #1273b8; --ink-soft: #d6ecfc;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(18,115,184,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="fantasy"] {
+  --ground: #f4eaff; --surface: #fff; --surface-2: #ecdfff;
+  --text: #3d1f6b; --muted: #6b4aa8; --faint: #a38ecf;
+  --border: #dcc8f7; --border-firm: #bd98ee;
+  --ink: #7a3fd1; --ink-soft: #ecdfff;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(122,63,209,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="cozy"] {
+  --ground: #fdf1e7; --surface: #fff; --surface-2: #f8e3cf;
+  --text: #5a3a24; --muted: #8f6a4a; --faint: #c09b7d;
+  --border: #f3d5bd; --border-firm: #e7b58d;
+  --ink: #c27034; --ink-soft: #f8e3cf;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(194,112,52,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="ocean"] {
+  --ground: #e0f8fa; --surface: #fff; --surface-2: #d0f1f4;
+  --text: #0a4a54; --muted: #2d7683; --faint: #6fadb8;
+  --border: #aae6ec; --border-firm: #6dd1db;
+  --ink: #0c7e8c; --ink-soft: #d0f1f4;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(12,138,153,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="animals"] {
+  --ground: #edf8ee; --surface: #fff; --surface-2: #dcf0de;
+  --text: #224d28; --muted: #4a7a50; --faint: #84ad8b;
+  --border: #c3e5c7; --border-firm: #8fca97;
+  --ink: #2f8a3d; --ink-soft: #dcf0de;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(47,138,61,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="horses"] {
+  --ground: #f5efe4; --surface: #fff; --surface-2: #efe3c8;
+  --text: #4d3a1e; --muted: #7a6038; --faint: #b09a6e;
+  --border: #e5d5b4; --border-firm: #cdb384;
+  --ink: #8a6428; --ink-soft: #efe3c8;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(148,111,47,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="racing"] {
+  --ground: #fdeef1; --surface: #fff; --surface-2: #fbdce3;
+  --text: #4a0f1d; --muted: #8a3a4a; --faint: #c07c8c;
+  --border: #f6c4ce; --border-firm: #ee92a4;
+  --ink: #c2183f; --ink-soft: #fbdce3;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(194,24,63,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="roboter"] {
+  --ground: #e9f0f7; --surface: #fff; --surface-2: #dbe8f5;
+  --text: #1c3049; --muted: #4a6484; --faint: #7f96b4;
+  --border: #bfd2e6; --border-firm: #8fadcf;
+  --ink: #2c5d9e; --ink-soft: #dbe8f5;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(44,93,158,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="fussball"] {
+  --ground: #e7f8ee; --surface: #fff; --surface-2: #d3f2df;
+  --text: #0f4526; --muted: #2f7a4a; --faint: #71ab84;
+  --border: #b3e8c6; --border-firm: #77d39a;
+  --ink: #0f8a42; --ink-soft: #d3f2df;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(15,138,66,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="fashion"] {
+  --ground: #fdeef6; --surface: #fff; --surface-2: #fbdbe9;
+  --text: #571c3e; --muted: #92456f; --faint: #c280a2;
+  --border: #f6c4dd; --border-firm: #ec93be;
+  --ink: #c22a7e; --ink-soft: #fbdbe9;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(194,42,126,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="kawaii"] {
+  --ground: #fff0f7; --surface: #fff; --surface-2: #fde0ee;
+  --text: #6b2150; --muted: #a05a85; --faint: #c995b3;
+  --border: #f9cde4; --border-firm: #f3a4cc;
+  --ink: #d64295; --ink-soft: #fde0ee;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(214,66,149,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="alien"] {
+  --ground: #e5fbf3; --surface: #fff; --surface-2: #d2f5e8;
+  --text: #0b4a3c; --muted: #2e7d6a; --faint: #6fae9e;
+  --border: #aceed4; --border-firm: #69dcb9;
+  --ink: #0c8a6a; --ink-soft: #d2f5e8;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(12,160,122,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="musik"] {
+  --ground: #f1ecff; --surface: #fff; --surface-2: #e4dcfc;
+  --text: #2c1a63; --muted: #5848a0; --faint: #9b8ed0;
+  --border: #cfc2f5; --border-firm: #a38fe9;
+  --ink: #5d3bd6; --ink-soft: #e4dcfc;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(93,59,214,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="voxel"] {
+  --ground: #eaf8e4; --surface: #fff; --surface-2: #dff2cf;
+  --text: #2a4d12; --muted: #57803a; --faint: #8fad76;
+  --border: #c9e8b4; --border-firm: #a0d47e;
+  --ink: #4e8a1c; --ink-soft: #dff2cf;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(92,158,38,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="creature"] {
+  --ground: #fdf2e4; --surface: #fff; --surface-2: #f8e4c9;
+  --text: #5c3510; --muted: #90642e; --faint: #bd9660;
+  --border: #f2d4ac; --border-firm: #e6b275;
+  --ink: #b36a1c; --ink-soft: #f8e4c9;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(179,106,28,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="kreativ"] {
+  --ground: #fdf0ea; --surface: #fff; --surface-2: #fbdfd2;
+  --text: #5e2415; --muted: #975a42; --faint: #c28d78;
+  --border: #f6cbb8; --border-firm: #eda182;
+  --ink: #d0502a; --ink-soft: #fbdfd2;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(208,80,42,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="gaming"] {
+  --ground: #eceaff; --surface: #fff; --surface-2: #ddd9fb;
+  --text: #241d63; --muted: #4e47a0; --faint: #8f88c9;
+  --border: #c9c2f2; --border-firm: #a49ae8;
+  --ink: #5a4ad6; --ink-soft: #ddd9fb;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(90,74,214,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="anime"] {
+  --ground: #fdeef3; --surface: #fff; --surface-2: #fadbe6;
+  --text: #4a1230; --muted: #8a3a5c; --faint: #c07f98;
+  --border: #f5c2d5; --border-firm: #ec8fae;
+  --ink: #c01e55; --ink-soft: #fadbe6;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(192,30,85,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="manga"] {
+  --ground: #f2f2f5; --surface: #fff; --surface-2: #e8e8f0;
+  --text: #16161e; --muted: #4c4c60; --faint: #9494a8;
+  --border: #d8d8e2; --border-firm: #b4b4c6;
+  --ink: #d62a44; --ink-soft: #f6dfe2;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(22,22,30,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="technik"] {
+  --ground: #e8f6fb; --surface: #fff; --surface-2: #d5eef6;
+  --text: #0d3d52; --muted: #2f6d8c; --faint: #6fa0b8;
+  --border: #b3e2f0; --border-firm: #74cbdf;
+  --ink: #077f9e; --ink-soft: #d5eef6;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(8,146,184,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="engineering"] {
+  --ground: #eef0f3; --surface: #fff; --surface-2: #e2e6ec;
+  --text: #22262e; --muted: #4c5666; --faint: #8c96a8;
+  --border: #ced4de; --border-firm: #aab4c4;
+  --ink: #c2510a; --ink-soft: #f8e2d2;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(34,38,46,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="buecher"] {
+  --ground: #f8f1e5; --surface: #fff; --surface-2: #f0e4cb;
+  --text: #43301a; --muted: #6f573a; --faint: #ab9268;
+  --border: #e8d9bd; --border-firm: #d0ba8d;
+  --ink: #8a6420; --ink-soft: #f0e4cb;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(138,100,32,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="reisen"] {
+  --ground: #e6f6fd; --surface: #fff; --surface-2: #d2ecfa;
+  --text: #0c3d5c; --muted: #2f6f94; --faint: #6fa5c2;
+  --border: #b0def2; --border-firm: #6fc4e8;
+  --ink: #0e7ba8; --ink-soft: #d2ecfa;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(14,134,184,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="foto"] {
+  --ground: #eef0f4; --surface: #fff; --surface-2: #dfe3ee;
+  --text: #232733; --muted: #4d5468; --faint: #8c93a8;
+  --border: #cfd4e0; --border-firm: #a8b0c6;
+  --ink: #3f4a6b; --ink-soft: #dfe3ee;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(35,39,51,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="architektur"] {
+  --ground: #f2f1ee; --surface: #fff; --surface-2: #e6e3da;
+  --text: #2b2a26; --muted: #5c594f; --faint: #9a968a;
+  --border: #d8d4ca; --border-firm: #b6b0a0;
+  --ink: #4d5a68; --ink-soft: #e0e5ea;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(43,42,38,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="interior"] {
+  --ground: #f7f0e9; --surface: #fff; --surface-2: #eee0d0;
+  --text: #40342a; --muted: #6f5c4c; --faint: #ab9784;
+  --border: #e6d5c4; --border-firm: #cbb296;
+  --ink: #96684a; --ink-soft: #eee0d0;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(150,104,74,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="film"] {
+  --ground: #fbeff2; --surface: #fff; --surface-2: #f6dde4;
+  --text: #5a1f33; --muted: #8d4357; --faint: #bd8a99;
+  --border: #f0c3cf; --border-firm: #dd97ab;
+  --ink: #c2305a; --ink-soft: #f6dde4;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(194,48,90,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="fitness"] {
+  --ground: #ecfbe8; --surface: #fff; --surface-2: #d9f4c6;
+  --text: #1d4a10; --muted: #407a28; --faint: #7fb066;
+  --border: #bfeaa8; --border-firm: #8ed66c;
+  --ink: #3e9e14; --ink-soft: #d9f4c6;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(62,158,20,.25);
+  color-scheme: light;
+}
+:root[data-theme-family="abenteuer"] {
+  --ground: #e5f6ef; --surface: #fff; --surface-2: #d2efe3;
+  --text: #10423a; --muted: #2e7566; --faint: #6fa897;
+  --border: #abe4d2; --border-firm: #6bcbad;
+  --ink: #0f8a68; --ink-soft: #d2efe3;
+  --shadow-clay: 0 3px 0 var(--border-firm), 0 10px 20px -8px rgba(15,138,104,.25);
+  color-scheme: light;
+}
+
+/* --- 3. Kopf-Picker ----------------------------------------------------------
+   Ein kleiner Tab rechts in den Kopf-Werkzeugen; das Popover darunter ist
+   bewusst kompakt: 10 Kacheln in zwei Spalten, mehr nie gleichzeitig. */
+
+.theme-picker { position: relative; flex: none; }
+.theme-picker > summary { list-style: none; }
+.theme-picker > summary::-webkit-details-marker { display: none; }
+.theme-tab {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .3rem .7rem; min-height: 32px;
+  border: 2px solid var(--border-firm); border-radius: 999px;
+  background: var(--surface-2); color: var(--muted);
+  font: 700 .8rem/1 inherit; cursor: pointer;
+  transition: background 150ms ease-out, color 150ms ease-out;
+}
+.theme-tab svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.theme-tab:hover { background: var(--ink-soft); color: var(--ink); }
+.theme-picker[open] .theme-tab { background: var(--ink); border-color: var(--ink); color: #fff; }
+.theme-tab:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+.theme-pop {
+  position: absolute; right: 0; top: calc(100% + .5rem); z-index: 60;
+  width: min(22rem, calc(100vw - 1.5rem));
+  padding: .9rem;
+  background: var(--surface); color: var(--text);
+  border: 3px solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-clay), 0 18px 40px -18px rgba(0,0,0,.35);
+}
+.theme-pop-titel {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 0 0 .6rem; font-weight: 800; font-size: .95rem; color: var(--text);
+}
+.theme-klasse-label {
+  font-size: .72rem; font-weight: 700; color: var(--muted);
+  background: var(--ink-soft); padding: .15rem .55rem; border-radius: 999px;
+}
+
+/* Genau zwei Spalten auf dem Desktop — die Zahl steht in --spalten aus
+   config.themes.desktop_columns; die Spalten selbst tragen keine Bedeutung. */
+.theme-grid {
+  display: grid; gap: .5rem;
+  grid-template-columns: repeat(var(--spalten, 2), minmax(0, 1fr));
+}
+.theme-tile { margin: 0; }
+.theme-tile-btn {
+  position: relative; display: grid; width: 100%; min-height: 0;
+  grid-template-columns: 2.1rem minmax(0, 1fr); grid-template-rows: auto auto;
+  column-gap: .5rem; align-items: center;
+  padding: .5rem .6rem; text-align: left;
+  background: var(--surface-2); color: var(--text);
+  border: 2px solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: none; font: inherit; cursor: pointer;
+}
+.theme-tile-btn:hover { transform: none; border-color: var(--border-firm); background: var(--ink-soft); }
+.theme-tile-btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 1px; }
+.theme-emoji {
+  grid-row: 1 / 3; display: grid; place-items: center;
+  width: 2.1rem; height: 2.1rem; border-radius: 30%;
+  font-size: 1.15rem;
+  background: linear-gradient(135deg, var(--ta, var(--ink-soft)), var(--tb, var(--border)));
+}
+.theme-name { font-size: .85rem; font-weight: 800; line-height: 1.2; color: var(--text); }
+.theme-tags { font-size: .68rem; font-weight: 600; color: var(--muted); line-height: 1.3; }
+.theme-check {
+  position: absolute; top: -.35rem; right: -.35rem;
+  display: none; place-items: center; width: 1.15rem; height: 1.15rem;
+  border-radius: 50%; background: var(--ok); color: #fff;
+  font-size: .7rem; font-weight: 800;
+}
+.theme-tile.aktiv .theme-tile-btn { border-color: var(--ink); background: var(--ink-soft); }
+.theme-tile.aktiv .theme-check { display: grid; }
+.theme-tile.aktiv .theme-tile-btn .sr { display: inline; }
+.theme-tile .sr { display: none; }
+
+.theme-reset { margin: .6rem 0 0; text-align: center; }
+.theme-reset button {
+  min-height: 0; padding: .2rem .6rem; border: 0; box-shadow: none;
+  background: none; color: var(--faint); font-size: .72rem; font-weight: 700;
+}
+.theme-reset button:hover { transform: none; color: var(--ink); text-decoration: underline; }
+
+.theme-entdecken { margin-top: .6rem; padding-top: .6rem; border-top: 1px solid var(--border); }
+.theme-mehr-label { margin: 0 0 .35rem; font-size: .68rem; font-weight: 800;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.theme-klassen { display: flex; gap: .35rem; flex-wrap: wrap; }
+.theme-klasse {
+  display: grid; place-items: center; width: 1.9rem; height: 1.9rem;
+  min-height: 0; padding: 0; border-radius: 50%;
+  border: 2px solid var(--border-firm); background: var(--surface);
+  color: var(--muted); font-size: .78rem; font-weight: 800; box-shadow: none;
+}
+.theme-klasse:hover { transform: none; background: var(--ink-soft); color: var(--ink); }
+.theme-klasse.aktiv { background: var(--ink); border-color: var(--ink); color: #fff; }
+.theme-klasse.eigen:not(.aktiv) { border-color: var(--ink); color: var(--ink); }
+.theme-klasse:focus-visible { outline: 3px solid var(--ink); outline-offset: 1px; }
+
+.theme-fehler { margin: .4rem 0 0; color: var(--bad); font-size: .75rem; font-weight: 700; }
+
+/* Mobile: das Popover wird zum unteren Blatt und bleibt komplett im Bild.
+   Der Tab zeigt nur noch das Icon — die Kopf-Werkzeuge duerfen die Seite
+   nie breiter machen als den Bildschirm. */
+@media (max-width: 560px) {
+  .theme-tab { padding-inline: .5rem; }
+  .theme-tab span { display: none; }
+}
+@media (max-width: 480px) {
+  .theme-pop {
+    position: fixed; left: .5rem; right: .5rem; top: auto; bottom: .5rem;
+    width: auto; max-height: 70vh; overflow-y: auto;
+  }
+}

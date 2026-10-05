@@ -509,3 +509,17 @@ CREATE TABLE IF NOT EXISTS material_seite (
     UNIQUE (paket_id, position)
 );
 CREATE INDEX IF NOT EXISTS idx_material_seite_paket ON material_seite(paket_id, position);
+
+-- ==========================================================================
+-- Oberflaechen-Einstellungen des Kindes
+-- ==========================================================================
+-- Schluessel/Wert-Speicher fuer Dinge, die rein die Darstellung betreffen:
+-- aktuell die gewaehlte Design-Welt (`theme_id`) und die Merkliste der
+-- letzten Wahlen (`theme_picks`, JSON-Array) fuer die Interessen-Sortierung.
+-- Kein Lernstand, keine Bewertung — die Tabelle darf geleert werden, ohne
+-- dass etwas verloren geht.
+CREATE TABLE IF NOT EXISTS ui_pref (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);

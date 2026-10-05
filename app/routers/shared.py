@@ -86,7 +86,7 @@ templates.env.filters["klartext"] = klartext
 try:
     ASSET_VERSION = str(max(
         (BASE / "static" / name).stat().st_mtime_ns
-        for name in ("karo.css", "simple.css", "simple.js", "drafts.js", "setup.js", "storage.js", "areas.css", "themes.js", "begleiter.js", "meine-welt.css", "meine-welt.js", "lernzeit.js", "fonts.css")
+        for name in ("karo.css", "simple.css", "simple.js", "drafts.js", "setup.js", "storage.js", "areas.css", "themes.js", "themes.css", "theme-picker.js", "begleiter.js", "meine-welt.css", "meine-welt.js", "lernzeit.js", "fonts.css")
     ))
 except OSError:
     ASSET_VERSION = "0"
@@ -161,6 +161,15 @@ def render(request: Request, name: str, status_code: int = 200,
             and quiz.get("state") in ("beantwortet", "ausgewertet")):
         basis["adult_page"] = True
     basis["ui_area"] = "parent" if basis["adult_page"] else "child"
+    # Design-Themes: reine Oberflaechen-Personalisierung des Kinderbereichs.
+    # `oberflaeche` liefert das aktive Theme am <html>-Element und den Inhalt
+    # des kleinen Kopf-Pickers. Ein Fehler hier darf nie eine Seite verhindern.
+    if basis["ui_area"] == "child":
+        try:
+            from .. import themes as design_themes
+            basis.update(design_themes.oberflaeche(cfg))
+        except Exception:  # noqa: BLE001
+            log.warning("Theme-Kontext nicht verfuegbar", exc_info=True)
     # Eltern sehen den Kinderbereich, aendern ihn aber nicht (Gate in main.py).
     # Die Oberflaeche sagt das vorher, statt den Knopf ins Leere laufen zu
     # lassen — und zeigt den Weg: den Kind-Modus.

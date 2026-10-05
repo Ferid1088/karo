@@ -27,8 +27,8 @@ from starlette.status import HTTP_303_SEE_OTHER
 from . import config, db, jobs, security
 from .config import ConfigUnreadable
 from .routers import (adaptiv, auth, eltern, kind, admin, dashboard,
-                      lernmaterial, lernzyklus, themenblatt, vorbereitung,
-                      messung, post)
+                      lernmaterial, lernzyklus, themenblatt, themes,
+                      vorbereitung, messung, post)
 from .woche import router as woche
 from .welten import router as welten
 from .observability import logging as obs_logging
@@ -65,7 +65,8 @@ VALID_ROLES = frozenset({"parent", "child"})
 # wird hier zentral erzwungen, nicht nur durch ausgeblendete Menuepunkte.
 CHILD_ALLOWED_EXACT = frozenset({"/", "/hilfe", "/lernstand", "/profilbild"})
 CHILD_ALLOWED_PREFIXES = ("/lernen", "/lernzyklus", "/quiz", "/material",
-                          "/klassenarbeit/material", "/woche", "/welten", "/post")
+                          "/klassenarbeit/material", "/woche", "/welten", "/post",
+                          "/themes")
 
 # Die Freigabe bleibt Elternsache, bis Eltern sie in den Einstellungen
 # ausdruecklich auch fuer das Kind aktivieren. Gilt fuer beide Routenfamilien.
@@ -188,6 +189,7 @@ app.include_router(admin.router)
 app.include_router(vorbereitung.router)
 app.include_router(messung.router)
 app.include_router(post.router)
+app.include_router(themes.router)
 # „Meine Woche“ verwendet die bestehende Anmeldung; Schema in db.init().
 app.include_router(woche.router)
 app.include_router(welten.router)

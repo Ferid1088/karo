@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de" data-ui-area="{{ ui_area|default('child') }}" data-theme-color="{{ 'karo' if ui_area == 'parent' else 'lila' }}">
+<html lang="de" data-ui-area="{{ ui_area|default('child') }}" data-theme-color="{{ 'karo' if ui_area == 'parent' else 'lila' }}"{% if theme_family|default('') %} data-theme-family="{{ theme_family }}" data-theme-band="{{ theme_band }}" data-theme-id="{{ theme_id }}"{% endif %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,6 +18,9 @@
   <link rel="stylesheet" href="/static/nav-icons.css?v={{ asset_version|default('0') }}">
   {% if learning_ui|default(false) %}<link rel="stylesheet" href="/static/learning.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/session.css?v={{ asset_version|default('0') }}">{% elif exam_ui|default(false) %}<link rel="stylesheet" href="/static/session.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/exam.css?v={{ asset_version|default('0') }}"><link rel="stylesheet" href="/static/exam-detail.css?v={{ asset_version|default('0') }}-journeys3"><link rel="stylesheet" href="/static/exam-overview-calendar.css?v={{ asset_version|default('0') }}-2">{% endif %}
   {% if world_page|default(false) %}<link rel="stylesheet" href="/static/meine-welt.css?v={{ asset_version|default('0') }}">{% endif %}
+  {# Design-Welten nur im Kinderbereich: Token-Bloecke je Familie und der
+     kleine Picker in der Kopfzeile. #}
+  {% if ui_area|default('child') == 'child' %}<link rel="stylesheet" href="/static/themes.css?v={{ asset_version|default('0') }}"><script src="/static/theme-picker.js?v={{ asset_version|default('0') }}" defer></script>{% endif %}
   {% block page_styles %}{% endblock %}
   <script src="/static/simple.js?v={{ asset_version|default('0') }}" defer></script>
   <script src="/static/drafts.js?v={{ asset_version|default('0') }}" defer></script>
@@ -100,6 +103,7 @@
       <button type="button" data-modus="auto" aria-pressed="true" aria-label="Automatisch wie das Gerät" title="Automatisch (wie das Gerät)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path class="halb" d="M12 4a8 8 0 0 1 0 16Z"/></svg></button>
       <button type="button" data-modus="dunkel" aria-pressed="false" aria-label="Dunkel" title="Dunkel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.2A8 8 0 0 1 9.8 4a8 8 0 1 0 10.2 10.2Z"/></svg></button>
     </div>{% endif %}
+    {% if theme_picker|default(None) %}{% include '_theme_picker.html' %}{% endif %}
     {% if not adult_page and request.session.get("auth") %}<a class="kopf-post{{ ' hat-neue' if post_neu_anzahl }}" href="/post" aria-label="Post von zu Hause{{ ', ' ~ post_neu_anzahl ~ ' neu' if post_neu_anzahl }}" title="Post von zu Hause"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m4 7.5 8 6 8-6"/></svg>{% if post_neu_anzahl %}<span class="kopf-post-zahl">{{ post_neu_anzahl }}</span>{% endif %}</a>{% endif %}
     <a class="kopf-hilfe" href="/hilfe" title="{{ 'Hilfe & Anleitung' if adult_page else 'Brauchst du Hilfe?' }}" aria-label="{{ 'Hilfe & Anleitung' if adult_page else 'Brauchst du Hilfe?' }}">?</a>
     {% if request.session.get('auth') %}<form method="post" action="/logout" class="kopf-abmelden" data-logout>{{ csrf_input() }}<button type="submit" class="linklike">Abmelden</button></form>{% endif %}
