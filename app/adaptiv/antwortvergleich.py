@@ -282,15 +282,33 @@ def _treffer_stelle(begriff: str, text: str):
 _NEGATIONEN = ("kein", "keine", "keinen", "keiner", "keinem", "keines",
                "nicht", "ohne", "nie", "niemals", "weder")
 
+#: Wortmarke fuer Satzgrenzen — „satzgrenze" ueberlebt die
+#: Normalisierung, wo ein Kommt schon weg ist. Eine Verneinung wirkt
+#: nur im eigenen Teilsatz: „kann nicht leben, Leben braucht viele
+#: Zellen" verneint „leben", nicht „braucht viele Zellen" — die
+#: Fehlvorstellung bliebe sonst hinter dem Rueckblick unsichtbar.
+_SATZGRENZE = "satzgrenze"
+_TRENNER = re.compile(r"[,;.!?…:—–()\n]")
+
+
+def _satzgrenzen(text: str) -> str:
+    """Trennzeichen vor der Normalisierung zur Wortmarke machen."""
+    return _TRENNER.sub(f" {_SATZGRENZE} ", text)
+
 
 def _negiert(text: str, position: int) -> bool:
     """Steht eine Negation kurz vor dem Treffer? Drei Worte Rueckblick
     reichen fuer „keinen Sauerstoff", „ohne Sauerstoff" und
     „braucht nie Sauerstoff". Eine verneinte Nennung ist kein Beleg
     dafuer, dass das Kind den Begriff fachlich verwendet hat — der
-    Treffer zaehlt dann nicht."""
-    vorn = text[:position].split()
-    return bool(vorn) and any(w in _NEGATIONEN for w in vorn[-3:])
+    Treffer zaehlt dann nicht. Der Rueckblick endet an der letzten
+    Satzgrenze: eine Verneinung im anderen Teilsatz gilt hier nicht."""
+    vorn = text[:position]
+    grenze = vorn.rfind(_SATZGRENZE)
+    if grenze != -1:
+        vorn = vorn[grenze + len(_SATZGRENZE):]
+    woerter = vorn.split()
+    return bool(woerter) and any(w in _NEGATIONEN for w in woerter[-3:])
 
 
 def _wort_treffer(begriff: str, text: str) -> bool:
@@ -329,11 +347,12 @@ def _rubrik_bewerten(antwort: str, rubrik: dict) -> dict:
             gruppen.append([str(eintrag).strip()])
     if not gruppen:
         return {"urteil": FALSCH, "fehlende": [], "hinweis": None}
-    text = normalisiere_thema(antwort)
+    text = normalisiere_thema(_satzgrenzen(antwort))
     hinweise = rubrik.get("hinweise") or {}
 
     for fehl in (rubrik.get("missverstaendnisse") or []):
-        varianten = [normalisiere_thema(b) for b in (fehl.get("begriffe") or [])]
+        varianten = [normalisiere_thema(_satzgrenzen(b))
+                     for b in (fehl.get("begriffe") or [])]
         if any(v and _wort_treffer(v, text) for v in varianten):
             return {"urteil": FALSCH, "fehlende": [],
                     "missverstaendnis": fehl.get("key") or None,
@@ -342,7 +361,8 @@ def _rubrik_bewerten(antwort: str, rubrik: dict) -> dict:
                                or hinweise.get("fehlt")}
 
     fehlende = [varianten[0] for varianten in gruppen
-                if not any(_wort_treffer(normalisiere_thema(w), text)
+                if not any(_wort_treffer(normalisiere_thema(_satzgrenzen(w)),
+                                         text)
                            for w in varianten)]
     gefunden = len(gruppen) - len(fehlende)
     schwelle = int(rubrik.get("mindestens") or len(gruppen))

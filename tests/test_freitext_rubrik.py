@@ -305,6 +305,20 @@ def test_alles_negiert_ist_unbekannt_statt_richtig():
     assert befund["urteil"] == UNBEKANNT
 
 
+def test_negation_im_anderen_teilsatz_verneint_nicht():
+    """„kann nicht leben, Leben braucht viele Zellen" — das „nicht" steht
+    im anderen Teilsatz und verneint „braucht viele Zellen" nicht. Ohne
+    Satzgrenze frass der Drei-Worte-Rueckblick die Fehlvorstellung weg
+    und die Antwort landete bei „unbekannt"."""
+    rubrik = {"begriffe": [["lebendig"], ["nahrung"], ["teilt"], ["energie"]],
+              "missverstaendnisse": [{"begriffe": ["braucht viele zellen"],
+                                      "key": "F_ZELLE_TOT"}]}
+    befund = bewerte("Eine einzelne Zelle kann nicht leben, Leben braucht "
+                     "viele Zellen.", "", "begriffe", rubrik)
+    assert befund["urteil"] == FALSCH
+    assert befund["missverstaendnis"] == "F_ZELLE_TOT"
+
+
 @pytest.mark.parametrize("antwort", [
     "Der Kraftstoff ist wichtig.",          # „kraftstoff" ≠ „kraft"
     "Das Atommodell hilft beim Denken.",    # „atommodell" ≠ „atom"
